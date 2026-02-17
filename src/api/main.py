@@ -27,6 +27,27 @@ def health():
     return {"status": "ok", "service": "presence_ia", "version": "1.0.0"}
 
 
+@app.get("/", response_class=HTMLResponse)
+def root():
+    return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><title>PRESENCE_IA</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.c{text-align:center;max-width:560px;padding:40px 20px}
+h1{font-size:2.2rem;color:#fff;margin-bottom:12px}h1 span{color:#e94560}
+p{color:#aaa;margin-bottom:32px;font-size:1.1rem}
+.btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn{padding:12px 28px;border-radius:6px;font-weight:bold;text-decoration:none;font-size:1rem}
+.btn-primary{background:#e94560;color:#fff}.btn-secondary{background:#1a1a2e;color:#e8e8f0;border:1px solid #2a2a4e}
+</style></head><body><div class="c">
+<h1>PRESENCE <span>IA</span></h1>
+<p>Pipeline d'audit de visibilité IA pour artisans locaux.</p>
+<div class="btns">
+  <a href="/docs" class="btn btn-primary">API Docs</a>
+  <a href="/health" class="btn btn-secondary">Health</a>
+</div>
+</div></body></html>""")
+
+
 # ── Routes ──
 from .routes import campaign, ia_test, scoring, generate, admin, pipeline
 
