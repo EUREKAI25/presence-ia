@@ -1,5 +1,5 @@
 """
-REF_IA — FastAPI app
+PRESENCE_IA — FastAPI app
 Démarrer : uvicorn src.api.main:app --reload --port 8001
 """
 import logging, os
@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s")
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="REF_IA — Référencement IA", version="1.0.0", docs_url="/docs")
+app = FastAPI(title="PRESENCE_IA — Référencement IA", version="1.0.0", docs_url="/docs")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -24,7 +24,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ref_ia", "version": "1.0.0"}
+    return {"status": "ok", "service": "presence_ia", "version": "1.0.0"}
 
 
 # ── Routes ──

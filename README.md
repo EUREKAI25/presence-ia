@@ -1,4 +1,4 @@
-# REF_IA — Pipeline Prospection IA
+# PRESENCE_IA — Pipeline Prospection IA
 
 > Audit de visibilité IA pour artisans locaux — pipeline B2B complet sans envoi auto.
 
@@ -123,7 +123,7 @@ tests/          # pytest
 | `OPENAI_API_KEY` | Clé OpenAI (gpt-4o-mini) |
 | `ANTHROPIC_API_KEY` | Clé Anthropic (claude-haiku) |
 | `GEMINI_API_KEY` | Clé Google (gemini-1.5-flash) |
-| `PROSPECTING_DB_PATH` | Chemin SQLite (défaut: `./data/ref_ia.db`) |
+| `PROSPECTING_DB_PATH` | Chemin SQLite (défaut: `./data/presence_ia.db`) |
 | `ADMIN_TOKEN` | Token protection admin UI |
 | `BASE_URL` | URL publique pour landing pages |
 | `SENDER_SIGNATURE` | Nom expéditeur emails |

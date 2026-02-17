@@ -1,12 +1,12 @@
-# REF_IA — Suivi
+# PRESENCE_IA — Suivi
 
 **Statut** : ✅ MVP livré — pipeline complet opérationnel
 **Créé** : 2026-02-12
 **Dernière MAJ** : 2026-02-17
 **Pipeline** : BRIEF ✅ → CDC ✅ → DEV ✅ → TESTS ✅ → GITHUB ✅
 
-**GitHub** : https://github.com/EUREKAI25/ref-ia
-**Local** : `/Users/nathalie/Dropbox/____BIG_BOFF___/PROJETS/PRO/REF_IA/`
+**GitHub** : https://github.com/EUREKAI25/presence-ia
+**Local** : `/Users/nathalie/Dropbox/____BIG_BOFF___/PROJETS/PRO/PRESENCE_IA/`
 **Port** : 8001 (API FastAPI)
 **Swagger** : http://localhost:8001/docs
 **Admin** : http://localhost:8001/admin?token=ADMIN_TOKEN
@@ -54,7 +54,7 @@ SCAN → TEST (multi-IA) → SCORE (EMAIL_OK) → GENERATE → QUEUE → ASSETS 
   - Routes API : campaign, ia_test, scoring, generate, pipeline, admin
   - Tests pytest : test_scoring (9 cas), test_ia_extract (12 cas)
   - README.md complet avec quickstart 10 lignes
-  - GitHub : https://github.com/EUREKAI25/ref-ia
+  - GitHub : https://github.com/EUREKAI25/presence-ia
   - .env → symlink `/Users/nathalie/.bigboff/secrets.env`
 
 ## Prochaines étapes

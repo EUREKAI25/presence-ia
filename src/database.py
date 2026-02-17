@@ -11,7 +11,7 @@ from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-DB_PATH      = os.getenv("DB_PATH", str(DATA_DIR / "ref_ia.db"))
+DB_PATH      = os.getenv("DB_PATH", str(DATA_DIR / "presence_ia.db"))
 ENGINE       = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
 

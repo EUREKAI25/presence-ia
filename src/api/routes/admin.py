@@ -43,14 +43,14 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         </tr>"""
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><title>REF_IA — Admin</title>
+<meta charset="UTF-8"><title>PRESENCE_IA — Admin</title>
 <style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
 h1{{color:#e94560;margin-bottom:20px}}
 table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
 th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
 td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}
 .badge{{display:inline-block;background:#e94560;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px}}</style></head>
-<body><h1>REF_IA — Pipeline Admin</h1>
+<body><h1>PRESENCE_IA — Pipeline Admin</h1>
 <table><tr><th>ID</th><th>Profession</th><th>Ville</th><th>Prospects</th><th>Éligibles</th><th>Statuts</th></tr>
 {rows or '<tr><td colspan=6 style="color:#666;text-align:center">Aucune campagne</td></tr>'}
 </table>

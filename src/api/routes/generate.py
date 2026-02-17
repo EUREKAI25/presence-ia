@@ -100,5 +100,5 @@ footer{{background:#0a0a15;padding:24px;text-align:center;color:#555;font-size:1
 <ul><li>Tout inclus</li><li>Rédaction contenus</li><li>Citations locales</li><li>Garantie 6 mois</li></ul>
 <a href="#contact" class="btn">Me contacter</a></div></div>
 <p style="text-align:center;color:#666;font-size:13px;margin-top:16px">Pas d'appel requis.</p></div></section>
-<footer>Les réponses IA peuvent varier ; résultats basés sur tests répétés horodatés ({", ".join(s["dates"])}).<br>© REF_IA</footer>
+<footer>Les réponses IA peuvent varier ; résultats basés sur tests répétés horodatés ({", ".join(s["dates"])}).<br>© PRESENCE_IA</footer>
 </body></html>""")

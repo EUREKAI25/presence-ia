@@ -18,7 +18,7 @@ SQ_DIR.mkdir(exist_ok=True)
 DIST_DIR.mkdir(exist_ok=True)
 
 BASE_URL  = os.getenv("BASE_URL", "http://localhost:8000")
-SIGNATURE = os.getenv("SENDER_SIGNATURE", "L'équipe REF_IA")
+SIGNATURE = os.getenv("SENDER_SIGNATURE", "L'équipe PRESENCE_IA")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ def audit_generate(db: Session, p: ProspectDB) -> str:
     )
     citems = "".join(f"<li>{c}</li>" for c in comps) or "<li>—</li>"
     html = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-<title>Audit REF_IA — {p.name}</title>
+<title>Audit PRESENCE_IA — {p.name}</title>
 <style>body{{font-family:Arial,sans-serif;max-width:860px;margin:40px auto;color:#222}}
 h1{{border-bottom:3px solid #e94560;padding-bottom:10px}}h2{{margin-top:40px;color:#1a1a2e}}
 .score{{background:#f0f4ff;border-left:5px solid #e94560;padding:20px 30px;margin:20px 0}}
@@ -66,7 +66,7 @@ td{{padding:9px;border-bottom:1px solid #eee}}.cited{{color:#2ecc71;font-weight:
 .ncited{{color:#e74c3c;font-weight:bold}}
 .plan{{background:#fffbea;border:1px solid #f1c40f;padding:20px;margin-top:30px;border-radius:6px}}
 .plan li{{margin:8px 0}}.plan li::before{{content:"☑ ";color:#2ecc71}}</style></head><body>
-<h1>🤖 Audit REF_IA — Visibilité IA</h1>
+<h1>🤖 Audit PRESENCE_IA — Visibilité IA</h1>
 <p><b>Entreprise :</b> {p.name} | <b>Ville :</b> {p.city} | <b>Secteur :</b> {p.profession}<br>
 <b>Date :</b> {datetime.utcnow().strftime("%d/%m/%Y")} | <b>Runs :</b> {s['runs']} sur {", ".join(s['models']) or "—"}</p>
 <div class="score"><div>Score de visibilité IA</div><div><b>{score}</b>/10</div>
@@ -85,7 +85,7 @@ td{{padding:9px;border-bottom:1px solid #eee}}.cited{{color:#2ecc71;font-weight:
 <li>1 article presse locale ou interview = signal fort pour LLMs</li>
 </ul><p><em>Délai estimé : 2-4 mois pour apparaître dans les réponses IA.</em></p></div>
 <footer style="margin-top:60px;color:#888;font-size:12px;border-top:1px solid #ddd;padding-top:20px">
-© REF_IA — Les réponses IA peuvent varier ; résultats basés sur tests répétés horodatés.</footer>
+© PRESENCE_IA — Les réponses IA peuvent varier ; résultats basés sur tests répétés horodatés.</footer>
 </body></html>"""
     out = DIST_DIR / p.prospect_id; out.mkdir(parents=True, exist_ok=True)
     (out / "audit.html").write_text(html, encoding="utf-8")
