@@ -33,7 +33,8 @@ SCAN → TEST → SCORE → GENERATE → QUEUE
 
 | Étape | Endpoint | Description |
 |-------|----------|-------------|
-| **SCAN** | `POST /api/prospect-scan` | Crée les prospects (CSV ou JSON) |
+| **SCAN auto** | `POST /api/prospect-scan/auto` | Récupère automatiquement les artisans via Google Places API |
+| **SCAN manuel** | `POST /api/prospect-scan` | Crée les prospects (CSV ou JSON) |
 | **TEST** | `POST /api/ia-test/run` | Lance les tests multi-IA (OpenAI/Anthropic/Gemini) |
 | **SCORE** | `POST /api/scoring/run` | Calcule éligibilité EMAIL_OK + score /10 |
 | **GENERATE** | `POST /api/generate/campaign` | Génère audit HTML + email + script vidéo |
@@ -48,7 +49,13 @@ SCAN → TEST → SCORE → GENERATE → QUEUE
 ## Curl exemples (ordre pipeline)
 
 ```bash
-# --- SCAN ---
+# --- SCAN AUTO (Google Places) ---
+curl -X POST http://localhost:8001/api/prospect-scan/auto \
+  -H "Content-Type: application/json" \
+  -d '{"city":"Rennes","profession":"couvreur","max_prospects":30}'
+# → {"campaign_id":"...","created":18,"skipped":12,"source":"google_places","prospects":[...]}
+
+# --- SCAN MANUEL (CSV ou JSON) ---
 curl -X POST http://localhost:8001/api/prospect-scan \
   -H "Content-Type: application/json" \
   -d '{"city":"Paris","profession":"plombier","max_prospects":10}'
@@ -124,6 +131,7 @@ tests/          # pytest
 
 | Variable | Description |
 |----------|-------------|
+| `GOOGLE_MAPS_API_KEY` | Clé Google Places API (pour `/api/prospect-scan/auto`) |
 | `OPENAI_API_KEY` | Clé OpenAI (gpt-4o-mini) |
 | `ANTHROPIC_API_KEY` | Clé Anthropic (claude-haiku) |
 | `GEMINI_API_KEY` | Clé Google (gemini-1.5-flash) |

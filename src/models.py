@@ -159,6 +159,14 @@ class AssetsInput(BaseModel):
     screenshot_url: str
 
 
+class AutoScanInput(BaseModel):
+    """Scan automatique via Google Places API."""
+    city:          str
+    profession:    str
+    max_prospects: int          = 30
+    campaign_id:   Optional[str] = None
+
+
 class PipelineRunInput(BaseModel):
     """Runner unique : SCAN → TEST → SCORE → GENERATE → QUEUE"""
     city:             str
