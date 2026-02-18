@@ -12,6 +12,25 @@ from ...models import ProspectStatus, ProspectDB
 
 router = APIRouter(tags=["Admin"])
 
+
+def _admin_nav(token: str) -> str:
+    tabs = [
+        ("contacts", "👥 Contacts"),
+        ("offers", "💶 Offres"),
+        ("analytics", "📊 Analytics"),
+        ("evidence", "📸 Preuves"),
+        ("send-queue", "📤 Envoi"),
+    ]
+    links = "".join(
+        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;font-size:13px;color:#fff">{label}</a>'
+        for t, label in tabs
+    )
+    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
+  {links}
+</div>'''
+
+
 def _check_token(request: Request):
     token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
@@ -43,22 +62,27 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             <td style="font-size:11px;color:#aaa">{', '.join(f'{k}:{v}' for k,v in counts.items())}</td>
         </tr>"""
 
+    token = _admin_token()
+    nav = _admin_nav(token)
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>PRESENCE_IA — Admin</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
-h1{{color:#e94560;margin-bottom:20px}}
+<style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;margin:0}}
+h1{{color:#e94560;margin-bottom:20px;font-size:18px}}
 table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
 th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
 td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}
 .badge{{display:inline-block;background:#e94560;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px}}</style></head>
-<body><h1>PRESENCE_IA — Pipeline Admin</h1>
+<body>
+{nav}
+<div style="padding:24px">
+<h1>Pipeline — Campagnes</h1>
 <table><tr><th>ID</th><th>Profession</th><th>Ville</th><th>Prospects</th><th>Éligibles</th><th>Statuts</th></tr>
 {rows or '<tr><td colspan=6 style="color:#666;text-align:center">Aucune campagne</td></tr>'}
 </table>
 <p style="margin-top:16px;color:#666;font-size:12px">
-  <a href="/docs?token={_admin_token()}">→ Swagger docs</a> &nbsp;|&nbsp;
-  <a href="/admin/scheduler?token={_admin_token()}">→ Scheduler status</a>
-</p></body></html>""")
+  <a href="/docs">→ Swagger docs</a> &nbsp;|&nbsp;
+  <a href="/admin/scheduler?token={token}">→ Scheduler status</a>
+</p></div></body></html>""")
 
 
 # ── Détail campagne ────────────────────────────────────────────────────────

@@ -270,7 +270,7 @@ footer a{color:#666}
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -282,3 +282,6 @@ app.include_router(jobs.router)
 app.include_router(upload.router)
 app.include_router(evidence.router)
 app.include_router(stripe_routes.router)
+app.include_router(contacts.router)
+app.include_router(offers.router)
+app.include_router(analytics.router)

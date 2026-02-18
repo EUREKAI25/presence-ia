@@ -195,6 +195,55 @@ class CityEvidenceDB(Base):
     __table_args__ = (sa.UniqueConstraint("profession", "city", name="uq_city_evidence"),)
 
 
+class ContactStatus(str, Enum):
+    SUSPECT   = "SUSPECT"
+    PROSPECT  = "PROSPECT"
+    CLIENT    = "CLIENT"
+
+
+class OfferKey(str, Enum):
+    FLASH         = "FLASH"
+    KIT           = "KIT"
+    DONE_FOR_YOU  = "DONE_FOR_YOU"
+
+
+class ContactDB(Base):
+    """Contact commercial — pipeline SUSPECT → PROSPECT → CLIENT."""
+    __tablename__ = "contacts"
+    id:                Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_name:      Mapped[str]            = mapped_column(sa.String, nullable=False)
+    email:             Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    phone:             Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    city:              Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    profession:        Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    status:            Mapped[str]            = mapped_column(sa.String, default="SUSPECT")
+    message_sent:      Mapped[bool]           = mapped_column(sa.Boolean, default=False)
+    message_read:      Mapped[bool]           = mapped_column(sa.Boolean, default=False)
+    paid:              Mapped[bool]           = mapped_column(sa.Boolean, default=False)
+    offer_selected:    Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # FLASH/KIT/DONE_FOR_YOU
+    acquisition_cost:  Mapped[Optional[float]]= mapped_column(sa.Float, nullable=True)
+    campaign_id:       Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    notes:             Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
+    date_added:        Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    date_message_sent: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    date_message_read: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    date_payment:      Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+
+
+class PricingConfigDB(Base):
+    """Offres tarifaires — éditables depuis l'admin, lues dynamiquement par la landing."""
+    __tablename__ = "pricing_config"
+    key:             Mapped[str]  = mapped_column(sa.String, primary_key=True)   # FLASH/KIT/DONE_FOR_YOU
+    title:           Mapped[str]  = mapped_column(sa.String, nullable=False)
+    price_text:      Mapped[str]  = mapped_column(sa.String, nullable=False)     # ex: "97€ une fois"
+    price_eur:       Mapped[float]= mapped_column(sa.Float, nullable=False, default=0)
+    bullets:         Mapped[str]  = mapped_column(sa.Text, default="[]")         # JSON list[str]
+    stripe_price_id: Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    highlighted:     Mapped[bool] = mapped_column(sa.Boolean, default=False)
+    active:          Mapped[bool] = mapped_column(sa.Boolean, default=True)
+    sort_order:      Mapped[int]  = mapped_column(sa.Integer, default=0)
+
+
 class JobStatus(str, Enum):
     QUEUED  = "QUEUED"
     RUNNING = "RUNNING"
