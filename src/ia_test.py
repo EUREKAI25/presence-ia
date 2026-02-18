@@ -188,7 +188,7 @@ def _anthropic(q: str) -> str:
 def _gemini(q: str) -> str:
     import google.generativeai as g
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    r = g.GenerativeModel("gemini-1.5-flash",
+    r = g.GenerativeModel("gemini-2.0-flash",
         generation_config={"temperature": TEMP, "max_output_tokens": 600}).generate_content(q)
     return r.text or ""
 
