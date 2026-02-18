@@ -3,9 +3,11 @@ PRESENCE_IA — FastAPI app
 Démarrer : uvicorn src.api.main:app --reload --port 8001
 """
 import logging, os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s")
 log = logging.getLogger(__name__)
@@ -20,6 +22,16 @@ def startup():
     from ..database import init_db
     init_db()
     log.info("DB initialisée (SQLite)")
+
+    # Montage fichiers statiques uploads (créé si absent, silencieux si permission refusée)
+    _default_uploads = str(Path(__file__).parent.parent.parent / "dist" / "uploads")
+    uploads_dir = Path(os.getenv("UPLOADS_DIR", _default_uploads))
+    try:
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        app.mount("/dist/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+        log.info("Static uploads monté sur /dist/uploads → %s", uploads_dir)
+    except Exception as e:
+        log.warning("Impossible de monter /dist/uploads : %s", e)
 
 
 @app.get("/health")
@@ -254,7 +266,7 @@ footer a{color:#666}
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -263,3 +275,4 @@ app.include_router(generate.router)
 app.include_router(admin.router)
 app.include_router(pipeline.router)
 app.include_router(jobs.router)
+app.include_router(upload.router)

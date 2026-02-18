@@ -18,6 +18,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
 
 def init_db():
     Base.metadata.create_all(bind=ENGINE)
+    # Migration colonnes ajoutées après création initiale
+    from sqlalchemy import text
+    with ENGINE.connect() as conn:
+        for col in ["email TEXT", "proof_image_url TEXT", "city_image_url TEXT"]:
+            try:
+                conn.execute(text(f"ALTER TABLE prospects ADD COLUMN {col}"))
+            except Exception:
+                pass
+        conn.commit()
 
 
 def get_db():

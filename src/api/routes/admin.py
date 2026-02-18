@@ -8,17 +8,18 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl
-from ...models import ProspectStatus
+from ...models import ProspectStatus, ProspectDB
 
 router = APIRouter(tags=["Admin"])
 
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "changeme")
-
-
 def _check_token(request: Request):
     token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
-    if token != ADMIN_TOKEN:
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Token admin invalide")
+
+
+def _admin_token() -> str:
+    return os.getenv("ADMIN_TOKEN", "changeme")
 
 
 # ── Dashboard HTML ─────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             counts[p.status] = counts.get(p.status, 0) + 1
         eligible = sum(1 for p in ps if p.eligibility_flag)
         rows += f"""<tr>
-            <td><a href="/admin/campaign/{c.campaign_id}?token={ADMIN_TOKEN}">{c.campaign_id[:8]}…</a></td>
+            <td><a href="/admin/campaign/{c.campaign_id}?token={_admin_token()}">{c.campaign_id[:8]}…</a></td>
             <td>{c.profession}</td><td>{c.city}</td>
             <td>{len(ps)}</td><td>{eligible}</td>
             <td style="font-size:11px;color:#aaa">{', '.join(f'{k}:{v}' for k,v in counts.items())}</td>
@@ -55,8 +56,8 @@ td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}
 {rows or '<tr><td colspan=6 style="color:#666;text-align:center">Aucune campagne</td></tr>'}
 </table>
 <p style="margin-top:16px;color:#666;font-size:12px">
-  <a href="/docs?token={ADMIN_TOKEN}">→ Swagger docs</a> &nbsp;|&nbsp;
-  <a href="/admin/scheduler?token={ADMIN_TOKEN}">→ Scheduler status</a>
+  <a href="/docs?token={_admin_token()}">→ Swagger docs</a> &nbsp;|&nbsp;
+  <a href="/admin/scheduler?token={_admin_token()}">→ Scheduler status</a>
 </p></body></html>""")
 
 
@@ -80,14 +81,14 @@ def admin_campaign(cid: str, request: Request, db: Session = Depends(get_db)):
     for p in ps:
         comps = ", ".join(jl(p.competitors_cited)[:3]) or "—"
         rows += f"""<tr>
-            <td><a href="/admin/prospect/{p.prospect_id}?token={ADMIN_TOKEN}">{p.name}</a></td>
+            <td><a href="/admin/prospect/{p.prospect_id}?token={_admin_token()}">{p.name}</a></td>
             <td>{p.city}</td><td>{_pill(p.status)}</td>
             <td>{"✅" if p.eligibility_flag else "—"}</td>
             <td>{p.ia_visibility_score or "—"}</td>
             <td style="font-size:11px">{comps}</td>
         </tr>"""
 
-    token = request.query_params.get("token", ADMIN_TOKEN)
+    token = request.query_params.get("token", _admin_token())
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Campagne {cid[:8]}</title>
 <style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
@@ -114,7 +115,7 @@ def admin_prospect(pid: str, request: Request, db: Session = Depends(get_db)):
     p = db_get_prospect(db, pid)
     if not p:
         raise HTTPException(404, "Prospect introuvable")
-    token = request.query_params.get("token", ADMIN_TOKEN)
+    token = request.query_params.get("token", _admin_token())
 
     assets_form = ""
     if p.status in (ProspectStatus.SCORED.value, ProspectStatus.READY_ASSETS.value):
@@ -166,6 +167,147 @@ a{{color:#e94560}}</style></head>
 </body></html>""")
 
 
+# ── Send Queue ─────────────────────────────────────────────────────────────
+
+
+@router.get("/admin/send-queue", response_class=HTMLResponse)
+def admin_send_queue(request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    token = request.query_params.get("token", _admin_token())
+
+    # Tous les prospects éligibles (SCORED, READY_ASSETS, READY_TO_SEND, SENT_MANUAL)
+    _ok_statuses = {
+        ProspectStatus.SCORED.value,
+        ProspectStatus.READY_ASSETS.value,
+        ProspectStatus.READY_TO_SEND.value,
+        ProspectStatus.SENT_MANUAL.value,
+    }
+    prospects: list[ProspectDB] = (
+        db.query(ProspectDB)
+        .filter(ProspectDB.eligibility_flag == True)
+        .filter(ProspectDB.status.in_(_ok_statuses))
+        .order_by(ProspectDB.ia_visibility_score.desc().nullslast())
+        .all()
+    )
+
+    def _check(val):
+        return "✅" if val else "❌"
+
+    def _pill(s):
+        color = {
+            "SCORED": "#3498db", "READY_ASSETS": "#9b59b6",
+            "READY_TO_SEND": "#f39c12", "SENT_MANUAL": "#27ae60",
+        }.get(s, "#666")
+        return f'<span style="background:{color};color:#fff;padding:2px 7px;border-radius:4px;font-size:11px">{s}</span>'
+
+    rows = ""
+    for p in prospects:
+        c1 = (jl(p.competitors_cited) or ["—"])[0]
+        email_cell = (
+            f'<code style="color:#2ecc71;font-size:11px">{p.email}</code>'
+            if p.email else
+            f'<button onclick="enrichEmail(\'{p.prospect_id}\')" '
+            f'style="background:#16213e;color:#aaa;border:1px solid #2a2a4e;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">'
+            f'Enrichir</button>'
+        )
+        send_btn = ""
+        if p.email and p.status != ProspectStatus.SENT_MANUAL.value:
+            send_btn = (
+                f'<button onclick="sendEmail(\'{p.prospect_id}\')" '
+                f'style="background:#e94560;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">'
+                f'Envoyer</button>'
+            )
+        rows += f"""<tr id="row-{p.prospect_id}">
+          <td><a href="/admin/prospect/{p.prospect_id}?token={token}" style="color:#e94560">{p.name}</a></td>
+          <td>{p.city}</td>
+          <td style="font-size:11px;color:#aaa">{p.profession}</td>
+          <td>{_pill(p.status)}</td>
+          <td style="text-align:center">{p.ia_visibility_score or '—'}</td>
+          <td style="font-size:11px">{c1}</td>
+          <td>{email_cell}{send_btn}</td>
+          <td style="text-align:center">
+            {_check(p.proof_image_url)}
+            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload preuve">
+              <input type="file" accept="image/*" style="display:none"
+                     onchange="uploadFile(this,'{p.prospect_id}','proof-image')">
+              📎
+            </label>
+          </td>
+          <td style="text-align:center">
+            {_check(p.city_image_url)}
+            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload photo ville">
+              <input type="file" accept="image/*" style="display:none"
+                     onchange="uploadFile(this,'{p.prospect_id}','city-image')">
+              📎
+            </label>
+          </td>
+          <td style="text-align:center">
+            {_check(p.video_url)}
+            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload vidéo">
+              <input type="file" accept="video/*" style="display:none"
+                     onchange="uploadFile(this,'{p.prospect_id}','video')">
+              📎
+            </label>
+          </td>
+        </tr>"""
+
+    js = f"""
+<script>
+const TOKEN = '{token}';
+
+async function enrichEmail(pid) {{
+  const r = await fetch(`/admin/prospect/${{pid}}/enrich-email?token=${{TOKEN}}`, {{method:'POST'}});
+  const d = await r.json();
+  location.reload();
+}}
+
+async function sendEmail(pid) {{
+  if (!confirm('Envoyer cet email via Brevo ?')) return;
+  const r = await fetch(`/admin/prospect/${{pid}}/send-email?token=${{TOKEN}}`, {{method:'POST'}});
+  const d = await r.json();
+  if (d.sent) {{ alert('✅ Email envoyé à ' + d.email); location.reload(); }}
+  else {{ alert('❌ Erreur : ' + (d.detail || JSON.stringify(d))); }}
+}}
+
+async function uploadFile(input, pid, type) {{
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  const r = await fetch(`/admin/prospect/${{pid}}/upload-${{type}}?token=${{TOKEN}}`, {{
+    method: 'POST', body: fd
+  }});
+  const d = await r.json();
+  if (d.url) {{ alert('✅ Uploadé : ' + d.url); location.reload(); }}
+  else {{ alert('❌ Erreur upload'); }}
+}}
+</script>"""
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><title>Send Queue — PRESENCE_IA</title>
+<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
+h1{{color:#e94560;margin-bottom:4px}}h2{{color:#aaa;font-size:13px;margin:0 0 20px}}
+table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
+th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:11px}}
+td{{padding:8px 10px;border-bottom:1px solid #2a2a4e;color:#ddd;vertical-align:middle}}
+a{{color:#e94560}}code{{font-size:11px}}</style></head>
+<body>
+<h1>Send Queue</h1>
+<h2>{len(prospects)} prospects éligibles</h2>
+<table>
+  <tr>
+    <th>Nom</th><th>Ville</th><th>Métier</th><th>Statut</th>
+    <th>Score</th><th>Concurrent #1</th><th>Email</th>
+    <th>Preuve</th><th>Ville img</th><th>Vidéo</th>
+  </tr>
+  {rows or '<tr><td colspan=10 style="text-align:center;color:#666;padding:20px">Aucun prospect éligible</td></tr>'}
+</table>
+<p style="margin-top:16px;color:#666;font-size:12px">
+  <a href="/admin?token={token}">← Dashboard</a> &nbsp;|&nbsp;
+  <a href="/admin/scheduler?token={token}">→ Scheduler</a>
+</p>
+{js}
+</body></html>""")
+
+
 # ── Scheduler status ───────────────────────────────────────────────────────
 
 
@@ -190,5 +332,5 @@ th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
 td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}</style></head>
 <body><h1>Scheduler — Jobs actifs</h1>
 <table><tr><th>ID</th><th>Prochain run</th><th>Trigger</th></tr>{rows}</table>
-<p style="margin-top:16px"><a href="/admin?token={request.query_params.get('token', ADMIN_TOKEN)}">← Retour</a></p>
+<p style="margin-top:16px"><a href="/admin?token={request.query_params.get('token', _admin_token())}">← Retour</a></p>
 </body></html>""")
