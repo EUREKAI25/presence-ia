@@ -214,7 +214,7 @@ _CONTENT_SEED = [
     # LANDING — HERO (génériques)
     ("landing", "hero", "title_tpl",    None, None, "À {city}, les IA recommandent vos concurrents. Pas vous."),
     ("landing", "hero", "subtitle_tpl", None, None, "{n_queries} requêtes testées sur {n_models} IA · {models}"),
-    ("landing", "hero", "cta_label",    None, None, "Recevoir mon audit complet — 97€"),
+    ("landing", "hero", "cta_label",    None, None, "Recevoir mon audit complet — {price}"),
     # LANDING — PROOF VISUAL
     ("landing", "proof_visual", "mention", None, None, "Tests effectués sur 3 jours consécutifs"),
     # LANDING — PROOF STAT

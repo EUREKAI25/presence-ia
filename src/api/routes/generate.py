@@ -69,7 +69,9 @@ def landing(t: str, db: Session = Depends(get_db)):
     pricing = db_list_pricing(db)
     landing_title = L("hero","title_tpl").replace("{city}", f'<span>{p.city}</span>').replace("{profession}", p.profession or "")
     landing_sub   = L("hero","subtitle_tpl").replace("{n_queries}", str(n_queries)).replace("{n_models}", str(len(s["models"]))).replace("{models}", models_str)
-    landing_cta   = L("hero","cta_label")
+    flash = next((o for o in pricing if o.key == "FLASH"), None)
+    flash_price   = flash.price_text if flash else "97€"
+    landing_cta   = L("hero","cta_label").replace("{price}", flash_price)
     landing_faq_html = "".join(
         f'<div class="faq-item"><h3 style="color:#fff;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>'
         for i in range(1, 5)
