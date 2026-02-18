@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from ...database import get_db, db_get_campaign, db_get_prospect, db_get_by_token, db_get_evidence, jl
+from ...database import get_db, db_get_campaign, db_get_prospect, db_get_by_token, db_get_evidence, db_list_pricing, get_block, jl
 from ...models import GenerateInput, AssetsInput
 from ...generate import audit_generate, email_generate, video_script, generate_campaign, landing_url, _summary, _comps
 from ...assets import set_assets, mark_ready
@@ -63,6 +63,28 @@ def landing(t: str, db: Session = Depends(get_db)):
     n_queries = sum(1 for q in s["ql"] if q)   # nb requêtes réellement affichées
     models_str = ", ".join(s["models"]) or "—"
 
+    # Content blocks landing
+    import json as _json
+    L = lambda sk, fk: get_block(db, "landing", sk, fk, profession=p.profession, city=p.city)
+    pricing = db_list_pricing(db)
+    landing_title = L("hero","title_tpl").replace("{city}", f'<span>{p.city}</span>').replace("{profession}", p.profession or "")
+    landing_sub   = L("hero","subtitle_tpl").replace("{n_queries}", str(n_queries)).replace("{n_models}", str(len(s["models"]))).replace("{models}", models_str)
+    landing_cta   = L("hero","cta_label")
+    landing_faq_html = "".join(
+        f'<div class="faq-item"><h3 style="color:#fff;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>'
+        for i in range(1, 5)
+        for q, a in [(L("faq", f"q{i}"), L("faq", f"a{i}"))]
+        if q
+    )
+    landing_plans_html = ""
+    for o in pricing:
+        bullets = _json.loads(o.bullets or "[]")
+        li = "".join(f"<li>{b}</li>" for b in bullets)
+        if o.highlighted:
+            landing_plans_html += f'<div class="plan best"><h3>{o.title}</h3><div class="price">{o.price_text}</div><ul>{li}</ul><button onclick="startCheckout()" class="btn">{landing_cta}</button></div>'
+        else:
+            landing_plans_html += f'<div class="plan"><h3>{o.title}</h3><div class="price">{o.price_text}</div><ul>{li}</ul><a href="mailto:contact@presence-ia.com" class="btn">Me contacter</a></div>'
+
     # Evidence screenshots (partagés par ville+profession)
     ev = db_get_evidence(db, p.profession, p.city)
     ev_images = jl(ev.images)[:6] if ev else []
@@ -93,7 +115,7 @@ def landing(t: str, db: Session = Depends(get_db)):
   <button id="btn-audit" onclick="startCheckout()"
     style="background:#e94560;color:#fff;border:none;padding:18px 40px;border-radius:8px;
     font-size:18px;font-weight:bold;cursor:pointer;width:100%;max-width:380px">
-    Recevoir mon audit complet — 97€
+    {landing_cta}
   </button>
   <p style="color:#555;font-size:12px;margin-top:8px">Paiement sécurisé Stripe · Rapport sous 48h</p>
 </div>
@@ -128,8 +150,8 @@ td{{padding:11px;border-bottom:1px solid #2a2a4e;color:#ddd}}.plans{{display:gri
 .btn{{display:block;background:#e94560;color:#fff;padding:14px;border-radius:6px;font-weight:bold;text-align:center;text-decoration:none;margin-top:14px}}
 footer{{background:#0a0a15;padding:24px;text-align:center;color:#555;font-size:12px;border-top:1px solid #1a1a2e}}</style></head><body>
 <div class="hero"><div class="c">
-<h1>À <span>{p.city}</span>, les IA recommandent vos concurrents. Pas vous.</h1>
-<p>{n_queries} requêtes testées sur {len(s['models'])} IA · {", ".join(s['models'])}</p></div></div>
+<h1>{landing_title}</h1>
+<p>{landing_sub}</p></div></div>
 <section><div class="c">
 <div class="box"><h2>📊 {p.name} — Résultats des tests</h2>
 <p style="color:#aaa;margin-bottom:16px">{n_queries} requêtes testées — {models_str}</p>
@@ -142,15 +164,12 @@ footer{{background:#0a0a15;padding:24px;text-align:center;color:#555;font-size:1
 </div></section>
 <section style="background:#0a0a15"><div class="c"><h2 style="text-align:center">Offres</h2>
 <div class="plans">
-<div class="plan"><h3>Audit Complet</h3><div class="price">97€ <span>une fois</span></div>
-<ul><li>Rapport complet</li><li>Vidéo 90s perso</li><li>Plan d'action</li><li>Checklist 8 points</li></ul>
-<button onclick="startCheckout()" class="btn">Recevoir mon audit</button></div>
-<div class="plan best"><h3>Kit Visibilité IA</h3><div class="price">500€ <span>+ 90€/mois×6</span></div>
-<ul><li>Audit inclus</li><li>Kit contenu IA</li><li>Suivi 6 mois</li><li>Dashboard résultats</li></ul>
-<a href="mailto:contact@presence-ia.com?subject=Kit Visibilité IA" class="btn">Démarrer</a></div>
-<div class="plan"><h3>On fait tout</h3><div class="price">3 500€ <span>forfait</span></div>
-<ul><li>Tout inclus</li><li>Rédaction contenus</li><li>Citations locales</li><li>Garantie 6 mois</li></ul>
-<a href="mailto:contact@presence-ia.com?subject=Forfait Tout inclus" class="btn">Me contacter</a></div></div>
-<p style="text-align:center;color:#666;font-size:13px;margin-top:16px">Pas d'appel requis.</p></div></section>
+{landing_plans_html}
+</div>
+<p style="text-align:center;color:#666;font-size:13px;margin-top:16px">Pas d'appel requis.</p>
+</div></section>
+<section><div class="c"><h2>Questions fréquentes</h2>
+<div style="max-width:720px">{landing_faq_html}</div>
+</div></section>
 <footer>Les réponses IA peuvent varier ; résultats basés sur tests répétés horodatés ({", ".join(s["dates"])}).<br>© PRESENCE_IA</footer>
 </body></html>""")

@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, ContactDB, PricingConfigDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, ContactDB, PricingConfigDB, ContentBlockDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -55,6 +55,9 @@ def init_db():
             for p in _PRICING_DEFAULTS:
                 db.add(PricingConfigDB(**p))
             db.commit()
+    # Seed content blocks
+    with SessionLocal() as db:
+        _seed_content_blocks(db)
 
 
 def get_db():
@@ -168,3 +171,119 @@ def db_update_pricing(db: Session, pricing: PricingConfigDB, **kwargs) -> Pricin
     for k, v in kwargs.items():
         setattr(pricing, k, v)
     db.commit(); db.refresh(pricing); return pricing
+
+
+# ── ContentBlocks ──
+_CONTENT_SEED = [
+    # HOME — HERO
+    ("home", "hero", "title",        None, None, "Quand vos clients demandent à ChatGPT,\nil cite vos concurrents. Pas vous."),
+    ("home", "hero", "subtitle",     None, None, "Nous testons votre visibilité sur 3 IA et 5 requêtes. Rapport en 48h. Plan d'action concret."),
+    ("home", "hero", "cta_primary",  None, None, "Tester ma visibilité — 97€"),
+    ("home", "hero", "cta_secondary",None, None, "Comment ça marche"),
+    # HOME — PROOF STAT
+    ("home", "proof_stat", "stat_1_value", None, None, "87%"),
+    ("home", "proof_stat", "stat_1_label", None, None, "des artisans testés sont invisibles sur les IA"),
+    ("home", "proof_stat", "stat_2_value", None, None, "3 IA"),
+    ("home", "proof_stat", "stat_2_label", None, None, "testées simultanément\nChatGPT · Gemini · Claude"),
+    ("home", "proof_stat", "stat_3_value", None, None, "48h"),
+    ("home", "proof_stat", "stat_3_label", None, None, "délai de livraison\nrapport + plan d'action"),
+    ("home", "proof_stat", "source_url_1",   None, None, ""),
+    ("home", "proof_stat", "source_label_1", None, None, ""),
+    ("home", "proof_stat", "source_url_2",   None, None, ""),
+    ("home", "proof_stat", "source_label_2", None, None, ""),
+    # HOME — PROOF VISUAL
+    ("home", "proof_visual", "title",    None, None, "Comment fonctionne l'audit"),
+    ("home", "proof_visual", "subtitle", None, None, "Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché."),
+    ("home", "proof_visual", "step_1",   None, None, "On simule vos clients — 5 requêtes différentes posées à ChatGPT, Gemini et Claude."),
+    ("home", "proof_visual", "step_2",   None, None, "On analyse les réponses — Êtes-vous cité ? Qui est cité à votre place ?"),
+    ("home", "proof_visual", "step_3",   None, None, "Score de visibilité /10 — Un score clair, des données concrètes."),
+    ("home", "proof_visual", "step_4",   None, None, "Plan d'action — Checklist priorisée pour corriger votre visibilité."),
+    # HOME — FAQ
+    ("home", "faq", "q1", None, None, "Pourquoi les IA ne me citent-elles pas ?"),
+    ("home", "faq", "a1", None, None, "Les IA s'appuient sur des données publiques : avis Google, contenu de votre site, mentions dans des articles. Si ces signaux sont absents ou faibles, vous êtes invisible."),
+    ("home", "faq", "q2", None, None, "Ça fonctionne pour quel type d'entreprise ?"),
+    ("home", "faq", "a2", None, None, "Artisans (couvreurs, plombiers, électriciens…), restaurants, cabinets médicaux, commerces locaux. Toute entreprise dont les clients cherchent localement."),
+    ("home", "faq", "q3", None, None, "Combien de temps pour voir des résultats ?"),
+    ("home", "faq", "a3", None, None, "L'audit est livré en 48h. Les améliorations de visibilité IA sont généralement visibles en 4 à 12 semaines selon les actions mises en place."),
+    ("home", "faq", "q4", None, None, "Est-ce que vous envoyez les emails à ma place ?"),
+    ("home", "faq", "a4", None, None, "Non. Nous produisons les contenus et le plan d'action. Vous gardez le contrôle total sur ce qui est envoyé et publié."),
+    # HOME — CTA
+    ("home", "cta", "title",    None, None, "Votre audit en 48h — 97€"),
+    ("home", "cta", "subtitle", None, None, "Entrez votre email, on vous envoie le lien de commande et on démarre le test."),
+    ("home", "cta", "btn_label",None, None, "Démarrer →"),
+    # LANDING — HERO (génériques)
+    ("landing", "hero", "title_tpl",    None, None, "À {city}, les IA recommandent vos concurrents. Pas vous."),
+    ("landing", "hero", "subtitle_tpl", None, None, "{n_queries} requêtes testées sur {n_models} IA · {models}"),
+    ("landing", "hero", "cta_label",    None, None, "Recevoir mon audit complet — 97€"),
+    # LANDING — PROOF VISUAL
+    ("landing", "proof_visual", "mention", None, None, "Tests effectués sur 3 jours consécutifs"),
+    # LANDING — PROOF STAT
+    ("landing", "proof_stat", "source_url_1",   None, None, ""),
+    ("landing", "proof_stat", "source_label_1", None, None, ""),
+    ("landing", "proof_stat", "source_url_2",   None, None, ""),
+    ("landing", "proof_stat", "source_label_2", None, None, ""),
+    # LANDING — FAQ
+    ("landing", "faq", "q1", None, None, "Pourquoi les IA ne me citent-elles pas ?"),
+    ("landing", "faq", "a1", None, None, "Les IA s'appuient sur des données publiques : avis Google, contenu de votre site, mentions dans des articles. Si ces signaux sont absents ou faibles, vous êtes invisible."),
+    ("landing", "faq", "q2", None, None, "Est-ce que le rapport inclut un plan d'action ?"),
+    ("landing", "faq", "a2", None, None, "Oui. Vous recevez un rapport complet avec les requêtes testées, les concurrents identifiés, et une checklist priorisée en 8 points."),
+]
+
+
+def _seed_content_blocks(db: Session):
+    for page_type, section_key, field_key, profession, city, value in _CONTENT_SEED:
+        exists = db.query(ContentBlockDB).filter_by(
+            page_type=page_type, section_key=section_key,
+            field_key=field_key, profession=profession, city=city
+        ).first()
+        if not exists:
+            db.add(ContentBlockDB(
+                page_type=page_type, section_key=section_key,
+                field_key=field_key, profession=profession, city=city,
+                value=value
+            ))
+    db.commit()
+
+
+def get_block(db: Session, page_type: str, section_key: str, field_key: str,
+              profession: Optional[str] = None, city: Optional[str] = None,
+              default: str = "") -> str:
+    """Retourne la valeur du bloc avec fallback générique."""
+    candidates = []
+    if profession and city:
+        candidates.append((profession, city))
+    if profession:
+        candidates.append((profession, None))
+    candidates.append((None, None))
+    for p, c in candidates:
+        row = db.query(ContentBlockDB).filter_by(
+            page_type=page_type, section_key=section_key,
+            field_key=field_key, profession=p, city=c
+        ).first()
+        if row and row.value:
+            return row.value
+    return default
+
+
+def set_block(db: Session, page_type: str, section_key: str, field_key: str,
+              value: str, profession: Optional[str] = None, city: Optional[str] = None) -> ContentBlockDB:
+    """Crée ou met à jour un bloc de contenu."""
+    row = db.query(ContentBlockDB).filter_by(
+        page_type=page_type, section_key=section_key,
+        field_key=field_key, profession=profession, city=city
+    ).first()
+    if row:
+        row.value = value
+    else:
+        row = ContentBlockDB(page_type=page_type, section_key=section_key,
+                             field_key=field_key, profession=profession, city=city, value=value)
+        db.add(row)
+    db.commit(); db.refresh(row); return row
+
+
+def db_list_content_blocks(db: Session, page_type: Optional[str] = None,
+                            section_key: Optional[str] = None) -> list:
+    q = db.query(ContentBlockDB)
+    if page_type:  q = q.filter_by(page_type=page_type)
+    if section_key: q = q.filter_by(section_key=section_key)
+    return q.order_by(ContentBlockDB.page_type, ContentBlockDB.section_key, ContentBlockDB.field_key).all()

@@ -195,6 +195,23 @@ class CityEvidenceDB(Base):
     __table_args__ = (sa.UniqueConstraint("profession", "city", name="uq_city_evidence"),)
 
 
+class ContentBlockDB(Base):
+    """Textes éditables depuis l'admin — HOME et LANDING."""
+    __tablename__ = "content_blocks"
+    id          : Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    page_type   : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "home" | "landing"
+    section_key : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "hero" | "proof_stat" | ...
+    field_key   : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "title" | "subtitle" | ...
+    profession  : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # None = générique
+    city        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # None = générique
+    value       : Mapped[str]            = mapped_column(sa.Text, default="")
+    updated_at  : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        sa.UniqueConstraint("page_type", "section_key", "field_key", "profession", "city", name="uq_content_block"),
+    )
+
+
 class ContactStatus(str, Enum):
     SUSPECT   = "SUSPECT"
     PROSPECT  = "PROSPECT"

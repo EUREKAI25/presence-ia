@@ -44,8 +44,55 @@ def health():
 
 
 @app.get("/", response_class=HTMLResponse)
-def root():
-    return HTMLResponse("""<!DOCTYPE html>
+def root(db=None):
+    from ..database import get_block, db_list_pricing, SessionLocal
+    _db = SessionLocal()
+    try:
+        B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
+        pricing = db_list_pricing(_db)
+
+        # HERO
+        h_title    = B("hero","title").replace("\n","<br>")
+        h_sub      = B("hero","subtitle")
+        h_cta1     = B("hero","cta_primary")
+        h_cta2     = B("hero","cta_secondary")
+        # PROOF STAT
+        s1v = B("proof_stat","stat_1_value"); s1l = B("proof_stat","stat_1_label").replace("\n","<br>")
+        s2v = B("proof_stat","stat_2_value"); s2l = B("proof_stat","stat_2_label").replace("\n","<br>")
+        s3v = B("proof_stat","stat_3_value"); s3l = B("proof_stat","stat_3_label").replace("\n","<br>")
+        src1u = B("proof_stat","source_url_1"); src1l = B("proof_stat","source_label_1")
+        src2u = B("proof_stat","source_url_2"); src2l = B("proof_stat","source_label_2")
+        sources_html = ""
+        if src1u and src1l:
+            sources_html += f'<a href="{src1u}" target="_blank" style="color:#555;font-size:11px;margin-right:16px">↗ {src1l}</a>'
+        if src2u and src2l:
+            sources_html += f'<a href="{src2u}" target="_blank" style="color:#555;font-size:11px">↗ {src2l}</a>'
+        # PROOF VISUAL steps
+        pv_title = B("proof_visual","title"); pv_sub = B("proof_visual","subtitle")
+        steps = [B("proof_visual",f"step_{i}") for i in range(1,5)]
+        steps_html = "".join(f'<div class="step"><div class="step-num">{i+1}</div><p style="color:#aaa;font-size:.9rem">{s}</p></div>' for i,s in enumerate(steps) if s)
+        # FAQ
+        faqs = [(B("faq",f"q{i}"), B("faq",f"a{i}")) for i in range(1,5)]
+        faq_html = "".join(f'<div class="faq-item"><h3 style="color:#fff;font-size:1rem;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>' for q,a in faqs if q)
+        # CTA
+        cta_title = B("cta","title"); cta_sub = B("cta","subtitle"); cta_btn = B("cta","btn_label")
+        # PRICING dynamique
+        plans_html = ""
+        for o in pricing:
+            import json as _json
+            bullets = _json.loads(o.bullets or "[]")
+            li = "".join(f"<li>{b}</li>" for b in bullets)
+            badge = '<div class="best-badge">Recommandé</div>' if o.highlighted else ""
+            plans_html += f'''<div class="plan{' best' if o.highlighted else ''}">
+{badge}<h3 style="color:#fff;margin-bottom:8px">{o.title}</h3>
+<div class="price">{o.price_text.replace(' ','<span style="font-size:1rem;color:#aaa"> </span>',1)}</div>
+<ul style="list-style:none;margin:20px 0 24px">{li}</ul>
+<a href="#contact" class="btn-plan{' ghost' if not o.highlighted else ''}">{"Commander" if not o.highlighted else "Démarrer"}</a>
+</div>'''
+    finally:
+        _db.close()
+
+    return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -131,11 +178,11 @@ footer a{color:#666}
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge">Nouveau — Audit IA pour artisans &amp; PME</div>
-  <h1>Quand vos clients demandent à ChatGPT,<br><span>il cite vos concurrents.</span> Pas vous.</h1>
-  <p>Nous testons votre visibilité sur 3 IA et 5 requêtes. Rapport en 48h. Plan d'action concret.</p>
+  <h1>{h_title}</h1>
+  <p>{h_sub}</p>
   <div class="hero-btns">
-    <a href="#contact" class="btn-primary">Tester ma visibilité — 97€</a>
-    <a href="#comment" class="btn-secondary">Comment ça marche</a>
+    <a href="#contact" class="btn-primary">{h_cta1}</a>
+    <a href="#comment" class="btn-secondary">{h_cta2}</a>
   </div>
 </div>
 
@@ -143,10 +190,11 @@ footer a{color:#666}
 <div class="proof">
   <p>Résultats observés sur nos derniers audits</p>
   <div class="proof-stats">
-    <div class="stat"><strong>87%</strong><span>des artisans testés<br>sont invisibles sur les IA</span></div>
-    <div class="stat"><strong>3 IA</strong><span>testées simultanément<br>ChatGPT · Gemini · Claude</span></div>
-    <div class="stat"><strong>48h</strong><span>délai de livraison<br>rapport + plan d'action</span></div>
+    <div class="stat"><strong>{s1v}</strong><span>{s1l}</span></div>
+    <div class="stat"><strong>{s2v}</strong><span>{s2l}</span></div>
+    <div class="stat"><strong>{s3v}</strong><span>{s3l}</span></div>
   </div>
+  {sources_html}
 </div>
 
 <!-- PROBLÈME -->
@@ -165,13 +213,10 @@ footer a{color:#666}
 
 <!-- COMMENT ÇA MARCHE -->
 <section id="comment" style="padding-top:0">
-  <h2>Comment fonctionne l'audit</h2>
-  <p class="sub">Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché.</p>
+  <h2>{pv_title}</h2>
+  <p class="sub">{pv_sub}</p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><h3>On simule vos clients</h3><p>5 requêtes différentes posées à ChatGPT, Gemini et Claude. Comme si c'était un vrai client.</p></div>
-    <div class="step"><div class="step-num">2</div><h3>On analyse les réponses</h3><p>Êtes-vous cité ? Qui est cité à votre place ? Combien de fois ? Sur quelle IA ?</p></div>
-    <div class="step"><div class="step-num">3</div><h3>Score de visibilité /10</h3><p>Un score clair, des données concrètes, les concurrents identifiés.</p></div>
-    <div class="step"><div class="step-num">4</div><h3>Plan d'action</h3><p>Checklist priorisée pour corriger votre visibilité. Applicable sans agence.</p></div>
+    {steps_html}
   </div>
 </section>
 
@@ -181,43 +226,7 @@ footer a{color:#666}
     <h2>Tarifs transparents</h2>
     <p class="sub">Sans abonnement caché. Sans engagement.</p>
     <div class="plans">
-      <div class="plan">
-        <h3>Audit Flash</h3>
-        <div class="price">97€ <span>une fois</span></div>
-        <ul>
-          <li>Test sur 3 IA × 5 requêtes</li>
-          <li>Score visibilité /10</li>
-          <li>Concurrents identifiés</li>
-          <li>Rapport PDF + vidéo 90s</li>
-          <li>Checklist 8 points</li>
-        </ul>
-        <a href="#contact" class="btn-plan ghost">Commander</a>
-      </div>
-      <div class="plan best">
-        <h3>Kit Visibilité IA</h3>
-        <div class="price">500€ <span>+ 90€/mois × 6</span></div>
-        <ul>
-          <li>Audit complet inclus</li>
-          <li>Kit contenu optimisé IA</li>
-          <li>Suivi mensuel 6 mois</li>
-          <li>Re-tests trimestriels</li>
-          <li>Dashboard résultats</li>
-          <li>Support prioritaire</li>
-        </ul>
-        <a href="#contact" class="btn-plan">Démarrer</a>
-      </div>
-      <div class="plan">
-        <h3>Tout inclus</h3>
-        <div class="price">3 500€ <span>forfait</span></div>
-        <ul>
-          <li>Audit + Kit inclus</li>
-          <li>Rédaction contenus</li>
-          <li>Citations locales</li>
-          <li>Optimisation fiches</li>
-          <li>Garantie résultats 6 mois</li>
-        </ul>
-        <a href="#contact" class="btn-plan ghost">Me contacter</a>
-      </div>
+      {plans_html}
     </div>
   </div>
 </div>
@@ -226,40 +235,35 @@ footer a{color:#666}
 <section>
   <h2>Questions fréquentes</h2>
   <div class="faq">
-    <div class="faq-item">
-      <h3>Pourquoi les IA ne me citent-elles pas ?</h3>
-      <p>Les IA s'appuient sur des données publiques : avis Google, contenu de votre site, mentions dans des articles. Si ces signaux sont absents ou faibles, vous êtes invisible.</p>
-    </div>
-    <div class="faq-item">
-      <h3>Ça fonctionne pour quel type d'entreprise ?</h3>
-      <p>Artisans (couvreurs, plombiers, électriciens…), restaurants, cabinets médicaux, commerces locaux. Toute entreprise dont les clients cherchent localement.</p>
-    </div>
-    <div class="faq-item">
-      <h3>Combien de temps pour voir des résultats ?</h3>
-      <p>L'audit est livré en 48h. Les améliorations de visibilité IA sont généralement visibles en 4 à 12 semaines selon les actions mises en place.</p>
-    </div>
-    <div class="faq-item">
-      <h3>Est-ce que vous envoyez les emails à ma place ?</h3>
-      <p>Non. Nous produisons les contenus et le plan d'action. Vous gardez le contrôle total sur ce qui est envoyé et publié.</p>
-    </div>
+    {faq_html}
   </div>
 </section>
 
 <!-- CTA FINAL -->
 <div class="cta-final" id="contact">
-  <h2>Votre audit en 48h — 97€</h2>
-  <p>Entrez votre email, on vous envoie le lien de commande et on démarre le test.</p>
-  <form style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto"
-        onsubmit="event.preventDefault();this.innerHTML='<p style=color:#2ecc71;font-size:1.1rem>✓ Reçu ! Vous recevrez un email sous 24h.</p>'">
-    <input type="email" placeholder="votre@email.fr" required
+  <h2>{cta_title}</h2>
+  <p>{cta_sub}</p>
+  <form id="cta-form" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto"
+        onsubmit="submitCta(event)">
+    <input id="cta-email" type="email" placeholder="votre@email.fr" required
            style="flex:1;min-width:220px;padding:14px 18px;background:#1a1a2e;border:1px solid #2a2a4e;color:#fff;border-radius:8px;font-size:1rem">
     <button type="submit"
             style="background:#e94560;color:#fff;border:none;padding:14px 28px;border-radius:8px;font-weight:bold;font-size:1rem;cursor:pointer">
-      Démarrer →
+      {cta_btn}
     </button>
   </form>
   <p style="margin-top:16px;color:#444;font-size:.85rem">Pas d'appel requis. Pas d'engagement.</p>
 </div>
+<script>
+async function submitCta(e) {{
+  e.preventDefault();
+  const email = document.getElementById('cta-email').value;
+  try {{
+    await fetch('/api/contact-capture', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email}})}});
+  }} catch(_) {{}}
+  document.getElementById('cta-form').innerHTML = '<p style="color:#2ecc71;font-size:1.1rem">✓ Reçu ! Vous allez recevoir un email sous peu.</p>';
+}}
+</script>
 
 <footer>
   © 2026 Présence IA — <a href="/docs">API</a> · <a href="/health">Status</a><br>
@@ -270,7 +274,7 @@ footer a{color:#666}
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -285,3 +289,4 @@ app.include_router(stripe_routes.router)
 app.include_router(contacts.router)
 app.include_router(offers.router)
 app.include_router(analytics.router)
+app.include_router(content.router)
