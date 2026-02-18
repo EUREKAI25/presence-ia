@@ -254,7 +254,7 @@ footer a{color:#666}
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -262,3 +262,4 @@ app.include_router(scoring.router)
 app.include_router(generate.router)
 app.include_router(admin.router)
 app.include_router(pipeline.router)
+app.include_router(jobs.router)

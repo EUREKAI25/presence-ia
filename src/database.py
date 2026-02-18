@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -70,3 +70,20 @@ def db_create_run(db: Session, obj: TestRunDB) -> TestRunDB:
 
 def db_list_runs(db: Session, pid: str) -> List[TestRunDB]:
     return db.query(TestRunDB).filter_by(prospect_id=pid).order_by(TestRunDB.ts).all()
+
+
+# ── Jobs ──
+def db_create_job(db: Session, obj: JobDB) -> JobDB:
+    db.add(obj); db.commit(); db.refresh(obj); return obj
+
+def db_get_job(db: Session, job_id: str) -> Optional[JobDB]:
+    return db.query(JobDB).filter_by(job_id=job_id).first()
+
+def db_update_job(db: Session, job: JobDB, **kwargs) -> JobDB:
+    for k, v in kwargs.items():
+        setattr(job, k, v)
+    db.commit(); db.refresh(job); return job
+
+def new_session() -> Session:
+    """Session indépendante pour les tâches en arrière-plan."""
+    return SessionLocal()

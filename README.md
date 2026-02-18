@@ -53,10 +53,14 @@ curl -X POST http://localhost:8001/api/prospect-scan \
   -H "Content-Type: application/json" \
   -d '{"city":"Paris","profession":"plombier","max_prospects":10}'
 
-# --- TEST ---
-curl -X POST http://localhost:8001/api/ia-test/run \
+# --- TEST (non-bloquant — retourne 202 immédiatement) ---
+JOB=$(curl -s -X POST http://localhost:8001/api/ia-test/run \
   -H "Content-Type: application/json" \
-  -d '{"campaign_id":"<ID>","dry_run":false}'
+  -d '{"campaign_id":"<ID>","dry_run":false}' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
+
+# --- SUIVI DU JOB ---
+curl http://localhost:8001/api/jobs/$JOB
+# → {"status":"DONE","progress":{"total":5,"processed":5,"runs_created":15,...}}
 
 # --- SCORE ---
 curl -X POST http://localhost:8001/api/scoring/run \

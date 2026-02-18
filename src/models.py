@@ -166,3 +166,29 @@ class PipelineRunInput(BaseModel):
     max_prospects:    int                          = 30
     manual_prospects: Optional[List[ProspectInput]] = None
     dry_run:          bool                         = False
+
+
+# ── JOB TRACKING ────────────────────────────────────────────────────────
+
+class JobStatus(str, Enum):
+    QUEUED  = "QUEUED"
+    RUNNING = "RUNNING"
+    DONE    = "DONE"
+    FAILED  = "FAILED"
+
+
+class JobDB(Base):
+    __tablename__ = "jobs"
+    job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    campaign_id:  Mapped[str]           = mapped_column(sa.String, nullable=False)
+    status:       Mapped[str]           = mapped_column(sa.String, default="QUEUED")
+    dry_run:      Mapped[bool]          = mapped_column(sa.Boolean, default=False)
+    prospect_ids: Mapped[str]           = mapped_column(sa.Text, default="[]")   # JSON
+    models_used:  Mapped[str]           = mapped_column(sa.Text, default="[]")   # JSON
+    total:        Mapped[int]           = mapped_column(sa.Integer, default=0)
+    processed:    Mapped[int]           = mapped_column(sa.Integer, default=0)
+    runs_created: Mapped[int]           = mapped_column(sa.Integer, default=0)
+    errors:       Mapped[str]           = mapped_column(sa.Text, default="[]")   # JSON
+    created_at:   Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
+    started_at:   Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    finished_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
