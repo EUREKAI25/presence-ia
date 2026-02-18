@@ -59,12 +59,19 @@
 <body>
   <h1>PRESENCE_IA — Evidence Capture</h1>
 
-  <label>Fournisseur IA</label>
-  <select id="provider">
-    <option value="openai">ChatGPT (OpenAI)</option>
-    <option value="anthropic">Claude (Anthropic)</option>
-    <option value="gemini">Gemini (Google)</option>
-  </select>
+  <label>Fournisseur détecté</label>
+  <div id="provider-display"
+    style="background:#1a1a2e;border:1px solid #2a2a4e;padding:8px 12px;border-radius:6px;font-size:13px;color:#2ecc71">
+    Détection…
+  </div>
+  <div id="provider-unknown" style="display:none;margin-top:6px">
+    <select id="provider-manual"
+      style="width:100%;background:#1a1a2e;border:1px solid #e94560;color:#fff;padding:8px 10px;border-radius:6px;font-size:13px">
+      <option value="openai">ChatGPT (OpenAI)</option>
+      <option value="anthropic">Claude (Anthropic)</option>
+      <option value="gemini">Gemini (Google)</option>
+    </select>
+  </div>
 
   <label>Profession</label>
   <input type="text" id="profession" value="couvreur">

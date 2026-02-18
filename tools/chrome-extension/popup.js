@@ -8,7 +8,45 @@ let config = {
   admin_token: "changeme"
 };
 
-// Charger config.json au démarrage
+// ── Détection provider depuis l'URL de l'onglet ────────────────────────────
+
+const PROVIDER_MAP = [
+  { pattern: /chat\.openai\.com|chatgpt\.com/,          value: "openai",    label: "ChatGPT (OpenAI)" },
+  { pattern: /claude\.ai/,                               value: "anthropic", label: "Claude (Anthropic)" },
+  { pattern: /gemini\.google\.com|bard\.google\.com/,   value: "gemini",    label: "Gemini (Google)" },
+];
+
+function detectProvider(url) {
+  for (const { pattern, value, label } of PROVIDER_MAP) {
+    if (pattern.test(url)) return { value, label };
+  }
+  return null;
+}
+
+let detectedProvider = null;  // null = inconnu → dropdown affiché
+
+async function initProvider() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const url = tab?.url || "";
+  const found = detectProvider(url);
+  const display = document.getElementById("provider-display");
+  const unknown = document.getElementById("provider-unknown");
+
+  if (found) {
+    detectedProvider = found.value;
+    display.textContent = `✓ ${found.label}`;
+    display.style.color = "#2ecc71";
+    unknown.style.display = "none";
+  } else {
+    detectedProvider = null;
+    display.textContent = "Non reconnu — choisir manuellement :";
+    display.style.color = "#e94560";
+    unknown.style.display = "block";
+  }
+}
+
+// ── Chargement config + init ──────────────────────────────────────────────
+
 fetch(chrome.runtime.getURL("config.json"))
   .then(r => r.json())
   .then(cfg => {
@@ -16,7 +54,8 @@ fetch(chrome.runtime.getURL("config.json"))
     document.getElementById("profession").value = config.default_profession;
     document.getElementById("city").value = config.default_city;
   })
-  .catch(() => {}); // fallback silencieux
+  .catch(() => {})
+  .finally(() => initProvider());
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -38,7 +77,7 @@ function dataURLtoBlob(dataUrl) {
 // ── Capture & Upload ──────────────────────────────────────────────────────
 
 document.getElementById("btn-capture").addEventListener("click", async () => {
-  const provider   = document.getElementById("provider").value;
+  const provider   = detectedProvider ?? document.getElementById("provider-manual").value;
   const profession = document.getElementById("profession").value.trim().toLowerCase();
   const city       = document.getElementById("city").value.trim().toLowerCase();
   const btn        = document.getElementById("btn-capture");
