@@ -92,7 +92,7 @@ p{color:#aaa;line-height:1.6;margin-bottom:8px}strong{color:#fff}</style></head>
 <div class="icon">✅</div>
 <h1>Paiement confirmé !</h1>
 <p>Merci pour votre confiance.</p>
-<p>Vous recevrez votre <strong>rapport d'audit IA complet</strong> par email sous <strong>48h</strong>.</p>
+<p>Vous recevrez votre <strong>rapport d'audit IA complet</strong> par email <strong>d'ici quelques minutes</strong>.</p>
 <p style="margin-top:24px;color:#555;font-size:13px">© PRESENCE_IA — contact@presence-ia.com</p>
 </div></body></html>""")
 
