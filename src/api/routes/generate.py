@@ -60,6 +60,8 @@ def landing(t: str, db: Session = Depends(get_db)):
     if not p: raise HTTPException(404)
     s = _summary(db, p); comps = _comps(p, 2)
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
+    n_queries = sum(1 for q in s["ql"] if q)   # nb requêtes réellement affichées
+    models_str = ", ".join(s["models"]) or "—"
 
     # Evidence screenshots (partagés par ville+profession)
     ev = db_get_evidence(db, p.profession, p.city)
@@ -127,10 +129,10 @@ td{{padding:11px;border-bottom:1px solid #2a2a4e;color:#ddd}}.plans{{display:gri
 footer{{background:#0a0a15;padding:24px;text-align:center;color:#555;font-size:12px;border-top:1px solid #1a1a2e}}</style></head><body>
 <div class="hero"><div class="c">
 <h1>À <span>{p.city}</span>, les IA recommandent vos concurrents. Pas vous.</h1>
-<p>Résultats de {s['runs']} tests répétés + plan clair pour corriger ça.</p></div></div>
+<p>{n_queries} requêtes testées sur {len(s['models'])} IA · {", ".join(s['models'])}</p></div></div>
 <section><div class="c">
 <div class="box"><h2>📊 {p.name} — Résultats des tests</h2>
-<p style="color:#aaa;margin-bottom:16px">Sur {s['runs']} runs — {", ".join(s['models'])}</p>
+<p style="color:#aaa;margin-bottom:16px">{n_queries} requêtes testées — {models_str}</p>
 <table><tr><th>Requête</th><th>Résultat</th></tr>{qrows}</table>
 {"<h3 style='color:#fff;margin-top:24px'>Cités à votre place :</h3><ul style='list-style:none;padding:0'>" + comp_html + "</ul>" if comps else ""}
 </div>
