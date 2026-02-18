@@ -33,10 +33,10 @@ def norm(name: str) -> str:
     return " ".join(s.split())
 
 def domain(url: str) -> str:
-    if not url: return ""
-    u = re.sub(r"^https?://|^www\.", "", url.lower()).split("/")[0]
-    p = u.split(".")
-    return p[-2] if len(p) >= 2 else u
+    if not url or not url.startswith(("http://", "https://")):
+        return ""
+    u = re.sub(r"^https?://(?:www\.)?", "", url.lower()).split("/")[0].split("?")[0]
+    return u if "." in u else ""
 
 
 # ── Matching flou ─────────────────────────────────────────────────────
@@ -54,32 +54,119 @@ def is_mentioned(text: str, name: str, website: Optional[str] = None, thr: float
         if SequenceMatcher(None, nn, chunk).ratio() >= thr: return True
     if website:
         d = domain(website)
-        if d and len(d) > 2 and d in nt: return True
+        nd = norm(d)  # normalise le domaine comme le texte (enlève les points etc.)
+        if nd and len(nd) > 2 and nd in nt: return True
     return False
 
 
 # ── Extraction entités ────────────────────────────────────────────────
 
+# Mots génériques jamais considérés comme concurrents
+_STOPWORDS: set = {
+    # Villes / géographie
+    "bordeaux", "paris", "lyon", "marseille", "toulouse", "nantes", "rennes",
+    "strasbourg", "lille", "nice", "montpellier", "grenoble", "tours",
+    "france", "europe",
+    # Plateformes / générique
+    "google", "maps", "googlemaps", "pagesjaunes", "pages", "jaunes", "yelp",
+    "tripadvisor", "leboncoin", "facebook", "instagram", "twitter", "linkedin",
+    "youtube", "whatsapp",
+    # Verbes / interjections en majuscule fréquents dans les réponses IA
+    "voici", "voila", "demandez", "recommandations", "recommandez",
+    "attention", "important", "note", "remarque", "conseil", "conseils",
+    "informations", "information", "contact", "contactez", "appelez",
+    "trouver", "recherchez", "consultez", "ressources", "services",
+    "avis", "devis", "urgent", "disponible", "disponibles",
+    # Réponses IA génériques
+    "content", "context", "listmodels", "models", "response", "error",
+    "call", "api", "query", "result", "results", "output",
+    # Termes ultra-génériques (pas les métiers : "Couverture Bretonne" est un vrai nom)
+    "artisan", "artisans", "entreprise", "entreprises",
+    "societe", "societes", "professionnel", "professionnels",
+}
+
+# Suffixes légaux à supprimer avant d'évaluer (déjà dans norm(), mais utile ici aussi)
+_LEGAL_SUFFIXES = re.compile(
+    r"\b(sarl|sas|eurl|snc|sa|spa|ltd|llc|gmbh|cie|groupe?|et fils|and co)\b", re.I
+)
+
+# Regex conservatrice : 2 à 5 tokens avec majuscule, séparés par espace ou tiret
+_ORG_RE = re.compile(
+    r"\b(?:[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]"
+    r"[a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý]{2,}"
+    r"(?:[-\s][A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]"
+    r"[a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý]{2,}){1,4})\b"
+)
+
+
+def _is_valid_org(name: str) -> bool:
+    """Renvoie True si le nom ressemble à une organisation réelle."""
+    tokens = name.split()
+
+    # Minimum 2 tokens
+    if len(tokens) < 2:
+        return False
+
+    # Chaque token doit faire >= 3 caractères
+    if any(len(t) < 3 for t in tokens):
+        return False
+
+    # Aucun token ne doit être un stopword
+    norm_tokens = {_no_accent(t.lower()) for t in tokens}
+    if norm_tokens & _STOPWORDS:
+        return False
+
+    # Nom entier normalisé ne doit pas être dans les stopwords
+    if _no_accent(name.lower().strip()) in _STOPWORDS:
+        return False
+
+    return True
+
+
 def extract_entities(text: str) -> List[Dict]:
+    """
+    Extraction conservatrice : URLs/domaines + noms d'organisation multi-tokens.
+    Retourne une liste vide si rien de fiable n'est trouvé — c'est OK.
+    """
     out = []
-    for url in re.findall(r"https?://\S+", text):
+
+    # 1. URLs → domaines fiables
+    for url in re.findall(r"https?://[^\s,;)\"'>]+", text):
         d = domain(url)
-        if d: out.append({"type": "url", "value": url, "domain": d})
-    for m in re.finditer(r"(?:[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ][a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý]+\s?){1,4}", text):
-        n = m.group().strip()
-        if len(n) > 3:
-            out.append({"type": "company", "value": n})
+        if d and len(d) > 3:
+            out.append({"type": "url", "value": url, "domain": d})
+
+    # 2. Noms d'organisation multi-tokens avec majuscule stricte
+    for m in _ORG_RE.finditer(text):
+        candidate = m.group().strip()
+        # Supprimer suffixes légaux pour évaluer le nom réel
+        clean = _LEGAL_SUFFIXES.sub("", candidate).strip()
+        if _is_valid_org(clean):
+            out.append({"type": "company", "value": candidate})
+
+    # Dédoublonnage insensible à la casse
     seen: set = set()
     return [e for e in out if not (e["value"].lower() in seen or seen.add(e["value"].lower()))]
 
+
 def competitors_from(entities: List[Dict], name: str, website: Optional[str]) -> List[str]:
+    """Filtre les entités : exclut le prospect lui-même + validation finale."""
     nt, dt = norm(name), domain(website or "")
     result = []
     for e in entities:
         v = e["value"]
-        if nt and nt in norm(v): continue
-        if dt and dt in v.lower(): continue
-        result.append(v)
+        # Exclure si c'est le prospect lui-même
+        if nt and nt in norm(v):
+            continue
+        if dt and dt in v.lower():
+            continue
+        # Pour les URLs, utiliser le domaine comme valeur lisible
+        if e["type"] == "url":
+            d = e.get("domain", "")
+            if d and d != dt:
+                result.append(d)
+        else:
+            result.append(v)
     return result
 
 
