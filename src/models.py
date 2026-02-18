@@ -87,6 +87,8 @@ class ProspectDB(Base):
     proof_image_url:     Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     city_image_url:      Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     screenshot_url:      Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    paid:                Mapped[bool]           = mapped_column(sa.Boolean, default=False)
+    stripe_session_id:   Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     status:              Mapped[str]            = mapped_column(sa.String, default="SCANNED")
     score_justification: Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
     created_at:          Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
@@ -180,6 +182,18 @@ class PipelineRunInput(BaseModel):
 
 
 # ── JOB TRACKING ────────────────────────────────────────────────────────
+
+class CityEvidenceDB(Base):
+    """Screenshots de preuves partagés par ville+profession."""
+    __tablename__ = "city_evidence"
+    id:         Mapped[str]      = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    profession: Mapped[str]      = mapped_column(sa.String, nullable=False, index=True)
+    city:       Mapped[str]      = mapped_column(sa.String, nullable=False, index=True)
+    images:     Mapped[str]      = mapped_column(sa.Text, default="[]")   # JSON [{ts,provider,filename,url}]
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (sa.UniqueConstraint("profession", "city", name="uq_city_evidence"),)
+
 
 class JobStatus(str, Enum):
     QUEUED  = "QUEUED"

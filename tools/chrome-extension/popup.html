@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PRESENCE_IA Evidence</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e8e8f0;
+      width: 320px;
+      padding: 20px;
+    }
+    h1 { color: #e94560; font-size: 14px; margin-bottom: 16px; }
+    label { display: block; color: #aaa; font-size: 11px; margin-bottom: 4px; margin-top: 12px; }
+    select, input[type="text"] {
+      width: 100%;
+      background: #1a1a2e;
+      border: 1px solid #2a2a4e;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    button {
+      width: 100%;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    button:disabled { background: #555; cursor: not-allowed; }
+    #status {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #aaa;
+      word-break: break-all;
+      min-height: 20px;
+    }
+    #status.ok  { color: #2ecc71; }
+    #status.err { color: #e94560; }
+    .copy-btn {
+      background: #2a2a4e;
+      color: #aaa;
+      font-size: 11px;
+      padding: 4px 8px;
+      margin-top: 6px;
+      border-radius: 4px;
+      font-weight: normal;
+    }
+  </style>
+</head>
+<body>
+  <h1>PRESENCE_IA — Evidence Capture</h1>
+
+  <label>Fournisseur IA</label>
+  <select id="provider">
+    <option value="openai">ChatGPT (OpenAI)</option>
+    <option value="anthropic">Claude (Anthropic)</option>
+    <option value="gemini">Gemini (Google)</option>
+  </select>
+
+  <label>Profession</label>
+  <input type="text" id="profession" value="couvreur">
+
+  <label>Ville</label>
+  <input type="text" id="city" value="Rennes">
+
+  <button id="btn-capture">📸 Capture &amp; Upload</button>
+
+  <div id="status"></div>
+  <button id="btn-copy" class="copy-btn" style="display:none">📋 Copier l'URL</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

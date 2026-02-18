@@ -23,15 +23,19 @@ def startup():
     init_db()
     log.info("DB initialisée (SQLite)")
 
-    # Montage fichiers statiques uploads (créé si absent, silencieux si permission refusée)
-    _default_uploads = str(Path(__file__).parent.parent.parent / "dist" / "uploads")
-    uploads_dir = Path(os.getenv("UPLOADS_DIR", _default_uploads))
-    try:
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-        app.mount("/dist/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
-        log.info("Static uploads monté sur /dist/uploads → %s", uploads_dir)
-    except Exception as e:
-        log.warning("Impossible de monter /dist/uploads : %s", e)
+    # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
+    dist_root = Path(__file__).parent.parent.parent / "dist"
+    for sub, route, name in [
+        ("uploads", "/dist/uploads", "uploads"),
+        ("evidence", "/dist/evidence", "evidence"),
+    ]:
+        d = dist_root / sub
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            app.mount(route, StaticFiles(directory=str(d)), name=name)
+            log.info("Static %s monté sur %s", name, d)
+        except Exception as e:
+            log.warning("Impossible de monter %s : %s", route, e)
 
 
 @app.get("/health")
@@ -266,7 +270,7 @@ footer a{color:#666}
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -276,3 +280,5 @@ app.include_router(admin.router)
 app.include_router(pipeline.router)
 app.include_router(jobs.router)
 app.include_router(upload.router)
+app.include_router(evidence.router)
+app.include_router(stripe_routes.router)

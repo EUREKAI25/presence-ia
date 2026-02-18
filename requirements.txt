@@ -15,8 +15,11 @@ google-generativeai>=0.7.0
 apscheduler>=3.10.4
 pytz>=2024.1
 
-# HTTP client (Google Places)
+# HTTP client (Google Places + Brevo)
 requests>=2.32.0
+
+# Stripe
+stripe>=10.0.0
 
 # Tests
 pytest>=8.0.0

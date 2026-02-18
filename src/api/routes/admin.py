@@ -241,13 +241,15 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
               📎
             </label>
           </td>
-          <td style="text-align:center">
-            {_check(p.video_url)}
-            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload vidéo">
-              <input type="file" accept="video/*" style="display:none"
-                     onchange="uploadFile(this,'{p.prospect_id}','video')">
-              📎
-            </label>
+          <td style="min-width:180px">
+            <input id="vid-{p.prospect_id}" type="text"
+              value="{p.video_url or ''}"
+              placeholder="Lien Dropbox…"
+              style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#fff;padding:4px 6px;border-radius:4px;font-size:11px">
+            <button onclick="saveVideoUrl('{p.prospect_id}')"
+              style="margin-top:4px;background:#2a2a4e;color:#aaa;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;width:100%">
+              Enregistrer
+            </button>
           </td>
         </tr>"""
 
@@ -278,6 +280,18 @@ async function uploadFile(input, pid, type) {{
   const d = await r.json();
   if (d.url) {{ alert('✅ Uploadé : ' + d.url); location.reload(); }}
   else {{ alert('❌ Erreur upload'); }}
+}}
+
+async function saveVideoUrl(pid) {{
+  const url = document.getElementById('vid-' + pid).value.trim();
+  if (!url) {{ alert('URL vide'); return; }}
+  const fd = new FormData(); fd.append('video_url', url);
+  const r = await fetch(`/admin/prospect/${{pid}}/upload-video?token=${{TOKEN}}`, {{
+    method: 'POST', body: fd
+  }});
+  const d = await r.json();
+  if (d.url) {{ alert('✅ Vidéo enregistrée'); }}
+  else {{ alert('❌ Erreur : ' + JSON.stringify(d)); }}
 }}
 </script>"""
 

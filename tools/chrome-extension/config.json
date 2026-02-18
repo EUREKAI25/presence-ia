@@ -1,0 +1,6 @@
+{
+  "server_url": "https://presence-ia.com",
+  "default_profession": "couvreur",
+  "default_city": "Rennes",
+  "admin_token": "changeme"
+}

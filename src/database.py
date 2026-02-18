@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -21,7 +21,10 @@ def init_db():
     # Migration colonnes ajoutées après création initiale
     from sqlalchemy import text
     with ENGINE.connect() as conn:
-        for col in ["email TEXT", "proof_image_url TEXT", "city_image_url TEXT"]:
+        for col in [
+            "email TEXT", "proof_image_url TEXT", "city_image_url TEXT",
+            "paid INTEGER DEFAULT 0", "stripe_session_id TEXT",
+        ]:
             try:
                 conn.execute(text(f"ALTER TABLE prospects ADD COLUMN {col}"))
             except Exception:
@@ -92,6 +95,18 @@ def db_update_job(db: Session, job: JobDB, **kwargs) -> JobDB:
     for k, v in kwargs.items():
         setattr(job, k, v)
     db.commit(); db.refresh(job); return job
+
+# ── CityEvidence ──
+def db_get_or_create_evidence(db: Session, profession: str, city: str) -> CityEvidenceDB:
+    ev = db.query(CityEvidenceDB).filter_by(profession=profession, city=city).first()
+    if not ev:
+        ev = CityEvidenceDB(profession=profession, city=city)
+        db.add(ev); db.commit(); db.refresh(ev)
+    return ev
+
+def db_get_evidence(db: Session, profession: str, city: str) -> Optional[CityEvidenceDB]:
+    return db.query(CityEvidenceDB).filter_by(profession=profession, city=city).first()
+
 
 def new_session() -> Session:
     """Session indépendante pour les tâches en arrière-plan."""

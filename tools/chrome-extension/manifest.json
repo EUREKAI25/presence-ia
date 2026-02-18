@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "PRESENCE_IA — Evidence Capture",
+  "version": "1.0.0",
+  "description": "Capture un screenshot de l'onglet courant et l'uploade comme preuve IA",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "http://localhost:8001/*",
+    "https://presence-ia.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PRESENCE_IA Evidence"
+  },
+  "icons": {
+    "16":  "icon16.png",
+    "48":  "icon48.png",
+    "128": "icon128.png"
+  }
+}
