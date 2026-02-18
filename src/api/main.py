@@ -92,21 +92,13 @@ def root(db=None):
     finally:
         _db.close()
 
-    return HTMLResponse(f"""<!DOCTYPE html>
-<html lang="fr"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Présence IA — Votre entreprise visible dans ChatGPT, Gemini et Claude</title>
-<meta name="description" content="Testez votre visibilité dans les IA et corrigez-la. Audit personnalisé pour artisans et PME locales.">
-<style>
+    _css = """
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;line-height:1.6}
 a{color:#e94560;text-decoration:none}
-/* NAV */
 nav{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid #1a1a2e;position:sticky;top:0;background:#0f0f1a;z-index:100}
 .logo{font-size:1.3rem;font-weight:bold;color:#fff}.logo span{color:#e94560}
 .nav-cta{background:#e94560;color:#fff;padding:10px 22px;border-radius:6px;font-weight:bold;font-size:.9rem}
-/* HERO */
 .hero{text-align:center;padding:100px 20px 80px;max-width:800px;margin:0 auto}
 .hero-badge{display:inline-block;background:#1a1a2e;border:1px solid #e94560;color:#e94560;padding:6px 16px;border-radius:20px;font-size:.85rem;margin-bottom:24px}
 .hero h1{font-size:clamp(2rem,5vw,3.2rem);color:#fff;margin-bottom:20px;line-height:1.2}
@@ -116,29 +108,24 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:20px 4
 .btn-primary{background:#e94560;color:#fff;padding:16px 36px;border-radius:8px;font-weight:bold;font-size:1.05rem}
 .btn-secondary{background:transparent;color:#e8e8f0;padding:16px 36px;border-radius:8px;font-weight:bold;font-size:1.05rem;border:1px solid #2a2a4e}
 .btn-primary:hover{background:#c73652}.btn-secondary:hover{border-color:#e94560;color:#e94560}
-/* PROOF */
 .proof{background:#080810;padding:28px 20px;text-align:center;border-top:1px solid #1a1a2e;border-bottom:1px solid #1a1a2e}
 .proof p{color:#666;font-size:.9rem;margin-bottom:12px}
 .proof-stats{display:flex;gap:48px;justify-content:center;flex-wrap:wrap}
 .stat{text-align:center}.stat strong{display:block;font-size:1.8rem;font-weight:bold;color:#fff}
 .stat span{font-size:.85rem;color:#666}
-/* PROBLEM */
 section{padding:80px 20px;max-width:960px;margin:0 auto}
 h2{font-size:clamp(1.5rem,3vw,2.2rem);color:#fff;margin-bottom:16px}
 .sub{color:#aaa;font-size:1.05rem;margin-bottom:48px}
-/* CHAT DEMO */
 .chat-demo{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:28px;margin:0 auto 60px;max-width:600px}
 .chat-q{color:#aaa;font-size:.9rem;margin-bottom:12px}
 .chat-q strong{color:#e8e8f0}
 .chat-r{background:#0f0f1a;border-radius:8px;padding:16px;font-size:.9rem;color:#ccc}
 .chat-r .bad{color:#e94560;font-weight:bold}.chat-r .good{color:#2ecc71;font-weight:bold}
-/* STEPS */
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-top:48px}
 .step{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:28px}
 .step-num{font-size:2rem;font-weight:bold;color:#e94560;margin-bottom:12px}
 .step h3{color:#fff;margin-bottom:8px;font-size:1rem}
 .step p{color:#aaa;font-size:.9rem}
-/* PRICING */
 .pricing{background:#080810;padding:80px 20px;border-top:1px solid #1a1a2e}
 .pricing-inner{max-width:960px;margin:0 auto;text-align:center}
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-top:48px;text-align:left}
@@ -153,19 +140,23 @@ h2{font-size:clamp(1.5rem,3vw,2.2rem);color:#fff;margin-bottom:16px}
 .plan ul li::before{content:"✓ ";color:#2ecc71}
 .btn-plan{display:block;background:#e94560;color:#fff;padding:14px;border-radius:6px;font-weight:bold;text-align:center}
 .btn-plan.ghost{background:transparent;border:1px solid #e94560;color:#e94560}
-/* FAQ */
 .faq{max-width:720px;margin:0 auto}
 .faq-item{border-bottom:1px solid #1a1a2e;padding:20px 0}
 .faq-item h3{color:#fff;font-size:1rem;margin-bottom:8px}
 .faq-item p{color:#aaa;font-size:.9rem}
-/* CTA FINAL */
 .cta-final{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:80px 20px;text-align:center;border-top:1px solid #2a2a4e}
 .cta-final h2{font-size:clamp(1.5rem,3vw,2rem);color:#fff;margin-bottom:16px}
 .cta-final p{color:#aaa;margin-bottom:32px}
-/* FOOTER */
 footer{background:#080810;padding:32px 20px;text-align:center;color:#444;font-size:.85rem;border-top:1px solid #1a1a2e}
 footer a{color:#666}
-</style>
+"""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Présence IA — Votre entreprise visible dans ChatGPT, Gemini et Claude</title>
+<meta name="description" content="Testez votre visibilité dans les IA et corrigez-la. Audit personnalisé pour artisans et PME locales.">
+<style>{_css}</style>
 </head>
 <body>
 
