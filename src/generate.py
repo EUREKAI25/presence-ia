@@ -153,7 +153,8 @@ def generate_campaign(db: Session, campaign_id: str, prospect_ids: Optional[List
         prospects = [p for pid in prospect_ids if (p := db_get_prospect(db, pid))]
     else:
         all_p = db_list_prospects(db, campaign_id)
-        prospects = [p for p in all_p if p.status == ProspectStatus.READY_ASSETS.value and p.eligibility_flag]
+        _ok = {ProspectStatus.SCORED.value, ProspectStatus.READY_ASSETS.value, ProspectStatus.READY_TO_SEND.value}
+        prospects = [p for p in all_p if p.status in _ok and p.eligibility_flag]
     csv_path = delivery(db, prospects)
     return {"generated": len(prospects), "send_queue_csv": csv_path,
             "dist_dir": str(DIST_DIR), "ids": [p.prospect_id for p in prospects]}
