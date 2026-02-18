@@ -2,7 +2,7 @@
 Module GOOGLE_PLACES — Récupération automatique de prospects
 Google Places API : Text Search + Place Details
 """
-import logging, re, time
+import logging, re
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -32,37 +32,26 @@ def _domain(url: str) -> str:
 # ── Appels API ────────────────────────────────────────────────────────────
 
 def fetch_text_search(profession: str, city: str, api_key: str,
-                      max_results: int = 60) -> List[Dict]:
+                      max_results: int = 20) -> List[Dict]:
     """
     Text Search : "{profession} {city}" → liste de places (place_id, name, user_ratings_total).
-    Pagine automatiquement jusqu'à max_results (max 60 = 3 pages × 20).
+    Une seule page (20 résultats max) — suffisant pour le pipeline de prospection.
     """
-    query   = f"{profession} {city}"
-    results: List[Dict] = []
-    params  = {"query": query, "key": api_key, "language": "fr"}
+    query  = f"{profession} {city}"
+    params = {"query": query, "key": api_key, "language": "fr"}
 
-    while len(results) < max_results:
-        resp = requests.get(_TEXT_SEARCH_URL, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = requests.get(_TEXT_SEARCH_URL, params=params, timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
 
-        status = data.get("status", "")
-        if status in _EMPTY_STATUSES:
-            break
-        if status not in _OK_STATUSES:
-            log.error("Places TextSearch status=%s msg=%s", status, data.get("error_message", ""))
-            raise ValueError(f"Google Places API: {status} — {data.get('error_message', '')}")
+    status = data.get("status", "")
+    if status in _EMPTY_STATUSES:
+        return []
+    if status not in _OK_STATUSES:
+        log.error("Places TextSearch status=%s msg=%s", status, data.get("error_message", ""))
+        raise ValueError(f"Google Places API: {status} — {data.get('error_message', '')}")
 
-        results.extend(data.get("results", []))
-
-        next_token = data.get("next_page_token")
-        if not next_token or len(results) >= max_results:
-            break
-        # Google exige ~2 s avant le next_page_token
-        time.sleep(2)
-        params = {"pagetoken": next_token, "key": api_key}
-
-    return results[:max_results]
+    return data.get("results", [])[:max_results]
 
 
 def fetch_place_details(place_id: str, api_key: str) -> Dict:
