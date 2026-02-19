@@ -60,12 +60,45 @@ def create_checkout(token: str, offer_id: str = "", db: Session = Depends(get_db
     if not offer:
         raise HTTPException(500, "Aucune offre active configurée")
 
-    # Montant en centimes — round() évite les erreurs float (ex: 500+5*100 = 1000 → 100000c)
     unit_amount = int(round(offer.price * 100))
     if unit_amount <= 0:
         raise HTTPException(500, f"Prix invalide : {offer.price}€")
 
-    # Si stripe_price_id configuré → utiliser le Price Stripe existant
+    base_params = dict(
+        payment_method_types=["card"],
+        success_url=f"{base_url}/success?session_id={{CHECKOUT_SESSION_ID}}&token={token}",
+        cancel_url=f"{base_url}/couvreur?t={token}",
+        metadata={"landing_token": token, "prospect_id": p.prospect_id, "offer_id": offer.id},
+    )
+
+    # ── Mode subscription (stripe_price_id = price mensuel récurrent) ──────────
+    # → 1 seule validation client : setup fee (price) + mensualités auto
+    if offer.stripe_price_id and offer.stripe_price_id.startswith("price_"):
+        # Vérifie si c'est un price récurrent (pour le mode subscription)
+        price_obj = s.Price.retrieve(offer.stripe_price_id)
+        if price_obj.get("recurring"):
+            # Setup fee = paiement unique en tête de subscription
+            setup_fee_amount = unit_amount  # 500€ → 50000 centimes
+            session = s.checkout.Session.create(
+                mode="subscription",
+                line_items=[{"price": offer.stripe_price_id, "quantity": 1}],
+                subscription_data={
+                    "add_invoice_items": [{
+                        "price_data": {
+                            "currency": "eur",
+                            "unit_amount": setup_fee_amount,
+                            "product_data": {"name": f"{offer.name} — Frais d'activation"},
+                        }
+                    }],
+                    "metadata": {"offer_id": offer.id, "months": "5"},
+                },
+                **base_params,
+            )
+            log.info("Checkout SUBSCRIPTION %s — setup %s€ + mensuel — prospect %s",
+                     session.id, offer.price, p.prospect_id)
+            return {"checkout_url": session.url, "session_id": session.id}
+
+    # ── Mode paiement unique (défaut — Flash 97€, Tout inclus 3500€) ───────────
     if offer.stripe_price_id:
         line_item = {"price": offer.stripe_price_id, "quantity": 1}
     else:
@@ -82,15 +115,12 @@ def create_checkout(token: str, offer_id: str = "", db: Session = Depends(get_db
         }
 
     session = s.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[line_item],
         mode="payment",
-        success_url=f"{base_url}/success?session_id={{CHECKOUT_SESSION_ID}}&token={token}",
-        cancel_url=f"{base_url}/couvreur?t={token}",
-        metadata={"landing_token": token, "prospect_id": p.prospect_id, "offer_id": offer.id},
+        line_items=[line_item],
+        **base_params,
     )
-
-    log.info("Checkout session %s — offre '%s' %s€ — prospect %s", session.id, offer.name, offer.price, p.prospect_id)
+    log.info("Checkout PAYMENT %s — offre '%s' %s€ — prospect %s",
+             session.id, offer.name, offer.price, p.prospect_id)
     return {"checkout_url": session.url, "session_id": session.id}
 
 
