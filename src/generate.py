@@ -17,7 +17,7 @@ DIST_DIR = Path(__file__).parent.parent / "dist"
 SQ_DIR.mkdir(exist_ok=True)
 DIST_DIR.mkdir(exist_ok=True)
 
-BASE_URL  = os.getenv("BASE_URL", "http://localhost:8000")
+BASE_URL  = os.getenv("BASE_URL", "http://localhost:8001")
 SIGNATURE = os.getenv("SENDER_SIGNATURE", "L'équipe PRESENCE_IA")
 
 

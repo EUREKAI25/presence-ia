@@ -1,0 +1,16 @@
+{
+  "project": "PRESENCE_IA",
+  "current_task": "TERMINÉ — Refactorisation HOME/LANDING/ADMIN content",
+  "last_update": "2026-02-18",
+  "next_step": "Prochaine évolution à définir",
+  "status": "deployed",
+  "completed": [
+    "84 tests passent",
+    "ContentBlockDB + get_block() avec fallback profession/ville",
+    "HOME dynamique (hero, stats, steps, faq, cta depuis DB)",
+    "LANDING dynamique (title_tpl, subtitle_tpl, cta, pricing, faq depuis DB)",
+    "Admin /admin/content — textarea par champ",
+    "CTA HOME → ContactDB SUSPECT via /api/contact-capture",
+    "Commit bced017 + push + déployé VPS 212.227.80.241"
+  ]
+}

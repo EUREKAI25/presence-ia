@@ -1,0 +1,4 @@
+name,website,phone,reviews_count,google_ads_active
+Couvreur Test 1,https://test1.fr,0612345678,45,true
+Couvreur Test 2,https://test2.fr,0622334455,12,false
+Couvreur Test 3,https://test3.fr,0633445566,87,true

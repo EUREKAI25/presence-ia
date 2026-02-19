@@ -39,18 +39,23 @@ def _nav(active: str, token: str) -> str:
 
 
 STATUS_COLORS = {"SUSPECT": "#888", "PROSPECT": "#e9a020", "CLIENT": "#2ecc71"}
-OFFER_LABELS  = {"FLASH": "Audit Flash", "KIT": "Kit Visibilité", "DONE_FOR_YOU": "Tout inclus"}
+def _offer_labels(db: Session) -> dict:
+    """Labels des offres lus depuis offers_module (pas hardcodés)."""
+    from offers_module.database import db_list_offers
+    offers = db_list_offers(db)
+    return {o.name: o.name for o in offers} if offers else {}
 
 
 @router.get("/admin/contacts", response_class=HTMLResponse)
 def contacts_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     contacts = db_list_contacts(db)
+    offer_labels = _offer_labels(db)
 
     rows = ""
     for c in contacts:
         sc = STATUS_COLORS.get(c.status, "#aaa")
-        offer = OFFER_LABELS.get(c.offer_selected or "", c.offer_selected or "—")
+        offer = offer_labels.get(c.offer_selected or "", c.offer_selected or "—")
         sent_icon  = "✅" if c.message_sent  else "—"
         read_icon  = "✅" if c.message_read  else "—"
         paid_icon  = "✅" if c.paid          else "—"
