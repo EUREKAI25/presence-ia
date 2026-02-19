@@ -36,7 +36,9 @@ def _admin_nav(token: str, active: str = "") -> str:
 
 
 def _check_token(request: Request):
-    token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
+    token = (request.headers.get("X-Admin-Token")
+             or request.query_params.get("token")
+             or request.cookies.get("admin_token", ""))
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Token admin invalide")
 
