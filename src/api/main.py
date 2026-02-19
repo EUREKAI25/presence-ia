@@ -23,6 +23,12 @@ def startup():
     init_db()
     log.info("DB initialisée (SQLite)")
 
+    # offers_module — branché sur la même DB SQLite
+    from offers_module import init_module as offers_init
+    db_path = os.getenv("DB_PATH", str(Path(__file__).parent.parent.parent / "data" / "presence_ia.db"))
+    offers_init(db_url=f"sqlite:///{db_path}")
+    log.info("offers_module initialisé")
+
     # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
     dist_root = Path(__file__).parent.parent.parent / "dist"
     for sub, route, name in [
@@ -45,11 +51,12 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def root(db=None):
-    from ..database import get_block, db_list_pricing, SessionLocal
+    from ..database import get_block, SessionLocal
     _db = SessionLocal()
     try:
         B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
-        pricing = db_list_pricing(_db)
+        from offers_module.database import db_list_offers
+        pricing = db_list_offers(_db)
 
         # HERO
         h_title    = B("hero","title").replace("\n","<br>")
@@ -76,18 +83,18 @@ def root(db=None):
         faq_html = "".join(f'<div class="faq-item"><h3 style="color:#fff;font-size:1rem;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>' for q,a in faqs if q)
         # CTA
         cta_title = B("cta","title"); cta_sub = B("cta","subtitle"); cta_btn = B("cta","btn_label")
-        # PRICING dynamique
+        # PRICING dynamique (OfferDB)
         plans_html = ""
+        import json as _json
         for o in pricing:
-            import json as _json
-            bullets = _json.loads(o.bullets or "[]")
-            li = "".join(f"<li>{b}</li>" for b in bullets)
-            badge = '<div class="best-badge">Recommandé</div>' if o.highlighted else ""
-            plans_html += f'''<div class="plan{' best' if o.highlighted else ''}">
-{badge}<h3 style="color:#fff;margin-bottom:8px">{o.title}</h3>
-<div class="price">{o.price_text.replace(' ','<span style="font-size:1rem;color:#aaa"> </span>',1)}</div>
+            features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
+            li = "".join(f"<li>{b}</li>" for b in features)
+            price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price}€"
+            plans_html += f'''<div class="plan">
+<h3 style="color:#fff;margin-bottom:8px">{o.name}</h3>
+<div class="price">{price_display}</div>
 <ul style="list-style:none;margin:20px 0 24px">{li}</ul>
-<a href="#contact" class="btn-plan{' ghost' if not o.highlighted else ''}">{"Commander" if not o.highlighted else "Démarrer"}</a>
+<a href="#contact" class="btn-plan">Commander</a>
 </div>'''
     finally:
         _db.close()
@@ -265,7 +272,8 @@ async function submitCta(e) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, analytics, content
+from offers_module import router as offers_router
 
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -278,6 +286,6 @@ app.include_router(upload.router)
 app.include_router(evidence.router)
 app.include_router(stripe_routes.router)
 app.include_router(contacts.router)
-app.include_router(offers.router)
+app.include_router(offers_router)
 app.include_router(analytics.router)
 app.include_router(content.router)

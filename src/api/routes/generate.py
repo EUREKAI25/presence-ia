@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from ...database import get_db, db_get_campaign, db_get_prospect, db_get_by_token, db_get_evidence, db_list_pricing, get_block, jl
+from ...database import get_db, db_get_campaign, db_get_prospect, db_get_by_token, db_get_evidence, get_block, jl
+from offers_module.database import db_list_offers
 from ...models import GenerateInput, AssetsInput
 from ...generate import audit_generate, email_generate, video_script, generate_campaign, landing_url, _summary, _comps
 from ...assets import set_assets, mark_ready
@@ -66,11 +67,11 @@ def landing(t: str, db: Session = Depends(get_db)):
     # Content blocks landing
     import json as _json
     L = lambda sk, fk: get_block(db, "landing", sk, fk, profession=p.profession, city=p.city)
-    pricing = db_list_pricing(db)
+    pricing = db_list_offers(db, profession=p.profession)
     landing_title = L("hero","title_tpl").replace("{city}", f'<span>{p.city}</span>').replace("{profession}", p.profession or "")
     landing_sub   = L("hero","subtitle_tpl").replace("{n_queries}", str(n_queries)).replace("{n_models}", str(len(s["models"]))).replace("{models}", models_str)
-    flash = next((o for o in pricing if o.key == "FLASH"), None)
-    flash_price   = flash.price_text if flash else "97€"
+    flash = next((o for o in pricing if "flash" in o.name.lower()), None)
+    flash_price   = f"{int(flash.price)}€" if flash and flash.price == int(flash.price) else (f"{flash.price}€" if flash else "97€")
     landing_cta   = L("hero","cta_label").replace("{price}", flash_price)
     landing_faq_html = "".join(
         f'<div class="faq-item"><h3 style="color:#fff;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>'
@@ -80,12 +81,10 @@ def landing(t: str, db: Session = Depends(get_db)):
     )
     landing_plans_html = ""
     for o in pricing:
-        bullets = _json.loads(o.bullets or "[]")
-        li = "".join(f"<li>{b}</li>" for b in bullets)
-        if o.highlighted:
-            landing_plans_html += f'<div class="plan best"><h3>{o.title}</h3><div class="price">{o.price_text}</div><ul>{li}</ul><button onclick="startCheckout()" class="btn">{landing_cta}</button></div>'
-        else:
-            landing_plans_html += f'<div class="plan"><h3>{o.title}</h3><div class="price">{o.price_text}</div><ul>{li}</ul><a href="mailto:contact@presence-ia.com" class="btn">Me contacter</a></div>'
+        features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
+        li = "".join(f"<li>{b}</li>" for b in features)
+        price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price}€"
+        landing_plans_html += f'<div class="plan"><h3>{o.name}</h3><div class="price">{price_display}</div><ul>{li}</ul><button onclick="startCheckout()" class="btn">{landing_cta}</button></div>'
 
     # Evidence screenshots (partagés par ville+profession)
     ev = db_get_evidence(db, p.profession, p.city)

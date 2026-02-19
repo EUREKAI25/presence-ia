@@ -247,19 +247,6 @@ class ContactDB(Base):
     date_payment:      Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
 
 
-class PricingConfigDB(Base):
-    """Offres tarifaires — éditables depuis l'admin, lues dynamiquement par la landing."""
-    __tablename__ = "pricing_config"
-    key:             Mapped[str]  = mapped_column(sa.String, primary_key=True)   # FLASH/KIT/DONE_FOR_YOU
-    title:           Mapped[str]  = mapped_column(sa.String, nullable=False)
-    price_text:      Mapped[str]  = mapped_column(sa.String, nullable=False)     # ex: "97€ une fois"
-    price_eur:       Mapped[float]= mapped_column(sa.Float, nullable=False, default=0)
-    bullets:         Mapped[str]  = mapped_column(sa.Text, default="[]")         # JSON list[str]
-    stripe_price_id: Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
-    highlighted:     Mapped[bool] = mapped_column(sa.Boolean, default=False)
-    active:          Mapped[bool] = mapped_column(sa.Boolean, default=True)
-    sort_order:      Mapped[int]  = mapped_column(sa.Integer, default=0)
-
 
 class JobStatus(str, Enum):
     QUEUED  = "QUEUED"

@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...models import ContactDB, PricingConfigDB
+from ...models import ContactDB
 
 router = APIRouter(tags=["Admin Analytics"])
 

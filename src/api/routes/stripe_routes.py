@@ -45,12 +45,18 @@ def create_checkout(token: str, db: Session = Depends(get_db)):
     s = _stripe()
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
 
+    # Lire le prix FLASH depuis offers_module
+    from offers_module.database import db_list_offers
+    flash_offers = db_list_offers(db)
+    flash = next((o for o in flash_offers if "flash" in o.name.lower()), None)
+    unit_amount = int(flash.price * 100) if flash else 9700  # fallback 97€
+
     session = s.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{
             "price_data": {
                 "currency": "eur",
-                "unit_amount": 9700,   # 97,00 €
+                "unit_amount": unit_amount,
                 "product_data": {
                     "name": f"Audit Visibilité IA — {p.name} ({p.city})",
                     "description": "Audit complet IA sur 3 modèles × 5 requêtes + plan d'action",

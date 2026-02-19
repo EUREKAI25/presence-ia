@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, ContactDB, PricingConfigDB, ContentBlockDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, ContactDB, ContentBlockDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -15,24 +15,6 @@ DB_PATH      = os.getenv("DB_PATH", str(DATA_DIR / "presence_ia.db"))
 ENGINE       = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
 
-
-_PRICING_DEFAULTS = [
-    {
-        "key": "FLASH", "title": "Audit Flash", "price_text": "97€ une fois", "price_eur": 97.0,
-        "bullets": '["Test sur 3 IA × 5 requêtes","Score visibilité /10","Concurrents identifiés","Rapport PDF + vidéo 90s","Checklist 8 points"]',
-        "stripe_price_id": None, "highlighted": False, "active": True, "sort_order": 1,
-    },
-    {
-        "key": "KIT", "title": "Kit Visibilité IA", "price_text": "500€ + 90€/mois × 6", "price_eur": 500.0,
-        "bullets": '["Audit complet inclus","Kit contenu optimisé IA","Suivi mensuel 6 mois","Re-tests trimestriels","Dashboard résultats","Support prioritaire"]',
-        "stripe_price_id": None, "highlighted": True, "active": True, "sort_order": 2,
-    },
-    {
-        "key": "DONE_FOR_YOU", "title": "Tout inclus", "price_text": "3 500€ forfait", "price_eur": 3500.0,
-        "bullets": '["Audit + Kit inclus","Rédaction contenus","Citations locales","Optimisation fiches","Garantie résultats 6 mois"]',
-        "stripe_price_id": None, "highlighted": False, "active": True, "sort_order": 3,
-    },
-]
 
 
 def init_db():
@@ -49,12 +31,6 @@ def init_db():
             except Exception:
                 pass
         conn.commit()
-    # Seed pricing defaults (only if table is empty)
-    with SessionLocal() as db:
-        if db.query(PricingConfigDB).count() == 0:
-            for p in _PRICING_DEFAULTS:
-                db.add(PricingConfigDB(**p))
-            db.commit()
     # Seed content blocks
     with SessionLocal() as db:
         _seed_content_blocks(db)
@@ -158,19 +134,6 @@ def db_update_contact(db: Session, contact: ContactDB, **kwargs) -> ContactDB:
 
 def db_delete_contact(db: Session, contact: ContactDB):
     db.delete(contact); db.commit()
-
-
-# ── Pricing ──
-def db_list_pricing(db: Session) -> list:
-    return db.query(PricingConfigDB).filter_by(active=True).order_by(PricingConfigDB.sort_order).all()
-
-def db_get_pricing(db: Session, key: str) -> Optional[PricingConfigDB]:
-    return db.query(PricingConfigDB).filter_by(key=key).first()
-
-def db_update_pricing(db: Session, pricing: PricingConfigDB, **kwargs) -> PricingConfigDB:
-    for k, v in kwargs.items():
-        setattr(pricing, k, v)
-    db.commit(); db.refresh(pricing); return pricing
 
 
 # ── ContentBlocks ──
