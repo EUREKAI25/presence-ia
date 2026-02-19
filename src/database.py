@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, ContactDB, ContentBlockDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -250,3 +250,35 @@ def db_list_content_blocks(db: Session, page_type: Optional[str] = None,
     if page_type:  q = q.filter_by(page_type=page_type)
     if section_key: q = q.filter_by(section_key=section_key)
     return q.order_by(ContentBlockDB.page_type, ContentBlockDB.section_key, ContentBlockDB.field_key).all()
+
+
+# ── City Headers ──────────────────────────────────────────────────────────────
+
+def db_get_header(db: Session, city: str) -> Optional[CityHeaderDB]:
+    return db.query(CityHeaderDB).filter_by(city=city.lower()).first()
+
+
+def db_upsert_header(db: Session, city: str, filename: str, url: str) -> CityHeaderDB:
+    row = db.query(CityHeaderDB).filter_by(city=city.lower()).first()
+    if row:
+        row.filename = filename
+        row.url = url
+    else:
+        row = CityHeaderDB(city=city.lower(), filename=filename, url=url)
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def db_delete_header(db: Session, city: str) -> bool:
+    row = db.query(CityHeaderDB).filter_by(city=city.lower()).first()
+    if not row:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def db_list_headers(db: Session) -> list:
+    return db.query(CityHeaderDB).order_by(CityHeaderDB.city).all()

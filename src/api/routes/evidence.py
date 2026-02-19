@@ -143,11 +143,13 @@ def get_latest_evidence(
 
 def _nav(active: str, token: str) -> str:
     tabs = [
-        ("contacts", "👥 Contacts"),
-        ("offers", "💶 Offres"),
+        ("contacts",  "👥 Contacts"),
+        ("offers",    "💶 Offres"),
         ("analytics", "📊 Analytics"),
-        ("evidence", "📸 Preuves"),
-        ("send-queue", "📤 Envoi"),
+        ("evidence",  "📸 Preuves"),
+        ("headers",   "🖼 Headers"),
+        ("content",   "✏️ Contenus"),
+        ("send-queue","📤 Envoi"),
     ]
     links = "".join(
         f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
@@ -226,18 +228,76 @@ def evidence_admin_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Preuves — PRESENCE_IA Admin</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+input,select{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 12px;border-radius:6px;font-size:13px}}</style>
 </head><body>
 {_nav("evidence", token)}
 <div style="max-width:1200px;margin:0 auto;padding:24px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-  <h1 style="color:#fff;font-size:18px">📸 Preuves ({total_imgs} images)</h1>
-  <p style="color:#aaa;font-size:12px">Chaque upload est automatiquement redimensionné à 1600px et cropé 16:9 en WEBP.</p>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;gap:24px;flex-wrap:wrap">
+  <h1 style="color:#fff;font-size:18px;align-self:center">📸 Preuves ({total_imgs} images)</h1>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;min-width:380px">
+    <h3 style="color:#fff;font-size:14px;margin-bottom:14px">Uploader des preuves</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px">Profession *</label>
+        <input id="up-profession" type="text" placeholder="couvreur" style="width:100%">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px">Ville *</label>
+        <input id="up-city" type="text" placeholder="rennes" style="width:100%">
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px">Modèle IA</label>
+      <select id="up-provider" style="width:100%">
+        <option value="openai">ChatGPT (OpenAI)</option>
+        <option value="anthropic">Claude (Anthropic)</option>
+        <option value="gemini">Gemini (Google)</option>
+      </select>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px">Images (PNG/JPG — multiple)</label>
+      <input id="up-files" type="file" accept="image/*" multiple style="width:100%">
+    </div>
+    <button onclick="uploadEvidence(this)"
+      style="background:#e94560;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;width:100%">
+      Uploader
+    </button>
+    <div id="up-status" style="margin-top:8px;font-size:12px;color:#aaa"></div>
+  </div>
 </div>
+
 {sections}{empty}
 </div>
 <script>
 const T = '{token}';
+async function uploadEvidence(btn) {{
+  const profession = document.getElementById('up-profession').value.trim().toLowerCase();
+  const city       = document.getElementById('up-city').value.trim().toLowerCase();
+  const provider   = document.getElementById('up-provider').value;
+  const files      = document.getElementById('up-files').files;
+  const status     = document.getElementById('up-status');
+  if (!profession || !city) {{ status.textContent = '⚠️ Profession et ville requises'; return; }}
+  if (!files.length) {{ status.textContent = '⚠️ Sélectionner au moins un fichier'; return; }}
+  btn.disabled = true; btn.textContent = '…';
+  let done = 0, errors = 0;
+  for (const file of files) {{
+    const form = new FormData();
+    form.append('file', file);
+    try {{
+      const r = await fetch(
+        `/api/evidence/upload?profession=${{encodeURIComponent(profession)}}&city=${{encodeURIComponent(city)}}&provider=${{provider}}&token=`+T,
+        {{ method: 'POST', body: form }}
+      );
+      if (r.ok) done++; else errors++;
+    }} catch(e) {{ errors++; }}
+    status.textContent = `${{done}}/${{files.length}} uploadé(s)…`;
+  }}
+  btn.disabled = false; btn.textContent = 'Uploader';
+  status.textContent = `✅ ${{done}} image(s) uploadée(s)${{errors ? ' — ' + errors + ' erreur(s)' : ''}}`;
+  if (done > 0) setTimeout(() => location.reload(), 1200);
+}}
 async function delEvidence(profession, city, idx, btn) {{
   if(!confirm('Supprimer cette image ?')) return;
   btn.disabled = true; btn.textContent = '…';

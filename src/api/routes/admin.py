@@ -13,16 +13,20 @@ from ...models import ProspectStatus, ProspectDB
 router = APIRouter(tags=["Admin"])
 
 
-def _admin_nav(token: str) -> str:
+def _admin_nav(token: str, active: str = "") -> str:
     tabs = [
-        ("contacts", "👥 Contacts"),
-        ("offers", "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence", "📸 Preuves"),
+        ("contacts",   "👥 Contacts"),
+        ("offers",     "💶 Offres"),
+        ("analytics",  "📊 Analytics"),
+        ("evidence",   "📸 Preuves"),
+        ("headers",    "🖼 Headers"),
+        ("content",    "✏️ Contenus"),
         ("send-queue", "📤 Envoi"),
     ]
     links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;font-size:13px;color:#fff">{label}</a>'
+        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
+        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
+        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
         for t, label in tabs
     )
     return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">

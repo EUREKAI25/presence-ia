@@ -34,6 +34,7 @@ def startup():
     for sub, route, name in [
         ("uploads", "/dist/uploads", "uploads"),
         ("evidence", "/dist/evidence", "evidence"),
+        ("headers",  "/dist/headers",  "headers"),
     ]:
         d = dist_root / sub
         try:
@@ -83,6 +84,31 @@ def root(db=None):
         faq_html = "".join(f'<div class="faq-item"><h3 style="color:#fff;font-size:1rem;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>' for q,a in faqs if q)
         # CTA
         cta_title = B("cta","title"); cta_sub = B("cta","subtitle"); cta_btn = B("cta","btn_label")
+        # PREUVES — 6 dernières images toutes villes confondues
+        from ..database import db_get_evidence, jl as _jl
+        from ..models import CityEvidenceDB
+        _PROVIDER_LABELS = {"openai": "ChatGPT", "anthropic": "Claude", "gemini": "Gemini"}
+        _all_ev = _db.query(CityEvidenceDB).all()
+        _all_imgs = []
+        for _ev in _all_ev:
+            for _img in _jl(_ev.images):
+                _img["_profession"] = _ev.profession
+                _img["_city"] = _ev.city
+                _all_imgs.append(_img)
+        _all_imgs.sort(key=lambda x: x.get("ts",""), reverse=True)
+        _latest_imgs = _all_imgs[:6]
+        evidence_html = ""
+        if _latest_imgs:
+            _cards = "".join(
+                f'<a href="{_i.get("url","")}" target="_blank" style="display:block;border-radius:8px;overflow:hidden;border:1px solid #2a2a4e">'
+                f'<img src="{_i.get("processed_url") or _i.get("url","")}" '
+                f'style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block" loading="lazy">'
+                f'<div style="padding:6px 8px;background:#1a1a2e;font-size:10px;color:#666">'
+                f'{_i.get("ts","")[:10]} · {_PROVIDER_LABELS.get(_i.get("provider",""), _i.get("provider",""))} · {_i.get("_city","").title()}'
+                f'</div></a>'
+                for _i in _latest_imgs
+            )
+            evidence_html = f"""<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:24px">{_cards}</div>"""
         # PRICING dynamique (OfferDB)
         plans_html = ""
         import json as _json
@@ -217,6 +243,13 @@ footer a{color:#666}
   </div>
 </section>
 
+<!-- PREUVES -->
+{f'''<section style="padding:60px 20px;max-width:960px;margin:0 auto">
+<h2 style="color:#fff;font-size:clamp(1.4rem,3vw,2rem);margin-bottom:8px">Captures réelles de nos tests</h2>
+<p style="color:#aaa;font-size:1rem;margin-bottom:0">Ces screenshots ont été pris lors de nos audits — ce que les IA répondent vraiment.</p>
+{evidence_html}
+</section>''' if evidence_html else ""}
+
 <!-- PRICING -->
 <div class="pricing" id="tarifs">
   <div class="pricing-inner">
@@ -264,7 +297,7 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers
 from offers_module import router as offers_router
 
 app.include_router(campaign.router)
@@ -282,3 +315,4 @@ app.include_router(offers.router)
 app.include_router(offers_router)
 app.include_router(analytics.router)
 app.include_router(content.router)
+app.include_router(headers.router)

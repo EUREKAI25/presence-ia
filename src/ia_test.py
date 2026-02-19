@@ -66,7 +66,10 @@ _STOPWORDS: set = {
     # Villes / géographie
     "bordeaux", "paris", "lyon", "marseille", "toulouse", "nantes", "rennes",
     "strasbourg", "lille", "nice", "montpellier", "grenoble", "tours",
-    "france", "europe",
+    "brest", "quimper", "lorient", "vannes", "saint", "bretagne",
+    "rouen", "caen", "dijon", "reims", "metz", "nancy", "amiens",
+    "clermont", "ferrand", "limoges", "poitiers", "angers", "le mans",
+    "france", "europe", "bretagne", "normandie", "alsace",
     # Plateformes / générique
     "google", "maps", "googlemaps", "pagesjaunes", "pages", "jaunes", "yelp",
     "tripadvisor", "leboncoin", "facebook", "instagram", "twitter", "linkedin",
@@ -90,12 +93,18 @@ _LEGAL_SUFFIXES = re.compile(
     r"\b(sarl|sas|eurl|snc|sa|spa|ltd|llc|gmbh|cie|groupe?|et fils|and co)\b", re.I
 )
 
-# Regex conservatrice : 2 à 5 tokens avec majuscule, séparés par espace ou tiret
+# Regex 1 : noms mixtes (Toit Mon Toit, Couverture Bretonne…)
 _ORG_RE = re.compile(
     r"\b(?:[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]"
     r"[a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý]{2,}"
     r"(?:[-\s][A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]"
     r"[a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý]{2,}){1,4})\b"
+)
+
+# Regex 2 : noms tout-caps (TOIT'URIEN, RDT COUVERTURE, LBAT TOITURE…)
+_ORG_CAPS_RE = re.compile(
+    r"\b(?:[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]{3,}"
+    r"(?:['\s\-][A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ]{3,}){0,4})\b"
 )
 
 
@@ -136,12 +145,22 @@ def extract_entities(text: str) -> List[Dict]:
         if d and len(d) > 3:
             out.append({"type": "url", "value": url, "domain": d})
 
-    # 2. Noms d'organisation multi-tokens avec majuscule stricte
+    # 2a. Noms d'organisation mixtes (Toit Mon Toit, Couverture Bretonne…)
     for m in _ORG_RE.finditer(text):
         candidate = m.group().strip()
-        # Supprimer suffixes légaux pour évaluer le nom réel
         clean = _LEGAL_SUFFIXES.sub("", candidate).strip()
         if _is_valid_org(clean):
+            out.append({"type": "company", "value": candidate})
+
+    # 2b. Noms tout-caps (TOIT'URIEN, RDT COUVERTURE…) — normalisation pour validation
+    for m in _ORG_CAPS_RE.finditer(text):
+        candidate = m.group().strip()
+        # Convertir en titre pour réutiliser _is_valid_org (qui travaille sur tokens)
+        candidate_title = candidate.replace("'", " ").replace("-", " ")
+        clean = _LEGAL_SUFFIXES.sub("", candidate_title).strip()
+        # Exclure les mots isolés de 3 lettres (acronymes courants) sauf si 2+ tokens
+        tokens = [t for t in clean.split() if t]
+        if len(tokens) >= 2 and not ({_no_accent(t.lower()) for t in tokens} & _STOPWORDS):
             out.append({"type": "company", "value": candidate})
 
     # Dédoublonnage insensible à la casse

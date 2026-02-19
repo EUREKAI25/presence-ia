@@ -195,6 +195,16 @@ class CityEvidenceDB(Base):
     __table_args__ = (sa.UniqueConstraint("profession", "city", name="uq_city_evidence"),)
 
 
+class CityHeaderDB(Base):
+    """Image header par ville — stockée dans /dist/headers/{city}.webp."""
+    __tablename__ = "city_headers"
+    id:         Mapped[str]      = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    city:       Mapped[str]      = mapped_column(sa.String, nullable=False, unique=True, index=True)
+    filename:   Mapped[str]      = mapped_column(sa.String, nullable=False)
+    url:        Mapped[str]      = mapped_column(sa.String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ContentBlockDB(Base):
     """Textes éditables depuis l'admin — HOME et LANDING."""
     __tablename__ = "content_blocks"

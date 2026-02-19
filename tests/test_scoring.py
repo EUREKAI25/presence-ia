@@ -65,13 +65,13 @@ class TestEmailOK:
         ]
         assert self._ok(runs) is False
 
-    def test_pas_de_concurrent_stable_non_eligible(self):
-        """Invisible mais chaque concurrent n'apparaît que dans 1 run → pas stable."""
+    def test_invisible_sans_concurrent_stable_eligible(self):
+        """Invisible sur 2 modèles, sans concurrent stable → éligible (règle v2 : concurrent non requis)."""
         runs = [
             make_run("openai",    False, [False]*5, ["alpha sa"]),
             make_run("anthropic", False, [False]*5, ["beta sarl"]),
         ]
-        assert self._ok(runs) is False
+        assert self._ok(runs) is True
 
     def test_aucun_run_non_eligible(self):
         assert self._ok([]) is False

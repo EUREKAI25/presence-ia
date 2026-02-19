@@ -1,6 +1,6 @@
 """
 Module SCORE
-Règle EMAIL_OK : mentions=0 sur ≥2/3 modèles ET ≥4/5 requêtes ET ≥1 concurrent stable
+Règle EMAIL_OK : mentions=0 sur ≥2/3 modèles ET ≥4/5 requêtes (concurrent stable optionnel)
 Score /10 : +4 invisible +2 concurrents +1 ads +1 reviews +1 website
 """
 import json, logging
@@ -38,10 +38,10 @@ def _email_ok(runs) -> Tuple[bool, str]:
             if isinstance(c, str): cc[c.lower()] += 1
     stable = [n for n, cnt in cc.items() if cnt >= MIN_COMP_RUNS]
 
-    ok = len(invis_models) >= MODELS_NEEDED and len(invis_queries) >= QUERIES_NEEDED and len(stable) >= 1
+    ok = len(invis_models) >= MODELS_NEEDED and len(invis_queries) >= QUERIES_NEEDED
     j  = (f"Modèles invisibles {len(invis_models)}/3 {'✓' if len(invis_models)>=MODELS_NEEDED else '✗'} | "
           f"Requêtes invisibles {len(invis_queries)}/5 {'✓' if len(invis_queries)>=QUERIES_NEEDED else '✗'} | "
-          f"Concurrents stables {len(stable)} {'✓' if stable else '✗'}")
+          f"Concurrents stables {len(stable)}")
     return ok, j
 
 
@@ -67,7 +67,10 @@ def run_scoring(db: Session, campaign_id: str, prospect_ids: Optional[List[str]]
     if prospect_ids:
         prospects = [p for pid in prospect_ids if (p := db_get_prospect(db, pid))]
     else:
-        prospects = db_list_prospects(db, campaign_id, status=ProspectStatus.TESTED.value)
+        # Re-scorer aussi les SCORED (pour mise à jour éligibilité après enrichissement email)
+        tested  = db_list_prospects(db, campaign_id, status=ProspectStatus.TESTED.value)
+        rescored = db_list_prospects(db, campaign_id, status=ProspectStatus.SCORED.value)
+        prospects = tested + rescored
 
     res = {"total": len(prospects), "scored": 0, "eligible": 0}
     for p in prospects:

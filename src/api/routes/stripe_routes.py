@@ -37,7 +37,7 @@ def _stripe():
 # ── Checkout session ─────────────────────────────────────────────────────────
 
 @router.post("/api/stripe/checkout-session")
-def create_checkout(token: str, db: Session = Depends(get_db)):
+def create_checkout(token: str, offer_id: str = "", db: Session = Depends(get_db)):
     p = db_get_by_token(db, token)
     if not p:
         raise HTTPException(404, "Token invalide")
@@ -45,32 +45,52 @@ def create_checkout(token: str, db: Session = Depends(get_db)):
     s = _stripe()
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
 
-    # Lire le prix FLASH depuis offers_module
-    from offers_module.database import db_list_offers
-    flash_offers = db_list_offers(db)
-    flash = next((o for o in flash_offers if "flash" in o.name.lower()), None)
-    unit_amount = int(flash.price * 100) if flash else 9700  # fallback 97€
+    # Résoudre l'offre : par ID si fourni, sinon première offre "flash"
+    from offers_module.database import db_list_offers, db_get_offer
+    if offer_id:
+        offer = db_get_offer(db, offer_id)
+        if not offer or not offer.active:
+            raise HTTPException(404, f"Offre '{offer_id}' introuvable ou inactive")
+    else:
+        all_offers = db_list_offers(db)
+        offer = next((o for o in all_offers if "flash" in o.name.lower()), None)
+        if not offer:
+            offer = all_offers[0] if all_offers else None
 
-    session = s.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{
+    if not offer:
+        raise HTTPException(500, "Aucune offre active configurée")
+
+    # Montant en centimes — round() évite les erreurs float (ex: 500+5*100 = 1000 → 100000c)
+    unit_amount = int(round(offer.price * 100))
+    if unit_amount <= 0:
+        raise HTTPException(500, f"Prix invalide : {offer.price}€")
+
+    # Si stripe_price_id configuré → utiliser le Price Stripe existant
+    if offer.stripe_price_id:
+        line_item = {"price": offer.stripe_price_id, "quantity": 1}
+    else:
+        line_item = {
             "price_data": {
                 "currency": "eur",
                 "unit_amount": unit_amount,
                 "product_data": {
-                    "name": f"Audit Visibilité IA — {p.name} ({p.city})",
-                    "description": "Audit complet IA sur 3 modèles × 5 requêtes + plan d'action",
+                    "name": f"{offer.name} — {p.name} ({p.city})",
+                    "description": "Audit Visibilité IA · 3 modèles × 5 requêtes · Plan d'action",
                 },
             },
             "quantity": 1,
-        }],
+        }
+
+    session = s.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[line_item],
         mode="payment",
         success_url=f"{base_url}/success?session_id={{CHECKOUT_SESSION_ID}}&token={token}",
         cancel_url=f"{base_url}/couvreur?t={token}",
-        metadata={"landing_token": token, "prospect_id": p.prospect_id},
+        metadata={"landing_token": token, "prospect_id": p.prospect_id, "offer_id": offer.id},
     )
 
-    log.info("Checkout session créée %s pour prospect %s", session.id, p.prospect_id)
+    log.info("Checkout session %s — offre '%s' %s€ — prospect %s", session.id, offer.name, offer.price, p.prospect_id)
     return {"checkout_url": session.url, "session_id": session.id}
 
 
