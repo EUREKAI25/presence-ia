@@ -282,3 +282,25 @@ def db_delete_header(db: Session, city: str) -> bool:
 
 def db_list_headers(db: Session) -> list:
     return db.query(CityHeaderDB).order_by(CityHeaderDB.city).all()
+
+
+# ── Page Layouts ─────────────────────────────────────────────────────────────
+
+def db_get_page_layout(db: Session, page_type: str):
+    """Récupère la config des sections pour une page (home/landing)."""
+    from .models import PageLayoutDB
+    return db.query(PageLayoutDB).filter_by(page_type=page_type).first()
+
+
+def db_upsert_page_layout(db: Session, page_type: str, sections_config: str):
+    """Crée ou met à jour la config des sections."""
+    from .models import PageLayoutDB
+    layout = db.query(PageLayoutDB).filter_by(page_type=page_type).first()
+    if layout:
+        layout.sections_config = sections_config
+    else:
+        layout = PageLayoutDB(page_type=page_type, sections_config=sections_config)
+        db.add(layout)
+    db.commit()
+    db.refresh(layout)
+    return layout

@@ -227,10 +227,34 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
     blocks_by_key = {(b.page_type, b.section_key, b.field_key, b.profession, b.city): b.value
                      for b in blocks}
 
-    # Déterminer les sections à afficher selon la page
-    sections_home    = ["hero", "proof_stat", "proof_visual", "cta"]
-    sections_landing = ["hero", "proof_stat", "proof_visual"]
-    sections = sections_home if page == "home" else sections_landing
+    # Lire la config du layout depuis la DB
+    from ...database import db_get_page_layout
+    import json as _json
+    layout = db_get_page_layout(db, page)
+    if layout:
+        sections_config = _json.loads(layout.sections_config)
+    else:
+        # Default si pas encore configuré
+        if page == "home":
+            sections_config = [
+                {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+                {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
+                {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
+                {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
+                {"key": "cta", "label": "CTA final", "enabled": True, "order": 4},
+            ]
+        else:
+            sections_config = [
+                {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+                {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
+                {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
+                {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
+            ]
+
+    # Filtrer les sections activées et trier par ordre
+    sections_enabled = [s for s in sections_config if s.get("enabled", True)]
+    sections_enabled.sort(key=lambda s: s.get("order", 0))
+    sections = [s["key"] for s in sections_enabled]
 
     # Masquer profession/ville sur HOME
     show_variants = (page == "landing")
@@ -271,9 +295,14 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
 </head><body>
 {_nav("content", token)}
 <div style="max-width:860px;margin:0 auto;padding:24px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
   <h1 style="color:#fff;font-size:18px">✏️ Contenus éditables</h1>
-  <div style="display:flex;gap:8px">{page_tabs}</div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    {page_tabs}
+    <button onclick="openLayoutModal()" style="background:#2a2a4e;color:#fff;border:1px solid #444;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:normal">
+      ⚙️ Gérer les sections
+    </button>
+  </div>
 </div>
 {variant_note}
 {sections_html}
@@ -391,7 +420,139 @@ function addFaqItem() {{
 </div>`;
   container.insertAdjacentHTML('beforeend', html);
 }}
+
+// ── Layout management (modal + drag & drop) ──────────────────────────────────
+
+let layoutSections = [];
+
+async function openLayoutModal() {{
+  const modal = document.getElementById('layout-modal');
+  modal.style.display = 'flex';
+  await loadLayoutSections();
+}}
+
+function closeLayoutModal() {{
+  document.getElementById('layout-modal').style.display = 'none';
+}}
+
+async function loadLayoutSections() {{
+  const r = await fetch(`/api/admin/content/layout?page=${{PAGE}}&token=${{T}}`);
+  const d = await r.json();
+  layoutSections = d.sections;
+  renderLayoutSections();
+}}
+
+function renderLayoutSections() {{
+  const container = document.getElementById('sections-list');
+  container.innerHTML = layoutSections.map((s, idx) => `
+    <div class="section-item" draggable="true" data-index="${{idx}}"
+      style="background:#0a0a15;border:1px solid #2a2a4e;border-radius:6px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:move">
+      <span style="color:#666;font-size:16px">☰</span>
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;color:#e8e8f0;font-size:14px">
+        <input type="checkbox" ${{s.enabled ? 'checked' : ''}} onchange="toggleSection(${{idx}})"
+          style="width:16px;height:16px;accent-color:#e94560">
+        ${{s.label}}
+      </label>
+    </div>
+  `).join('');
+
+  // Setup drag & drop
+  const items = container.querySelectorAll('.section-item');
+  items.forEach(item => {{
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragend', handleDragEnd);
+  }});
+}}
+
+let draggedItem = null;
+
+function handleDragStart(e) {{
+  draggedItem = this;
+  this.style.opacity = '0.4';
+}}
+
+function handleDragOver(e) {{
+  e.preventDefault();
+  return false;
+}}
+
+function handleDrop(e) {{
+  e.preventDefault();
+  if (draggedItem !== this) {{
+    const fromIdx = parseInt(draggedItem.dataset.index);
+    const toIdx = parseInt(this.dataset.index);
+    const [moved] = layoutSections.splice(fromIdx, 1);
+    layoutSections.splice(toIdx, 0, moved);
+    layoutSections.forEach((s, i) => s.order = i);
+    renderLayoutSections();
+  }}
+  return false;
+}}
+
+function handleDragEnd() {{
+  this.style.opacity = '1';
+}}
+
+function toggleSection(idx) {{
+  layoutSections[idx].enabled = !layoutSections[idx].enabled;
+}}
+
+async function saveLayout() {{
+  const btn = document.getElementById('save-layout-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement...';
+  try {{
+    const r = await fetch(`/api/admin/content/layout?token=${{T}}`, {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{page_type: PAGE, sections: layoutSections}})
+    }});
+    if (r.ok) {{
+      btn.textContent = '✅ Enregistré';
+      setTimeout(() => {{
+        closeLayoutModal();
+        window.location.reload();
+      }}, 800);
+    }} else {{
+      btn.textContent = '❌ Erreur';
+      btn.disabled = false;
+    }}
+  }} catch(e) {{
+    btn.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+  }}
+}}
 </script>
+
+<!-- Modal gestion layout -->
+<div id="layout-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:32px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <h2 style="color:#fff;font-size:18px">⚙️ Gérer les sections — {page.upper()}</h2>
+      <button onclick="closeLayoutModal()" style="background:transparent;border:none;color:#999;font-size:24px;cursor:pointer;padding:0;line-height:1">&times;</button>
+    </div>
+
+    <p style="color:#9ca3af;font-size:13px;margin-bottom:20px">
+      Glisse-dépose pour réorganiser · Décoche pour masquer une section
+    </p>
+
+    <div id="sections-list"></div>
+
+    <div style="display:flex;gap:12px;margin-top:24px">
+      <button id="save-layout-btn" onclick="saveLayout()"
+        style="flex:1;background:#e94560;color:#fff;border:none;padding:12px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold">
+        Enregistrer
+      </button>
+      <button onclick="closeLayoutModal()"
+        style="background:#2a2a4e;color:#fff;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;font-size:14px">
+        Annuler
+      </button>
+    </div>
+  </div>
+</div>
+
 </body></html>""")
 
 
@@ -421,4 +582,54 @@ async def update_content(request: Request, db: Session = Depends(get_db)):
         profession=profession,
         city=city,
     )
+    return JSONResponse({"ok": True})
+
+
+# ── Gestion du layout (ordre + enabled des sections) ────────────────────────
+
+@router.get("/api/admin/content/layout")
+def get_layout(page: str, db: Session = Depends(get_db), token: str = ""):
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+        raise HTTPException(403, "Accès refusé")
+    
+    from ...database import db_get_page_layout
+    import json
+    layout = db_get_page_layout(db, page)
+    if layout:
+        return JSONResponse({"sections": json.loads(layout.sections_config)})
+    
+    # Default layout si pas encore configuré
+    default_sections_home = [
+        {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+        {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
+        {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
+        {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
+        {"key": "cta", "label": "CTA final", "enabled": True, "order": 4},
+    ]
+    default_sections_landing = [
+        {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+        {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
+        {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
+        {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
+    ]
+    sections = default_sections_home if page == "home" else default_sections_landing
+    return JSONResponse({"sections": sections})
+
+
+@router.post("/api/admin/content/layout")
+async def save_layout(request: Request, db: Session = Depends(get_db)):
+    token = request.query_params.get("token")
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+        raise HTTPException(403, "Accès refusé")
+    
+    from ...database import db_upsert_page_layout
+    import json
+    data = await request.json()
+    page_type = data.get("page_type")
+    sections = data.get("sections", [])
+    
+    if not page_type or page_type not in ["home", "landing"]:
+        raise HTTPException(400, "page_type invalide")
+    
+    db_upsert_page_layout(db, page_type, json.dumps(sections))
     return JSONResponse({"ok": True})

@@ -222,6 +222,14 @@ class ContentBlockDB(Base):
     )
 
 
+class PageLayoutDB(Base):
+    """Configuration des sections (ordre + activé/désactivé) pour HOME et LANDING."""
+    __tablename__ = "page_layouts"
+    page_type:       Mapped[str]      = mapped_column(sa.String, primary_key=True)  # "home" | "landing"
+    sections_config: Mapped[str]      = mapped_column(sa.Text, default="[]")  # JSON: [{"key":"hero","label":"Hero","enabled":true,"order":0},...]
+    updated_at:      Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ContactStatus(str, Enum):
     SUSPECT   = "SUSPECT"
     PROSPECT  = "PROSPECT"
