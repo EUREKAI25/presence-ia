@@ -499,6 +499,45 @@ function toggleSection(idx) {{
   layoutSections[idx].enabled = !layoutSections[idx].enabled;
 }}
 
+function showAddSectionForm() {{
+  document.getElementById('add-section-form').style.display = 'block';
+  document.getElementById('add-section-btn').style.display = 'none';
+  document.getElementById('new-section-key').value = '';
+  document.getElementById('new-section-label').value = '';
+}}
+
+function cancelAddSection() {{
+  document.getElementById('add-section-form').style.display = 'none';
+  document.getElementById('add-section-btn').style.display = 'block';
+}}
+
+function addNewSection() {{
+  const key = document.getElementById('new-section-key').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const label = document.getElementById('new-section-label').value.trim();
+
+  if (!key || !label) {{
+    alert('Clé et label obligatoires');
+    return;
+  }}
+
+  if (layoutSections.find(s => s.key === key)) {{
+    alert('Cette clé existe déjà');
+    return;
+  }}
+
+  const maxOrder = Math.max(...layoutSections.map(s => s.order), -1);
+  layoutSections.push({{
+    key: key,
+    label: label,
+    enabled: true,
+    order: maxOrder + 1,
+    custom: true
+  }});
+
+  renderLayoutSections();
+  cancelAddSection();
+}}
+
 async function saveLayout() {{
   const btn = document.getElementById('save-layout-btn');
   btn.disabled = true;
@@ -539,6 +578,29 @@ async function saveLayout() {{
     </p>
 
     <div id="sections-list"></div>
+
+    <div id="add-section-form" style="display:none;background:#0a0a15;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-top:16px">
+      <h3 style="color:#e94560;font-size:14px;margin-bottom:12px">Nouvelle section personnalisée</h3>
+      <label style="display:block;color:#aaa;font-size:12px;margin-bottom:4px">Clé (ex: temoignages, tarifs...)</label>
+      <input id="new-section-key" type="text" placeholder="ma_section"
+        style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
+      <label style="display:block;color:#aaa;font-size:12px;margin-bottom:4px">Label affiché</label>
+      <input id="new-section-label" type="text" placeholder="Ma section"
+        style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
+      <div style="display:flex;gap:8px">
+        <button onclick="addNewSection()" style="flex:1;background:#e94560;color:#fff;border:none;padding:8px;border-radius:4px;cursor:pointer;font-size:13px">
+          Ajouter
+        </button>
+        <button onclick="cancelAddSection()" style="background:#2a2a4e;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px">
+          Annuler
+        </button>
+      </div>
+    </div>
+
+    <button onclick="showAddSectionForm()" id="add-section-btn"
+      style="width:100%;background:transparent;border:1px dashed #2a2a4e;color:#9ca3af;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:16px">
+      + Ajouter une section personnalisée
+    </button>
 
     <div style="display:flex;gap:12px;margin-top:24px">
       <button id="save-layout-btn" onclick="saveLayout()"
