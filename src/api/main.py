@@ -29,6 +29,22 @@ def startup():
     offers_init(db_url=f"sqlite:///{db_path}")
     log.info("offers_module initialisé")
 
+    # Scheduler — prospection automatique toutes les heures
+    try:
+        from ..scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        log.warning("Scheduler non démarré : %s", e)
+
+
+@app.on_event("shutdown")
+def shutdown():
+    try:
+        from ..scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
+
     # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
     dist_root = Path(__file__).parent.parent.parent / "dist"
     for sub, route, name in [
@@ -325,7 +341,7 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin
 from offers_module import router as offers_router
 
 app.include_router(campaign.router)
@@ -345,3 +361,4 @@ app.include_router(analytics.router)
 app.include_router(content.router)
 app.include_router(headers.router)
 app.include_router(scan_admin.router)
+app.include_router(prospection_admin.router)

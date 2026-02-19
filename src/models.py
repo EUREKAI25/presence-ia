@@ -265,6 +265,21 @@ class JobStatus(str, Enum):
     FAILED  = "FAILED"
 
 
+class ProspectionTargetDB(Base):
+    """Ciblage de prospection automatique (ville × métier × fréquence)."""
+    __tablename__ = "prospection_targets"
+    id:             Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name:           Mapped[str]            = mapped_column(sa.String, nullable=False)          # ex: "hors cadre"
+    city:           Mapped[str]            = mapped_column(sa.String, nullable=False)
+    profession:     Mapped[str]            = mapped_column(sa.String, nullable=False)
+    frequency:      Mapped[str]            = mapped_column(sa.String, default="weekly")        # daily/2x_week/weekly/2x_month/monthly
+    max_prospects:  Mapped[int]            = mapped_column(sa.Integer, default=20)
+    active:         Mapped[bool]           = mapped_column(sa.Boolean, default=True)
+    last_run:       Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    last_count:     Mapped[int]            = mapped_column(sa.Integer, default=0)             # nb prospects trouvés au dernier run
+    created_at:     Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
