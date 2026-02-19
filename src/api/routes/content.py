@@ -76,6 +76,12 @@ _FIELD_LABELS = {
     # LANDING PROOF VISUAL
     ("landing","proof_visual","mention"): "Mention tests (ex: 9 tests sur 3 jours)",
     # LANDING PROOF STAT
+    ("landing","proof_stat","stat_1_value"):  "Stat 1 — Valeur",
+    ("landing","proof_stat","stat_1_label"):  "Stat 1 — Texte",
+    ("landing","proof_stat","stat_2_value"):  "Stat 2 — Valeur",
+    ("landing","proof_stat","stat_2_label"):  "Stat 2 — Texte",
+    ("landing","proof_stat","stat_3_value"):  "Stat 3 — Valeur",
+    ("landing","proof_stat","stat_3_label"):  "Stat 3 — Texte",
     ("landing","proof_stat","source_url_1"):   "Source 1 — URL",
     ("landing","proof_stat","source_label_1"): "Source 1 — Texte",
     ("landing","proof_stat","source_url_2"):   "Source 2 — URL",
