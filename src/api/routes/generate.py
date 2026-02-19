@@ -62,7 +62,8 @@ def landing(t: str, db: Session = Depends(get_db)):
     s = _summary(db, p); comps = _comps(p, 3)
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
     n_queries = sum(1 for q in s["ql"] if q)
-    models_str = ", ".join(s["models"]) or "—"
+    _MODEL_LABEL = {"openai": "ChatGPT", "anthropic": "Anthropic", "gemini": "Gemini"}
+    models_str = ", ".join(_MODEL_LABEL.get(m, m.title()) for m in s["models"]) or "—"
 
     # Header image de la ville (si uploadée)
     city_header = db_get_header(db, p.city.lower())
@@ -79,7 +80,13 @@ def landing(t: str, db: Session = Depends(get_db)):
     plans_html = ""
     for i, o in enumerate(pricing):
         features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
-        li = "".join(f"<li>{f}</li>" for f in features)
+        # Détecter si la première feature est une mention de mensualités (ex: "puis 5 × 100€/mois")
+        monthly_note = ""
+        display_feats = features
+        if features and features[0].lower().startswith("puis"):
+            monthly_note = f'<div class="plan-monthly">{features[0]}</div>'
+            display_feats = features[1:]
+        li = "".join(f"<li>{f}</li>" for f in display_feats)
         price_int = int(round(o.price))
         is_best = i == 1
         badge = '<span class="badge">Le plus choisi</span>' if is_best else ""
@@ -87,6 +94,7 @@ def landing(t: str, db: Session = Depends(get_db)):
 {badge}
 <div class="plan-name">{o.name}</div>
 <div class="plan-price"><sup>€</sup>{price_int}</div>
+{monthly_note}
 <div class="plan-divider"></div>
 <ul class="plan-feats">{li}</ul>
 <button class="plan-btn" onclick="checkout(this,'{o.id}')">Choisir ce plan &rarr;</button>
@@ -121,7 +129,6 @@ def landing(t: str, db: Session = Depends(get_db)):
 <div class="c">
   <p class="sect-label">Preuves</p>
   <h2>Nos tests en conditions reelles</h2>
-  <p class="sect-sub">Captures horodatees des reponses des IA sur les {p.profession}s a {p.city}.</p>
   <div class="ev-carousel">
     <div class="ev-track" id="ev-track"></div>
     <div class="ev-nav">
@@ -161,9 +168,13 @@ def landing(t: str, db: Session = Depends(get_db)):
 
     # ── Résultats requêtes ───────────────────────────────────────────────
     def _rs_label(c):
-        if c > 0:
-            return f"{c} concurrent{'s' if c > 1 else ''} deja en place"
-        return "Personne n'est encore present"
+        if c == 0:
+            return "Je ne sais pas."
+        names = comps[:2]
+        label = ", ".join(names)
+        if len(comps) > 2:
+            label += "..."
+        return label
 
     result_rows = "".join(
         f'<div class="rrow"><span class="rq">{l}</span>'
@@ -303,6 +314,7 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
   box-shadow:0 4px 16px rgba(232,53,90,.35)}}
 .plan--best .plan-btn:hover{{box-shadow:0 6px 22px rgba(232,53,90,.5);transform:translateY(-1px)}}
 .plans-note{{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}}
+.plan-monthly{{font-size:13px;color:var(--muted);margin-top:-8px;margin-bottom:4px}}
 
 /* FAQ */
 .sect-faq{{background:var(--light)}}
@@ -365,7 +377,6 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
     <div class="plans-grid">
       {plans_html}
     </div>
-    <p class="plans-note">Paiement securise Stripe &middot; Satisfait ou rembourse 7 jours</p>
   </div>
 </section>
 
@@ -373,7 +384,8 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 {f'<section class="sect-faq"><div class="c"><p class="sect-label">FAQ</p><h2>Questions frequentes</h2><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
 
 <footer>
-  Resultats bases sur tests repetes horodates. Les reponses IA peuvent varier. &copy; PRESENCE_IA
+  &copy; 2026 PRESENCE_IA &nbsp;&middot;&nbsp;
+  <a href="/cgv" target="_blank" style="color:#9ca3af;text-decoration:underline">Conditions Générales de Vente</a>
 </footer>
 
 <script>

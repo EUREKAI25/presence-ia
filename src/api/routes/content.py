@@ -183,8 +183,29 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
   Remplis pour créer une variante spécifique ex: "couvreur" + "Rennes".
 </p>
 {sections_html}
+
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:24px;margin-bottom:20px">
+<h3 style="color:#e94560;font-size:14px;margin-bottom:16px">📄 CGV (PDF)</h3>
+<p style="color:#9ca3af;font-size:12px;margin-bottom:16px">Le PDF sera accessible sur <code style="color:#e94560">/cgv</code> et lié automatiquement dans le footer de chaque landing.</p>
+<input type="file" id="cgv-file" accept="application/pdf" style="display:none" onchange="uploadCGV(this)">
+<button onclick="document.getElementById('cgv-file').click()" style="background:#e94560;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:13px">
+  Uploader les CGV (PDF)
+</button>
+<span id="cgv-status" style="margin-left:12px;font-size:12px;color:#9ca3af"></span>
 </div>
+</div><!-- /max-width -->
 <script>
+async function uploadCGV(input) {{
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('cgv-status');
+  status.textContent = 'Envoi en cours...';
+  try {{
+    const r = await fetch('/api/admin/cgv?token={token}', {{method:'POST', body: await file.arrayBuffer(), headers:{{'Content-Type':'application/pdf'}}}});
+    const d = await r.json();
+    status.textContent = d.ok ? '✅ CGV uploadées (' + Math.round(d.size/1024) + ' ko)' : '❌ Erreur';
+  }} catch(e) {{ status.textContent = '❌ ' + e.message; }}
+}}
 const T = '{token}';
 async function saveBlock(page_type, section_key, field_key, uid, btn) {{
   const value    = document.getElementById(uid).value;

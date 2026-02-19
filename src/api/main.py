@@ -4,7 +4,7 @@ Démarrer : uvicorn src.api.main:app --reload --port 8001
 """
 import logging, os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -48,6 +48,34 @@ def startup():
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "presence_ia", "version": "1.0.0"}
+
+
+# ── CGV (PDF statique uploadé depuis l'admin) ─────────────────────────────
+_CGV_PATH = Path(__file__).parent.parent.parent / "dist" / "cgv.pdf"
+
+@app.get("/cgv")
+def cgv():
+    from fastapi.responses import FileResponse, HTMLResponse
+    if _CGV_PATH.exists():
+        return FileResponse(str(_CGV_PATH), media_type="application/pdf")
+    return HTMLResponse("<p style='font-family:sans-serif;padding:40px'>CGV non disponibles pour le moment.</p>", status_code=404)
+
+@app.post("/api/admin/cgv")
+async def upload_cgv(request: Request):
+    from fastapi import Request as _R
+    from fastapi.responses import JSONResponse
+    import shutil
+    admin_token = request.query_params.get("token","")
+    if admin_token != os.getenv("ADMIN_TOKEN","changeme"):
+        from fastapi import HTTPException
+        raise HTTPException(403, "Accès refusé")
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "Fichier vide")
+    _CGV_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CGV_PATH.write_bytes(body)
+    log.info("CGV uploadé — %d octets", len(body))
+    return JSONResponse({"ok": True, "size": len(body)})
 
 
 @app.get("/", response_class=HTMLResponse)

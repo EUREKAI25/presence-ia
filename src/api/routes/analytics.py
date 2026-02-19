@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...models import ContactDB
+from ...models import ContactDB, ProspectDB
 
 router = APIRouter(tags=["Admin Analytics"])
 
@@ -64,6 +64,19 @@ def _bar(label: str, value: int, max_val: int, color: str = "#e94560") -> str:
 def analytics_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     contacts = db.query(ContactDB).all()
+
+    # KPIs pipeline IA (table prospects)
+    all_prospects = db.query(ProspectDB).all()
+    p_total     = len(all_prospects)
+    p_tested    = sum(1 for p in all_prospects if p.status in ("TESTED","EMAIL_OK","SCORED","READY_ASSETS","READY_TO_SEND","SENT"))
+    p_suspects  = sum(1 for p in all_prospects if p.status in ("EMAIL_OK","SCORED","READY_ASSETS","READY_TO_SEND"))
+    p_sent      = sum(1 for p in all_prospects if p.status == "SENT")
+    pipeline_cards = "".join([
+        _stat_card("Scannés", str(p_total), color="#4b5ea8"),
+        _stat_card("Testés", str(p_tested), color="#6366f1"),
+        _stat_card("Suspects qualifiés", str(p_suspects), color="#e9a020"),
+        _stat_card("Envoyés", str(p_sent), color="#2ecc71"),
+    ])
 
     # Charger les offres depuis offers_module (prix dynamiques depuis DB)
     from offers_module.database import db_list_offers
@@ -158,6 +171,11 @@ h2{{color:#fff;font-size:15px;margin:0 0 16px}}</style></head><body>
 
 <h1 style="color:#fff;font-size:18px;margin-bottom:24px">📊 Analytics</h1>
 
+<h3 style="color:#9ca3af;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Pipeline IA</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:32px">
+{pipeline_cards}
+</div>
+<h3 style="color:#9ca3af;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">CRM</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:32px">
 {kpis}
 </div>
