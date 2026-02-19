@@ -73,19 +73,12 @@ async def login_submit(request: Request):
         return resp
 
     # Mot de passe OK → pose le cookie et redirige vers /admin
-    resp = Response(
+    max_age = 60 * 60 * 24 * 7   # 7 jours
+    cookie = f"admin_token={_admin_token()}; Max-Age={max_age}; Path=/; HttpOnly; SameSite=Lax"
+    return Response(
         status_code=303,
-        headers={"Location": "/admin"},
+        headers={"Location": "/admin", "Set-Cookie": cookie},
     )
-    resp.set_cookie(
-        key="admin_token",
-        value=_admin_token(),
-        httponly=True,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7,   # 7 jours
-        secure=False,
-    )
-    return resp
 
 
 @router.get("/admin/logout")
