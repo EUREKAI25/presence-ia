@@ -17,6 +17,22 @@ app = FastAPI(title="PRESENCE_IA — Référencement IA", version="1.0.0", docs_
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+@app.middleware("http")
+async def redirect_403_to_login(request: Request, call_next):
+    """Redirige les 403 sur /admin/* vers /admin/login pour les navigateurs."""
+    response = await call_next(request)
+    path = request.url.path
+    accept = request.headers.get("accept", "")
+    is_browser = "text/html" in accept
+    if (response.status_code == 403
+            and path.startswith("/admin")
+            and not path.startswith("/api/admin")
+            and is_browser):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/admin/login", status_code=303)
+    return response
+
+
 @app.on_event("startup")
 def startup():
     from ..database import init_db
@@ -341,7 +357,7 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login
 from offers_module import router as offers_router
 
 app.include_router(campaign.router)
@@ -360,5 +376,6 @@ app.include_router(offers_router)
 app.include_router(analytics.router)
 app.include_router(content.router)
 app.include_router(headers.router)
+app.include_router(login.router)
 app.include_router(scan_admin.router)
 app.include_router(prospection_admin.router)
