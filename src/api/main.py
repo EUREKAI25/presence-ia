@@ -52,15 +52,6 @@ def startup():
     except Exception as e:
         log.warning("Scheduler non démarré : %s", e)
 
-
-@app.on_event("shutdown")
-def shutdown():
-    try:
-        from ..scheduler import stop_scheduler
-        stop_scheduler()
-    except Exception:
-        pass
-
     # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
     dist_root = Path(__file__).parent.parent.parent / "dist"
     for sub, route, name in [
@@ -75,6 +66,15 @@ def shutdown():
             log.info("Static %s monté sur %s", name, d)
         except Exception as e:
             log.warning("Impossible de monter %s : %s", route, e)
+
+
+@app.on_event("shutdown")
+def shutdown():
+    try:
+        from ..scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
 
 
 @app.get("/health")
