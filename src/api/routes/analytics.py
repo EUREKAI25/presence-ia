@@ -60,14 +60,24 @@ def _bar(label: str, value: int, max_val: int, color: str = "#e94560") -> str:
 </div>"""
 
 
-OFFER_LABELS = {"FLASH": "Audit Flash (97€)", "KIT": "Kit Visibilité (500€)", "DONE_FOR_YOU": "Tout inclus (3 500€)"}
-OFFER_PRICES = {"FLASH": 97, "KIT": 500, "DONE_FOR_YOU": 3500}
-
-
 @router.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     contacts = db.query(ContactDB).all()
+
+    # Charger les offres depuis offers_module (prix dynamiques depuis DB)
+    from offers_module.database import db_list_offers
+    offers = db_list_offers(db)
+    offer_prices = {o.name: o.price for o in offers}   # name → price
+    # Fallback : chercher par nom partiel pour les contacts avec offer_selected = clé legacy
+    def _resolve_price(offer_key: str) -> float:
+        if offer_key in offer_prices:
+            return offer_prices[offer_key]
+        key_lower = offer_key.lower()
+        for name, price in offer_prices.items():
+            if key_lower in name.lower() or name.lower() in key_lower:
+                return price
+        return 0.0
 
     total       = len(contacts)
     suspects    = sum(1 for c in contacts if c.status == "SUSPECT")
@@ -80,14 +90,14 @@ def analytics_page(request: Request, db: Session = Depends(get_db)):
     conv_rate   = f"{clients/total*100:.1f}%" if total else "—"
     open_rate   = f"{read_count/sent_count*100:.1f}%" if sent_count else "—"
 
-    # Revenue
-    revenue_total = sum(OFFER_PRICES.get(c.offer_selected or "", 0) for c in contacts if c.paid)
-    revenue_by_offer: dict = defaultdict(int)
+    # Revenue — prix lus depuis la DB (plus hardcodés)
+    revenue_by_offer: dict = defaultdict(float)
     clients_by_offer: dict = Counter()
     for c in contacts:
         if c.paid and c.offer_selected:
-            revenue_by_offer[c.offer_selected] += OFFER_PRICES.get(c.offer_selected, 0)
+            revenue_by_offer[c.offer_selected] += _resolve_price(c.offer_selected)
             clients_by_offer[c.offer_selected] += 1
+    revenue_total = sum(revenue_by_offer.values())
 
     # Avg acquisition cost
     costs = [c.acquisition_cost for c in contacts if c.acquisition_cost]
@@ -102,6 +112,7 @@ def analytics_page(request: Request, db: Session = Depends(get_db)):
     max_all_city = max(all_city.values(), default=1)
 
     # Build KPI cards
+    rev_display = f"{int(revenue_total)}€" if revenue_total == int(revenue_total) else f"{revenue_total:.2f}€"
     kpis = "".join([
         _stat_card("Total contacts", str(total)),
         _stat_card("Suspects", str(suspects), color="#888"),
@@ -109,17 +120,21 @@ def analytics_page(request: Request, db: Session = Depends(get_db)):
         _stat_card("Clients", str(clients), color="#2ecc71"),
         _stat_card("Taux conversion", conv_rate, f"{paid_count} payés / {total} contacts"),
         _stat_card("Taux ouverture", open_rate, f"{read_count} lus / {sent_count} envoyés"),
-        _stat_card("Revenu total", f"{revenue_total}€", color="#2ecc71"),
+        _stat_card("Revenu total", rev_display, sub="Prix depuis admin", color="#2ecc71"),
         _stat_card("Coût acq. moyen", avg_cost),
     ])
 
-    # Revenue by offer bars
+    # Revenue by offer bars (offres actives depuis la DB)
     rev_bars = ""
     max_rev = max(revenue_by_offer.values(), default=1)
-    for key, label in OFFER_LABELS.items():
-        rev = revenue_by_offer.get(key, 0)
-        nb  = clients_by_offer.get(key, 0)
-        rev_bars += _bar(f"{label} ({nb} clients)", rev, max_rev, "#e94560")
+    if offers:
+        for o in offers:
+            rev = revenue_by_offer.get(o.name, 0)
+            nb  = clients_by_offer.get(o.name, 0)
+            price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price:.2f}€"
+            rev_bars += _bar(f"{o.name} ({price_display} — {nb} clients)", int(rev), int(max_rev), "#e94560")
+    if not rev_bars:
+        rev_bars = '<p style="color:#555;font-size:12px">Aucune offre configurée — <a href="/api/admin/offers" style="color:#e94560">Créer des offres</a></p>'
 
     # Clients by city bars
     city_bars = "".join(

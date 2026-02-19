@@ -94,7 +94,7 @@ def root(db=None):
 <h3 style="color:#fff;margin-bottom:8px">{o.name}</h3>
 <div class="price">{price_display}</div>
 <ul style="list-style:none;margin:20px 0 24px">{li}</ul>
-<a href="#contact" class="btn-plan">Commander</a>
+<button onclick="startCheckout('{o.id}')" class="btn-plan">Commander</button>
 </div>'''
     finally:
         _db.close()
@@ -170,7 +170,6 @@ footer a{color:#666}
 <!-- NAV -->
 <nav>
   <div class="logo">Présence<span>IA</span></div>
-  <a href="#contact" class="nav-cta">Demander mon audit</a>
 </nav>
 
 <!-- HERO -->
@@ -237,34 +236,27 @@ footer a{color:#666}
   </div>
 </section>
 
-<!-- CTA FINAL -->
-<div class="cta-final" id="contact">
-  <h2>{cta_title}</h2>
-  <p>{cta_sub}</p>
-  <form id="cta-form" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto"
-        onsubmit="submitCta(event)">
-    <input id="cta-email" type="email" placeholder="votre@email.fr" required
-           style="flex:1;min-width:220px;padding:14px 18px;background:#1a1a2e;border:1px solid #2a2a4e;color:#fff;border-radius:8px;font-size:1rem">
-    <button type="submit"
-            style="background:#e94560;color:#fff;border:none;padding:14px 28px;border-radius:8px;font-weight:bold;font-size:1rem;cursor:pointer">
-      {cta_btn}
-    </button>
-  </form>
-  <p style="margin-top:16px;color:#444;font-size:.85rem">Pas d'appel requis. Pas d'engagement.</p>
-</div>
 <script>
-async function submitCta(e) {{
-  e.preventDefault();
-  const email = document.getElementById('cta-email').value;
+async function startCheckout(offerId) {{
   try {{
-    await fetch('/api/contact-capture', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email}})}});
-  }} catch(_) {{}}
-  document.getElementById('cta-form').innerHTML = '<p style="color:#2ecc71;font-size:1.1rem">✓ Reçu ! Vous allez recevoir un email sous peu.</p>';
+    const r = await fetch('/api/checkout/' + offerId, {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{
+        success_url: window.location.origin + '/success',
+        cancel_url: window.location.href,
+      }})
+    }});
+    const data = await r.json();
+    if (data.checkout_url) window.location.href = data.checkout_url;
+  }} catch(e) {{
+    alert('Erreur lors du paiement. Veuillez réessayer.');
+  }}
 }}
 </script>
 
 <footer>
-  © 2026 Présence IA — <a href="/docs">API</a> · <a href="/health">Status</a><br>
+  © 2026 Présence IA — <a href="/cgv">Conditions Générales de Vente</a><br>
   <span style="font-size:.8rem">Les résultats IA peuvent varier selon les modèles et les dates de test.</span>
 </footer>
 
