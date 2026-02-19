@@ -6,7 +6,7 @@ POST /admin/login  → valide ADMIN_PASSWORD, pose le cookie admin_token, rediri
 GET  /admin/logout → efface le cookie, redirige vers /admin/login
 """
 import os
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 router = APIRouter(tags=["Auth"])
@@ -72,15 +72,18 @@ async def login_submit(request: Request):
         resp = RedirectResponse("/admin/login?error=1", status_code=303)
         return resp
 
-    # Mot de passe OK → pose le cookie admin_token
-    resp = RedirectResponse("/admin", status_code=303)
+    # Mot de passe OK → pose le cookie et redirige vers /admin
+    resp = Response(
+        status_code=303,
+        headers={"Location": "/admin"},
+    )
     resp.set_cookie(
         key="admin_token",
         value=_admin_token(),
         httponly=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 7,   # 7 jours
-        secure=False,                 # True en prod HTTPS (nginx s'en charge)
+        secure=False,
     )
     return resp
 
