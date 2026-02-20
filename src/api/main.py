@@ -390,9 +390,10 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview
 from offers_module import router as offers_router
 
+app.include_router(preview.router)
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
 app.include_router(scoring.router)
@@ -412,3 +413,7 @@ app.include_router(headers.router)
 app.include_router(login.router)
 app.include_router(scan_admin.router)
 app.include_router(prospection_admin.router)
+app.include_router(ai_inquiry.router)
+app.include_router(competitor_analysis.router)
+app.include_router(evidence_routes.router)
+app.include_router(cms.router)
