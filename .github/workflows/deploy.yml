@@ -16,7 +16,12 @@ jobs:
             set -e
             cd /opt/presence-ia
             git pull origin main
-            pip3 install -q -r requirements.txt
+            # Utiliser le pip du venv si disponible, sinon pip3 système
+            if [ -f /opt/presence-ia/venv/bin/pip ]; then
+              /opt/presence-ia/venv/bin/pip install -q -r requirements.txt
+            else
+              pip3 install -q --break-system-packages -r requirements.txt
+            fi
             systemctl restart presence-ia
             sleep 3
             echo "=== STATUS ==="
