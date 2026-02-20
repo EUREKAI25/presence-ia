@@ -288,6 +288,14 @@ class ProspectionTargetDB(Base):
     created_at:     Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
 
 
+class ThemeConfigDB(Base):
+    """ThemePreset stocké en DB — généré par ThemeComposer, éditable via admin."""
+    __tablename__ = "theme_config"
+    id         : Mapped[str]      = mapped_column(sa.String, primary_key=True, default="default")
+    preset_json: Mapped[str]      = mapped_column(sa.Text, default="{}")   # ThemePreset dict sérialisé
+    updated_at : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class CmsBlockDB(Base):
     """Blocs CMS — clé/valeur/locale pour les textes home + landing."""
     __tablename__ = "cms_blocks"

@@ -1,0 +1,143 @@
+// ============================================================
+// _pricing.scss — Bloc Pricing BEM + grille auto N cartes
+// ============================================================
+@import '../variables';
+
+.pricing {
+  padding: var(--spacing-3xl) 0;
+
+  &__header {
+    text-align: center;
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  &__title {
+    font-size: var(--font-size-3xl);
+    color: var(--color-text);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__subtitle {
+    color: var(--color-text-light);
+    font-size: var(--font-size-lg);
+  }
+
+  &__grid {
+    display: grid;
+    gap: var(--spacing-lg);
+    max-width: 1100px;
+    margin: 0 auto;
+
+    @include tablet {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  &__grid--1col { grid-template-columns: minmax(0, 480px); justify-content: center; }
+  &__grid--2col { grid-template-columns: repeat(2, 1fr); }
+  &__grid--3col { grid-template-columns: repeat(3, 1fr); }
+  &__grid--auto { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  // Card
+  &__card {
+    @include card;
+    padding: var(--spacing-xl);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    transition: all var(--transition-base);
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-xl);
+      border-color: var(--color-primary);
+    }
+
+    // Featured
+    &--featured {
+      border-color: var(--color-primary);
+      border-width: 2px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+
+    // Style variants
+    &--elevated { box-shadow: var(--shadow-lg); border: none; }
+    &--flat     { box-shadow: none; }
+  }
+
+  &__badge-featured {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-primary);
+    color: #fff;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    padding: 4px var(--spacing-sm);
+    border-radius: var(--border-radius-xl);
+    white-space: nowrap;
+  }
+
+  &__name {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+  }
+
+  &__price {
+    font-size: var(--font-size-4xl);
+    font-weight: 800;
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-xs);
+    line-height: 1;
+  }
+
+  &__period {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__features {
+    flex: 1;
+    margin-bottom: var(--spacing-lg);
+
+    li {
+      padding: var(--spacing-sm) 0;
+      border-bottom: 1px solid var(--color-bg-gray);
+      font-size: var(--font-size-md);
+      color: var(--color-text);
+
+      &::before {
+        content: '✓ ';
+        color: var(--color-primary);
+        font-weight: 700;
+        margin-right: var(--spacing-xs);
+      }
+    }
+  }
+
+  &__cta {
+    display: block;
+    text-align: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: #fff;
+    font-weight: 600;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-base);
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-md);
+    text-decoration: none;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+      opacity: 1;
+    }
+  }
+}

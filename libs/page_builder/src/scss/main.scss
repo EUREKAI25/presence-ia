@@ -1,0 +1,23 @@
+// ============================================================
+// main.scss — Point d'entrée SCSS page_builder v0.2
+// Importé et compilé une seule fois au démarrage (libsass).
+// Les CSS custom properties (:root { --... }) sont injectées
+// séparément via generate_css_variables() en Python.
+// ============================================================
+
+@import 'variables';
+@import 'reset';
+@import 'grid';
+
+// Blocs
+@import 'blocks/navbar';
+@import 'blocks/hero';
+@import 'blocks/stat';
+@import 'blocks/steps';
+@import 'blocks/faq';
+@import 'blocks/pricing';
+@import 'blocks/cta';
+@import 'blocks/image';
+@import 'blocks/testimonials';
+@import 'blocks/content';
+@import 'blocks/footer';

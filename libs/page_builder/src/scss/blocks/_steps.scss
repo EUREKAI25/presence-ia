@@ -1,0 +1,120 @@
+// ============================================================
+// _steps.scss — Bloc Steps BEM + variants cards/timeline/simple
+// ============================================================
+@import '../variables';
+
+.steps {
+  padding: var(--spacing-3xl) 0;
+
+  &__header {
+    text-align: center;
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  &__title {
+    font-size: var(--font-size-3xl);
+    color: var(--color-text);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__subtitle {
+    color: var(--color-text-light);
+    font-size: var(--font-size-lg);
+  }
+
+  // Cards variant (défaut)
+  &--cards &__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-lg);
+
+    @include tablet {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--cards &__item {
+    @include card;
+    padding: var(--spacing-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+  }
+
+  // Timeline variant
+  &--timeline &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    padding-left: var(--spacing-2xl);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--color-border);
+    }
+  }
+
+  &--timeline &__item {
+    position: relative;
+    padding: var(--spacing-md) 0 var(--spacing-lg);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: calc(-1 * var(--spacing-2xl) + 8px);
+      top: var(--spacing-md);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      border: 2px solid var(--color-bg);
+    }
+  }
+
+  // Simple variant
+  &--simple &__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+    text-align: center;
+  }
+
+  // Vertical direction
+  &--vertical &__list {
+    flex-direction: column;
+  }
+
+  &__number {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__item-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  &__item-desc {
+    font-size: var(--font-size-md);
+    color: var(--color-text-light);
+    line-height: 1.6;
+  }
+}

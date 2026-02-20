@@ -1,0 +1,68 @@
+// ============================================================
+// _cta.scss — Bloc CTA BEM
+// ============================================================
+@import '../variables';
+
+.cta-block {
+  padding: var(--spacing-3xl) var(--spacing-md);
+
+  &--gradient {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: #fff;
+
+    .cta-block__title,
+    .cta-block__subtitle { color: #fff; }
+    .cta-block__subtitle { opacity: 0.9; }
+  }
+
+  &--color {
+    color: var(--color-text);
+  }
+
+  &--text-center { text-align: center; }
+  &--text-left   { text-align: left; }
+
+  &__inner {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  &__title {
+    font-size: var(--font-size-3xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-md);
+  }
+
+  &__subtitle {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-light);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  &__btn {
+    display: inline-block;
+    padding: var(--spacing-md) var(--spacing-2xl);
+    background: #fff;
+    color: var(--color-primary);
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    transition: all var(--transition-base);
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      opacity: 1;
+    }
+  }
+
+  // Si bg non gradient, btn primary
+  &:not(.cta-block--gradient) &__btn {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: #fff;
+  }
+}

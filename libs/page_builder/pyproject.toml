@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eurkai-page-builder"
+version = "0.2.0"
+description = "Module standalone de construction de pages modulaires pour l'écosystème EURKAI (v0.2 — SCSS, i18n, manifest, blocs étendus)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "EURKAI", email = "contact@eurkai.com"}
+]
+dependencies = [
+    "fastapi>=0.109.0",
+    "pydantic>=2.5.0",
+    "jinja2>=3.1.0",
+    "sqlalchemy>=2.0.0",
+    "libsass>=0.23.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["templates/**/*.j2"]

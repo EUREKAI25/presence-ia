@@ -5,6 +5,7 @@ python-multipart>=0.0.9
 
 # DB
 sqlalchemy>=2.0.0
+pydantic>=2.5.0
 
 # IA
 openai>=1.30.0
@@ -20,6 +21,20 @@ requests>=2.32.0
 
 # Stripe
 stripe>=10.0.0
+
+# Image processing (headers villes)
+pillow>=10.0.0
+
+# SCSS compilation (page_builder)
+libsass>=0.23.0
+
+# EURKAI modules (vendored dans libs/)
+# Palette + style presets (scraping → ThemePreset)
+-e ./libs/theme_composer
+# CSS variables depuis ThemePreset
+-e ./libs/theme_generator
+# Génération HTML modulaire (blocs, manifest, SCSS)
+-e ./libs/page_builder
 
 # Tests
 pytest>=8.0.0

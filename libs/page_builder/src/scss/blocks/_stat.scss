@@ -1,0 +1,65 @@
+// ============================================================
+// _stat.scss — Bloc Stat BEM
+// ============================================================
+@import '../variables';
+
+.stat {
+  padding: var(--spacing-3xl) 0;
+  background: var(--color-bg-gray);
+
+  &__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+  }
+
+  &__grid {
+    display: flex;
+    gap: var(--spacing-xl);
+    justify-content: center;
+    flex-wrap: wrap;
+
+    @include tablet {
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+
+  // Vertical layout
+  &--vertical &__grid {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  &__item {
+    text-align: center;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  &__value {
+    font-size: var(--font-size-4xl);
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-light);
+    line-height: 1.4;
+  }
+
+  &__source {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-light);
+    opacity: 0.7;
+
+    a {
+      color: var(--color-primary);
+      text-decoration: underline;
+    }
+  }
+}

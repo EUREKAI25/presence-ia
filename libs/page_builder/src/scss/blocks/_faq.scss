@@ -1,0 +1,92 @@
+// ============================================================
+// _faq.scss — Bloc FAQ BEM (accordion + list)
+// ============================================================
+@import '../variables';
+
+.faq {
+  padding: var(--spacing-3xl) 0;
+
+  &__header {
+    text-align: center;
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  &__title {
+    font-size: var(--font-size-3xl);
+    color: var(--color-text);
+  }
+
+  &__list {
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  &__item {
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    background: var(--color-bg);
+  }
+
+  // Accordion style
+  &--accordion &__question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    transition: background var(--transition-fast);
+    gap: var(--spacing-md);
+
+    &:hover {
+      background: var(--color-bg-gray);
+    }
+
+    &[aria-expanded="true"] .faq__icon {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__icon {
+    font-size: var(--font-size-lg);
+    transition: transform var(--transition-base);
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  &__answer {
+    padding: 0 var(--spacing-lg) var(--spacing-md);
+    color: var(--color-text-light);
+    font-size: var(--font-size-md);
+    line-height: 1.7;
+
+    &[hidden] { display: none; }
+  }
+
+  // List style
+  &--list &__question {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: 600;
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    background: var(--color-bg-gray);
+    cursor: default;
+    display: block;
+    width: 100%;
+    border: none;
+    text-align: left;
+  }
+
+  &--list &__answer {
+    display: block !important;
+  }
+}

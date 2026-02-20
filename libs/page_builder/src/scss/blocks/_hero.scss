@@ -1,0 +1,97 @@
+// ============================================================
+// _hero.scss — Hero BEM + variants bg-type/text-position/overlay
+// ============================================================
+@import '../variables';
+
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-primary);
+
+  // Variants bg-type
+  &--bg-image {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  &--bg-gradient {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  }
+
+  &--bg-color {
+    background: var(--color-primary);
+  }
+
+  // Overlay
+  &--overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 100%);
+    z-index: 1;
+  }
+
+  // Text positions
+  &--text-center &__content { text-align: center; align-items: center; }
+  &--text-left   &__content { text-align: left;   align-items: flex-start; }
+  &--text-right  &__content { text-align: right;  align-items: flex-end; }
+
+  &__content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    max-width: 860px;
+    padding: var(--spacing-3xl) var(--spacing-md);
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  &__badge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: var(--border-radius-xl);
+    color: #fff;
+    margin-bottom: var(--spacing-md);
+    backdrop-filter: blur(4px);
+    align-self: flex-start;
+  }
+
+  &__title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: var(--spacing-md);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  &__subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+    color: rgba(255,255,255,0.92);
+    margin-bottom: var(--spacing-xl);
+    max-width: 640px;
+    line-height: 1.6;
+  }
+
+  &__cta-group {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+
+    @include mobile {
+      flex-direction: column;
+      align-items: stretch;
+
+      .btn { text-align: center; }
+    }
+  }
+}

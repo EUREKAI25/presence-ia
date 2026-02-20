@@ -1,0 +1,50 @@
+// ============================================================
+// _content.scss — Bloc Content BEM + variants
+// ============================================================
+@import '../variables';
+
+.content-block {
+  padding: var(--spacing-2xl) var(--spacing-md);
+  max-width: 900px;
+  margin: 0 auto;
+
+  &--card {
+    @include card;
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-xl);
+  }
+
+  &--highlight {
+    background: var(--color-bg-gray);
+    border-left: 4px solid var(--color-primary);
+    padding: var(--spacing-lg) var(--spacing-xl);
+  }
+
+  &--media-left,
+  &--media-right {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xl);
+    align-items: center;
+    max-width: 1100px;
+
+    @include tablet {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--media-right .content-block__media {
+    order: 2;
+  }
+
+  &__text {
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    line-height: 1.7;
+  }
+
+  &__image {
+    width: 100%;
+    border-radius: var(--border-radius-md);
+  }
+}

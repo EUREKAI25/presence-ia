@@ -1,0 +1,69 @@
+{
+  "navbar": {
+    "demo": {
+      "logo":       "My Project",
+      "link_how":   "How it works",
+      "link_price": "Pricing",
+      "link_faq":   "FAQ"
+    }
+  },
+  "hero": {
+    "demo": {
+      "title":          "Your compelling main headline",
+      "subtitle":       "A sentence that explains your value proposition in two lines maximum.",
+      "badge":          "New",
+      "cta_primary":    "Get started",
+      "cta_secondary":  "Learn more"
+    }
+  },
+  "stat": {
+    "demo": {
+      "s1_value": "98%",
+      "s1_label": "satisfied customers",
+      "s2_value": "10k+",
+      "s2_label": "active users",
+      "s3_value": "24h",
+      "s3_label": "delivery time"
+    }
+  },
+  "steps": {
+    "demo": {
+      "title":      "How it works",
+      "subtitle":   "A simple process in a few steps",
+      "step1_desc": "First step — describe it briefly",
+      "step2_desc": "Second step — what happens next",
+      "step3_desc": "Third step — the result obtained",
+      "step4_desc": "Fourth step — what comes next"
+    }
+  },
+  "faq": {
+    "demo": {
+      "q1": "What is your first frequently asked question?",
+      "a1": "Here is a clear and concise answer to this question.",
+      "q2": "How does your service work?",
+      "a2": "Describe how it works in a few sentences.",
+      "q3": "What are the timelines?",
+      "a3": "Specify your usual timelines here.",
+      "q4": "Do you offer a refund?",
+      "a4": "Explain your refund policy."
+    }
+  },
+  "pricing": {
+    "demo": {
+      "title":    "Our pricing",
+      "subtitle": "Clear offers, no surprises."
+    }
+  },
+  "cta": {
+    "demo": {
+      "title":     "Ready to get started?",
+      "subtitle":  "Join our satisfied users.",
+      "btn_label": "Start now"
+    }
+  },
+  "footer": {
+    "demo": {
+      "copyright": "© 2026 My Project"
+    }
+  }
+}

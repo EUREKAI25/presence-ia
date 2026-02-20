@@ -1,0 +1,73 @@
+// ============================================================
+// _navbar.scss — NavBar BEM
+// ============================================================
+@import '../variables';
+
+.navbar {
+  width: 100%;
+  z-index: 1000;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+
+  &--sticky  { position: sticky; top: 0; }
+  &--fixed   { position: fixed; top: 0; left: 0; right: 0; }
+  &--relative { position: relative; }
+
+  &--transparent {
+    background: transparent;
+    border-bottom: none;
+  }
+
+  &--primary {
+    background: var(--color-primary);
+    border-bottom: none;
+
+    .navbar__logo,
+    .navbar__link { color: #fff; }
+  }
+
+  &__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__logo {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    text-decoration: none;
+
+    img {
+      height: 36px;
+      width: auto;
+    }
+  }
+
+  &__links {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    list-style: none;
+
+    @include tablet {
+      display: none;
+    }
+  }
+
+  &__link {
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    font-weight: 500;
+    transition: color var(--transition-fast);
+
+    &:hover {
+      color: var(--color-primary);
+      opacity: 1;
+    }
+  }
+}

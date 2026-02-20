@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -31,9 +31,10 @@ def init_db():
             except Exception:
                 pass
         conn.commit()
-    # Seed content blocks
+    # Seed content blocks + theme
     with SessionLocal() as db:
         _seed_content_blocks(db)
+        _seed_theme(db)
     # Seed CMS blocks (lazy import to avoid circular)
     try:
         from .api.routes.cms import seed_cms_blocks
@@ -311,3 +312,78 @@ def db_upsert_page_layout(db: Session, page_type: str, sections_config: str):
     db.commit()
     db.refresh(layout)
     return layout
+
+
+# ── Theme Config ──────────────────────────────────────────────────────────────
+
+# ThemePreset de base — palette myhealthprac (warm/naturelle) + style rounded
+_DEFAULT_THEME_PRESET = {
+    "name": "PRESENCE_IA — Warm Professional",
+    "source_url": "https://www.myhealthprac.com/",
+    "mood": "warm",
+    "use_cases": ["landing"],
+    "color_system": {
+        "primary":   {"base": "rgb(176, 144, 111)", "light": "rgb(204, 188, 172)", "dark": "rgb(124, 72, 34)"},
+        "secondary": {"base": "rgb(152, 108, 67)",  "light": "rgb(204, 188, 172)", "dark": "rgb(80, 36, 16)"},
+    },
+    "font_family_headings": "Inter",
+    "font_family_body": "Inter",
+    "font_google_url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    "font_weights": {"normal": 400, "medium": 500, "bold": 700},
+    # Palette myhealthprac + style preset "rounded" choisi indépendamment
+    "style_preset_name": "rounded",
+    # Ombres teintées warm (override du preset rounded)
+    "style_overrides": {
+        "shadow": {
+            "sm": "0 1px 3px rgba(124, 72, 34, 0.08)",
+            "md": "0 4px 12px rgba(124, 72, 34, 0.12)",
+            "lg": "0 10px 24px rgba(124, 72, 34, 0.16)",
+            "xl": "0 20px 40px rgba(124, 72, 34, 0.20)",
+        }
+    },
+    "bg_prominence": "strong",
+    "animation_style": "subtle",
+    "harmony_description": "Palette naturelle et chaleureuse (tons or, terre, bois) — palette myhealthprac + style rounded professionnel.",
+    "key_characteristics": [
+        "Palette warm/naturelle (or, terre, bois)",
+        "Style rounded — arrondi professionnel",
+        "Ombres chaudes teintées warm",
+        "Animations subtiles",
+    ],
+}
+
+
+def db_get_theme(db: Session) -> dict:
+    """Retourne le ThemePreset actuel depuis la DB. Fallback sur le preset par défaut."""
+    row = db.query(ThemeConfigDB).filter_by(id="default").first()
+    if row and row.preset_json and row.preset_json != "{}":
+        try:
+            return json.loads(row.preset_json)
+        except Exception:
+            pass
+    return _DEFAULT_THEME_PRESET.copy()
+
+
+def db_upsert_theme(db: Session, preset_dict: dict) -> ThemeConfigDB:
+    """Sauvegarde le ThemePreset en DB."""
+    row = db.query(ThemeConfigDB).filter_by(id="default").first()
+    payload = json.dumps(preset_dict, ensure_ascii=False)
+    if row:
+        row.preset_json = payload
+    else:
+        row = ThemeConfigDB(id="default", preset_json=payload)
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def _seed_theme(db: Session):
+    """Insère le ThemePreset par défaut si la table est vide."""
+    exists = db.query(ThemeConfigDB).filter_by(id="default").first()
+    if not exists:
+        db.add(ThemeConfigDB(
+            id="default",
+            preset_json=json.dumps(_DEFAULT_THEME_PRESET, ensure_ascii=False),
+        ))
+        db.commit()

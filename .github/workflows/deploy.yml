@@ -16,6 +16,7 @@ jobs:
             set -e
             cd /opt/presence-ia
             git pull origin main
+            pip3 install -q -r requirements.txt
             systemctl restart presence-ia
             sleep 3
             echo "=== STATUS ==="

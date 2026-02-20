@@ -110,15 +110,31 @@ async def upload_cgv(request: Request):
     return JSONResponse({"ok": True, "size": len(body)})
 
 
-@app.get("/", response_class=HTMLResponse)
-def root(db=None):
-    from ..database import get_block, SessionLocal, db_get_page_layout
-    from .design_system import generate_css_with_tokens
-    import json as _json
-    _db = SessionLocal()
+_CHECKOUT_JS = """<script>
+async function startCheckout(offerId) {
+  try {
+    const r = await fetch('/api/checkout/' + offerId, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({success_url: window.location.origin + '/success', cancel_url: window.location.href})
+    });
+    const data = await r.json();
+    if (data.checkout_url) window.location.href = data.checkout_url;
+  } catch(e) { alert('Erreur lors du paiement. Veuillez réessayer.'); }
+}
+</script>"""
 
-    # Thème tons or (myhealthprac) - TODO: stocker en DB settings
-    preset = "myhealthprac"
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    from .routes.page_builder_route import render_home
+    from ..database import SessionLocal
+    with SessionLocal() as _db:
+        html = render_home(_db, extra_body_end=_CHECKOUT_JS)
+    return HTMLResponse(html)
+
+    # LEGACY (conservé pour référence — plus utilisé)
+    _LEGACY_START = True
     try:
         # Layout — sections activables/désactivables
         layout = db_get_page_layout(_db, "home")
@@ -331,19 +347,19 @@ async function startCheckout(offerId) {{
 
 
 @app.get("/landing", response_class=HTMLResponse)
-def landing(db=None):
-    from ..database import (get_block, SessionLocal, db_get_page_layout,
-                            db_get_header, db_list_headers, jl as _jl)
-    from .design_system import generate_css_with_tokens
-    from ..models import CityEvidenceDB
-    import json as _json
-    _db = SessionLocal()
+def landing(city: str = None, profession: str = None):
+    from .routes.page_builder_route import render_landing
+    from ..database import SessionLocal
+    with SessionLocal() as _db:
+        html = render_landing(_db, city=city, profession=profession, extra_body_end=_CHECKOUT_JS)
+    return HTMLResponse(html)
 
-    preset = "myhealthprac"
-
+    # LEGACY (plus utilisé — conservé pour référence)
+    _LEGACY_START = True
+    _db = None
     try:
         # Layout landing
-        layout = db_get_page_layout(_db, "landing")
+        layout = None  # db_get_page_layout(_db, "landing")
         if layout:
             sections_config = _json.loads(layout.sections_config)
         else:
@@ -589,6 +605,7 @@ async function startCheckout(offerId) {{
 
 # ── Routes ──
 from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview
+from .routes.theme_admin import router as theme_admin_router
 from offers_module import router as offers_router
 
 app.include_router(preview.router)
@@ -615,3 +632,4 @@ app.include_router(ai_inquiry.router)
 app.include_router(competitor_analysis.router)
 app.include_router(evidence_routes.router)
 app.include_router(cms.router)
+app.include_router(theme_admin_router)

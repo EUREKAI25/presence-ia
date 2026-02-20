@@ -1,0 +1,245 @@
+{
+  "page_type": "landing",
+  "lang": "fr",
+  "title": "Demo Landing — {project_name}",
+  "description": "Démonstration complète d'une landing page générée via page_builder v0.2",
+  "theme": {
+    "name": "Demo Rounded",
+    "mood": "neutral",
+    "use_cases": ["landing"],
+    "color_system": {
+      "primary": {
+        "base":  "rgb(102, 126, 234)",
+        "light": "rgb(118, 142, 250)",
+        "dark":  "rgb(85, 104, 211)"
+      },
+      "secondary": {
+        "base":  "rgb(118, 75, 162)",
+        "light": "rgb(134, 91, 178)",
+        "dark":  "rgb(102, 59, 146)"
+      }
+    },
+    "font_family_headings": "Inter",
+    "font_family_body": "Inter",
+    "font_google_url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap",
+    "style_preset_name": "rounded",
+    "bg_prominence": "none",
+    "animation_style": "subtle"
+  },
+  "placeholder_context": {
+    "project_name": "Mon Projet",
+    "price": "97€"
+  },
+  "sections": [
+    {
+      "key": "navbar",
+      "enabled": true,
+      "order": 0,
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "navbar_block",
+          "structure": { "position": "sticky", "style": "white" },
+          "seed": {
+            "logo_text": "@navbar.demo.logo",
+            "logo_href": "/",
+            "links": [
+              { "label": "@navbar.demo.link_how",   "href": "#how" },
+              { "label": "@navbar.demo.link_price", "href": "#pricing" },
+              { "label": "@navbar.demo.link_faq",   "href": "#faq" }
+            ]
+          }
+        }
+      }]
+    },
+    {
+      "key": "hero",
+      "enabled": true,
+      "order": 1,
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "hero_block",
+          "structure": {
+            "bg_type": "gradient",
+            "text_position": "center",
+            "overlay": false,
+            "min_height": "85vh"
+          },
+          "seed": {
+            "title":             "@hero.demo.title",
+            "subtitle":          "@hero.demo.subtitle",
+            "badge":             "@hero.demo.badge",
+            "cta_primary_label": "@hero.demo.cta_primary",
+            "cta_primary_href":  "#pricing",
+            "cta_secondary_label": "@hero.demo.cta_secondary",
+            "cta_secondary_href":  "#how"
+          }
+        }
+      }]
+    },
+    {
+      "key": "stats",
+      "enabled": true,
+      "order": 2,
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "stat_block",
+          "structure": { "layout": "horizontal", "show_sources": false },
+          "seed": {
+            "stats": [
+              { "value": "@stat.demo.s1_value", "label": "@stat.demo.s1_label" },
+              { "value": "@stat.demo.s2_value", "label": "@stat.demo.s2_label" },
+              { "value": "@stat.demo.s3_value", "label": "@stat.demo.s3_label" }
+            ]
+          }
+        }
+      }]
+    },
+    {
+      "key": "how",
+      "enabled": true,
+      "order": 3,
+      "id": "how",
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "steps_block",
+          "structure": { "direction": "horizontal", "numbering": "numeric", "variant": "cards" },
+          "seed": {
+            "title":    "@steps.demo.title",
+            "subtitle": "@steps.demo.subtitle",
+            "steps": [
+              { "description": "@steps.demo.step1_desc" },
+              { "description": "@steps.demo.step2_desc" },
+              { "description": "@steps.demo.step3_desc" },
+              { "description": "@steps.demo.step4_desc" }
+            ]
+          }
+        }
+      }]
+    },
+    {
+      "key": "pricing",
+      "enabled": true,
+      "order": 4,
+      "id": "pricing",
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "pricing_block",
+          "structure": { "layout": "auto", "card_style": "bordered" },
+          "seed": {
+            "title":    "@pricing.demo.title",
+            "subtitle": "@pricing.demo.subtitle",
+            "cards": [
+              {
+                "name": "Starter",
+                "price": "29€",
+                "period": "/ mois",
+                "features": ["Fonctionnalité A", "Fonctionnalité B", "Support email"],
+                "is_featured": false,
+                "cta_label": "Commencer",
+                "cta_href": "#"
+              },
+              {
+                "name": "Pro",
+                "price": "{price}",
+                "period": "/ mois",
+                "features": ["Tout Starter", "Fonctionnalité C", "Fonctionnalité D", "Support prioritaire"],
+                "is_featured": true,
+                "cta_label": "Choisir Pro",
+                "cta_href": "#"
+              },
+              {
+                "name": "Enterprise",
+                "price": "Sur devis",
+                "features": ["Tout Pro", "Accès API", "SLA dédié", "Onboarding personnalisé"],
+                "is_featured": false,
+                "cta_label": "Nous contacter",
+                "cta_href": "#contact"
+              }
+            ]
+          }
+        }
+      }]
+    },
+    {
+      "key": "faq",
+      "enabled": true,
+      "order": 5,
+      "id": "faq",
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "faq_block",
+          "structure": { "style": "accordion", "max_width": "800px" },
+          "seed": {
+            "title": "FAQ",
+            "items": [
+              { "question": "@faq.demo.q1", "answer": "@faq.demo.a1" },
+              { "question": "@faq.demo.q2", "answer": "@faq.demo.a2" },
+              { "question": "@faq.demo.q3", "answer": "@faq.demo.a3" },
+              { "question": "@faq.demo.q4", "answer": "@faq.demo.a4" }
+            ]
+          }
+        }
+      }]
+    },
+    {
+      "key": "cta_final",
+      "enabled": true,
+      "order": 6,
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "cta_block",
+          "structure": { "bg_type": "gradient", "text_align": "center" },
+          "seed": {
+            "title":     "@cta.demo.title",
+            "subtitle":  "@cta.demo.subtitle",
+            "btn_label": "@cta.demo.btn_label",
+            "btn_href":  "#pricing"
+          }
+        }
+      }]
+    },
+    {
+      "key": "footer",
+      "enabled": true,
+      "order": 7,
+      "columns": [{
+        "span": 12,
+        "block": {
+          "block_type": "footer_block",
+          "structure": { "columns": 2, "show_social": false },
+          "seed": {
+            "copyright": "@footer.demo.copyright",
+            "columns": [
+              {
+                "title": "Produit",
+                "links": [
+                  { "label": "Fonctionnalités", "href": "#" },
+                  { "label": "Tarifs", "href": "#pricing" }
+                ]
+              },
+              {
+                "title": "Légal",
+                "links": [
+                  { "label": "CGV", "href": "/cgv" },
+                  { "label": "Mentions légales", "href": "/mentions" }
+                ]
+              }
+            ],
+            "social_links": []
+          }
+        }
+      }]
+    }
+  ],
+  "meta": {
+    "version": "0.2.0",
+    "author": "page_builder demo"
+  }
+}

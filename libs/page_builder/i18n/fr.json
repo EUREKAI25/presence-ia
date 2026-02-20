@@ -1,0 +1,69 @@
+{
+  "navbar": {
+    "demo": {
+      "logo":       "Mon Projet",
+      "link_how":   "Comment ça marche",
+      "link_price": "Tarifs",
+      "link_faq":   "FAQ"
+    }
+  },
+  "hero": {
+    "demo": {
+      "title":          "Votre titre principal accrocheur",
+      "subtitle":       "Une phrase qui explique votre proposition de valeur en deux lignes maximum.",
+      "badge":          "Nouveau",
+      "cta_primary":    "Commencer",
+      "cta_secondary":  "En savoir plus"
+    }
+  },
+  "stat": {
+    "demo": {
+      "s1_value": "98%",
+      "s1_label": "de clients satisfaits",
+      "s2_value": "10k+",
+      "s2_label": "utilisateurs actifs",
+      "s3_value": "24h",
+      "s3_label": "délai de livraison"
+    }
+  },
+  "steps": {
+    "demo": {
+      "title":      "Comment ça marche",
+      "subtitle":   "Un processus simple en quelques étapes",
+      "step1_desc": "Première étape — décrivez-la brièvement",
+      "step2_desc": "Deuxième étape — ce qui se passe ensuite",
+      "step3_desc": "Troisième étape — le résultat obtenu",
+      "step4_desc": "Quatrième étape — la suite"
+    }
+  },
+  "faq": {
+    "demo": {
+      "q1": "Quelle est votre première question fréquente ?",
+      "a1": "Voici une réponse claire et concise à cette question.",
+      "q2": "Comment fonctionne votre service ?",
+      "a2": "Décrivez ici le fonctionnement en quelques phrases.",
+      "q3": "Quels sont les délais ?",
+      "a3": "Précisez ici vos délais habituels.",
+      "q4": "Proposez-vous un remboursement ?",
+      "a4": "Expliquez votre politique de remboursement."
+    }
+  },
+  "pricing": {
+    "demo": {
+      "title":    "Nos tarifs",
+      "subtitle": "Des offres claires, sans surprise."
+    }
+  },
+  "cta": {
+    "demo": {
+      "title":     "Prêt à démarrer ?",
+      "subtitle":  "Rejoignez nos utilisateurs satisfaits.",
+      "btn_label": "Commencer maintenant"
+    }
+  },
+  "footer": {
+    "demo": {
+      "copyright": "© 2026 Mon Projet"
+    }
+  }
+}
