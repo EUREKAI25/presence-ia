@@ -161,7 +161,7 @@ def root(db=None):
         steps_html = "".join(f'<div class="step"><div class="step-num">{i+1}</div><p style="color:#aaa;font-size:.9rem">{s}</p></div>' for i,s in enumerate(steps) if s)
         # FAQ
         faqs = [(B("faq",f"q{i}"), B("faq",f"a{i}")) for i in range(1,5)]
-        faq_html = "".join(f'<div class="faq-item"><h3 style="color:#fff;font-size:1rem;margin-bottom:8px">{q}</h3><p style="color:#aaa;font-size:.9rem">{a}</p></div>' for q,a in faqs if q)
+        faq_html = "".join(f'<div class="faq-item"><h3>{q}</h3><p>{a}</p></div>' for q,a in faqs if q)
         # CTA
         cta_title = B("cta","title"); cta_sub = B("cta","subtitle"); cta_btn = B("cta","btn_label")
         # PREUVES — 6 dernières images toutes villes confondues
