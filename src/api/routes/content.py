@@ -699,3 +699,24 @@ async def save_layout(request: Request, db: Session = Depends(get_db)):
     
     db_upsert_page_layout(db, page_type, json.dumps(sections))
     return JSONResponse({"ok": True})
+
+
+@router.delete("/api/admin/content/layout")
+async def reset_layout(request: Request, db: Session = Depends(get_db)):
+    """Supprime le layout pour forcer le rechargement de la config par défaut"""
+    token = request.query_params.get("token")
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+        raise HTTPException(403, "Accès refusé")
+
+    page_type = request.query_params.get("page_type", "home")
+    if page_type not in ["home", "landing"]:
+        raise HTTPException(400, "page_type invalide")
+
+    from ...database import db_get_page_layout
+    from ...models import PageLayoutDB
+    layout = db.query(PageLayoutDB).filter_by(page_type=page_type).first()
+    if layout:
+        db.delete(layout)
+        db.commit()
+
+    return JSONResponse({"ok": True, "message": f"Layout {page_type} réinitialisé"})
