@@ -304,16 +304,14 @@ def build_manifest_from_db(
     else:
         layout_cfg = {}
 
-    # 3. Hero bg_src (landing uniquement)
+    # 3. Hero bg_src (landing uniquement) — toujours chercher un header disponible
     header_url = None
     if page_type == "landing":
-        if city:
-            hdr = db_get_header(db, city)
-            if not hdr:
-                # Premier header disponible
-                from ...models import CityHeaderDB
-                hdr = db.query(CityHeaderDB).first()
-            header_url = hdr.url if hdr else None
+        from ...models import CityHeaderDB
+        hdr = db_get_header(db, city) if city else None
+        if not hdr:
+            hdr = db.query(CityHeaderDB).first()
+        header_url = hdr.url if hdr else None
 
     # 4. Seeds des blocs
     seed_builders = {
