@@ -1,8 +1,44 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : ✅ Harmonisation CSS thème clair + 98/98 tests
+**Statut** : 🟢 actif — Pack global 9 chantiers en cours
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-02-20
+**Dernière MAJ** : 2026-02-20 16:00
+
+## 🔌 SESSION EN COURS (2026-02-20 16:00) — PACK GLOBAL 9 CHANTIERS
+
+### Chantiers (source: `CLAUDE/TODO/presence_ia_prompts_global/`)
+
+| # | Chantier | Lieu | Statut |
+|---|---|---|---|
+| 00 | Conventions | — | ✅ lues |
+| 01 | AI_INQUIRY_MODULE | `EURKAI/MODULES/AI_INQUIRY_MODULE/` + endpoint `/api/ai-inquiry/run` | ✅ 25/25 tests |
+| 02 | competitor_analysis scenario | `src/prospecting/competitor_analysis.py` | 🔜 |
+| 03 | evidence_manager | `src/evidence/manager.py` | 🔜 |
+| 04 | admin CMS blocks | sqlite + routes + UI `/admin/cms` | 🔜 |
+| 05 | landing render | `/{profession}?t=token` + offres | 🔜 |
+| 06 | contacts tracking | mini CRM + endpoints | 🔜 |
+| 07 | outreach sans email | POST `/api/generate/prospect/{id}/outreach-messages` | 🔜 |
+| 08 | demo script | `/admin/demo/{campaign_id}` | 🔜 |
+
+### Chantier 01 — AI_INQUIRY_MODULE (terminé 2026-02-20 16:00)
+- **Module** : `EURKAI/MODULES/AI_INQUIRY_MODULE/` (module.py + __init__.py + README.md)
+- **Tests** : `TESTS/test_module.py` — 25 tests, 25 passent (dry_run, contrat uniforme, normalisation, extraction entités, présence, concurrents)
+- **Adapter** : `src/api/routes/ai_inquiry.py` — `POST /api/ai-inquiry/run`
+- **main.py** : route enregistrée
+- **Fonctions réutilisées** : `norm()`, `is_mentioned()`, `extract_entities()`, `competitors_from()` (portées depuis ia_test.py, autonomes)
+
+### Contrat de sortie OBLIGATOIRE (tous modules)
+```json
+{ "success": bool, "result": <any>, "message": str, "error": null|{"code":str,"detail":str} }
+```
+
+### Règles
+- Modules dans `EURKAI/MODULES/<NOM>/` — README + tests
+- PRESENCE_IA consomme via endpoints/adapters
+- API-first : chaque module = 1 endpoint POST minimum
+- `dry_run=true` option
+
+---
 **Pipeline** : BRIEF ✅ → CDC ✅ → DEV ✅ → TESTS ✅ → GITHUB ✅
 
 **GitHub** : https://github.com/EUREKAI25/presence-ia
@@ -87,6 +123,14 @@ SCAN → TEST (multi-IA) → SCORE (EMAIL_OK) → GENERATE → QUEUE → ASSETS 
   - `generate.py` + `stripe_routes.py` : adaptés pour `OfferDB` (name/price/features)
   - `analytics.py` : import mort supprimé
   - 84/84 tests verts après migration
+
+- 2026-02-20 : Session 6 — Fix landing page (session Claude Code)
+  - **Bug 1 fixé** : Landing lisait hero/title au lieu de hero/title_tpl → champs vides
+  - **Bug 2 fixé** : Landing ne rendait que hero+pricing même si admin configurait d'autres sections
+  - **Bug 3 fixé** : `db_get_header()` appelé après `_db.close()` (hors du try) → session fermée
+  - **Bug 4 fixé** : Overlay ajouté sur l'image header (gradient sombre top→transparent)
+  - **DB** : sections_config landing restaurée (6 sections : hero, proof_stat, proof_visual, evidence, pricing, faq)
+  - **Default fallback** : si header_city pas configuré, prend le 1er header dispo en DB
 
 - 2026-02-20 : Session 5 — Harmonisation CSS thème clair (session Claude Code)
   - **Conversion dark → light theme** pour toutes les pages (homepage, landing, admin)

@@ -332,12 +332,13 @@ async function startCheckout(offerId) {{
 
 @app.get("/landing", response_class=HTMLResponse)
 def landing(db=None):
-    from ..database import get_block, SessionLocal, db_get_page_layout
+    from ..database import (get_block, SessionLocal, db_get_page_layout,
+                            db_get_header, db_list_headers, jl as _jl)
     from .design_system import generate_css_with_tokens
+    from ..models import CityEvidenceDB
     import json as _json
     _db = SessionLocal()
 
-    # Thème tons or
     preset = "myhealthprac"
 
     try:
@@ -347,26 +348,50 @@ def landing(db=None):
             sections_config = _json.loads(layout.sections_config)
         else:
             sections_config = [
-                {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
-                {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 1},
+                {"key": "hero",        "label": "Hero",                       "enabled": True, "order": 0},
+                {"key": "proof_stat",  "label": "Preuves statistiques",       "enabled": True, "order": 1},
+                {"key": "proof_visual","label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
+                {"key": "faq",         "label": "FAQ",                        "enabled": True, "order": 3},
+                {"key": "pricing",     "label": "Tarifs",                     "enabled": True, "order": 4},
             ]
 
         sections_enabled = {s["key"]: s.get("enabled", True) for s in sections_config}
 
         B = lambda sk, fk, **kw: get_block(_db, "landing", sk, fk, **kw)
         from offers_module.database import db_list_offers
-        pricing = db_list_offers(_db)
-        num_offers = len(pricing)
+        pricing_offers = db_list_offers(_db)
+        num_offers = len(pricing_offers)
 
-        # Blocs hero
-        h_title = B("hero","title").replace("\n","<br>")
-        h_sub = B("hero","subtitle")
-        h_cta1 = B("hero","cta_primary")
-        h_cta2 = B("hero","cta_secondary")
+        # HERO — clés spécifiques landing
+        h_title = B("hero", "title_tpl").replace("\n", "<br>")
+        h_sub   = B("hero", "subtitle_tpl")
+        h_cta1  = B("hero", "cta_label")
 
-        # Pricing
+        # PROOF STAT
+        s1v = B("proof_stat","stat_1_value"); s1l = B("proof_stat","stat_1_label").replace("\n","<br>")
+        s2v = B("proof_stat","stat_2_value"); s2l = B("proof_stat","stat_2_label").replace("\n","<br>")
+        s3v = B("proof_stat","stat_3_value"); s3l = B("proof_stat","stat_3_label").replace("\n","<br>")
+        src1u = B("proof_stat","source_url_1"); src1l = B("proof_stat","source_label_1")
+        src2u = B("proof_stat","source_url_2"); src2l = B("proof_stat","source_label_2")
+        sources_html = ""
+        if src1u and src1l:
+            sources_html += f'<a href="{src1u}" target="_blank" style="color:#555;font-size:11px;margin-right:16px">↗ {src1l}</a>'
+        if src2u and src2l:
+            sources_html += f'<a href="{src2u}" target="_blank" style="color:#555;font-size:11px">↗ {src2l}</a>'
+
+        # PROOF VISUAL
+        pv_mention = B("proof_visual", "mention")
+
+        # FAQ — jusqu'à 10 items
+        faqs = [(B("faq", f"q{i}"), B("faq", f"a{i}")) for i in range(1, 11)]
+        faq_html = "".join(
+            f'<div class="faq-item"><h3>{q}</h3><p>{a}</p></div>'
+            for q, a in faqs if q
+        )
+
+        # PRICING
         plans_html = ""
-        for o in pricing:
+        for o in pricing_offers:
             features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
             li = "".join(f"<li>{b}</li>" for b in features)
             price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price}€"
@@ -376,36 +401,55 @@ def landing(db=None):
 <ul>{li}</ul>
 <button onclick="startCheckout('{o.id}')" class="btn-plan">Commander</button>
 </div>'''
+
+        # EVIDENCE — 6 dernières captures
+        _PROVIDER_LABELS = {"openai": "ChatGPT", "anthropic": "Claude", "gemini": "Gemini"}
+        _all_ev = _db.query(CityEvidenceDB).all()
+        _all_imgs = []
+        for _ev in _all_ev:
+            for _img in _jl(_ev.images):
+                _img["_city"] = _ev.city
+                _all_imgs.append(_img)
+        _all_imgs.sort(key=lambda x: x.get("ts", ""), reverse=True)
+        evidence_html = ""
+        if _all_imgs[:6]:
+            _cards = "".join(
+                f'<a href="{_i.get("url","")}" target="_blank" style="display:block;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">'
+                f'<img src="{_i.get("processed_url") or _i.get("url","")}" '
+                f'style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block" loading="lazy">'
+                f'<div style="padding:6px 8px;background:#f9fafb;font-size:10px;color:#6b7280">'
+                f'{_i.get("ts","")[:10]} · {_PROVIDER_LABELS.get(_i.get("provider",""), _i.get("provider",""))} · {_i.get("_city","").title()}'
+                f'</div></a>'
+                for _i in _all_imgs[:6]
+            )
+            evidence_html = f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:24px">{_cards}</div>'
+
+        # HEADER IMAGE — config DB, sinon premier header dispo
+        header_city = B("config", "header_city", default="")
+        header_row = db_get_header(_db, header_city) if header_city else None
+        if not header_row:
+            all_headers = db_list_headers(_db)
+            header_row = all_headers[0] if all_headers else None
+        header_img = header_row.url if header_row else ""
+
     finally:
         _db.close()
 
     _css = generate_css_with_tokens(preset)
 
-    # Image header
-    header_img = "/headers/rennes.webp"  # TODO: configurable par thème
+    header_html = ""
+    if header_img:
+        header_html = f'''<div style="position:relative;width:100%;height:420px;overflow:hidden">
+  <img src="{header_img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0.15) 60%,rgba(0,0,0,0) 100%)"></div>
+</div>'''
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Présence IA — Landing</title>
+<title>Présence IA — Audit de visibilité IA</title>
 <style>{_css}</style>
-<style>
-.header-image {{
-    width: 100%;
-    height: 400px;
-    object-fit: cover;
-    display: block;
-    margin-bottom: calc(var(--spacing-unit) * -10);
-    position: relative;
-    z-index: 1;
-}}
-.hero {{
-    position: relative;
-    z-index: 2;
-    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, var(--color-primary-lighter) 100%);
-}}
-</style>
 </head>
 <body>
 
@@ -415,19 +459,44 @@ def landing(db=None):
   <a href="#tarifs" class="nav-cta">Démarrer</a>
 </nav>
 
-<!-- HEADER IMAGE -->
-<img src="{header_img}" alt="Header" class="header-image">
+{header_html}
 
 {f'''<!-- HERO -->
 <div class="hero">
-  <div class="hero-badge">Landing Page</div>
   <h1>{h_title}</h1>
   <p>{h_sub}</p>
   <div class="hero-btns">
-    <a href="#tarifs" class="btn-primary">{h_cta1}</a>
-    <a href="/" class="btn-secondary">{h_cta2}</a>
+    <a href="#tarifs" class="btn-primary">{h_cta1 or "Démarrer mon audit"}</a>
   </div>
 </div>''' if sections_enabled.get("hero", True) else ""}
+
+{f'''<!-- PROOF STAT -->
+<div class="proof">
+  <p>Résultats observés sur nos derniers audits</p>
+  <div class="proof-stats">
+    <div class="stat"><strong>{s1v}</strong><span>{s1l}</span></div>
+    <div class="stat"><strong>{s2v}</strong><span>{s2l}</span></div>
+    <div class="stat"><strong>{s3v}</strong><span>{s3l}</span></div>
+  </div>
+  {sources_html}
+</div>''' if sections_enabled.get("proof_stat", True) and (s1v or s2v or s3v) else ""}
+
+{f'''<!-- COMMENT ÇA MARCHE -->
+<div class="section-howto">
+<section id="comment">
+  <h2>Comment ça marche</h2>
+  {f'<p class="sub">{pv_mention}</p>' if pv_mention else ""}
+</section>
+</div>''' if sections_enabled.get("proof_visual", True) else ""}
+
+{f'''<!-- EVIDENCE -->
+<div class="section-evidence">
+<section style="padding:60px 20px;max-width:900px;margin:0 auto">
+  <h2 style="color:#1a1a2e;font-size:clamp(1.4rem,3vw,2rem);margin-bottom:8px">Captures réelles de nos tests</h2>
+  <p style="color:#6b7280;font-size:1rem;margin-bottom:0">Ce que les IA répondent vraiment à vos futurs clients.</p>
+  {evidence_html}
+</section>
+</div>''' if evidence_html and sections_enabled.get("evidence", True) else ""}
 
 {f'''<!-- PRICING -->
 <div class="pricing" id="tarifs">
@@ -439,6 +508,14 @@ def landing(db=None):
     </div>
   </div>
 </div>''' if sections_enabled.get("pricing", True) else ""}
+
+{f'''<!-- FAQ -->
+<section>
+  <h2>Questions fréquentes</h2>
+  <div class="faq">
+    {faq_html}
+  </div>
+</section>''' if faq_html and sections_enabled.get("faq", True) else ""}
 
 <script>
 async function startCheckout(offerId) {{
@@ -460,7 +537,7 @@ async function startCheckout(offerId) {{
 </script>
 
 <footer>
-  © 2026 Présence IA — <a href="/cgv">CGV</a>
+  © 2026 Présence IA — <a href="/cgv">Conditions Générales de Vente</a>
 </footer>
 
 </body></html>""")
