@@ -9,13 +9,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deployment webhook
+      - name: Deploy via SSH
         run: |
-          curl -X POST \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_SECRET }}" \
-            -f \
-            "https://presence-ia.com:9001/deploy?token=${{ secrets.DEPLOY_SECRET }}"
-        timeout-minutes: 2
+          sudo apt-get update && sudo apt-get install -y sshpass
+          sshpass -p '${{ secrets.VPS_PASSWORD }}' ssh -o StrictHostKeyChecking=no root@212.227.80.241 << 'EOF'
+            cd /opt/presence-ia
+            git pull origin main
+            systemctl restart presence-ia
+            echo "✅ Déploiement réussi"
+          EOF
+        timeout-minutes: 5
 
       - name: Deployment success
         if: success()
@@ -23,4 +26,4 @@ jobs:
 
       - name: Deployment failed
         if: failure()
-        run: echo "❌ Échec du déploiement - vérifier le webhook"
+        run: echo "❌ Échec du déploiement - vérifier SSH"
