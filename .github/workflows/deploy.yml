@@ -16,12 +16,12 @@ jobs:
             set -e
             cd /opt/presence-ia
             git pull origin main
-            # Utiliser le pip du venv si disponible, sinon pip3 système
-            if [ -f /opt/presence-ia/venv/bin/pip ]; then
-              /opt/presence-ia/venv/bin/pip install -q -r requirements.txt
-            else
-              pip3 install -q --break-system-packages -r requirements.txt
-            fi
+            # Installer uniquement les nouveaux packages (évite les conflits avec packages Debian)
+            pip3 install -q --break-system-packages "libsass>=0.23.0" "pillow>=10.0.0"
+            pip3 install -q --break-system-packages --no-deps \
+              -e ./libs/theme_composer \
+              -e ./libs/theme_generator \
+              -e ./libs/page_builder
             systemctl restart presence-ia
             sleep 3
             echo "=== STATUS ==="
