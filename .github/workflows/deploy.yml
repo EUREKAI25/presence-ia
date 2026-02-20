@@ -25,8 +25,11 @@ jobs:
             sleep 3
             echo "=== STATUS ==="
             systemctl status presence-ia --no-pager | head -20
-            echo "=== LOGS (30 dernières lignes) ==="
-            journalctl -u presence-ia -n 30 --no-pager
+            echo "=== TEST REQUÊTE ==="
+            curl -s -o /tmp/test_resp.txt -w "HTTP %{http_code}" http://127.0.0.1:8001/ || true
+            echo ""
+            echo "=== LOGS (50 dernières lignes) ==="
+            journalctl -u presence-ia -n 50 --no-pager
             echo "✅ Déploiement terminé"
           EOF
         timeout-minutes: 5
