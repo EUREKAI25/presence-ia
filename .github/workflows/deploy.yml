@@ -13,10 +13,16 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y sshpass
           sshpass -p '${{ secrets.VPS_PASSWORD }}' ssh -o StrictHostKeyChecking=no root@212.227.80.241 << 'EOF'
+            set -e
             cd /opt/presence-ia
             git pull origin main
             systemctl restart presence-ia
-            echo "✅ Déploiement réussi"
+            sleep 3
+            echo "=== STATUS ==="
+            systemctl status presence-ia --no-pager | head -20
+            echo "=== LOGS (30 dernières lignes) ==="
+            journalctl -u presence-ia -n 30 --no-pager
+            echo "✅ Déploiement terminé"
           EOF
         timeout-minutes: 5
 
