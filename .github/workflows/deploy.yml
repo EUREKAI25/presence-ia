@@ -16,9 +16,9 @@ jobs:
             set -e
             cd /opt/presence-ia
             git pull origin main
-            # Installer uniquement les nouveaux packages (évite les conflits avec packages Debian)
-            pip3 install -q --break-system-packages "libsass>=0.23.0" "pillow>=10.0.0"
-            pip3 install -q --break-system-packages --no-deps \
+            # Installer dans le venv du service (.venv)
+            .venv/bin/pip install -q "libsass>=0.23.0" "pillow>=10.0.0"
+            .venv/bin/pip install -q --no-deps \
               -e ./libs/theme_composer \
               -e ./libs/theme_generator \
               -e ./libs/page_builder
