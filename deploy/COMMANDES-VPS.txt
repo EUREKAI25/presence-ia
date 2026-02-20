@@ -1,0 +1,64 @@
+Ai━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 COMMANDES À COPIER-COLLER DANS LA CONSOLE IONOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ Ouvrir https://my.ionos.com → Serveurs → Console Web
+
+2️⃣ Copier-coller ces commandes (tout d'un bloc) :
+
+# ── Installation webhook ──
+
+cd /opt/presence-ia && git pull origin main
+
+pip3 install flask
+
+cat > /etc/systemd/system/presence-ia-webhook.service <<'EOF'
+[Unit]
+Description=PRESENCE_IA Webhook Deploy Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/presence-ia/deploy
+Environment="DEPLOY_SECRET=571cc969753751ba330808b1f28f220384c6eade3fd0f55f8bf1d9c3e58dc6a0"
+ExecStart=/usr/bin/python3 /opt/presence-ia/deploy/webhook-server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable presence-ia-webhook
+systemctl start presence-ia-webhook
+
+# Vérifier que le service tourne
+systemctl status presence-ia-webhook
+
+# Ouvrir le port 9001
+ufw allow 9001/tcp
+ufw reload
+
+# Test local
+curl http://localhost:9001/health
+
+echo ""
+echo "✅ Installation terminée !"
+echo "Le webhook écoute sur le port 9001"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3️⃣ Configurer GitHub Secret :
+
+• Aller sur : https://github.com/EUREKAI25/presence-ia/settings/secrets/actions
+• Cliquer "New repository secret"
+• Name : DEPLOY_SECRET
+• Value : 571cc969753751ba330808b1f28f220384c6eade3fd0f55f8bf1d9c3e58dc6a0
+• Cliquer "Add secret"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ C'est tout ! Ensuite revenir ici pour tester.
