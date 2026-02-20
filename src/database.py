@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -34,6 +34,13 @@ def init_db():
     # Seed content blocks
     with SessionLocal() as db:
         _seed_content_blocks(db)
+    # Seed CMS blocks (lazy import to avoid circular)
+    try:
+        from .api.routes.cms import seed_cms_blocks
+        with SessionLocal() as db:
+            seed_cms_blocks(db)
+    except Exception:
+        pass
 
 
 def get_db():

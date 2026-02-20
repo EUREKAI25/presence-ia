@@ -86,14 +86,59 @@ _FIELD_LABELS = {
     ("landing","proof_stat","source_label_1"): "Source 1 — Texte",
     ("landing","proof_stat","source_url_2"):   "Source 2 — URL",
     ("landing","proof_stat","source_label_2"): "Source 2 — Texte",
+    # LANDING PROBLEM
+    ("landing","problem","title"):    "Titre",
+    ("landing","problem","subtitle"): "Sous-titre / accroche",
+    # LANDING PROOF VISUAL
+    ("landing","proof_visual","title"):    "Titre section",
+    ("landing","proof_visual","subtitle"): "Sous-titre",
+    ("landing","proof_visual","step_1"):   "Étape 1",
+    ("landing","proof_visual","step_2"):   "Étape 2",
+    ("landing","proof_visual","step_3"):   "Étape 3",
+    ("landing","proof_visual","step_4"):   "Étape 4",
+    ("landing","proof_visual","mention"):  "Mention tests (ex: 9 tests sur 3 jours)",
+    # LANDING CTA
+    ("landing","cta","title"):     "Titre CTA final",
+    ("landing","cta","subtitle"):  "Sous-titre CTA",
+    ("landing","cta","btn_label"): "Texte bouton",
+    # HOME PROBLEM
+    ("home","problem","title"):    "Titre",
+    ("home","problem","subtitle"): "Sous-titre / accroche",
 }
 
 _SECTION_TITLES = {
-    "hero": "🦸 HERO",
-    "proof_stat": "📊 Preuves statistiques",
-    "proof_visual": "👁 Preuves visuelles / Étapes",
-    "faq": "❓ FAQ",
-    "cta": "📣 CTA final",
+    "hero":         "🦸 HERO",
+    "proof_stat":   "📊 Preuves statistiques",
+    "problem":      "⚠️ Problème / Accroche",
+    "proof_visual": "👁 Comment ça marche",
+    "evidence":     "📸 Captures d'écran",
+    "pricing":      "💶 Tarifs",
+    "faq":          "❓ FAQ",
+    "cta":          "📣 CTA final",
+}
+
+# Catalogue complet des sections disponibles par page
+_SECTIONS_CATALOG = {
+    "home": [
+        {"key": "hero",         "label": "🦸 Hero"},
+        {"key": "proof_stat",   "label": "📊 Preuves statistiques"},
+        {"key": "problem",      "label": "⚠️ Problème / Accroche"},
+        {"key": "proof_visual", "label": "👁 Comment ça marche"},
+        {"key": "evidence",     "label": "📸 Captures d'écran"},
+        {"key": "pricing",      "label": "💶 Tarifs"},
+        {"key": "faq",          "label": "❓ FAQ"},
+        {"key": "cta",          "label": "📣 CTA final"},
+    ],
+    "landing": [
+        {"key": "hero",         "label": "🦸 Hero"},
+        {"key": "proof_stat",   "label": "📊 Preuves statistiques"},
+        {"key": "problem",      "label": "⚠️ Problème / Accroche"},
+        {"key": "proof_visual", "label": "👁 Comment ça marche"},
+        {"key": "evidence",     "label": "📸 Captures d'écran"},
+        {"key": "pricing",      "label": "💶 Tarifs"},
+        {"key": "faq",          "label": "❓ FAQ"},
+        {"key": "cta",          "label": "📣 CTA final"},
+    ],
 }
 
 _ROWS = {
@@ -655,31 +700,32 @@ async def update_content(request: Request, db: Session = Depends(get_db)):
 def get_layout(page: str, db: Session = Depends(get_db), token: str = ""):
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Accès refusé")
-    
+
     from ...database import db_get_page_layout
     import json
+
+    # Sections sauvegardées en DB (ordre + enabled)
     layout = db_get_page_layout(db, page)
-    if layout:
-        return JSONResponse({"sections": json.loads(layout.sections_config)})
-    
-    # Default layout si pas encore configuré
-    default_sections_home = [
-        {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
-        {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
-        {"key": "problem", "label": "Problème", "enabled": True, "order": 2},
-        {"key": "proof_visual", "label": "Comment ça marche", "enabled": True, "order": 3},
-        {"key": "evidence", "label": "Preuves / Screenshots", "enabled": True, "order": 4},
-        {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 5},
-        {"key": "faq", "label": "FAQ", "enabled": True, "order": 6},
-    ]
-    default_sections_landing = [
-        {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
-        {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
-        {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
-        {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
-    ]
-    sections = default_sections_home if page == "home" else default_sections_landing
-    return JSONResponse({"sections": sections})
+    saved = json.loads(layout.sections_config) if layout else []
+    saved_keys = {s["key"] for s in saved}
+
+    # Catalogue complet pour cette page
+    catalog = _SECTIONS_CATALOG.get(page, [])
+
+    # Résultat = sections sauvegardées (ordre conservé) + sections du catalogue non encore ajoutées
+    result = list(saved)
+    max_order = max((s.get("order", 0) for s in result), default=-1)
+    for cat_s in catalog:
+        if cat_s["key"] not in saved_keys:
+            max_order += 1
+            result.append({
+                "key":     cat_s["key"],
+                "label":   cat_s["label"],
+                "enabled": False,
+                "order":   max_order,
+            })
+
+    return JSONResponse({"sections": result})
 
 
 @router.post("/api/admin/content/layout")

@@ -288,6 +288,18 @@ class ProspectionTargetDB(Base):
     created_at:     Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
 
 
+class CmsBlockDB(Base):
+    """Blocs CMS — clé/valeur/locale pour les textes home + landing."""
+    __tablename__ = "cms_blocks"
+    id         : Mapped[str]      = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    key        : Mapped[str]      = mapped_column(sa.String, nullable=False, index=True)  # ex: "landing.hero.title"
+    value      : Mapped[str]      = mapped_column(sa.Text, default="")
+    locale     : Mapped[str]      = mapped_column(sa.String, default="fr")               # ex: "fr" | "en"
+    updated_at : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (sa.UniqueConstraint("key", "locale", name="uq_cms_block"),)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))

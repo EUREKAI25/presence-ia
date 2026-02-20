@@ -362,10 +362,21 @@ def landing(db=None):
         pricing_offers = db_list_offers(_db)
         num_offers = len(pricing_offers)
 
+        # Template defaults pour la preview générique /landing
+        _first_price = f"{int(pricing_offers[0].price)}€" if pricing_offers else "49€"
+        _defaults = {
+            "{city}": "votre ville", "{profession}": "votre métier",
+            "{n_queries}": "15", "{n_models}": "3",
+            "{models}": "ChatGPT, Gemini et Claude", "{price}": _first_price,
+        }
+        def _tpl(t: str) -> str:
+            for k, v in _defaults.items(): t = t.replace(k, v)
+            return t
+
         # HERO — clés spécifiques landing
-        h_title = B("hero", "title_tpl").replace("\n", "<br>")
-        h_sub   = B("hero", "subtitle_tpl")
-        h_cta1  = B("hero", "cta_label")
+        h_title = _tpl(B("hero", "title_tpl")).replace("\n", "<br>")
+        h_sub   = _tpl(B("hero", "subtitle_tpl"))
+        h_cta1  = _tpl(B("hero", "cta_label"))
 
         # PROOF STAT
         s1v = B("proof_stat","stat_1_value"); s1l = B("proof_stat","stat_1_label").replace("\n","<br>")
@@ -424,6 +435,25 @@ def landing(db=None):
             )
             evidence_html = f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:24px">{_cards}</div>'
 
+        # CTA
+        cta_title = B("cta", "title")
+        cta_sub   = B("cta", "subtitle")
+        cta_btn   = _tpl(B("cta", "btn_label"))
+
+        # PROBLEM
+        pb_title = B("problem", "title")
+        pb_sub   = B("problem", "subtitle")
+
+        # PROOF VISUAL enrichi
+        pv_title    = B("proof_visual", "title")
+        pv_subtitle = B("proof_visual", "subtitle")
+        pv_mention  = B("proof_visual", "mention")
+        pv_steps    = [B("proof_visual", f"step_{i}") for i in range(1, 5)]
+        steps_html  = "".join(
+            f'<div class="step"><div class="step-num">{i+1}</div><p style="color:#aaa;font-size:.9rem">{s}</p></div>'
+            for i, s in enumerate(pv_steps) if s
+        )
+
         # HEADER IMAGE — config DB, sinon premier header dispo
         header_city = B("config", "header_city", default="")
         header_row = db_get_header(_db, header_city) if header_city else None
@@ -437,12 +467,28 @@ def landing(db=None):
 
     _css = generate_css_with_tokens(preset)
 
-    header_html = ""
-    if header_img:
-        header_html = f'''<div style="position:relative;width:100%;height:420px;overflow:hidden">
-  <img src="{header_img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0.15) 60%,rgba(0,0,0,0) 100%)"></div>
+    # Hero : image en background + overlay + texte blanc — ou hero classique si pas d'image
+    if header_img and sections_enabled.get("hero", True):
+        _hero_html = f'''<!-- HERO avec image header + overlay -->
+<div style="position:relative;background-image:url({header_img});background-size:cover;background-position:center;min-height:520px;display:flex;align-items:center">
+  <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,0.62) 0%,rgba(0,0,0,0.42) 55%,rgba(0,0,0,0.18) 100%)"></div>
+  <div style="position:relative;z-index:1;text-align:center;width:100%;padding:80px 20px">
+    <h1 style="color:#fff;font-size:clamp(2rem,5vw,3.2rem);margin-bottom:16px;line-height:1.15">{h_title}</h1>
+    <p style="color:rgba(255,255,255,0.88);font-size:1.1rem;margin-bottom:32px;max-width:600px;margin-left:auto;margin-right:auto">{h_sub}</p>
+    <a href="#tarifs" style="display:inline-block;background:#fff;color:var(--color-primary);font-weight:700;padding:14px 36px;border-radius:8px;text-decoration:none;font-size:1rem;box-shadow:0 4px 16px rgba(0,0,0,0.25)">{h_cta1 or "Démarrer mon audit"}</a>
+  </div>
 </div>'''
+    elif sections_enabled.get("hero", True):
+        _hero_html = f'''<!-- HERO sans image -->
+<div class="hero">
+  <h1>{h_title}</h1>
+  <p>{h_sub}</p>
+  <div class="hero-btns">
+    <a href="#tarifs" class="btn-primary">{h_cta1 or "Démarrer mon audit"}</a>
+  </div>
+</div>'''
+    else:
+        _hero_html = ""
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
@@ -459,16 +505,7 @@ def landing(db=None):
   <a href="#tarifs" class="nav-cta">Démarrer</a>
 </nav>
 
-{header_html}
-
-{f'''<!-- HERO -->
-<div class="hero">
-  <h1>{h_title}</h1>
-  <p>{h_sub}</p>
-  <div class="hero-btns">
-    <a href="#tarifs" class="btn-primary">{h_cta1 or "Démarrer mon audit"}</a>
-  </div>
-</div>''' if sections_enabled.get("hero", True) else ""}
+{_hero_html}
 
 {f'''<!-- PROOF STAT -->
 <div class="proof">
@@ -481,13 +518,18 @@ def landing(db=None):
   {sources_html}
 </div>''' if sections_enabled.get("proof_stat", True) and (s1v or s2v or s3v) else ""}
 
+{f'''<!-- PROBLÈME -->
+<div class="section-problem"><section>
+  <h2>{pb_title}</h2>
+  <p class="sub">{pb_sub}</p>
+</section></div>''' if pb_title and sections_enabled.get("problem", False) else ""}
+
 {f'''<!-- COMMENT ÇA MARCHE -->
-<div class="section-howto">
-<section id="comment">
-  <h2>Comment ça marche</h2>
-  {f'<p class="sub">{pv_mention}</p>' if pv_mention else ""}
-</section>
-</div>''' if sections_enabled.get("proof_visual", True) else ""}
+<div class="section-howto"><section id="comment">
+  <h2>{pv_title or "Comment ça marche"}</h2>
+  {f'<p class="sub">{pv_subtitle or pv_mention}</p>' if (pv_subtitle or pv_mention) else ""}
+  {f'<div class="steps">{steps_html}</div>' if steps_html else ""}
+</section></div>''' if sections_enabled.get("proof_visual", True) else ""}
 
 {f'''<!-- EVIDENCE -->
 <div class="section-evidence">
@@ -495,27 +537,29 @@ def landing(db=None):
   <h2 style="color:#1a1a2e;font-size:clamp(1.4rem,3vw,2rem);margin-bottom:8px">Captures réelles de nos tests</h2>
   <p style="color:#6b7280;font-size:1rem;margin-bottom:0">Ce que les IA répondent vraiment à vos futurs clients.</p>
   {evidence_html}
-</section>
-</div>''' if evidence_html and sections_enabled.get("evidence", True) else ""}
+</section></div>''' if evidence_html and sections_enabled.get("evidence", True) else ""}
 
 {f'''<!-- PRICING -->
 <div class="pricing" id="tarifs">
   <div class="pricing-inner">
     <h2>Tarifs transparents</h2>
     <p class="sub">Sans abonnement caché. Sans engagement.</p>
-    <div class="plans plans-{num_offers}">
-      {plans_html}
-    </div>
+    <div class="plans plans-{num_offers}">{plans_html}</div>
   </div>
 </div>''' if sections_enabled.get("pricing", True) else ""}
 
 {f'''<!-- FAQ -->
 <section>
   <h2>Questions fréquentes</h2>
-  <div class="faq">
-    {faq_html}
-  </div>
+  <div class="faq">{faq_html}</div>
 </section>''' if faq_html and sections_enabled.get("faq", True) else ""}
+
+{f'''<!-- CTA FINAL -->
+<div style="background:linear-gradient(135deg,var(--color-primary-lighter,#f8f6f3) 0%,#fff 100%);padding:60px 20px;text-align:center">
+  <h2 style="color:#1a1a2e;margin-bottom:12px">{cta_title}</h2>
+  <p style="color:#6b7280;margin-bottom:28px">{cta_sub}</p>
+  <a href="#tarifs" class="btn-primary">{cta_btn or "Démarrer mon audit"}</a>
+</div>''' if cta_title and sections_enabled.get("cta", False) else ""}
 
 <script>
 async function startCheckout(offerId) {{
