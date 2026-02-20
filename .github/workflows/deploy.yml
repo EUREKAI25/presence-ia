@@ -1,0 +1,26 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Permet de déclencher manuellement depuis GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deployment webhook
+        run: |
+          curl -X POST \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_SECRET }}" \
+            -f \
+            "https://presence-ia.com:9001/deploy?token=${{ secrets.DEPLOY_SECRET }}"
+        timeout-minutes: 2
+
+      - name: Deployment success
+        if: success()
+        run: echo "✅ Déploiement réussi sur presence-ia.com"
+
+      - name: Deployment failed
+        if: failure()
+        run: echo "❌ Échec du déploiement - vérifier le webhook"

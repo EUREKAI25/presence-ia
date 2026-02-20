@@ -1,16 +1,17 @@
 {
   "project": "PRESENCE_IA",
-  "current_task": "TERMINÉ — Refactorisation HOME/LANDING/ADMIN content",
-  "last_update": "2026-02-18",
-  "next_step": "Prochaine évolution à définir",
+  "current_task": "TERMINÉ — Harmonisation CSS thème clair",
+  "last_update": "2026-02-20",
+  "next_step": "Déployer sur VPS + tester visuellement",
   "status": "deployed",
   "completed": [
-    "84 tests passent",
-    "ContentBlockDB + get_block() avec fallback profession/ville",
-    "HOME dynamique (hero, stats, steps, faq, cta depuis DB)",
-    "LANDING dynamique (title_tpl, subtitle_tpl, cta, pricing, faq depuis DB)",
-    "Admin /admin/content — textarea par champ",
-    "CTA HOME → ContactDB SUSPECT via /api/contact-capture",
-    "Commit bced017 + push + déployé VPS 212.227.80.241"
+    "98 tests passent",
+    "Conversion dark → light theme (homepage, landing, admin)",
+    "Couleurs unifiées: #fff/#f9fafb, borders #e5e7eb, text #1a1a2e",
+    "Box-shadows ajoutées pour profondeur visuelle",
+    "main.py: CSS homepage (nav, sections, boutons, footer)",
+    "content.py: CSS admin contenus (formulaires, FAQ, modal)",
+    "admin.py: CSS admin pages (dashboard, prospects, send queue)",
+    "Commit 0027143 + push GitHub ✅"
   ]
 }

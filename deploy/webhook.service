@@ -1,0 +1,15 @@
+[Unit]
+Description=PRESENCE_IA Webhook Deploy Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/presence-ia/deploy
+Environment="DEPLOY_SECRET=YOUR_SECRET_TOKEN_HERE"
+ExecStart=/usr/bin/python3 /opt/presence-ia/deploy/webhook-server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

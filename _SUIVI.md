@@ -1,8 +1,8 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : ✅ Migration offers_module + 84/84 tests
+**Statut** : ✅ Harmonisation CSS thème clair + 98/98 tests
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-02-19
+**Dernière MAJ** : 2026-02-20
 **Pipeline** : BRIEF ✅ → CDC ✅ → DEV ✅ → TESTS ✅ → GITHUB ✅
 
 **GitHub** : https://github.com/EUREKAI25/presence-ia
@@ -87,6 +87,15 @@ SCAN → TEST (multi-IA) → SCORE (EMAIL_OK) → GENERATE → QUEUE → ASSETS 
   - `generate.py` + `stripe_routes.py` : adaptés pour `OfferDB` (name/price/features)
   - `analytics.py` : import mort supprimé
   - 84/84 tests verts après migration
+
+- 2026-02-20 : Session 5 — Harmonisation CSS thème clair (session Claude Code)
+  - **Conversion dark → light theme** pour toutes les pages (homepage, landing, admin)
+  - `src/api/main.py` : CSS homepage (body, nav, sections, boutons, footer)
+  - `src/api/routes/content.py` : CSS admin contenus (formulaires, FAQ, modal sections)
+  - `src/api/routes/admin.py` : CSS admin pages (dashboard, prospects, send queue, scheduler)
+  - **Couleurs unifiées** : backgrounds #fff/#f9fafb, borders #e5e7eb, text #1a1a2e/#6b7280
+  - **Ajout shadows** : `box-shadow: 0 1px 3px rgba(0,0,0,0.1)` pour profondeur
+  - 98/98 tests verts — commit + push GitHub ✅
 
 ---
 
