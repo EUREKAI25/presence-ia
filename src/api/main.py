@@ -115,14 +115,15 @@ def root(db=None):
     from ..database import get_block, SessionLocal, db_get_page_layout, jl as _jl
     _db = SessionLocal()
     try:
-        # Layout — sections activables/désactivables
-        layout_db = db_get_page_layout(_db, "home")
-        if layout_db and layout_db.sections_config:
-            sections_list = _jl(layout_db.sections_config)
-            sections_enabled = {s["id"]: s["enabled"] for s in sections_list}
-        else:
-            # Par défaut, toutes les sections sont activées
-            sections_enabled = {}
+        # Layout — sections activables/désactivables (TODO: implémenter l'interface admin)
+        # Pour l'instant, toutes les sections sont activées par défaut
+        sections_enabled = {
+            "problem": True,
+            "howto": True,
+            "evidence": True,
+            "pricing": True,
+            "faq": True
+        }
 
         B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
         from offers_module.database import db_list_offers
