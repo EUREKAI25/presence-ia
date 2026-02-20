@@ -147,11 +147,19 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     headers = db_list_headers(db)
 
+    # Ville actuellement définie pour la landing
+    from ...database import get_block
+    current_landing_city = get_block(db, "landing", "config", "header_city", default="")
+
     cards = ""
     for h in headers:
-        cards += f"""<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;position:relative">
+        is_landing = (h.city == current_landing_city)
+        badge = '<span style="background:#e94560;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:8px">Landing</span>' if is_landing else ""
+        use_btn_style = "background:#1a4a1a;color:#4ade80" if is_landing else "background:#0f0f1a;color:#aaa;border:1px solid #2a2a4e"
+        use_btn_label = "✅ Landing active" if is_landing else "🖼 Utiliser pour la landing"
+        cards += f"""<div style="background:#1a1a2e;border:1px solid {'#e94560' if is_landing else '#2a2a4e'};border-radius:8px;padding:16px;position:relative">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <span style="color:#fff;font-weight:bold;font-size:14px">{h.city.title()}</span>
+    <span style="color:#fff;font-weight:bold;font-size:14px">{h.city.title()}{badge}</span>
     <button onclick="deleteHeader('{h.city}',this)"
       style="background:#4a1a1a;color:#e94560;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">
       🗑 Supprimer
@@ -162,10 +170,16 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
          onerror="this.style.display='none'">
   </a>
   <div style="font-size:10px;color:#555;margin-top:6px;word-break:break-all">{h.url}</div>
-  <button onclick="navigator.clipboard.writeText('{h.url}')"
-    style="margin-top:6px;background:#0f0f1a;color:#aaa;border:1px solid #2a2a4e;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">
-    📋 Copier URL
-  </button>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <button onclick="setLandingHeader('{h.city}',this)"
+      style="{use_btn_style};border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;flex:1">
+      {use_btn_label}
+    </button>
+    <button onclick="navigator.clipboard.writeText('{h.url}')"
+      style="background:#0f0f1a;color:#aaa;border:1px solid #2a2a4e;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">
+      📋
+    </button>
+  </div>
 </div>"""
 
     empty = '<p style="color:#555;font-size:13px;padding:40px;text-align:center">Aucun header défini</p>' if not headers else ""
@@ -232,6 +246,16 @@ async function deleteHeader(city, btn) {{
   if (!confirm('Supprimer le header de ' + city + ' ?')) return;
   btn.disabled = true; btn.textContent = '…';
   const r = await fetch('/api/headers/' + city + '?token=' + T, {{ method: 'DELETE' }});
+  if (r.ok) location.reload();
+  else {{ btn.disabled = false; btn.textContent = '❌ Erreur'; }}
+}}
+async function setLandingHeader(city, btn) {{
+  btn.disabled = true; btn.textContent = '…';
+  const r = await fetch('/admin/content/update?token=' + T, {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{page_type:'landing', section_key:'config', field_key:'header_city', value:city, profession:null, city:null}})
+  }});
   if (r.ok) location.reload();
   else {{ btn.disabled = false; btn.textContent = '❌ Erreur'; }}
 }}
