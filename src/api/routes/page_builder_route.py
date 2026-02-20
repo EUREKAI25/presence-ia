@@ -24,7 +24,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from page_builder import ManifestPage, parse_manifest, render_page
-from page_builder.src.manifest.schema import ManifestSection, ManifestColumn, ManifestBlockConfig
+from page_builder.manifest.schema import ManifestSection, ManifestColumn, ManifestBlockConfig
 
 from ...database import get_block, db_get_header, db_get_theme, db_get_page_layout
 

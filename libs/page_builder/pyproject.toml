@@ -27,8 +27,17 @@ dev = [
     "httpx>=0.25.0"
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = [
+    "page_builder",
+    "page_builder.blocks",
+    "page_builder.core",
+    "page_builder.manifest",
+    "page_builder.renderer",
+]
+
+[tool.setuptools.package-dir]
+"page_builder" = "src"
 
 [tool.setuptools.package-data]
-"*" = ["templates/**/*.j2"]
+"page_builder" = ["scss/**/*.scss"]

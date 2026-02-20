@@ -18,10 +18,9 @@ jobs:
             git pull origin main
             # Installer dans le venv du service (.venv)
             .venv/bin/pip install -q "libsass>=0.23.0" "pillow>=10.0.0"
-            .venv/bin/pip install -q --no-deps \
-              -e ./libs/theme_composer \
-              -e ./libs/theme_generator \
-              -e ./libs/page_builder
+            .venv/bin/pip install -q --no-deps -e ./libs/theme_composer
+            .venv/bin/pip install -q --no-deps -e ./libs/theme_generator
+            .venv/bin/pip install -q --no-deps --force-reinstall -e ./libs/page_builder
             systemctl restart presence-ia
             sleep 3
             echo "=== STATUS ==="
