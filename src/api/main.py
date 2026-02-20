@@ -111,8 +111,9 @@ async def upload_cgv(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-def root(db=None):
+def root(preset: str = "myhealthprac", db=None):
     from ..database import get_block, SessionLocal, db_get_page_layout
+    from .design_system import generate_css_with_tokens
     import json as _json
     _db = SessionLocal()
     try:
@@ -138,6 +139,7 @@ def root(db=None):
         B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
         from offers_module.database import db_list_offers
         pricing = db_list_offers(_db)
+        num_offers = len(pricing)
 
         # HERO
         h_title    = B("hero","title").replace("\n","<br>")
@@ -205,71 +207,7 @@ def root(db=None):
     finally:
         _db.close()
 
-    _css = """
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#fafafa;color:#1a1a2e;line-height:1.6}
-a{color:#e94560;text-decoration:none}
-nav{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);z-index:100;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-.logo{font-size:1.3rem;font-weight:bold;color:#1a1a2e}.logo span{color:#e94560}
-.nav-cta{background:#e94560;color:#fff;padding:10px 22px;border-radius:6px;font-weight:bold;font-size:.9rem}
-.hero{text-align:center;padding:100px 20px 80px;max-width:800px;margin:0 auto;background:linear-gradient(180deg,#fff 0%,#fef5f7 100%)}
-.hero-badge{display:inline-block;background:#fff;border:1px solid #e94560;color:#e94560;padding:6px 16px;border-radius:20px;font-size:.85rem;margin-bottom:24px;box-shadow:0 2px 4px rgba(233,69,96,0.1)}
-.hero h1{font-size:clamp(2rem,5vw,3.2rem);color:#1a1a2e;margin-bottom:20px;line-height:1.2}
-.hero h1 span{color:#e94560}
-.hero p{font-size:1.15rem;color:#6b7280;max-width:580px;margin:0 auto 36px}
-.hero-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
-.btn-primary{background:linear-gradient(90deg,#e94560,#ff7043);color:#fff;padding:16px 36px;border-radius:8px;font-weight:bold;font-size:1.05rem;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(233,69,96,0.25)}
-.btn-secondary{background:#fff;color:#1a1a2e;padding:16px 36px;border-radius:8px;font-weight:bold;font-size:1.05rem;border:1px solid #d1d5db;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
-.btn-primary:hover{opacity:0.9;transform:translateY(-2px)}.btn-secondary:hover{border-color:#e94560;color:#e94560}
-.proof{background:linear-gradient(180deg,#fef5f7 0%,#fff 100%);padding:28px 20px;text-align:center;border-top:1px solid #ffe5ec;border-bottom:1px solid #ffe5ec}
-.proof>*{max-width:900px;margin-left:auto;margin-right:auto}
-.proof p{color:#6b7280;font-size:.9rem;margin-bottom:12px}
-.proof-stats{display:flex;gap:48px;justify-content:center;flex-wrap:wrap}
-.stat{text-align:center}.stat strong{display:block;font-size:1.8rem;font-weight:bold;color:#e94560}
-.stat span{font-size:.85rem;color:#6b7280}
-section{padding:80px 20px;max-width:900px;margin:0 auto}
-h2{font-size:clamp(1.5rem,3vw,2.2rem);color:#1a1a2e;margin-bottom:16px;max-width:800px}
-.sub{color:#6b7280;font-size:1.05rem;margin-bottom:48px;max-width:700px}
-.chat-demo{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:28px;margin:0 auto 60px;max-width:600px;box-shadow:0 4px 12px rgba(0,0,0,0.08)}
-.chat-q{color:#6b7280;font-size:.9rem;margin-bottom:12px}
-.chat-q strong{color:#1a1a2e}
-.chat-r{background:#f9fafb;border-left:3px solid #e94560;border-radius:6px;padding:16px;font-size:.9rem;color:#374151}
-.chat-r .bad{color:#e94560;font-weight:bold}.chat-r .good{color:#2ecc71;font-weight:bold}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-top:48px}
-.step{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform 0.2s}
-.step:hover{transform:translateY(-4px);box-shadow:0 4px 16px rgba(0,0,0,0.1)}
-.step-num{font-size:2rem;font-weight:bold;color:#e94560;margin-bottom:12px}
-.step h3{color:#1a1a2e;margin-bottom:8px;font-size:1rem}
-.step p{color:#6b7280;font-size:.9rem}
-.pricing{background:linear-gradient(180deg,#fff 0%,#f9fafb 100%);padding:80px 20px;border-top:1px solid #e5e7eb}
-.pricing-inner{max-width:960px;margin:0 auto;text-align:center}
-.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-top:48px;text-align:left}
-.plan{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:32px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform 0.2s}
-.plan:hover{transform:translateY(-4px);box-shadow:0 4px 16px rgba(0,0,0,0.1)}
-.plan.best{border-color:#e94560;box-shadow:0 4px 16px rgba(233,69,96,0.15)}
-.plan.best::before{content:"Recommandé";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#e94560;color:#fff;padding:4px 16px;border-radius:20px;font-size:.8rem;font-weight:bold;white-space:nowrap}
-.plan h3{color:#1a1a2e;margin-bottom:8px}
-.price{font-size:2.4rem;font-weight:bold;color:#e94560;margin:12px 0}
-.price span{font-size:1rem;color:#6b7280}
-.plan ul{list-style:none;margin:20px 0 24px}
-.plan ul li{padding:7px 0;color:#374151;border-bottom:1px solid #e5e7eb;font-size:.9rem}
-.plan ul li::before{content:"✓ ";color:#2ecc71}
-.btn-plan{display:block;background:linear-gradient(90deg,#e94560,#ff7043);color:#fff;padding:14px;border-radius:6px;font-weight:bold;text-align:center;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(233,69,96,0.25)}
-.btn-plan.ghost{background:#fff;border:1px solid #e94560;color:#e94560}
-.btn-plan:hover{opacity:0.9;transform:translateY(-2px)}
-.faq{max-width:720px;margin:0 auto}
-.faq-item{border-bottom:1px solid #e5e7eb;padding:20px 0}
-.faq-item h3{color:#1a1a2e;font-size:1rem;margin-bottom:8px}
-.faq-item p{color:#6b7280;font-size:.9rem}
-.section-problem{background:linear-gradient(135deg,#fff5f7 0%,#fff 100%);padding:80px 20px;margin:60px 0}
-.section-howto{background:#fff;padding:80px 20px}
-.section-evidence{background:linear-gradient(180deg,#fafafa 0%,#fff 100%);padding:80px 20px;margin:60px 0}
-.cta-final{background:linear-gradient(135deg,#e94560,#ff7043);padding:80px 20px;text-align:center}
-.cta-final h2{font-size:clamp(1.5rem,3vw,2rem);color:#fff;margin-bottom:16px}
-.cta-final p{color:#fff;margin-bottom:32px;opacity:0.9}
-footer{background:#f9fafb;padding:32px 20px;text-align:center;color:#6b7280;font-size:.85rem;border-top:1px solid #e5e7eb}
-footer a{color:#e94560}
-"""
+    _css = generate_css_with_tokens(preset)
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8">
@@ -348,7 +286,7 @@ footer a{color:#e94560}
   <div class="pricing-inner">
     <h2>Tarifs transparents</h2>
     <p class="sub">Sans abonnement caché. Sans engagement.</p>
-    <div class="plans">
+    <div class="plans plans-{num_offers}">
       {plans_html}
     </div>
   </div>
