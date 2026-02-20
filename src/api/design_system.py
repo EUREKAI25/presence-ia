@@ -305,9 +305,12 @@ h2 {{
 
 .steps {{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: calc(var(--spacing-unit) * 3);
     margin-top: calc(var(--spacing-unit) * 6);
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
 }}
 
 .step {{
@@ -373,14 +376,17 @@ h2 {{
     grid-template-columns: repeat(3, 1fr);
 }}
 
-.plans-4, .plans-5, .plans-6 {{
-    grid-template-columns: repeat(3, 1fr);
+/* 4 offres : 2x2 (jamais 3+1 ou 4 colonnes) */
+.plans-4 {{
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
 }}
 
-@media (min-width: 1200px) {{
-    .plans-4, .plans-5, .plans-6 {{
-        grid-template-columns: repeat(4, 1fr);
-    }}
+/* 5-6 offres : 3 colonnes puis 2x2 */
+.plans-5, .plans-6 {{
+    grid-template-columns: repeat(3, 1fr);
 }}
 
 @media (max-width: 900px) {{

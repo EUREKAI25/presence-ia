@@ -111,11 +111,14 @@ async def upload_cgv(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-def root(preset: str = "myhealthprac", db=None):
+def root(db=None):
     from ..database import get_block, SessionLocal, db_get_page_layout
     from .design_system import generate_css_with_tokens
     import json as _json
     _db = SessionLocal()
+
+    # Thème tons or (myhealthprac) - TODO: stocker en DB settings
+    preset = "myhealthprac"
     try:
         # Layout — sections activables/désactivables
         layout = db_get_page_layout(_db, "home")
@@ -322,6 +325,142 @@ async function startCheckout(offerId) {{
 <footer>
   © 2026 Présence IA — <a href="/cgv">Conditions Générales de Vente</a><br>
   <span style="font-size:.8rem">Les résultats IA peuvent varier selon les modèles et les dates de test.</span>
+</footer>
+
+</body></html>""")
+
+
+@app.get("/landing", response_class=HTMLResponse)
+def landing(db=None):
+    from ..database import get_block, SessionLocal, db_get_page_layout
+    from .design_system import generate_css_with_tokens
+    import json as _json
+    _db = SessionLocal()
+
+    # Thème tons or
+    preset = "myhealthprac"
+
+    try:
+        # Layout landing
+        layout = db_get_page_layout(_db, "landing")
+        if layout:
+            sections_config = _json.loads(layout.sections_config)
+        else:
+            sections_config = [
+                {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+                {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 1},
+            ]
+
+        sections_enabled = {s["key"]: s.get("enabled", True) for s in sections_config}
+
+        B = lambda sk, fk, **kw: get_block(_db, "landing", sk, fk, **kw)
+        from offers_module.database import db_list_offers
+        pricing = db_list_offers(_db)
+        num_offers = len(pricing)
+
+        # Blocs hero
+        h_title = B("hero","title").replace("\n","<br>")
+        h_sub = B("hero","subtitle")
+        h_cta1 = B("hero","cta_primary")
+        h_cta2 = B("hero","cta_secondary")
+
+        # Pricing
+        plans_html = ""
+        for o in pricing:
+            features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
+            li = "".join(f"<li>{b}</li>" for b in features)
+            price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price}€"
+            plans_html += f'''<div class="plan">
+<h3>{o.name}</h3>
+<div class="price">{price_display}</div>
+<ul>{li}</ul>
+<button onclick="startCheckout('{o.id}')" class="btn-plan">Commander</button>
+</div>'''
+    finally:
+        _db.close()
+
+    _css = generate_css_with_tokens(preset)
+
+    # Image header
+    header_img = "/headers/rennes.webp"  # TODO: configurable par thème
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Présence IA — Landing</title>
+<style>{_css}</style>
+<style>
+.header-image {{
+    width: 100%;
+    height: 400px;
+    object-fit: cover;
+    display: block;
+    margin-bottom: calc(var(--spacing-unit) * -10);
+    position: relative;
+    z-index: 1;
+}}
+.hero {{
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, var(--color-primary-lighter) 100%);
+}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Présence<span>IA</span></div>
+  <a href="#tarifs" class="nav-cta">Démarrer</a>
+</nav>
+
+<!-- HEADER IMAGE -->
+<img src="{header_img}" alt="Header" class="header-image">
+
+{f'''<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Landing Page</div>
+  <h1>{h_title}</h1>
+  <p>{h_sub}</p>
+  <div class="hero-btns">
+    <a href="#tarifs" class="btn-primary">{h_cta1}</a>
+    <a href="/" class="btn-secondary">{h_cta2}</a>
+  </div>
+</div>''' if sections_enabled.get("hero", True) else ""}
+
+{f'''<!-- PRICING -->
+<div class="pricing" id="tarifs">
+  <div class="pricing-inner">
+    <h2>Tarifs transparents</h2>
+    <p class="sub">Sans abonnement caché. Sans engagement.</p>
+    <div class="plans plans-{num_offers}">
+      {plans_html}
+    </div>
+  </div>
+</div>''' if sections_enabled.get("pricing", True) else ""}
+
+<script>
+async function startCheckout(offerId) {{
+  try {{
+    const r = await fetch('/api/checkout/' + offerId, {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{
+        success_url: window.location.origin + '/success',
+        cancel_url: window.location.href,
+      }})
+    }});
+    const data = await r.json();
+    if (data.checkout_url) window.location.href = data.checkout_url;
+  }} catch(e) {{
+    alert('Erreur lors du paiement. Veuillez réessayer.');
+  }}
+}}
+</script>
+
+<footer>
+  © 2026 Présence IA — <a href="/cgv">CGV</a>
 </footer>
 
 </body></html>""")
