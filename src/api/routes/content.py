@@ -32,10 +32,10 @@ def _nav(active: str, token: str) -> str:
     links = "".join(
         f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
         f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
+        f'background:{"#e94560" if t==active else "#f9fafb"};color:{"#fff" if t==active else "#374151"}">{label}</a>'
         for t, label in tabs
     )
-    return f'<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' \
+    return f'<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' \
            f'<a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>' \
            f'{links}</div>'
 
@@ -179,7 +179,7 @@ def _render_faq_section(blocks_by_key: dict, page_type: str, show_variants: bool
     html += '</div>'
 
     html += f'''<button onclick="addFaqItem()"
-      style="background:#2a2a4e;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:12px">
+      style="background:#e94560;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       + Ajouter une FAQ
     </button>'''
     return html
@@ -193,19 +193,19 @@ def _render_faq_item(page_type: str, idx: str, q_val: str, a_val: str, show_vari
     if show_variants:
         variant_inputs = f'''
     <input id="{uid_q}__prof" type="text" placeholder="profession (optionnel)"
-      style="background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:5px 8px;border-radius:4px;font-size:11px;width:140px">
+      style="background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:5px 8px;border-radius:4px;font-size:11px;width:140px">
     <input id="{uid_q}__city" type="text" placeholder="ville (optionnel)"
-      style="background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:5px 8px;border-radius:4px;font-size:11px;width:120px">'''
+      style="background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:5px 8px;border-radius:4px;font-size:11px;width:120px">'''
 
-    return f'''<div class="faq-item" style="border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px;background:#0a0a15">
-  <label style="display:block;color:#aaa;font-size:11px;margin-bottom:4px">Question {idx}</label>
+    return f'''<div class="faq-item" style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9fafb;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+  <label style="display:block;color:#6b7280;font-size:11px;margin-bottom:4px">Question {idx}</label>
   <textarea id="{uid_q}" rows="2"
-    style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical;margin-bottom:12px"
+    style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical;margin-bottom:12px"
   >{q_val}</textarea>
 
-  <label style="display:block;color:#aaa;font-size:11px;margin-bottom:4px">Réponse {idx}</label>
+  <label style="display:block;color:#6b7280;font-size:11px;margin-bottom:4px">Réponse {idx}</label>
   <textarea id="{uid_a}" rows="3"
-    style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical"
+    style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical"
   >{a_val}</textarea>
 
   <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
@@ -214,7 +214,7 @@ def _render_faq_item(page_type: str, idx: str, q_val: str, a_val: str, show_vari
       style="background:#e94560;color:#fff;border:none;padding:5px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">
       Enregistrer
     </button>
-    <span id="{uid_q}__status" style="font-size:11px;color:#aaa"></span>
+    <span id="{uid_q}__status" style="font-size:11px;color:#6b7280"></span>
   </div>
 </div>'''
 
@@ -263,14 +263,14 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
     for sk in sections:
         section_html = _render_section(blocks_by_key, page, sk, show_variants)
         if section_html:
-            sections_html += f"""<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:24px;margin-bottom:20px">
+            sections_html += f"""<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
 <h3 style="color:#e94560;font-size:14px;margin-bottom:20px">{_SECTION_TITLES.get(sk, sk)}</h3>
 {section_html}
 </div>"""
 
     # Section FAQ séparée (dynamique)
     faq_html = _render_faq_section(blocks_by_key, page, show_variants)
-    sections_html += f"""<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:24px;margin-bottom:20px">
+    sections_html += f"""<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
 <h3 style="color:#e94560;font-size:14px;margin-bottom:20px">{_SECTION_TITLES.get("faq", "FAQ")}</h3>
 {faq_html}
 </div>"""
@@ -278,12 +278,12 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
     page_tabs = "".join(
         f'<a href="/admin/content?token={token}&page={p}" style="padding:8px 18px;border-radius:6px;'
         f'text-decoration:none;font-size:13px;font-weight:{"bold" if p==page else "normal"};'
-        f'background:{"#1a1a2e" if p==page else "transparent"};color:#fff;border:1px solid {"#e94560" if p==page else "#2a2a4e"}">'
+        f'background:{"#e94560" if p==page else "#fff"};color:{"#fff" if p==page else "#374151"};border:1px solid {"#e94560" if p==page else "#e5e7eb"}">'
         f'{"🏠 HOME" if p=="home" else "📄 LANDING"}</a>'
         for p in ["home", "landing"]
     )
 
-    variant_note = "" if page == "home" else '''<p style="color:#555;font-size:12px;margin-bottom:24px">
+    variant_note = "" if page == "home" else '''<p style="color:#6b7280;font-size:12px;margin-bottom:24px">
   Les champs profession/ville sont optionnels — laissés vides = texte générique (fallback pour tous).
   Remplis pour créer une variante spécifique ex: "couvreur" + "Rennes".
 </p>'''
@@ -291,15 +291,15 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Contenus — PRESENCE_IA Admin</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e}}</style>
 </head><body>
 {_nav("content", token)}
 <div style="max-width:860px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-  <h1 style="color:#fff;font-size:18px">✏️ Contenus éditables</h1>
+  <h1 style="color:#1a1a2e;font-size:18px">✏️ Contenus éditables</h1>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     {page_tabs}
-    <button onclick="openLayoutModal()" style="background:#2a2a4e;color:#fff;border:1px solid #444;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:normal">
+    <button onclick="openLayoutModal()" style="background:#fff;color:#374151;border:1px solid #e5e7eb;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:normal">
       ⚙️ Gérer les sections
     </button>
   </div>
@@ -307,7 +307,7 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
 {variant_note}
 {sections_html}
 
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:24px;margin-bottom:20px">
+<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
 <h3 style="color:#e94560;font-size:14px;margin-bottom:16px">📄 CGV (PDF)</h3>
 <p style="color:#9ca3af;font-size:12px;margin-bottom:16px">Le PDF sera accessible sur <code style="color:#e94560">/cgv</code> et lié automatiquement dans le footer de chaque landing.</p>
 <input type="file" id="cgv-file" accept="application/pdf" style="display:none" onchange="uploadCGV(this)">
@@ -394,19 +394,19 @@ function addFaqItem() {{
   const container = document.getElementById('faq-container');
   const variant_inputs = SHOW_VARIANTS ? `
     <input id="${{PAGE}}__faq__q${{idx}}__prof" type="text" placeholder="profession (optionnel)"
-      style="background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:5px 8px;border-radius:4px;font-size:11px;width:140px">
+      style="background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:5px 8px;border-radius:4px;font-size:11px;width:140px">
     <input id="${{PAGE}}__faq__q${{idx}}__city" type="text" placeholder="ville (optionnel)"
-      style="background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:5px 8px;border-radius:4px;font-size:11px;width:120px">` : '';
+      style="background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:5px 8px;border-radius:4px;font-size:11px;width:120px">` : '';
 
-  const html = `<div class="faq-item" style="border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px;background:#0a0a15">
-  <label style="display:block;color:#aaa;font-size:11px;margin-bottom:4px">Question ${{idx}}</label>
+  const html = `<div class="faq-item" style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9fafb;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+  <label style="display:block;color:#6b7280;font-size:11px;margin-bottom:4px">Question ${{idx}}</label>
   <textarea id="${{PAGE}}__faq__q${{idx}}" rows="2"
-    style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical;margin-bottom:12px"
+    style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical;margin-bottom:12px"
   ></textarea>
 
-  <label style="display:block;color:#aaa;font-size:11px;margin-bottom:4px">Réponse ${{idx}}</label>
+  <label style="display:block;color:#6b7280;font-size:11px;margin-bottom:4px">Réponse ${{idx}}</label>
   <textarea id="${{PAGE}}__faq__a${{idx}}" rows="3"
-    style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical"
+    style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:10px;border-radius:6px;font-size:13px;font-family:'Segoe UI',sans-serif;resize:vertical"
   ></textarea>
 
   <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
@@ -415,7 +415,7 @@ function addFaqItem() {{
       style="background:#e94560;color:#fff;border:none;padding:5px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">
       Enregistrer
     </button>
-    <span id="${{PAGE}}__faq__q${{idx}}__status" style="font-size:11px;color:#aaa"></span>
+    <span id="${{PAGE}}__faq__q${{idx}}__status" style="font-size:11px;color:#6b7280"></span>
   </div>
 </div>`;
   container.insertAdjacentHTML('beforeend', html);
@@ -446,9 +446,9 @@ function renderLayoutSections() {{
   const container = document.getElementById('sections-list');
   container.innerHTML = layoutSections.map((s, idx) => `
     <div class="section-item" draggable="true" data-index="${{idx}}"
-      style="background:#0a0a15;border:1px solid #2a2a4e;border-radius:6px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:move">
-      <span style="color:#666;font-size:16px">☰</span>
-      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;color:#e8e8f0;font-size:14px">
+      style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <span style="color:#9ca3af;font-size:16px">☰</span>
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;color:#1a1a2e;font-size:14px">
         <input type="checkbox" ${{s.enabled ? 'checked' : ''}} onchange="toggleSection(${{idx}})"
           style="width:16px;height:16px;accent-color:#e94560">
         ${{s.label}}
@@ -566,39 +566,39 @@ async function saveLayout() {{
 </script>
 
 <!-- Modal gestion layout -->
-<div id="layout-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:32px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto">
+<div id="layout-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:32px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 10px 25px rgba(0,0,0,0.2)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-      <h2 style="color:#fff;font-size:18px">⚙️ Gérer les sections — {page.upper()}</h2>
-      <button onclick="closeLayoutModal()" style="background:transparent;border:none;color:#999;font-size:24px;cursor:pointer;padding:0;line-height:1">&times;</button>
+      <h2 style="color:#1a1a2e;font-size:18px">⚙️ Gérer les sections — {page.upper()}</h2>
+      <button onclick="closeLayoutModal()" style="background:transparent;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:0;line-height:1">&times;</button>
     </div>
 
-    <p style="color:#9ca3af;font-size:13px;margin-bottom:20px">
+    <p style="color:#6b7280;font-size:13px;margin-bottom:20px">
       Glisse-dépose pour réorganiser · Décoche pour masquer une section
     </p>
 
     <div id="sections-list"></div>
 
-    <div id="add-section-form" style="display:none;background:#0a0a15;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-top:16px">
+    <div id="add-section-form" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-top:16px">
       <h3 style="color:#e94560;font-size:14px;margin-bottom:12px">Nouvelle section personnalisée</h3>
-      <label style="display:block;color:#aaa;font-size:12px;margin-bottom:4px">Clé (ex: temoignages, tarifs...)</label>
+      <label style="display:block;color:#6b7280;font-size:12px;margin-bottom:4px">Clé (ex: temoignages, tarifs...)</label>
       <input id="new-section-key" type="text" placeholder="ma_section"
-        style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
-      <label style="display:block;color:#aaa;font-size:12px;margin-bottom:4px">Label affiché</label>
+        style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
+      <label style="display:block;color:#6b7280;font-size:12px;margin-bottom:4px">Label affiché</label>
       <input id="new-section-label" type="text" placeholder="Ma section"
-        style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
+        style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:12px">
       <div style="display:flex;gap:8px">
         <button onclick="addNewSection()" style="flex:1;background:#e94560;color:#fff;border:none;padding:8px;border-radius:4px;cursor:pointer;font-size:13px">
           Ajouter
         </button>
-        <button onclick="cancelAddSection()" style="background:#2a2a4e;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px">
+        <button onclick="cancelAddSection()" style="background:#fff;color:#374151;border:1px solid #e5e7eb;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px">
           Annuler
         </button>
       </div>
     </div>
 
     <button onclick="showAddSectionForm()" id="add-section-btn"
-      style="width:100%;background:transparent;border:1px dashed #2a2a4e;color:#9ca3af;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:16px">
+      style="width:100%;background:#fff;border:1px dashed #e5e7eb;color:#6b7280;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:16px">
       + Ajouter une section personnalisée
     </button>
 
@@ -608,7 +608,7 @@ async function saveLayout() {{
         Enregistrer
       </button>
       <button onclick="closeLayoutModal()"
-        style="background:#2a2a4e;color:#fff;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;font-size:14px">
+        style="background:#fff;color:#374151;border:1px solid #e5e7eb;padding:12px 24px;border-radius:6px;cursor:pointer;font-size:14px">
         Annuler
       </button>
     </div>

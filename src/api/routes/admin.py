@@ -26,10 +26,10 @@ def _admin_nav(token: str, active: str = "") -> str:
     links = "".join(
         f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
         f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
+        f'background:{"#e94560" if t==active else "#f9fafb"};color:{"#fff" if t==active else "#374151"}">{label}</a>'
         for t, label in tabs
     )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    return f'''<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
   <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
   {links}
 </div>'''
@@ -65,27 +65,27 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             <td><a href="/admin/campaign/{c.campaign_id}?token={_admin_token()}">{c.campaign_id[:8]}…</a></td>
             <td>{c.profession}</td><td>{c.city}</td>
             <td>{len(ps)}</td><td>{eligible}</td>
-            <td style="font-size:11px;color:#aaa">{', '.join(f'{k}:{v}' for k,v in counts.items())}</td>
+            <td style="font-size:11px;color:#6b7280">{', '.join(f'{k}:{v}' for k,v in counts.items())}</td>
         </tr>"""
 
     token = _admin_token()
     nav = _admin_nav(token)
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>PRESENCE_IA — Admin</title>
-<style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;margin:0}}
-h1{{color:#e94560;margin-bottom:20px;font-size:18px}}
-table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
-th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
-td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}
+<style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e;margin:0}}
+h1{{color:#1a1a2e;margin-bottom:20px;font-size:18px}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
+th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:12px}}
+td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560}}
 .badge{{display:inline-block;background:#e94560;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px}}</style></head>
 <body>
 {nav}
 <div style="padding:24px">
 <h1>Pipeline — Campagnes</h1>
 <table><tr><th>ID</th><th>Profession</th><th>Ville</th><th>Prospects</th><th>Éligibles</th><th>Statuts</th></tr>
-{rows or '<tr><td colspan=6 style="color:#666;text-align:center">Aucune campagne</td></tr>'}
+{rows or '<tr><td colspan=6 style="color:#9ca3af;text-align:center">Aucune campagne</td></tr>'}
 </table>
-<p style="margin-top:16px;color:#666;font-size:12px">
+<p style="margin-top:16px;color:#9ca3af;font-size:12px">
   <a href="/docs">→ Swagger docs</a> &nbsp;|&nbsp;
   <a href="/admin/scheduler?token={token}">→ Scheduler status</a>
 </p></div></body></html>""")
@@ -121,16 +121,16 @@ def admin_campaign(cid: str, request: Request, db: Session = Depends(get_db)):
     token = request.query_params.get("token", _admin_token())
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Campagne {cid[:8]}</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
-h1{{color:#e94560}}h2{{color:#aaa;font-size:14px;margin:4px 0 20px}}
-table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
-th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
-td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}</style></head>
+<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
+h1{{color:#1a1a2e}}h2{{color:#6b7280;font-size:14px;margin:4px 0 20px}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
+th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:12px}}
+td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560}}</style></head>
 <body>
 <h1>Campagne — {c.profession} / {c.city}</h1>
 <h2>ID: {cid} &nbsp;|&nbsp; {len(ps)} prospects</h2>
 <table><tr><th>Nom</th><th>Ville</th><th>Statut</th><th>Éligible</th><th>Score</th><th>Concurrents</th></tr>
-{rows or '<tr><td colspan=6 style="color:#666;text-align:center">Aucun prospect</td></tr>'}
+{rows or '<tr><td colspan=6 style="color:#9ca3af;text-align:center">Aucun prospect</td></tr>'}
 </table>
 <p style="margin-top:16px"><a href="/admin?token={token}">← Retour</a></p>
 </body></html>""")
@@ -150,30 +150,30 @@ def admin_prospect(pid: str, request: Request, db: Session = Depends(get_db)):
     assets_form = ""
     if p.status in (ProspectStatus.SCORED.value, ProspectStatus.READY_ASSETS.value):
         assets_form = f"""
-<h2 style="color:#aaa;margin-top:32px">Ajouter assets</h2>
+<h2 style="color:#6b7280;margin-top:32px">Ajouter assets</h2>
 <form method="post" action="/api/prospect/{pid}/assets?token={token}"
-      style="background:#1a1a2e;padding:20px;border-radius:8px;max-width:600px">
-  <label style="display:block;margin-bottom:8px;color:#aaa">video_url</label>
-  <input name="video_url" style="width:100%;padding:8px;background:#0f0f1a;border:1px solid #2a2a4e;color:#fff;border-radius:4px;margin-bottom:12px" value="{p.video_url or ''}">
-  <label style="display:block;margin-bottom:8px;color:#aaa">screenshot_url</label>
-  <input name="screenshot_url" style="width:100%;padding:8px;background:#0f0f1a;border:1px solid #2a2a4e;color:#fff;border-radius:4px;margin-bottom:16px" value="{p.screenshot_url or ''}">
-  <button type="submit" style="background:#e94560;color:#fff;border:none;padding:10px 20px;border-radius:4px;cursor:pointer">Enregistrer assets</button>
+      style="background:#fff;padding:20px;border-radius:8px;max-width:600px;border:1px solid #e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+  <label style="display:block;margin-bottom:8px;color:#6b7280">video_url</label>
+  <input name="video_url" style="width:100%;padding:8px;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;border-radius:4px;margin-bottom:12px" value="{p.video_url or ''}">
+  <label style="display:block;margin-bottom:8px;color:#6b7280">screenshot_url</label>
+  <input name="screenshot_url" style="width:100%;padding:8px;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;border-radius:4px;margin-bottom:16px" value="{p.screenshot_url or ''}">
+  <button type="submit" style="background:#e94560;color:#fff;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1)">Enregistrer assets</button>
 </form>"""
 
     mark_ready_btn = ""
     if p.status == ProspectStatus.READY_ASSETS.value and p.video_url and p.screenshot_url:
         mark_ready_btn = f"""
 <form method="post" action="/api/prospect/{pid}/mark-ready?token={token}" style="margin-top:12px">
-  <button style="background:#2ecc71;color:#0f0f1a;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-weight:bold">
+  <button style="background:#2ecc71;color:#fff;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-weight:bold;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
     ✓ Marquer READY_TO_SEND
   </button>
 </form>"""
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>{p.name}</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
-h1{{color:#e94560}}dt{{color:#aaa;font-size:12px;margin-top:12px}}dd{{color:#fff;margin:4px 0 0 0}}
-.box{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;max-width:600px;margin:20px 0}}
+<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
+h1{{color:#1a1a2e}}dt{{color:#6b7280;font-size:12px;margin-top:12px}}dd{{color:#1a1a2e;margin:4px 0 0 0}}
+.box{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;max-width:600px;margin:20px 0;box-shadow:0 1px 3px rgba(0,0,0,0.1)}}
 a{{color:#e94560}}</style></head>
 <body>
 <h1>{p.name}</h1>
@@ -187,7 +187,7 @@ a{{color:#e94560}}</style></head>
   <dt>Concurrents</dt><dd>{', '.join(jl(p.competitors_cited)) or '—'}</dd>
   <dt>video_url</dt><dd>{p.video_url or '—'}</dd>
   <dt>screenshot_url</dt><dd>{p.screenshot_url or '—'}</dd>
-  <dt>Justification</dt><dd style="color:#aaa;font-size:12px">{p.score_justification or '—'}</dd>
+  <dt>Justification</dt><dd style="color:#6b7280;font-size:12px">{p.score_justification or '—'}</dd>
 </dl></div>
 {assets_form}
 {mark_ready_btn}
@@ -237,7 +237,7 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
             f'<code style="color:#2ecc71;font-size:11px">{p.email}</code>'
             if p.email else
             f'<button onclick="enrichEmail(\'{p.prospect_id}\')" '
-            f'style="background:#16213e;color:#aaa;border:1px solid #2a2a4e;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">'
+            f'style="background:#fff;color:#374151;border:1px solid #e5e7eb;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">'
             f'Enrichir</button>'
         )
         send_btn = ""
@@ -250,14 +250,14 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
         rows += f"""<tr id="row-{p.prospect_id}">
           <td><a href="/admin/prospect/{p.prospect_id}?token={token}" style="color:#e94560">{p.name}</a></td>
           <td>{p.city}</td>
-          <td style="font-size:11px;color:#aaa">{p.profession}</td>
+          <td style="font-size:11px;color:#6b7280">{p.profession}</td>
           <td>{_pill(p.status)}</td>
           <td style="text-align:center">{p.ia_visibility_score or '—'}</td>
           <td style="font-size:11px">{c1}</td>
           <td>{email_cell}{send_btn}</td>
           <td style="text-align:center">
             {_check(p.proof_image_url)}
-            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload preuve">
+            <label style="cursor:pointer;color:#6b7280;font-size:11px" title="Upload preuve">
               <input type="file" accept="image/*" style="display:none"
                      onchange="uploadFile(this,'{p.prospect_id}','proof-image')">
               📎
@@ -265,7 +265,7 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
           </td>
           <td style="text-align:center">
             {_check(p.city_image_url)}
-            <label style="cursor:pointer;color:#aaa;font-size:11px" title="Upload photo ville">
+            <label style="cursor:pointer;color:#6b7280;font-size:11px" title="Upload photo ville">
               <input type="file" accept="image/*" style="display:none"
                      onchange="uploadFile(this,'{p.prospect_id}','city-image')">
               📎
@@ -275,9 +275,9 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
             <input id="vid-{p.prospect_id}" type="text"
               value="{p.video_url or ''}"
               placeholder="Lien Dropbox…"
-              style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#fff;padding:4px 6px;border-radius:4px;font-size:11px">
+              style="width:100%;background:#fff;border:1px solid #e5e7eb;color:#1a1a2e;padding:4px 6px;border-radius:4px;font-size:11px">
             <button onclick="saveVideoUrl('{p.prospect_id}')"
-              style="margin-top:4px;background:#2a2a4e;color:#aaa;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;width:100%">
+              style="margin-top:4px;background:#fff;color:#374151;border:1px solid #e5e7eb;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;width:100%">
               Enregistrer
             </button>
           </td>
@@ -327,11 +327,11 @@ async function saveVideoUrl(pid) {{
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Send Queue — PRESENCE_IA</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
-h1{{color:#e94560;margin-bottom:4px}}h2{{color:#aaa;font-size:13px;margin:0 0 20px}}
-table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px;overflow:hidden}}
-th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:11px}}
-td{{padding:8px 10px;border-bottom:1px solid #2a2a4e;color:#ddd;vertical-align:middle}}
+<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
+h1{{color:#1a1a2e;margin-bottom:4px}}h2{{color:#6b7280;font-size:13px;margin:0 0 20px}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
+th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:11px}}
+td{{padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e;vertical-align:middle}}
 a{{color:#e94560}}code{{font-size:11px}}</style></head>
 <body>
 <h1>Send Queue</h1>
@@ -342,9 +342,9 @@ a{{color:#e94560}}code{{font-size:11px}}</style></head>
     <th>Score</th><th>Concurrent #1</th><th>Email</th>
     <th>Preuve</th><th>Ville img</th><th>Vidéo</th>
   </tr>
-  {rows or '<tr><td colspan=10 style="text-align:center;color:#666;padding:20px">Aucun prospect éligible</td></tr>'}
+  {rows or '<tr><td colspan=10 style="text-align:center;color:#9ca3af;padding:20px">Aucun prospect éligible</td></tr>'}
 </table>
-<p style="margin-top:16px;color:#666;font-size:12px">
+<p style="margin-top:16px;color:#9ca3af;font-size:12px">
   <a href="/admin?token={token}">← Dashboard</a> &nbsp;|&nbsp;
   <a href="/admin/scheduler?token={token}">→ Scheduler</a>
 </p>
@@ -370,10 +370,10 @@ def admin_scheduler(request: Request):
     )
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Scheduler</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#0f0f1a;color:#e8e8f0;margin:0;padding:24px}}
-h1{{color:#e94560}}table{{border-collapse:collapse;width:100%;background:#1a1a2e;border-radius:8px}}
-th{{background:#16213e;color:#aaa;padding:10px;text-align:left;font-size:12px}}
-td{{padding:10px;border-bottom:1px solid #2a2a4e;color:#ddd}}a{{color:#e94560}}</style></head>
+<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
+h1{{color:#1a1a2e}}table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
+th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:12px}}
+td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560}}</style></head>
 <body><h1>Scheduler — Jobs actifs</h1>
 <table><tr><th>ID</th><th>Prochain run</th><th>Trigger</th></tr>{rows}</table>
 <p style="margin-top:16px"><a href="/admin?token={request.query_params.get('token', _admin_token())}">← Retour</a></p>
