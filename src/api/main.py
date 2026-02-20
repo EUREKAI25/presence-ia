@@ -222,6 +222,7 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:20px 4
 .btn-secondary{background:#fff;color:#1a1a2e;padding:16px 36px;border-radius:8px;font-weight:bold;font-size:1.05rem;border:1px solid #d1d5db;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
 .btn-primary:hover{opacity:0.9;transform:translateY(-2px)}.btn-secondary:hover{border-color:#e94560;color:#e94560}
 .proof{background:linear-gradient(180deg,#fef5f7 0%,#fff 100%);padding:28px 20px;text-align:center;border-top:1px solid #ffe5ec;border-bottom:1px solid #ffe5ec}
+.proof>*{max-width:900px;margin-left:auto;margin-right:auto}
 .proof p{color:#6b7280;font-size:.9rem;margin-bottom:12px}
 .proof-stats{display:flex;gap:48px;justify-content:center;flex-wrap:wrap}
 .stat{text-align:center}.stat strong{display:block;font-size:1.8rem;font-weight:bold;color:#e94560}
@@ -284,7 +285,7 @@ footer a{color:#e94560}
   <div class="logo">Présence<span>IA</span></div>
 </nav>
 
-<!-- HERO -->
+{f'''<!-- HERO -->
 <div class="hero">
   <div class="hero-badge">Nouveau — Audit IA pour artisans &amp; PME</div>
   <h1>{h_title}</h1>
@@ -293,9 +294,9 @@ footer a{color:#e94560}
     <a href="#contact" class="btn-primary">{h_cta1}</a>
     <a href="#comment" class="btn-secondary">{h_cta2}</a>
   </div>
-</div>
+</div>''' if sections_enabled.get("hero", True) else ""}
 
-<!-- PROOF -->
+{f'''<!-- PROOF -->
 <div class="proof">
   <p>Résultats observés sur nos derniers audits</p>
   <div class="proof-stats">
@@ -304,7 +305,7 @@ footer a{color:#e94560}
     <div class="stat"><strong>{s3v}</strong><span>{s3l}</span></div>
   </div>
   {sources_html}
-</div>
+</div>''' if sections_enabled.get("proof_stat", True) else ""}
 
 {f'''<!-- PROBLÈME -->
 <div class="section-problem">
