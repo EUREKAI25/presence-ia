@@ -112,12 +112,17 @@ async def upload_cgv(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 def root(db=None):
-    from ..database import get_block, SessionLocal, db_page_layout_get
+    from ..database import get_block, SessionLocal, db_get_page_layout, jl as _jl
     _db = SessionLocal()
     try:
         # Layout — sections activables/désactivables
-        layout = db_page_layout_get(_db, "home")
-        sections_enabled = {s["id"]: s["enabled"] for s in layout}
+        layout_db = db_get_page_layout(_db, "home")
+        if layout_db and layout_db.sections_config:
+            sections_list = _jl(layout_db.sections_config)
+            sections_enabled = {s["id"]: s["enabled"] for s in sections_list}
+        else:
+            # Par défaut, toutes les sections sont activées
+            sections_enabled = {}
 
         B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
         from offers_module.database import db_list_offers
