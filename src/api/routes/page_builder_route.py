@@ -351,7 +351,7 @@ def build_manifest_from_db(
         ))
 
     # 6. Placeholder context
-    price = "{price}"  # sera remplacé si offers_module disponible
+    price = _PLACEHOLDER_DEFAULTS["price"]  # "97€" par défaut
     placeholder_context = {
         **_PLACEHOLDER_DEFAULTS,
         "city":       city or _PLACEHOLDER_DEFAULTS["city"],

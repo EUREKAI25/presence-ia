@@ -70,7 +70,11 @@ def render_section(section: Section) -> str:
 
     # 1 colonne span 12 → pas de grid
     if len(section.columns) == 1 and section.columns[0].span == 12:
-        inner = render_module(section.columns[0].module)
+        module = section.columns[0].module
+        inner  = render_module(module)
+        # HeroBlock et FooterBlock : full-width, sans container, sans padding section
+        if isinstance(module, (HeroBlock, FooterBlock)):
+            return f'<section{section_id} class="section section--full"{bg_style}>\n{inner}\n</section>'
         return f'<section{section_id} class="section"{bg_style}>\n  <div class="container">\n{inner}\n  </div>\n</section>'
 
     cols_html = "\n".join(
