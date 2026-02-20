@@ -112,18 +112,28 @@ async def upload_cgv(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 def root(db=None):
-    from ..database import get_block, SessionLocal, db_get_page_layout, jl as _jl
+    from ..database import get_block, SessionLocal, db_get_page_layout
+    import json as _json
     _db = SessionLocal()
     try:
-        # Layout — sections activables/désactivables (TODO: implémenter l'interface admin)
-        # Pour l'instant, toutes les sections sont activées par défaut
-        sections_enabled = {
-            "problem": True,
-            "howto": True,
-            "evidence": True,
-            "pricing": True,
-            "faq": True
-        }
+        # Layout — sections activables/désactivables
+        layout = db_get_page_layout(_db, "home")
+        if layout:
+            sections_config = _json.loads(layout.sections_config)
+        else:
+            # Config par défaut si pas encore configuré
+            sections_config = [
+                {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
+                {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
+                {"key": "problem", "label": "Problème", "enabled": True, "order": 2},
+                {"key": "proof_visual", "label": "Comment ça marche", "enabled": True, "order": 3},
+                {"key": "evidence", "label": "Preuves / Screenshots", "enabled": True, "order": 4},
+                {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 5},
+                {"key": "faq", "label": "FAQ", "enabled": True, "order": 6},
+            ]
+
+        # Filtrer les sections activées
+        sections_enabled = {s["key"]: s.get("enabled", True) for s in sections_config}
 
         B = lambda sk, fk, **kw: get_block(_db, "home", sk, fk, **kw)
         from offers_module.database import db_list_offers
@@ -321,7 +331,7 @@ footer a{color:#e94560}
     {steps_html}
   </div>
 </section>
-</div>''' if sections_enabled.get("howto", True) else ""}
+</div>''' if sections_enabled.get("proof_visual", True) else ""}
 
 <!-- PREUVES -->
 {f'''<div class="section-evidence">

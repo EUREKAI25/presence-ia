@@ -239,9 +239,11 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
             sections_config = [
                 {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
                 {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
-                {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
-                {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
-                {"key": "cta", "label": "CTA final", "enabled": True, "order": 4},
+                {"key": "problem", "label": "Problème", "enabled": True, "order": 2},
+                {"key": "proof_visual", "label": "Comment ça marche", "enabled": True, "order": 3},
+                {"key": "evidence", "label": "Preuves / Screenshots", "enabled": True, "order": 4},
+                {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 5},
+                {"key": "faq", "label": "FAQ", "enabled": True, "order": 6},
             ]
         else:
             sections_config = [
@@ -664,9 +666,11 @@ def get_layout(page: str, db: Session = Depends(get_db), token: str = ""):
     default_sections_home = [
         {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
         {"key": "proof_stat", "label": "Preuves statistiques", "enabled": True, "order": 1},
-        {"key": "proof_visual", "label": "Preuves visuelles / Étapes", "enabled": True, "order": 2},
-        {"key": "faq", "label": "FAQ", "enabled": True, "order": 3},
-        {"key": "cta", "label": "CTA final", "enabled": True, "order": 4},
+        {"key": "problem", "label": "Problème", "enabled": True, "order": 2},
+        {"key": "proof_visual", "label": "Comment ça marche", "enabled": True, "order": 3},
+        {"key": "evidence", "label": "Preuves / Screenshots", "enabled": True, "order": 4},
+        {"key": "pricing", "label": "Tarifs", "enabled": True, "order": 5},
+        {"key": "faq", "label": "FAQ", "enabled": True, "order": 6},
     ]
     default_sections_landing = [
         {"key": "hero", "label": "Hero", "enabled": True, "order": 0},
