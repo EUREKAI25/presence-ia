@@ -741,7 +741,8 @@ def landing_v3(token: str):
     with SessionLocal() as db:
         p = db.get(V3ProspectDB, token)
         if not p:
-            return HTMLResponse("<h1 style='font-family:sans-serif;padding:40px'>Page non trouvée.</h1>", status_code=404)
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url="https://presence-ia.com", status_code=302)
         city_img       = db.get(V3CityImageDB, _city_image_key(p.city))
         city_image_url = city_img.image_url if city_img else ""
         competitors    = json.loads(p.competitors) if p.competitors else []
