@@ -443,37 +443,44 @@ def _render_landing(
   <div class="stat-item"><strong>3</strong><span>prompts différents<br>par test</span></div>
 </div>"""
 
-    # ── Chat boxes ────────────────────────────────────────────────────────
-    def _make_chat_box(model_name, prompt, response, tested_at_str):
-        ts = ""
-        if tested_at_str:
-            try:
-                ts = datetime.fromisoformat(str(tested_at_str)).strftime("%d/%m à %H:%M")
-            except Exception:
-                ts = str(tested_at_str)[:16]
-        resp_html = (response or "").replace("\n", "<br>")
-        ts_label = f" (test du {ts})" if ts else ""
-        return f"""
-  <div class="chat-box">
-    <div class="chat-prompt">
-      <span class="chat-label">Prompt{ts_label}</span>
-      <em>&laquo;&nbsp;{prompt}&nbsp;&raquo;</em>
-    </div>
-    <div class="chat-response" style="margin-top:14px">
-      <span class="chat-label">{model_name}</span>
-      <div class="chat-text">{resp_html}</div>
-    </div>
-    <p style="margin-top:10px;font-weight:700;color:#dc2626">→ {model_name} ne vous connait pas.</p>
-  </div>"""
-
+    # ── Chat groups (1 prompt → accordéon par IA) ─────────────────────────
     if ia_results_list:
-        chat_html = "\n".join(
-            _make_chat_box(r["model"],
-                           r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?",
-                           r.get("response", ""),
-                           r.get("tested_at"))
-            for r in ia_results_list
-        )
+        from collections import OrderedDict
+        by_prompt = OrderedDict()
+        for r in ia_results_list:
+            pr = r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?"
+            if pr not in by_prompt:
+                by_prompt[pr] = {"tested_at": r.get("tested_at"), "models": []}
+            by_prompt[pr]["models"].append(r)
+
+        chat_html = ""
+        for prompt_text, group in by_prompt.items():
+            ts = ""
+            ts_raw = group["tested_at"]
+            if ts_raw:
+                try:
+                    ts = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m à %H:%M")
+                except Exception:
+                    ts = str(ts_raw)[:16]
+            ts_label = f" (test du {ts})" if ts else ""
+            acc_items = ""
+            for r in group["models"]:
+                resp_html = (r.get("response", "") or "").replace("\n", "<br>")
+                acc_items += (
+                    f'<details class="chat-detail">'
+                    f'<summary>{r["model"]} ne vous connait pas</summary>'
+                    f'<div class="chat-detail-body">{resp_html}</div>'
+                    f'</details>'
+                )
+            chat_html += (
+                f'<div class="chat-group">'
+                f'<div class="chat-prompt">'
+                f'<span class="chat-label">Prompt{ts_label}</span>'
+                f'<em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em>'
+                f'</div>'
+                f'<div class="chat-accordion">{acc_items}</div>'
+                f'</div>'
+            )
     else:
         # Aucune donnée IA — fallback illustratif avec mention explicite
         chat_html = f"""
@@ -633,6 +640,15 @@ nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-bet
 .section h2{{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.2}}
 .section>p{{color:#555;font-size:1.05rem;margin-bottom:32px}}
 .chat-box{{background:#fafafa;border:1px solid var(--g2);border-radius:12px;padding:24px 28px;margin:32px 0}}
+.chat-group{{margin:28px 0}}
+.chat-accordion{{margin-top:12px;border:1px solid var(--g2);border-radius:10px;overflow:hidden}}
+.chat-detail{{border-bottom:1px solid var(--g2)}}
+.chat-detail:last-child{{border-bottom:none}}
+.chat-detail summary{{padding:13px 18px;font-size:.9rem;font-weight:600;color:#dc2626;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;user-select:none}}
+.chat-detail summary::before{{content:"▸";font-size:.8rem;transition:transform .2s;display:inline-block}}
+.chat-detail[open] summary::before{{transform:rotate(90deg)}}
+.chat-detail summary:hover{{background:#fafafa}}
+.chat-detail-body{{padding:14px 18px 16px;font-size:.88rem;color:#444;line-height:1.7;border-top:1px solid var(--g2);background:#fff}}
 .chat-meta{{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--g2)}}
 .chat-meta strong{{font-size:.9rem}}.chat-time{{font-size:.78rem;color:var(--g3);margin-left:auto}}
 .chat-label{{display:block;font-size:.72rem;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}}
