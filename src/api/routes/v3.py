@@ -28,8 +28,8 @@ from fastapi import APIRouter, Cookie, File, Form, HTTPException, Request, Uploa
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from ...models import V3ProspectDB, V3CityImageDB, V3LandingTextDB
-from ...database import SessionLocal
+from ...models import V3ProspectDB, V3CityImageDB, V3LandingTextDB, ContentBlockDB
+from ...database import SessionLocal, get_block, set_block
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -94,9 +94,9 @@ def _normalize_phone(phone: str) -> str:
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
-    "Je travaille sur la visibilité des {profession}s dans les intelligences artificielles "
+    "Je travaille sur la visibilité des {metiers} dans les intelligences artificielles "
     "(ChatGPT, Gemini, Claude).\n\n"
-    "J'ai effectué un test pour votre entreprise à {city} — "
+    "J'ai effectué un test pour votre entreprise à {ville} — "
     "le résultat vous concerne directement.\n\n"
     "Accès à votre rapport personnalisé : {landing_url}\n\n"
     "Cordialement,\n"
@@ -104,25 +104,50 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "Bonjour, test visibilité IA effectué pour votre entreprise à {city}. "
+    "Bonjour, test visibilité IA effectué pour votre entreprise à {ville}. "
     "Rapport : {landing_url} - Présence IA. STOP: contact@presence-ia.com"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
                      template: Optional[str] = None) -> str:
     tpl = template or _DEFAULT_EMAIL_TEMPLATE
+    metier  = profession.lower()
+    metiers = metier + "s" if not metier.endswith("s") else metier
     try:
-        return tpl.format(name=name, city=city, profession=profession, landing_url=landing_url)
+        return tpl.format(name=name, ville=city, metier=metier, metiers=metiers,
+                          landing_url=landing_url,
+                          city=city, profession=profession)  # compat anciens templates
     except Exception:
-        return _DEFAULT_EMAIL_TEMPLATE.format(name=name, city=city, profession=profession, landing_url=landing_url)
+        return _DEFAULT_EMAIL_TEMPLATE.format(name=name, ville=city, metier=metier,
+                                              metiers=metiers, landing_url=landing_url,
+                                              city=city, profession=profession)
 
-def _contact_message_sms(name: str, city: str, landing_url: str,
+def _contact_message_sms(name: str, city: str, profession: str, landing_url: str,
                          template: Optional[str] = None) -> str:
     tpl = template or _DEFAULT_SMS_TEMPLATE
+    metier  = profession.lower() if profession else ""
+    metiers = metier + "s" if metier and not metier.endswith("s") else metier
     try:
-        return tpl.format(name=name, city=city, landing_url=landing_url)
+        return tpl.format(name=name, ville=city, metier=metier, metiers=metiers,
+                          landing_url=landing_url,
+                          city=city, profession=profession)  # compat anciens templates
     except Exception:
-        return _DEFAULT_SMS_TEMPLATE.format(name=name, city=city, landing_url=landing_url)
+        return _DEFAULT_SMS_TEMPLATE.format(name=name, ville=city, metier=metier,
+                                             metiers=metiers, landing_url=landing_url,
+                                             city=city, profession=profession)
+
+
+def _strip_markdown(text: str) -> str:
+    """Supprime les balises markdown (**, ##, *, - etc.) des réponses IA."""
+    if not text:
+        return text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    return text.strip()
 
 
 def _youtube_embed(url: str) -> str:
@@ -262,7 +287,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 max_tokens=350, temperature=0.3,
             )
             results.append({"model": "ChatGPT", "prompt": prompt,
-                            "response": r.choices[0].message.content.strip(),
+                            "response": _strip_markdown(r.choices[0].message.content.strip()),
                             "tested_at": datetime.utcnow().isoformat()})
     except Exception as e:
         log.error("IA test ChatGPT: %s", e)
@@ -277,7 +302,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
             gmodel = genai.GenerativeModel("gemini-2.0-flash")
             r = gmodel.generate_content(prompt)
             results.append({"model": "Gemini", "prompt": prompt,
-                            "response": r.text.strip(),
+                            "response": _strip_markdown(r.text.strip()),
                             "tested_at": datetime.utcnow().isoformat()})
     except Exception as e:
         log.error("IA test Gemini: %s", e)
@@ -294,7 +319,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 messages=[{"role": "user", "content": prompt}],
             )
             results.append({"model": "Claude", "prompt": prompt,
-                            "response": r.content[0].text.strip(),
+                            "response": _strip_markdown(r.content[0].text.strip()),
                             "tested_at": datetime.utcnow().isoformat()})
     except Exception as e:
         log.error("IA test Claude: %s", e)
@@ -1008,10 +1033,34 @@ tr:hover{{background:#fafafa}}
 
 <!-- ── Onglet Textes ── -->
 <div class="panel {"active" if tab=="textes" else ""}">
-  <div class="card" style="margin-bottom:16px">
-    <h2 style="font-size:1rem;font-weight:700;margin-bottom:12px">Éditer les textes de la landing</h2>
-    <p style="font-size:.83rem;color:#666;margin-bottom:16px">Sélectionnez une paire ville / métier pour personnaliser les textes et voir les preuves IA disponibles.</p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+
+  <!-- SECTION 1 : Templates de contact GLOBAUX -->
+  <div class="card" style="margin-bottom:20px">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">✉ Templates de contact (global)</h2>
+    <p style="font-size:.82rem;color:#666;margin-bottom:14px">Ces templates s'appliquent à tous les envois. Placeholders disponibles : <code>{{{{metier}}}}</code> <code>{{{{metiers}}}}</code> <code>{{{{ville}}}}</code> <code>{{{{name}}}}</code> <code>{{{{landing_url}}}}</code></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message email</label>
+        <textarea id="gtpl-email" rows="8" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message SMS</label>
+        <textarea id="gtpl-sms" rows="4" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
+        <p style="font-size:.73rem;color:#999;margin-top:8px">Le SMS doit rester sous 160 caractères.</p>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-primary" onclick="saveGlobalTemplate()">💾 Sauvegarder templates</button>
+      <button class="btn btn-sm" onclick="previewEmail()" style="margin-left:4px">👁 Aperçu email</button>
+      <span id="gtpl-status" style="font-size:.82rem;color:#16a34a"></span>
+    </div>
+  </div>
+
+  <!-- SECTION 2 : Personnalisation landing par paire -->
+  <div class="card" style="margin-bottom:20px">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🖋 Personnalisation landing par paire</h2>
+    <p style="font-size:.83rem;color:#666;margin-bottom:12px">Hero, CTA et preuves spécifiques à une ville / métier. Laisser vide = auto-généré.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
       <div class="form-group">
         <label>Ville</label>
         <select id="txt-city" onchange="loadTexts()">
@@ -1025,62 +1074,85 @@ tr:hover{{background:#fafafa}}
         </select>
       </div>
     </div>
-  </div>
-
-  <div id="txt-editor" style="display:{"block" if all_cities and all_professions else "none"}">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-      <div class="card">
-        <h3 style="font-size:.9rem;font-weight:700;margin-bottom:16px">Textes de la landing</h3>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero (laisser vide = auto)</label>
-          <textarea id="txt-hero" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+    <div id="txt-editor" style="display:{"block" if all_cities and all_professions else "none"}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero (laisser vide = auto)</label>
+            <textarea id="txt-hero" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre hero</label>
+            <textarea id="txt-hero-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre CTA</label>
+            <input type="text" id="txt-cta" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre CTA</label>
+            <textarea id="txt-cta-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Témoignages (une par ligne : "texte|source")</label>
+            <textarea id="txt-proofs" rows="4" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="Super résultats depuis l'audit IA...|Jean D., pisciniste"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Vidéos (URL YouTube/Vimeo, une par ligne)</label>
+            <textarea id="txt-videos" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveTexts()">💾 Sauvegarder</button>
+          <span id="txt-save-status" style="font-size:.82rem;color:#16a34a;margin-left:10px"></span>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre hero</label>
-          <textarea id="txt-hero-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        <div class="card" style="background:#f8f9fa">
+          <h3 style="font-size:.9rem;font-weight:700;margin-bottom:12px">Preuves IA (captures)</h3>
+          <div id="txt-evidence" style="font-size:.82rem;color:#666">Sélectionnez une paire pour voir les captures.</div>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre CTA</label>
-          <input type="text" id="txt-cta" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
-        </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre CTA</label>
-          <textarea id="txt-cta-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve texte (citation + source, une par ligne : "texte|source")</label>
-          <textarea id="txt-proofs" rows="4" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="Depuis que j'ai travaillé ma visibilité IA...|Jean D., plombier Lyon\n"></textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve vidéo (URL YouTube/Vimeo, une par ligne)</label>
-          <textarea id="txt-videos" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="https://www.youtube.com/watch?v=..."></textarea>
-        </div>
-        <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0">
-        <div style="font-size:.78rem;font-weight:600;color:#2563eb;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Templates de contact</div>
-        <div style="font-size:.75rem;color:#888;margin-bottom:10px">Placeholders : <code>{{name}}</code> <code>{{city}}</code> <code>{{profession}}</code> <code>{{landing_url}}</code></div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message email (laisser vide = message par défaut)</label>
-          <textarea id="txt-email-tpl" rows="7" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:16px">
-          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message SMS (laisser vide = SMS par défaut)</label>
-          <textarea id="txt-sms-tpl" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
-        </div>
-        <button class="btn btn-primary" onclick="saveTexts()">💾 Sauvegarder</button>
-        <button class="btn btn-sm" onclick="previewEmail()" style="margin-left:8px">👁 Aperçu email</button>
-        <span id="txt-save-status" style="font-size:.82rem;color:#16a34a;margin-left:10px"></span>
-      </div>
-      <div class="card">
-        <h3 style="font-size:.9rem;font-weight:700;margin-bottom:16px">Preuves IA disponibles (captures d'écran)</h3>
-        <div id="txt-evidence" style="font-size:.82rem;color:#666">Sélectionnez une paire pour voir les captures.</div>
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-top:20px">
-    <h3 style="font-size:.9rem;font-weight:700;margin-bottom:12px">Page d'accueil (home)</h3>
-    <p style="font-size:.83rem;color:#666">La page d'accueil présence-ia.com est en cours de développement. Les textes seront éditables ici.</p>
+  <!-- SECTION 3 : Page d'accueil -->
+  <div class="card" style="margin-bottom:20px">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🏠 Page d'accueil (presence-ia.com)</h2>
+    <p style="font-size:.82rem;color:#666;margin-bottom:14px">Éditez les textes de la home page.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero</label>
+          <textarea id="home-hero-title" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre hero</label>
+          <textarea id="home-hero-subtitle" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Bouton principal</label>
+          <input type="text" id="home-hero-cta" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+        </div>
+      </div>
+      <div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre CTA final</label>
+          <input type="text" id="home-cta-title" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre CTA final</label>
+          <textarea id="home-cta-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Bouton CTA final</label>
+          <input type="text" id="home-cta-btn" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-primary" onclick="saveHomeBlocks()">💾 Sauvegarder home</button>
+      <span id="home-save-status" style="font-size:.82rem;color:#16a34a"></span>
+      <a href="/" target="_blank" class="btn btn-sm" style="text-decoration:none">👁 Voir la home</a>
+    </div>
   </div>
+
 </div>
 
 </div><!-- /container -->
@@ -1088,12 +1160,13 @@ tr:hover{{background:#fafafa}}
 <script>
 const TOKEN = "{api_token}";
 
-// Auto-charger les textes si on est sur l'onglet textes et qu'une paire est dispo
-if ("{tab}" === "textes") {{ loadTextsOnce(); }}
-function loadTextsOnce() {{
+// Auto-charger si on est sur l'onglet textes
+if ("{tab}" === "textes") {{
+  loadGlobalTemplate();
+  loadHomeBlocks();
   const c = document.getElementById('txt-city');
-  const p = document.getElementById('txt-prof');
-  if (c && c.value && p && p.value) loadTexts();
+  const pp = document.getElementById('txt-prof');
+  if (c && c.value && pp && pp.value) loadTexts();
 }}
 
 function applyFilter() {{
@@ -1147,6 +1220,64 @@ async function bulkSendSelected(method, isTest) {{
 const DEFAULT_EMAIL_TPL = {json.dumps(_DEFAULT_EMAIL_TEMPLATE)};
 const DEFAULT_SMS_TPL = {json.dumps(_DEFAULT_SMS_TEMPLATE)};
 
+// ── Templates globaux ─────────────────────────────────────────────────────────
+async function loadGlobalTemplate() {{
+  const r = await fetch(`/api/v3/global-template?token=${{TOKEN}}`);
+  if (!r.ok) return;
+  const d = await r.json();
+  document.getElementById('gtpl-email').value = d.email_template || DEFAULT_EMAIL_TPL;
+  document.getElementById('gtpl-sms').value   = d.sms_template   || DEFAULT_SMS_TPL;
+}}
+async function saveGlobalTemplate() {{
+  const body = {{
+    email_template: document.getElementById('gtpl-email').value.trim() || null,
+    sms_template:   document.getElementById('gtpl-sms').value.trim()   || null,
+  }};
+  const r = await fetch(`/api/v3/global-template?token=${{TOKEN}}`, {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(body)
+  }});
+  const d = await r.json();
+  const st = document.getElementById('gtpl-status');
+  st.textContent = d.ok ? '✓ Sauvegardé' : '✗ Erreur';
+  setTimeout(() => st.textContent = '', 3000);
+}}
+
+// ── Home page blocks ──────────────────────────────────────────────────────────
+async function loadHomeBlocks() {{
+  const r = await fetch(`/api/v3/home-blocks?token=${{TOKEN}}`);
+  if (!r.ok) return;
+  const d = await r.json();
+  document.getElementById('home-hero-title').value   = d.hero_title    || '';
+  document.getElementById('home-hero-subtitle').value= d.hero_subtitle || '';
+  document.getElementById('home-hero-cta').value     = d.hero_cta      || '';
+  document.getElementById('home-cta-title').value    = d.cta_title     || '';
+  document.getElementById('home-cta-sub').value      = d.cta_subtitle  || '';
+  document.getElementById('home-cta-btn').value      = d.cta_btn       || '';
+}}
+async function saveHomeBlocks() {{
+  const blocks = [
+    ['hero', 'title',    document.getElementById('home-hero-title').value],
+    ['hero', 'subtitle', document.getElementById('home-hero-subtitle').value],
+    ['hero', 'cta_primary', document.getElementById('home-hero-cta').value],
+    ['cta_final', 'title',    document.getElementById('home-cta-title').value],
+    ['cta_final', 'subtitle', document.getElementById('home-cta-sub').value],
+    ['cta_final', 'btn_label',document.getElementById('home-cta-btn').value],
+  ];
+  let ok = true;
+  for (const [sec, fk, val] of blocks) {{
+    if (!val.trim()) continue;
+    const r = await fetch(`/api/v3/home-block?token=${{TOKEN}}`, {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{section_key: sec, field_key: fk, value: val.trim()}})
+    }});
+    if (!r.ok) ok = false;
+  }}
+  const st = document.getElementById('home-save-status');
+  st.textContent = ok ? '✓ Sauvegardé' : '✗ Erreur partielle';
+  setTimeout(() => st.textContent = '', 3000);
+}}
+
 async function loadTexts() {{
   const city = document.getElementById('txt-city').value;
   const prof = document.getElementById('txt-prof').value;
@@ -1158,11 +1289,9 @@ async function loadTexts() {{
   document.getElementById('txt-hero-sub').value  = d.hero_subtitle || '';
   document.getElementById('txt-cta').value       = d.cta_headline  || '';
   document.getElementById('txt-cta-sub').value   = d.cta_subtitle  || '';
-  const proofs = (d.proof_texts || []).map(p => `${{p.text}}|${{p.source}}`).join('\n');
+  const proofs = (d.proof_texts || []).map(p => `${{p.text}}|${{p.source}}`).join('\\n');
   document.getElementById('txt-proofs').value    = proofs;
-  document.getElementById('txt-videos').value    = (d.proof_videos || []).map(v => v.url).join('\n');
-  document.getElementById('txt-email-tpl').value = d.email_template || DEFAULT_EMAIL_TPL;
-  document.getElementById('txt-sms-tpl').value   = d.sms_template   || DEFAULT_SMS_TPL;
+  document.getElementById('txt-videos').value    = (d.proof_videos || []).map(v => v.url).join('\\n');
   // Evidence screenshots
   const evEl = document.getElementById('txt-evidence');
   if (d.evidence && d.evidence.length) {{
@@ -1177,11 +1306,9 @@ async function loadTexts() {{
 async function saveTexts() {{
   const city = document.getElementById('txt-city').value;
   const prof = document.getElementById('txt-prof').value;
-  const proofsRaw = document.getElementById('txt-proofs').value.split('\n').filter(l => l.trim());
+  const proofsRaw = document.getElementById('txt-proofs').value.split('\\n').filter(l => l.trim());
   const proofs = proofsRaw.map(l => {{ const [text, source] = l.split('|'); return {{text: (text||'').trim(), source: (source||'').trim()}}; }});
-  const videos = document.getElementById('txt-videos').value.split('\n').filter(l => l.trim()).map(url => ({{url: url.trim()}}));
-  const emailTpl = document.getElementById('txt-email-tpl').value.trim();
-  const smsTpl   = document.getElementById('txt-sms-tpl').value.trim();
+  const videos = document.getElementById('txt-videos').value.split('\\n').filter(l => l.trim()).map(url => ({{url: url.trim()}}));
   const body = {{
     city, profession: prof,
     hero_headline:  document.getElementById('txt-hero').value || null,
@@ -1189,8 +1316,6 @@ async function saveTexts() {{
     cta_headline:   document.getElementById('txt-cta').value || null,
     cta_subtitle:   document.getElementById('txt-cta-sub').value || null,
     proof_texts:    proofs, proof_videos: videos,
-    email_template: emailTpl || null,
-    sms_template:   smsTpl   || null,
   }};
   const r = await fetch(`/api/v3/landing-text?token=${{TOKEN}}`, {{
     method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -1202,14 +1327,18 @@ async function saveTexts() {{
   setTimeout(() => st.textContent = '', 3000);
 }}
 function previewEmail() {{
-  const tpl = document.getElementById('txt-email-tpl').value || DEFAULT_EMAIL_TPL;
-  const city = document.getElementById('txt-city').value || 'Votre ville';
-  const prof = document.getElementById('txt-prof').value || 'votre métier';
+  const tpl = document.getElementById('gtpl-email').value || DEFAULT_EMAIL_TPL;
+  const metier = prompt('Métier pour l\\u2019aperçu ?', 'pisciniste') || 'pisciniste';
+  const metiers = metier.endsWith('s') ? metier : metier + 's';
+  const ville = prompt('Ville pour l\\u2019aperçu ?', 'Montpellier') || 'Montpellier';
   const preview = tpl
-    .replace(/\{{name\}}/g, 'Jean Dupont')
-    .replace(/\{{city\}}/g, city)
-    .replace(/\{{profession\}}/g, prof)
-    .replace(/\{{landing_url\}}/g, 'https://presence-ia.com/l/exemple');
+    .replace(/\\{{name\\}}/g, 'Jean Dupont')
+    .replace(/\\{{ville\\}}/g, ville)
+    .replace(/\\{{metier\\}}/g, metier)
+    .replace(/\\{{metiers\\}}/g, metiers)
+    .replace(/\\{{city\\}}/g, ville)
+    .replace(/\\{{profession\\}}/g, metier)
+    .replace(/\\{{landing_url\\}}/g, 'https://presence-ia.com/l/exemple');
   const w = window.open('', '_blank', 'width=600,height=500');
   w.document.write('<pre style="font-family:sans-serif;padding:24px;white-space:pre-wrap">' + preview + '</pre>');
 }}
@@ -1554,6 +1683,37 @@ async def save_landing_text(req: LandingTextRequest, token: str = "", request: R
     return {"ok": True}
 
 
+class GlobalTemplateRequest(BaseModel):
+    email_template: Optional[str] = None
+    sms_template:   Optional[str] = None
+
+
+@router.get("/api/v3/global-template")
+def get_global_template(token: str = "", request: Request = None):
+    _require_admin(token, request)
+    with SessionLocal() as db:
+        lt = db.get(V3LandingTextDB, "__global__")
+        return {
+            "email_template": lt.email_template if lt else None,
+            "sms_template":   lt.sms_template   if lt else None,
+        }
+
+
+@router.post("/api/v3/global-template")
+async def save_global_template(req: GlobalTemplateRequest, token: str = "", request: Request = None):
+    _require_admin(token, request)
+    with SessionLocal() as db:
+        lt = db.get(V3LandingTextDB, "__global__")
+        if not lt:
+            lt = V3LandingTextDB(id="__global__", city="__global__", profession="__global__")
+            db.add(lt)
+        lt.email_template = req.email_template or None
+        lt.sms_template   = req.sms_template   or None
+        lt.updated_at     = datetime.utcnow()
+        db.commit()
+    return {"ok": True}
+
+
 @router.post("/api/v3/prospect/{tok}/send-email")
 async def send_email_prospect(tok: str, request: Request):
     body = await request.json()
@@ -1564,9 +1724,8 @@ async def send_email_prospect(tok: str, request: Request):
             raise HTTPException(404)
         if not p.email:
             return JSONResponse({"ok": False, "error": "Pas d'email pour ce prospect"})
-        lt_id = f"{p.city.lower().strip()}_{p.profession.lower().strip()}"
-        lt    = db.get(V3LandingTextDB, lt_id)
-        tpl   = lt.email_template if lt and lt.email_template else None
+        lt_global = db.get(V3LandingTextDB, "__global__")
+        tpl       = lt_global.email_template if lt_global and lt_global.email_template else None
         msg   = _contact_message(p.name, p.city, p.profession, p.landing_url, tpl)
         subj  = f"Votre visibilité IA à {p.city} — résultat personnalisé"
         ok    = _send_brevo_email(p.email, p.name, subj, msg)
@@ -1588,10 +1747,9 @@ async def send_sms_prospect(tok: str, request: Request):
             raise HTTPException(404)
         if not p.phone:
             return JSONResponse({"ok": False, "error": "Pas de téléphone"})
-        lt_id = f"{p.city.lower().strip()}_{p.profession.lower().strip()}"
-        lt    = db.get(V3LandingTextDB, lt_id)
-        tpl   = lt.sms_template if lt and lt.sms_template else None
-        msg   = _contact_message_sms(p.name, p.city, p.landing_url, tpl)
+        lt_global = db.get(V3LandingTextDB, "__global__")
+        tpl       = lt_global.sms_template if lt_global and lt_global.sms_template else None
+        msg   = _contact_message_sms(p.name, p.city, p.profession, p.landing_url, tpl)
         ok    = _send_brevo_sms(p.phone, msg)
         if ok:
             p.sent_at     = datetime.utcnow()
@@ -1627,27 +1785,25 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                 prospects = db.query(V3ProspectDB).filter(q_phone, *q_unsent).limit(req.max_per_day).all()
         tokens = [(p.token, p.name, p.city, p.profession, p.email, p.phone, p.landing_url)
                   for p in prospects]
-        # Pré-charger les templates custom
-        lt_cache = {f"{lt.city.lower().strip()}_{lt.profession.lower().strip()}": lt
-                    for lt in db.query(V3LandingTextDB).all()}
+        # Template global (une seule entrée __global__)
+        lt_global  = db.get(V3LandingTextDB, "__global__")
+        email_tpl  = lt_global.email_template if lt_global and lt_global.email_template else None
+        sms_tpl    = lt_global.sms_template   if lt_global and lt_global.sms_template   else None
 
     _bulk_status.update({"running": True, "done": 0, "total": len(tokens), "errors": [],
                          "test_mode": test_mode})
 
     def _do_bulk():
         for i, (tok, name, city, profession, email, phone, landing_url) in enumerate(tokens):
-            lt   = lt_cache.get(f"{city.lower().strip()}_{profession.lower().strip()}")
             if req.method == "email":
                 dest   = req.test_email if test_mode else email
-                tpl    = lt.email_template if lt and lt.email_template else None
-                msg    = _contact_message(name, city, profession, landing_url, tpl)
+                msg    = _contact_message(name, city, profession, landing_url, email_tpl)
                 subj   = f"[TEST] Votre visibilité IA à {city}" if test_mode else \
                          f"Votre visibilité IA à {city} — résultat personnalisé"
                 ok     = _send_brevo_email(dest, name, subj, msg) if dest else False
             elif req.method == "sms":
                 dest   = req.test_phone if test_mode else phone
-                tpl    = lt.sms_template if lt and lt.sms_template else None
-                msg    = _contact_message_sms(name, city, landing_url, tpl)
+                msg    = _contact_message_sms(name, city, profession, landing_url, sms_tpl)
                 ok     = _send_brevo_sms(dest, msg) if dest else False
             else:
                 ok = False
@@ -1770,3 +1926,31 @@ def export_v3_csv(token: str = ""):
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=prospects_v3.csv"})
+
+
+@router.get("/api/v3/home-blocks")
+def get_home_blocks(token: str = "", request: Request = None):
+    _require_admin(token, request)
+    with SessionLocal() as db:
+        return {
+            "hero_title":    get_block(db, "home", "hero",      "title"),
+            "hero_subtitle": get_block(db, "home", "hero",      "subtitle"),
+            "hero_cta":      get_block(db, "home", "hero",      "cta_primary"),
+            "cta_title":     get_block(db, "home", "cta_final", "title"),
+            "cta_subtitle":  get_block(db, "home", "cta_final", "subtitle"),
+            "cta_btn":       get_block(db, "home", "cta_final", "btn_label"),
+        }
+
+
+class HomeBlockRequest(BaseModel):
+    section_key: str
+    field_key:   str
+    value:       str
+
+
+@router.post("/api/v3/home-block")
+async def save_home_block(req: HomeBlockRequest, token: str = "", request: Request = None):
+    _require_admin(token, request)
+    with SessionLocal() as db:
+        set_block(db, "home", req.section_key, req.field_key, req.value)
+    return {"ok": True}
