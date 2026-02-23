@@ -45,6 +45,12 @@ _IGNORE_EMAIL_DOMAINS = {
     "google.com","facebook.com","wixpress.com","wix.com","cloudflare.com",
 }
 _IGNORE_EMAIL_PREFIXES = ("noreply","no-reply","donotreply","postmaster","mailer-daemon")
+# Extensions de fichiers qui ne sont pas des TLD valides
+_IGNORE_EMAIL_TLDS = {
+    "jpg","jpeg","png","gif","svg","webp","ico","bmp","tiff","avif",
+    "css","js","ts","jsx","tsx","php","html","htm","xml","json","pdf",
+    "woff","woff2","ttf","eot","otf","map","gz","zip",
+}
 _CONTACT_KEYWORDS = ("contact","nous-contacter","contactez","joindre","coordonnees","coordonnées")
 
 # Statut de l'envoi en masse (en mémoire)
@@ -106,7 +112,8 @@ def _scrape_site(url: str) -> dict:
         emails = [e.lower() for e in _EMAIL_RE.findall(text)
                   if e.split("@")[1] not in _IGNORE_EMAIL_DOMAINS
                   and not any(e.lower().startswith(p) for p in _IGNORE_EMAIL_PREFIXES)
-                  and len(e.split("@")[1].split(".")[-1]) <= 6]
+                  and len(e.split("@")[1].split(".")[-1]) <= 6
+                  and e.split("@")[1].split(".")[-1].lower() not in _IGNORE_EMAIL_TLDS]
         phones = _PHONE_FR_RE.findall(text)
         return emails[0] if emails else None, phones[0] if phones else None
 
