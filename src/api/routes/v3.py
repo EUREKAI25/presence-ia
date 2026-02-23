@@ -271,70 +271,105 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 
 # ── IA test ───────────────────────────────────────────────────────────────────
 
-def _run_ia_test(profession: str, city: str) -> dict:
-    """Interroge ChatGPT, Gemini et Claude sur la même question. Retourne les 3 résultats."""
-    prompt = f"Quels {profession}s recommandes-tu à {city} ?"
-    results = []
+_PROMPTS_FILE = Path(__file__).resolve().parents[2] / "ia_prompts.json"
+_DEFAULT_PROMPTS = [
+    "Quels {profession}s recommandes-tu à {city} ?",
+    "Je cherche un bon {profession} à {city}, tu as des recommandations ?",
+    "Quelles entreprises de {profession} font un bon travail à {city} ?",
+]
 
-    # 1. ChatGPT
+def _load_prompts() -> list:
+    """Charge les prompts depuis data/ia_prompts.json, sinon retourne les défauts."""
+    try:
+        return json.loads(_PROMPTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return _DEFAULT_PROMPTS
+
+
+def _run_ia_test(profession: str, city: str) -> dict:
+    """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
+    pro_plural = profession.lower() + "s" if not profession.lower().endswith("s") else profession.lower()
+    city_cap   = city.capitalize()
+    prompts    = [p.format(profession=pro_plural, city=city_cap) for p in _load_prompts()]
+    results    = []
+
+    # Clients IA (initialisés une seule fois)
+    chatgpt_client = None
     try:
         import openai
         key = os.getenv("OPENAI_API_KEY", "")
         if key:
-            client = openai.OpenAI(api_key=key)
-            r = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=350, temperature=0.3,
-            )
-            results.append({"model": "ChatGPT", "prompt": prompt,
-                            "response": _strip_markdown(r.choices[0].message.content.strip()),
-                            "tested_at": datetime.utcnow().isoformat()})
+            chatgpt_client = openai.OpenAI(api_key=key)
     except Exception as e:
-        log.error("IA test ChatGPT: %s", e)
+        log.error("IA init ChatGPT: %s", e)
 
-    # 2. Gemini
+    gemini_model = None
     try:
         import google.generativeai as genai  # type: ignore
         key = os.getenv("GEMINI_API_KEY", "")
         if key:
             genai.configure(api_key=key)
-            # gemini-2.0-flash : modèle stable disponible en v1beta
-            gmodel = genai.GenerativeModel("gemini-2.0-flash")
-            r = gmodel.generate_content(prompt)
-            results.append({"model": "Gemini", "prompt": prompt,
-                            "response": _strip_markdown(r.text.strip()),
-                            "tested_at": datetime.utcnow().isoformat()})
+            gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     except Exception as e:
-        log.error("IA test Gemini: %s", e)
+        log.error("IA init Gemini: %s", e)
 
-    # 3. Claude
+    anthropic_client = None
     try:
         import anthropic  # type: ignore
         key = os.getenv("ANTHROPIC_API_KEY", "")
         if key:
-            client = anthropic.Anthropic(api_key=key)
-            r = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=350,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            results.append({"model": "Claude", "prompt": prompt,
-                            "response": _strip_markdown(r.content[0].text.strip()),
-                            "tested_at": datetime.utcnow().isoformat()})
+            anthropic_client = anthropic.Anthropic(api_key=key)
     except Exception as e:
-        log.error("IA test Claude: %s", e)
+        log.error("IA init Claude: %s", e)
+
+    for prompt in prompts:
+        ts = datetime.utcnow().isoformat()
+
+        if chatgpt_client:
+            try:
+                r = chatgpt_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=350, temperature=0.3,
+                )
+                results.append({"model": "ChatGPT", "prompt": prompt,
+                                "response": _strip_markdown(r.choices[0].message.content.strip()),
+                                "tested_at": ts})
+            except Exception as e:
+                log.error("IA test ChatGPT prompt=%r: %s", prompt[:40], e)
+
+        if gemini_model:
+            try:
+                r = gemini_model.generate_content(prompt)
+                results.append({"model": "Gemini", "prompt": prompt,
+                                "response": _strip_markdown(r.text.strip()),
+                                "tested_at": ts})
+            except Exception as e:
+                log.error("IA test Gemini prompt=%r: %s", prompt[:40], e)
+
+        if anthropic_client:
+            try:
+                r = anthropic_client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=350,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                results.append({"model": "Claude", "prompt": prompt,
+                                "response": _strip_markdown(r.content[0].text.strip()),
+                                "tested_at": ts})
+            except Exception as e:
+                log.error("IA test Claude prompt=%r: %s", prompt[:40], e)
 
     if not results:
         return {}
 
     first = results[0]
     return {
-        "results": results,                    # nouveau : les 3
-        "prompt": prompt,                      # compat
-        "response": first["response"],         # compat
-        "model":    first["model"],            # compat
-        "tested_at": datetime.fromisoformat(first["tested_at"]),  # compat
+        "results":   results,
+        "prompt":    first["prompt"],
+        "response":  first["response"],
+        "model":     first["model"],
+        "tested_at": datetime.fromisoformat(first["tested_at"]),
     }
 
 
