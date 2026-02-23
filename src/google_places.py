@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 _TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 _DETAILS_URL     = "https://maps.googleapis.com/maps/api/place/details/json"
-_DETAIL_FIELDS   = "name,website,formatted_phone_number,user_ratings_total"
+_DETAIL_FIELDS   = "name,website,formatted_phone_number,user_ratings_total,rating"
 
 # Statuts Google qui signifient "pas de résultat" (pas une erreur)
 _EMPTY_STATUSES = {"ZERO_RESULTS"}
@@ -126,6 +126,7 @@ def search_prospects(profession: str, city: str, api_key: str,
             "phone":         details.get("formatted_phone_number"),
             "reviews_count": details.get("user_ratings_total")
                              or place.get("user_ratings_total"),
+            "rating":        details.get("rating") or place.get("rating"),
         })
 
     return prospects, reasons

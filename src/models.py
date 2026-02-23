@@ -324,6 +324,14 @@ class V3ProspectDB(Base):
     ia_response:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     ia_model:      Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
     ia_tested_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    # Enrichissement scraping
+    email:         Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    contact_url:   Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    rating:        Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
+    scrape_status: Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # pending/done/error
+    # Envoi
+    sent_at:       Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    sent_method:   Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # email/sms/form
     contacted:     Mapped[bool]          = mapped_column(sa.Boolean, default=False)
     notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
