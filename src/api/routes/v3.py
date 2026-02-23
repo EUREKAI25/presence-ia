@@ -273,8 +273,7 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 
 def _run_ia_test(profession: str, city: str) -> dict:
     """Interroge ChatGPT, Gemini et Claude sur la même question. Retourne les 3 résultats."""
-    prompt = (f"Quels {profession}s recommandes-tu à {city} ? "
-              f"Cite les 3 meilleurs avec une courte description de chacun.")
+    prompt = f"Quels {profession}s recommandes-tu à {city} ?"
     results = []
 
     # 1. ChatGPT
@@ -1522,7 +1521,7 @@ async function uploadImage() {{
   const file = document.getElementById('img-file').files[0];
   const status = document.getElementById('upload-status');
   if (!city || !file) {{ alert('Ville et fichier requis'); return; }}
-  status.textContent = '⏳ Compression de l\'image...';
+  status.textContent = "⏳ Compression de l&#39;image...";
   let blob;
   try {{ blob = await _compressImg(file); }}
   catch(e) {{ blob = file; }}
