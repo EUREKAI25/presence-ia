@@ -696,7 +696,6 @@ footer a{{color:var(--g3)}}
 <div style="background:var(--g1);padding:72px 48px;">
   <div style="max-width:780px;margin:0 auto;">
     <h2 style="font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.03em;margin-bottom:16px;">Ce que couvre l'audit gratuit</h2>
-    <p style="color:#555;font-size:1.05rem;margin-bottom:0;">30 minutes. Résultats concrets sur votre situation réelle à {city_cap}.</p>
     <div class="audit-grid">{pts}</div>
   </div>
 </div>
