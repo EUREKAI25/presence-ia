@@ -273,7 +273,8 @@ def _run_ia_test(profession: str, city: str) -> dict:
         key = os.getenv("GEMINI_API_KEY", "")
         if key:
             genai.configure(api_key=key)
-            gmodel = genai.GenerativeModel("gemini-1.5-flash")
+            # gemini-2.0-flash : modèle stable disponible en v1beta
+            gmodel = genai.GenerativeModel("gemini-2.0-flash")
             r = gmodel.generate_content(prompt)
             results.append({"model": "Gemini", "prompt": prompt,
                             "response": r.text.strip(),
