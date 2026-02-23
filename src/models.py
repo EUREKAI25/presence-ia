@@ -319,9 +319,18 @@ class V3ProspectDB(Base):
     website:       Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
     reviews_count: Mapped[Optional[int]] = mapped_column(sa.Integer, nullable=True)
     landing_url:   Mapped[str]           = mapped_column(sa.String, nullable=False)
+    competitors:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)   # JSON list[str]
     contacted:     Mapped[bool]          = mapped_column(sa.Boolean, default=False)
     notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+
+class V3CityImageDB(Base):
+    """Image de ville/métier affichée dans le header des landings V3."""
+    __tablename__ = "v3_city_images"
+    id:        Mapped[str] = mapped_column(sa.String, primary_key=True)  # "{city}_{profession}"
+    image_url: Mapped[str] = mapped_column(sa.String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class JobDB(Base):
