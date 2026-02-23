@@ -2011,7 +2011,7 @@ def refresh_ia(token: str = ""):
     with SessionLocal() as db:
         n_pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().count()
     return {"ok": True, "pairs": n_pairs,
-            "note": f"Refresh IA lancé pour {n_pairs} paires ville/métier en background (~{n_pairs*15}s)"}
+            "note": f"Refresh IA lancé pour {n_pairs} paires ville/métier en background (~{n_pairs*45}s)"}
 
 
 @router.post("/api/v3/prospect/{tok}/contacted")

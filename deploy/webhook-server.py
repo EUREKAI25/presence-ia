@@ -32,6 +32,31 @@ def health():
     """Health check endpoint."""
     return jsonify({"status": "ok", "service": "presence-ia-webhook"})
 
+def setup_cron():
+    """Met à jour le cron refresh-ia (lun/jeu/dim à 9h, 15h, 19h)."""
+    token = ""
+    try:
+        for line in open("/opt/presence-ia/.env"):
+            if line.startswith("ADMIN_TOKEN="):
+                token = line.strip().split("=", 1)[1].strip('"').strip("'")
+                break
+    except Exception:
+        return
+    if not token:
+        return
+    url = f"https://presence-ia.com/api/v3/refresh-ia?token={token}"
+    new_entries = [
+        f"0 9  * * 1,4,0 curl -s -X POST '{url}' > /dev/null 2>&1",
+        f"0 15 * * 1,4,0 curl -s -X POST '{url}' > /dev/null 2>&1",
+        f"0 19 * * 1,4,0 curl -s -X POST '{url}' > /dev/null 2>&1",
+    ]
+    result = subprocess.run(['crontab', '-l'], capture_output=True, text=True)
+    existing_lines = [l for l in (result.stdout if result.returncode == 0 else "").splitlines()
+                      if 'refresh-ia' not in l and l.strip()]
+    new_cron = "\n".join(existing_lines + new_entries) + "\n"
+    subprocess.run(['crontab', '-'], input=new_cron, text=True)
+
+
 @app.route('/deploy', methods=['POST'])
 def deploy():
     """Endpoint de déploiement - vérifie le token et déploie."""
@@ -61,6 +86,8 @@ def deploy():
             text=True,
             timeout=10
         )
+
+        setup_cron()
 
         return jsonify({
             "status": "success",
