@@ -663,13 +663,7 @@ footer a{{color:var(--g3)}}
 {stats_html}
 
 <div class="section">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
-    <h2 style="margin-bottom:0">Ce que voient vos futurs clients<br>quand ils interrogent une IA</h2>
-    <div style="text-align:right">
-      <div style="font-size:.88rem;font-weight:600">{name}</div>
-      {rating_html}
-    </div>
-  </div>
+  <h2 style="margin-bottom:8px">Ce que voient vos futurs clients<br>quand ils interrogent une IA</h2>
   <p>Réponses réelles obtenues lors des derniers tests sur les {pro_label}s de {city_cap}&nbsp;:</p>
   {chat_html}
   <div style="margin-top:32px;padding:28px 0">
