@@ -308,6 +308,22 @@ class CmsBlockDB(Base):
     __table_args__ = (sa.UniqueConstraint("key", "locale", name="uq_cms_block"),)
 
 
+class V3ProspectDB(Base):
+    """Prospects V3 — générés via Google Places, landing Calendly."""
+    __tablename__ = "v3_prospects"
+    token:         Mapped[str]           = mapped_column(sa.String, primary_key=True)
+    name:          Mapped[str]           = mapped_column(sa.String, nullable=False)
+    city:          Mapped[str]           = mapped_column(sa.String, nullable=False)
+    profession:    Mapped[str]           = mapped_column(sa.String, nullable=False)
+    phone:         Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    website:       Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    reviews_count: Mapped[Optional[int]] = mapped_column(sa.Integer, nullable=True)
+    landing_url:   Mapped[str]           = mapped_column(sa.String, nullable=False)
+    contacted:     Mapped[bool]          = mapped_column(sa.Boolean, default=False)
+    notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
