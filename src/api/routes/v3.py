@@ -502,7 +502,8 @@ def admin_v3(
     f_email: str = "",
     f_phone: str = "",
 ):
-    _require_admin(token, request)
+    if not _check_admin(token, request):
+        return RedirectResponse("/login/v3", status_code=302)
     # Token pour les appels API JS (embedded dans la page, pas dans l'URL)
     api_token = token or os.getenv("ADMIN_TOKEN", "changeme")
     with SessionLocal() as db:
