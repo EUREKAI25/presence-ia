@@ -474,9 +474,25 @@ def _render_landing(
         for n, t, d in audit_points
     )
 
+    # ── Contexte de substitution des placeholders ─────────────────────────
+    _bmin = (landing_text.budget_min or "") if landing_text else ""
+    _bmax = (landing_text.budget_max or "") if landing_text else ""
+    _sub_ctx = {
+        "metier": pro_label, "metiers": pro_plural, "ville": city_cap,
+        "name": name, "budget_min": _bmin, "budget_max": _bmax,
+        "city": city_cap, "profession": pro_label,  # compat anciens templates
+    }
+    def _sub(t):
+        if not t:
+            return t
+        try:
+            return t.format_map(_sub_ctx)
+        except Exception:
+            return t
+
     # ── Hero ──────────────────────────────────────────────────────────────
-    _hero_h1  = landing_text.hero_headline if landing_text and landing_text.hero_headline else None
-    _hero_sub = landing_text.hero_subtitle  if landing_text and landing_text.hero_subtitle  else None
+    _hero_h1  = _sub(landing_text.hero_headline) if landing_text and landing_text.hero_headline else None
+    _hero_sub = _sub(landing_text.hero_subtitle)  if landing_text and landing_text.hero_subtitle  else None
     sub_text  = _hero_sub or "ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale."
     # Sur fond sombre (image) : em clair #93c5fd. Sur fond blanc : em bleu via CSS
     _em_img   = 'style="font-style:normal;color:#93c5fd"'
@@ -506,8 +522,8 @@ def _render_landing(
     )
 
     # ── CTA custom ────────────────────────────────────────────────────────
-    cta_title = landing_text.cta_headline if landing_text and landing_text.cta_headline else "Réservez votre<br>audit gratuit"
-    cta_sub   = landing_text.cta_subtitle  if landing_text and landing_text.cta_subtitle  else "30 minutes. Résultats sur votre visibilité réelle.<br>Sans engagement."
+    cta_title = _sub(landing_text.cta_headline) if landing_text and landing_text.cta_headline else "Réservez votre<br>audit gratuit"
+    cta_sub   = _sub(landing_text.cta_subtitle)  if landing_text and landing_text.cta_subtitle  else "30 minutes. Résultats sur votre visibilité réelle.<br>Sans engagement."
 
     # ── Preuves texte + vidéo (depuis landing_text) ───────────────────────
     proof_section = ""
@@ -1063,7 +1079,8 @@ tr:hover{{background:#fafafa}}
   <!-- SECTION 2 : Personnalisation landing par paire -->
   <div class="card" style="margin-bottom:20px">
     <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🖋 Personnalisation landing par paire</h2>
-    <p style="font-size:.83rem;color:#666;margin-bottom:12px">Hero, CTA et preuves spécifiques à une ville / métier. Laisser vide = auto-généré.</p>
+    <p style="font-size:.83rem;color:#666;margin-bottom:4px">Textes spécifiques à une paire ville/métier. Placeholders disponibles :</p>
+    <p style="font-size:.78rem;color:#555;background:#f3f4f6;padding:6px 10px;border-radius:6px;font-family:monospace;margin-bottom:12px"><code>{{metier}}</code> <code>{{metiers}}</code> <code>{{ville}}</code> <code>{{budget_min}}</code> <code>{{budget_max}}</code> <code>{{name}}</code></p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
       <div class="form-group">
         <label>Ville</label>
@@ -1081,8 +1098,18 @@ tr:hover{{background:#fafafa}}
     <div id="txt-editor" style="display:{"block" if all_cities and all_professions else "none"}">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="form-group">
+              <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Panier moyen MIN</label>
+              <input type="text" id="txt-budget-min" placeholder="ex: 12 000€" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+            </div>
+            <div class="form-group">
+              <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Panier moyen MAX</label>
+              <input type="text" id="txt-budget-max" placeholder="ex: 25 000€" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+            </div>
+          </div>
           <div class="form-group" style="margin-bottom:12px">
-            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero (laisser vide = auto)</label>
+            <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero</label>
             <textarea id="txt-hero" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
           </div>
           <div class="form-group" style="margin-bottom:12px">
@@ -1292,6 +1319,8 @@ async function loadTexts() {{
   document.getElementById('txt-editor').style.display='block';
   const r = await fetch(`/api/v3/landing-text/${{encodeURIComponent(city)}}/${{encodeURIComponent(prof)}}?token=${{TOKEN}}`);
   const d = await r.json();
+  document.getElementById('txt-budget-min').value = d.budget_min || '';
+  document.getElementById('txt-budget-max').value = d.budget_max || '';
   document.getElementById('txt-hero').value      = d.hero_headline || '';
   document.getElementById('txt-hero-sub').value  = d.hero_subtitle || '';
   document.getElementById('txt-cta').value       = d.cta_headline  || '';
@@ -1318,6 +1347,8 @@ async function saveTexts() {{
   const videos = document.getElementById('txt-videos').value.split('\\n').filter(l => l.trim()).map(url => ({{url: url.trim()}}));
   const body = {{
     city, profession: prof,
+    budget_min:     document.getElementById('txt-budget-min').value || null,
+    budget_max:     document.getElementById('txt-budget-max').value || null,
     hero_headline:  document.getElementById('txt-hero').value || null,
     hero_subtitle:  document.getElementById('txt-hero-sub').value || null,
     cta_headline:   document.getElementById('txt-cta').value || null,
@@ -1509,6 +1540,8 @@ class LandingTextRequest(BaseModel):
     cta_subtitle:   Optional[str]       = None
     proof_texts:    Optional[List[dict]] = None   # [{text, source}]
     proof_videos:   Optional[List[dict]] = None   # [{url}]
+    budget_min:     Optional[str]       = None    # ex: "12 000€"
+    budget_max:     Optional[str]       = None    # ex: "25 000€"
     email_template: Optional[str]       = None
     sms_template:   Optional[str]       = None
 
@@ -1663,8 +1696,8 @@ def get_landing_text(city: str, profession: str, token: str = "", request: Reque
         "cta_subtitle":   lt.cta_subtitle   if lt else None,
         "proof_texts":    json.loads(lt.proof_texts)  if lt and lt.proof_texts  else [],
         "proof_videos":   json.loads(lt.proof_videos) if lt and lt.proof_videos else [],
-        "email_template": lt.email_template if lt else None,
-        "sms_template":   lt.sms_template   if lt else None,
+        "budget_min":     lt.budget_min     if lt else None,
+        "budget_max":     lt.budget_max     if lt else None,
         "evidence":       ev_list,
     }
 
@@ -1684,8 +1717,8 @@ async def save_landing_text(req: LandingTextRequest, token: str = "", request: R
         lt.cta_subtitle   = req.cta_subtitle   or None
         lt.proof_texts    = json.dumps(req.proof_texts,  ensure_ascii=False) if req.proof_texts  else None
         lt.proof_videos   = json.dumps(req.proof_videos, ensure_ascii=False) if req.proof_videos else None
-        lt.email_template = req.email_template or None
-        lt.sms_template   = req.sms_template   or None
+        lt.budget_min     = req.budget_min     or None
+        lt.budget_max     = req.budget_max     or None
         db.commit()
     return {"ok": True}
 

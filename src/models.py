@@ -359,6 +359,8 @@ class V3LandingTextDB(Base):
     cta_subtitle:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     proof_texts:    Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{text, source}]
     proof_videos:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{url}]
+    budget_min:     Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # ex: "12 000€"
+    budget_max:     Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # ex: "25 000€"
     email_subject:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)   # objet email
     email_template: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{profession},{landing_url}
     sms_template:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{landing_url}

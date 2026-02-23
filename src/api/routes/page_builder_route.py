@@ -377,6 +377,199 @@ def render_landing(db: Session, city: Optional[str] = None, profession: Optional
 
 
 def render_home(db: Session, extra_body_end: str = "") -> str:
-    manifest = build_manifest_from_db(db, page_type="home")
-    page = parse_manifest(manifest)
-    return render_page(page, extra_body_end=extra_body_end)
+    """Page d'accueil — HTML direct (indépendant de page_builder)."""
+    B = lambda sk, fk, d="": get_block(db, "home", sk, fk) or d
+
+    hero_title    = B("hero", "title",        "Quand vos clients demandent à ChatGPT,\nil cite vos concurrents. Pas vous.").replace("\n", "<br>")
+    hero_subtitle = B("hero", "subtitle",     "Nous testons votre visibilité sur 3 IA et 5 requêtes. Rapport en 48h. Plan d'action concret.")
+    hero_cta      = B("hero", "cta_primary",  "Tester ma visibilité — 97€")
+    cta_title     = B("cta_final", "title",    "Votre audit IA en 48h — 97€")
+    cta_subtitle  = B("cta_final", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
+    cta_btn       = B("cta_final", "btn_label","Commander mon audit")
+
+    # FAQ (jusqu'à 8 Q/R depuis ContentBlockDB, sinon défauts)
+    _faq_defaults = [
+        ("Pourquoi suis-je invisible sur les IA ?",
+         "Les IA recommandent les entreprises qu'elles connaissent. Si votre présence en ligne est faible (pas de fiche Google, peu d'avis, site mal référencé), elles citent vos concurrents."),
+        ("Pour quel type d'entreprise ?",
+         "Tout professionnel en contact avec des particuliers : artisans, prestataires de services, cuisinistes, piscinistes, professions libérales..."),
+        ("Combien de temps pour recevoir mon rapport ?",
+         "48 heures après votre commande, vous recevez votre rapport complet par email avec votre score et le plan d'action."),
+        ("Qu'est-ce que le plan d'action contient ?",
+         "Une liste des actions prioritaires pour améliorer votre visibilité sur ChatGPT, Gemini et Claude : fiche Google, contenu, avis clients, présence sur les annuaires IA..."),
+        ("Est-ce que ça remplace le SEO ?",
+         "Non, c'est complémentaire. Le SEO optimise votre visibilité sur Google. Le référencement IA optimise votre présence dans les réponses de ChatGPT, Gemini et Claude."),
+        ("Comment améliorer ma visibilité après l'audit ?",
+         "Nous proposons un accompagnement mensuel pour mettre en œuvre le plan d'action et suivre l'évolution de votre score sur les IA."),
+    ]
+    faq_items = []
+    for i in range(1, 9):
+        q = B("faq", f"q{i}")
+        a = B("faq", f"a{i}")
+        if q and a:
+            faq_items.append((q, a))
+    if not faq_items:
+        faq_items = _faq_defaults
+
+    faq_html = ""
+    for i, (q, a) in enumerate(faq_items):
+        faq_html += (
+            f'<div class="faq-item">'
+            f'<button class="faq-q" aria-expanded="false" onclick="toggleFaq(this)">'
+            f'{q}<span class="faq-icon">▾</span></button>'
+            f'<div class="faq-a" hidden>{a}</div>'
+            f'</div>'
+        )
+
+    # Steps
+    _steps_defaults = [
+        ("Simulation client", "Nous simulons les requêtes de vos futurs clients sur ChatGPT, Gemini et Claude."),
+        ("Analyse de la réponse", "Nous vérifions si votre entreprise est citée, en quelle position, et comment."),
+        ("Rapport personnalisé", "Vous recevez un rapport détaillé avec votre score de visibilité IA et celui de vos concurrents."),
+        ("Plan d'action", "Vous obtenez une liste des actions concrètes pour améliorer votre référencement IA."),
+    ]
+    steps_html = ""
+    for i, (title, desc) in enumerate(_steps_defaults, 1):
+        steps_html += (
+            f'<div class="step">'
+            f'<div class="step__num">{i}</div>'
+            f'<div class="step__title">{title}</div>'
+            f'<div class="step__desc">{desc}</div>'
+            f'</div>'
+        )
+
+    css = """
+:root{--p:#4f46e5;--pd:#3730a3;--t:#111827;--m:#6b7280;--bg:#f9fafb;--r:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--t);line-height:1.6}
+a{color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0;z-index:10}
+.nav__brand{font-weight:800;font-size:1.1rem;color:var(--p);text-decoration:none;letter-spacing:-.02em}
+.nav__cta{background:var(--p);color:#fff;padding:10px 22px;border-radius:8px;font-weight:600;font-size:.9rem;text-decoration:none}
+.hero{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;text-align:center;padding:96px 24px 80px}
+.hero h1{font-size:clamp(1.9rem,5vw,3rem);font-weight:800;line-height:1.2;max-width:800px;margin:0 auto 24px}
+.hero p{font-size:1.1rem;max-width:560px;margin:0 auto 40px;opacity:.88;line-height:1.75}
+.btn-hero{display:inline-block;background:#fff;color:var(--p);font-weight:700;padding:16px 38px;border-radius:50px;text-decoration:none;font-size:1rem;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:transform .15s,box-shadow .15s}
+.btn-hero:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.2)}
+.stats-bar{background:#fff;border-bottom:1px solid #e5e7eb;padding:40px 24px}
+.stats-bar__grid{display:flex;justify-content:center;gap:56px;flex-wrap:wrap;max-width:900px;margin:0 auto}
+.stat{text-align:center}
+.stat__val{font-size:2.2rem;font-weight:800;color:var(--p)}
+.stat__lbl{font-size:.82rem;color:var(--m);margin-top:4px;max-width:140px}
+.section{padding:80px 24px}
+.section--alt{background:var(--bg)}
+.container{max-width:1000px;margin:0 auto}
+.section__title{text-align:center;font-size:clamp(1.5rem,3vw,2rem);font-weight:800;margin-bottom:12px}
+.section__sub{text-align:center;color:var(--m);margin-bottom:52px;font-size:1.05rem}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:24px}
+.step{background:#fff;border-radius:var(--r);padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.step__num{width:40px;height:40px;background:var(--p);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;margin-bottom:16px}
+.step__title{font-weight:700;margin-bottom:8px}
+.step__desc{font-size:.9rem;color:var(--m);line-height:1.6}
+.faq-list{max-width:760px;margin:0 auto}
+.faq-item{border-bottom:1px solid #e5e7eb}
+.faq-q{width:100%;text-align:left;padding:20px 0;font-weight:600;font-size:1rem;background:none;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--t)}
+.faq-icon{flex-shrink:0;color:var(--p);transition:transform .2s;font-style:normal}
+.faq-item.open .faq-icon{transform:rotate(180deg)}
+.faq-a{padding:0 0 20px;color:var(--m);line-height:1.7}
+.cta-section{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;text-align:center;padding:80px 24px}
+.cta-section h2{font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;margin-bottom:16px}
+.cta-section p{font-size:1.05rem;opacity:.9;margin:0 auto 36px;max-width:520px;line-height:1.7}
+.btn-cta{display:inline-block;background:#fff;color:var(--p);font-weight:700;padding:18px 46px;border-radius:50px;text-decoration:none;font-size:1.05rem;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+footer{background:#111827;color:#9ca3af;padding:60px 24px 32px}
+.footer__inner{max-width:1000px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:40px;margin-bottom:40px}
+.footer__col h4{color:#fff;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+.footer__col a{display:block;color:#9ca3af;text-decoration:none;font-size:.85rem;margin-bottom:10px}
+.footer__col a:hover{color:#fff}
+.footer__bottom{max-width:1000px;margin:0 auto;padding-top:24px;border-top:1px solid #374151;font-size:.8rem}
+@media(max-width:600px){.stats-bar__grid{gap:32px}.footer__inner{flex-direction:column;gap:24px}}
+"""
+
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Présence IA — Audit de visibilité sur ChatGPT, Gemini et Claude</title>
+  <meta name="description" content="Testez si votre entreprise apparaît dans les réponses de ChatGPT, Gemini et Claude. Rapport personnalisé en 48h.">
+  <style>{css}</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav__brand" href="/">Présence IA</a>
+  <a class="nav__cta" href="#contact">Tester ma visibilité</a>
+</nav>
+
+<div class="hero">
+  <h1>{hero_title}</h1>
+  <p>{hero_subtitle}</p>
+  <a class="btn-hero" href="#contact">{hero_cta}</a>
+</div>
+
+<div class="stats-bar">
+  <div class="stats-bar__grid">
+    <div class="stat"><div class="stat__val">87%</div><div class="stat__lbl">des pros testés sont invisibles sur les IA</div></div>
+    <div class="stat"><div class="stat__val">3 IA</div><div class="stat__lbl">testées : ChatGPT · Gemini · Claude</div></div>
+    <div class="stat"><div class="stat__val">48h</div><div class="stat__lbl">délai de livraison rapport + plan d'action</div></div>
+  </div>
+</div>
+
+<div class="section section--alt" id="how">
+  <div class="container">
+    <h2 class="section__title">Comment fonctionne l'audit</h2>
+    <p class="section__sub">Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché.</p>
+    <div class="steps-grid">{steps_html}</div>
+  </div>
+</div>
+
+<div class="section" id="faq">
+  <div class="container">
+    <h2 class="section__title">Questions fréquentes</h2>
+    <div class="faq-list">{faq_html}</div>
+  </div>
+</div>
+
+<div class="cta-section" id="contact">
+  <h2>{cta_title}</h2>
+  <p>{cta_subtitle}</p>
+  <a class="btn-cta" href="https://calendly.com/contact-presence-ia/30min">{cta_btn}</a>
+</div>
+
+<footer>
+  <div class="footer__inner">
+    <div class="footer__col">
+      <h4>Service</h4>
+      <a href="#how">Comment ça marche</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Commander</a>
+    </div>
+    <div class="footer__col">
+      <h4>Légal</h4>
+      <a href="/cgv">CGV</a>
+      <a href="/mentions">Mentions légales</a>
+    </div>
+    <div class="footer__col">
+      <h4>Contact</h4>
+      <a href="mailto:contact@presence-ia.com">contact@presence-ia.com</a>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <p>© 2026 Présence IA — Tous droits réservés</p>
+  </div>
+</footer>
+
+<script>
+function toggleFaq(btn) {{
+  const item = btn.closest('.faq-item');
+  const ans  = btn.nextElementSibling;
+  const open = !ans.hidden;
+  ans.hidden = open;
+  btn.setAttribute('aria-expanded', !open);
+  item.classList.toggle('open', !open);
+}}
+</script>
+
+{extra_body_end}
+</body>
+</html>"""
