@@ -2067,6 +2067,23 @@ class HomeBlockRequest(BaseModel):
     value:       str
 
 
+@router.post("/api/v3/clean-prospect-names")
+def clean_prospect_names(token: str = "", request: Request = None):
+    """Nettoyage one-shot des noms de prospects (supprime suffixes marketing Google Places)."""
+    _require_admin(token, request)
+    from ...google_places import _clean_name
+    updated = []
+    with SessionLocal() as db:
+        prospects = db.query(V3ProspectDB).all()
+        for p in prospects:
+            cleaned = _clean_name(p.name or "")
+            if cleaned != p.name:
+                updated.append({"token": p.token, "before": p.name, "after": cleaned})
+                p.name = cleaned
+        db.commit()
+    return {"updated": len(updated), "changes": updated}
+
+
 @router.post("/api/v3/home-block")
 async def save_home_block(req: HomeBlockRequest, token: str = "", request: Request = None):
     _require_admin(token, request)
