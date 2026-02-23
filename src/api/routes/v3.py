@@ -447,6 +447,53 @@ def admin_v3(
     pct_e   = round(n_email / total * 100) if total else 0
     pct_p   = round(n_phone / total * 100) if total else 0
 
+    # Stats accordéon : ventilation par ville / métier / méthode
+    from collections import Counter
+    sent_rows = [r for r in all_rows if r.sent_at or r.contacted]
+    by_ville  = Counter(r.city for r in sent_rows)
+    by_metier = Counter(r.profession for r in sent_rows)
+    by_method = Counter((r.sent_method or "manuel") for r in sent_rows)
+
+    def _mini_table(counter, label):
+        if not counter:
+            return f'<p style="color:#999;font-size:.82rem">Aucun {label} contacté.</p>'
+        rows_html = "".join(
+            f'<tr><td style="padding:4px 10px;font-size:.82rem">{k.capitalize()}</td>'
+            f'<td style="padding:4px 10px;font-size:.82rem;font-weight:600">{v}</td></tr>'
+            for k, v in sorted(counter.items(), key=lambda x: -x[1])
+        )
+        return f'<table style="border-collapse:collapse">{rows_html}</table>'
+
+    accordion_html = f"""
+<details class="card" style="margin-bottom:20px;cursor:pointer">
+  <summary style="font-weight:600;font-size:.9rem;list-style:none;display:flex;align-items:center;gap:10px">
+    <span>📊</span>
+    <span>Contacts envoyés — total toutes campagnes : <strong>{len(sent_rows)}</strong></span>
+    <span style="margin-left:auto;color:#999;font-size:.8rem">▼ Détail</span>
+  </summary>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:24px;margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+    <div>
+      <div style="font-size:.75rem;text-transform:uppercase;color:#666;font-weight:600;margin-bottom:8px;letter-spacing:.05em">Par ville</div>
+      {_mini_table(by_ville, "ville")}
+    </div>
+    <div>
+      <div style="font-size:.75rem;text-transform:uppercase;color:#666;font-weight:600;margin-bottom:8px;letter-spacing:.05em">Par métier</div>
+      {_mini_table(by_metier, "métier")}
+    </div>
+    <div>
+      <div style="font-size:.75rem;text-transform:uppercase;color:#666;font-weight:600;margin-bottom:8px;letter-spacing:.05em">Par méthode</div>
+      {_mini_table(by_method, "méthode")}
+    </div>
+  </div>
+  {''.join(
+    f'<div style="margin-top:12px;font-size:.78rem;color:#666;border-top:1px solid #f0f0f0;padding-top:10px">'
+    f'<strong>{r.name}</strong> ({r.city}) — {r.sent_method or "manuel"} '
+    f'le {(r.sent_at if isinstance(r.sent_at, datetime) else datetime.fromisoformat(str(r.sent_at))).strftime("%d/%m à %H:%M") if r.sent_at else "?"}'
+    f'</div>'
+    for r in sorted(sent_rows, key=lambda x: x.sent_at or datetime.min, reverse=True)[:20]
+  ) if sent_rows else ""}
+</details>"""
+
     # Table prospects
     table_rows = ""
     for r in rows:
@@ -560,6 +607,8 @@ tr:hover{{background:#fafafa}}
 <!-- ── Onglet Prospects ── -->
 <div class="panel {"active" if tab=="prospects" else ""}">
 
+  {accordion_html}
+
   <div class="stats-bar">
     <div class="stat-chip"><strong>{total}</strong><span>Prospects total</span></div>
     <div class="stat-chip"><strong style="color:#2563eb">{n_email} <span style="font-size:.8rem;font-weight:400">({pct_e}%)</span></strong><span>Avec email</span></div>
@@ -603,10 +652,12 @@ tr:hover{{background:#fafafa}}
         <input type="checkbox" id="f-phone" {"checked" if f_phone=="1" else ""} onchange="applyFilter()"> Tél présent
       </label>
       <button class="btn btn-sm" onclick="resetFilters()">Réinitialiser</button>
-      <div style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="scrapeAll()" title="Récupère emails/tels/URLs contact depuis les sites web">🔎 Scraper les contacts</button>
-        <button class="btn btn-primary btn-sm" onclick="bulkSend('email')" title="Envoie à tous les prospects avec email (1 par minute)">✉ Email à tous</button>
-        <button class="btn btn-primary btn-sm" onclick="bulkSend('sms')">💬 SMS à tous</button>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="scrapeAll()" title="Récupère emails/tels/URLs contact depuis les sites web">🔎 Scraper</button>
+        <button class="btn btn-sm" onclick="bulkSend('email', true)" title="Test : envoie tous les messages à votre adresse email">🧪 Test email</button>
+        <button class="btn btn-sm" onclick="bulkSend('sms', true)" title="Test : envoie tous les SMS à votre numéro">🧪 Test SMS</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSend('email', false)" title="Envoie à tous les prospects avec email (1 par minute)">✉ Email à tous</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSend('sms', false)">💬 SMS à tous</button>
       </div>
     </div>
 
@@ -715,17 +766,32 @@ async function scrapeAll() {{
   setTimeout(() => location.reload(), 60000);
 }}
 
-async function bulkSend(method) {{
-  const label = method === 'email' ? 'tous les emails' : 'tous les SMS';
-  if (!confirm(`Lancer l\\'envoi ${{label}} ? (1 envoi/60s, max 50/jour)`)) return;
+async function bulkSend(method, isTest) {{
+  let testEmail = null, testPhone = null;
+  if (isTest) {{
+    if (method === 'email') {{
+      testEmail = prompt('Email de test (recevra tous les messages) :');
+      if (!testEmail) return;
+    }} else {{
+      testPhone = prompt('Numéro de test (recevra tous les SMS, format 06XXXXXXXX) :');
+      if (!testPhone) return;
+    }}
+  }} else {{
+    const label = method === 'email' ? 'tous les emails' : 'tous les SMS';
+    if (!confirm(`Lancer l\\'envoi RÉEL ${{label}} ? (1 envoi/60s, max 50/jour)`)) return;
+  }}
+  const body = {{method, delay_seconds: isTest ? 5 : 60}};
+  if (testEmail) body.test_email = testEmail;
+  if (testPhone) body.test_phone = testPhone;
   const r = await fetch(`/api/v3/bulk-send?token=${{TOKEN}}`, {{
     method: 'POST', headers: {{'Content-Type': 'application/json'}},
-    body: JSON.stringify({{method, delay_seconds: 60}})
+    body: JSON.stringify(body)
   }});
   const d = await r.json();
   document.getElementById('bulk-progress').style.display = 'block';
+  const modeLabel = d.test_mode ? '🧪 MODE TEST' : '✉ Envoi réel';
   document.getElementById('bulk-progress').textContent =
-    `⏳ Envoi lancé : ${{d.total}} envois prévus · ~${{Math.ceil(d.total)}} minutes · Rafraîchis la page pour voir les statuts.`;
+    `${{modeLabel}} — ${{d.total}} envois · ${{d.note}} · Rafraîchis la page pour voir les statuts.`;
 }}
 
 async function launchSearch() {{
@@ -801,6 +867,8 @@ class BulkSendRequest(BaseModel):
     method: str = "email"   # "email" | "sms"
     delay_seconds: int = 60
     max_per_day: int = 50
+    test_email: Optional[str] = None  # Mode test : envoie ici au lieu du vrai email
+    test_phone: Optional[str] = None  # Mode test : envoie ici au lieu du vrai tel
 
 
 @router.post("/api/v3/generate")
@@ -814,18 +882,28 @@ def generate_v3(req: GenerateRequest, token: str = ""):
     with SessionLocal() as db:
         for t in req.targets:
             try:
-                prospects, _ = search_prospects(t.profession, t.city, api_key, max_results=t.max_results)
+                # Compte les prospects existants pour cette paire
+                n_existing = db.query(V3ProspectDB).filter_by(
+                    city=t.city, profession=t.profession
+                ).count()
+                # Fetch assez de résultats Google pour trouver t.max_results NOUVEAUX
+                raw_max = min(t.max_results + n_existing + 10, 60)
+                prospects, _ = search_prospects(t.profession, t.city, api_key, max_results=raw_max)
             except Exception as e:
                 log.error("Google Places (%s %s): %s", t.profession, t.city, e)
                 continue
             ia_data = _run_ia_test(t.profession, t.city) if req.run_ia_test else {}
             all_names = [p["name"] for p in prospects]
+            new_count = 0
             for p in prospects:
+                if new_count >= t.max_results:
+                    break
                 tok = _make_token(p["name"], t.city, t.profession)
                 landing_url = f"{BASE_URL}/l/{tok}"
                 competitors = [n for n in all_names if n != p["name"]][:3]
                 existing = db.get(V3ProspectDB, tok)
                 if not existing:
+                    new_count += 1
                     db.add(V3ProspectDB(
                         token=tok, name=p["name"], city=t.city, profession=t.profession,
                         phone=p.get("phone"), website=p.get("website"),
@@ -963,55 +1041,100 @@ async def send_sms_prospect(tok: str, request: Request):
 @router.post("/api/v3/bulk-send")
 async def bulk_send(req: BulkSendRequest, token: str = ""):
     _require_admin(token)
+    test_mode = bool(req.test_email or req.test_phone)
+
     with SessionLocal() as db:
         if req.method == "email":
             prospects = db.query(V3ProspectDB).filter(
                 V3ProspectDB.email.isnot(None),
-                V3ProspectDB.sent_at.is_(None),
+                *([V3ProspectDB.sent_at.is_(None)] if not test_mode else []),
             ).limit(req.max_per_day).all()
         else:
             prospects = db.query(V3ProspectDB).filter(
                 V3ProspectDB.phone.isnot(None),
-                V3ProspectDB.sent_at.is_(None),
+                *([V3ProspectDB.sent_at.is_(None)] if not test_mode else []),
             ).limit(req.max_per_day).all()
-        tokens = [p.token for p in prospects]
+        tokens = [(p.token, p.name, p.city, p.profession, p.email, p.phone, p.landing_url)
+                  for p in prospects]
 
-    _bulk_status.update({"running": True, "done": 0, "total": len(tokens), "errors": []})
+    _bulk_status.update({"running": True, "done": 0, "total": len(tokens), "errors": [],
+                         "test_mode": test_mode})
 
     def _do_bulk():
-        for i, tok in enumerate(tokens):
-            with SessionLocal() as db:
-                p = db.get(V3ProspectDB, tok)
-                if not p:
-                    continue
-                if req.method == "email" and p.email:
-                    msg  = _contact_message(p.name, p.city, p.profession, p.landing_url)
-                    subj = f"Votre visibilité IA à {p.city} — résultat personnalisé"
-                    ok   = _send_brevo_email(p.email, p.name, subj, msg)
-                elif req.method == "sms" and p.phone:
-                    msg = _contact_message_sms(p.name, p.city, p.landing_url)
-                    ok  = _send_brevo_sms(p.phone, msg)
-                else:
-                    ok = False
-                if ok:
-                    p.sent_at = datetime.utcnow(); p.sent_method = req.method
-                    p.contacted = True; db.commit()
-                    _bulk_status["done"] += 1
-                else:
-                    _bulk_status["errors"].append(tok)
+        for i, (tok, name, city, profession, email, phone, landing_url) in enumerate(tokens):
+            if req.method == "email":
+                dest   = req.test_email if test_mode else email
+                msg    = _contact_message(name, city, profession, landing_url)
+                subj   = f"[TEST] Votre visibilité IA à {city}" if test_mode else \
+                         f"Votre visibilité IA à {city} — résultat personnalisé"
+                ok     = _send_brevo_email(dest, name, subj, msg) if dest else False
+            elif req.method == "sms":
+                dest   = req.test_phone if test_mode else phone
+                msg    = _contact_message_sms(name, city, landing_url)
+                ok     = _send_brevo_sms(dest, msg) if dest else False
+            else:
+                ok = False
+
+            if ok:
+                _bulk_status["done"] += 1
+                if not test_mode:
+                    with SessionLocal() as db:
+                        p = db.get(V3ProspectDB, tok)
+                        if p:
+                            p.sent_at = datetime.utcnow()
+                            p.sent_method = req.method
+                            p.contacted = True
+                            db.commit()
+            else:
+                _bulk_status["errors"].append(tok)
+
             if i < len(tokens) - 1:
                 time.sleep(req.delay_seconds)
         _bulk_status["running"] = False
 
     threading.Thread(target=_do_bulk, daemon=True).start()
-    return {"ok": True, "total": len(tokens),
-            "note": f"1 envoi/{req.delay_seconds}s · max {req.max_per_day}/jour · anti-spam: Brevo gère la réputation IP"}
+    mode_label = f"MODE TEST → {req.test_email or req.test_phone}" if test_mode else "envoi réel"
+    return {"ok": True, "total": len(tokens), "test_mode": test_mode,
+            "note": f"{mode_label} · 1 envoi/{req.delay_seconds}s · max {req.max_per_day}/jour"}
 
 
 @router.get("/api/v3/bulk-status")
 def bulk_status(token: str = ""):
     _require_admin(token)
     return _bulk_status
+
+
+@router.post("/api/v3/refresh-ia")
+def refresh_ia(token: str = ""):
+    """Relance les tests IA pour toutes les paires ville/métier (background).
+    Appelé automatiquement par cron lun/jeu/dim à 9:30, 15h, 18h30."""
+    _require_admin(token)
+
+    def _do_refresh():
+        with SessionLocal() as db:
+            pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
+        for city, profession in pairs:
+            try:
+                ia_data = _run_ia_test(profession, city)
+                if not ia_data:
+                    continue
+                with SessionLocal() as db:
+                    for p in db.query(V3ProspectDB).filter_by(city=city, profession=profession).all():
+                        p.ia_prompt    = ia_data.get("prompt")
+                        p.ia_response  = ia_data.get("response")
+                        p.ia_model     = ia_data.get("model")
+                        p.ia_tested_at = ia_data.get("tested_at")
+                    db.commit()
+                log.info("refresh-ia OK: %s %s", profession, city)
+            except Exception as exc:
+                log.error("refresh-ia %s %s: %s", profession, city, exc)
+            time.sleep(3)  # Pause entre les appels IA pour éviter le rate-limit
+
+    threading.Thread(target=_do_refresh, daemon=True).start()
+    with SessionLocal() as db:
+        n_pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().count()
+    return {"ok": True, "pairs": n_pairs,
+            "note": f"Refresh IA lancé pour {n_pairs} paires ville/métier en background (~{n_pairs*15}s)"}
 
 
 @router.post("/api/v3/prospect/{tok}/contacted")
