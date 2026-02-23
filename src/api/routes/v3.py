@@ -503,12 +503,12 @@ def _render_landing(
     h1_img    = _hero_h1 or (
         f'À <em {_em_img}>{city_cap}</em>, les IA recommandent<br>'
         f'des <em {_em_img}>{pro_plural}</em> à vos potentiels clients.<br>'
-        f'Mais pas <em {_em_img}>{name}</em>.'
+        f'Mais pas vous.'
     )
     h1_plain  = _hero_h1 or (
         f'À <em>{city_cap}</em>, les IA recommandent<br>'
         f'des <em>{pro_plural}</em> à vos potentiels clients.<br>'
-        f'Mais pas <em>{name}</em>.'
+        f'Mais pas vous.'
     )
 
     hero_html = (
