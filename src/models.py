@@ -320,6 +320,10 @@ class V3ProspectDB(Base):
     reviews_count: Mapped[Optional[int]] = mapped_column(sa.Integer, nullable=True)
     landing_url:   Mapped[str]           = mapped_column(sa.String, nullable=False)
     competitors:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)   # JSON list[str]
+    ia_prompt:     Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    ia_response:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    ia_model:      Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
+    ia_tested_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     contacted:     Mapped[bool]          = mapped_column(sa.Boolean, default=False)
     notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
