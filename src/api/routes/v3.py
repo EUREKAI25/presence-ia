@@ -1500,31 +1500,52 @@ async function launchSearch() {{
   }}
 }}
 
+async function _compressImg(file, maxW=1400, q=0.85) {{
+  return new Promise(resolve => {{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {{
+      let w = img.width, h = img.height;
+      if (w > maxW) {{ h = Math.round(h * maxW / w); w = maxW; }}
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', q);
+    }};
+    img.onerror = () => {{ URL.revokeObjectURL(url); resolve(file); }};
+    img.src = url;
+  }});
+}}
 async function uploadImage() {{
   const city = document.getElementById('img-city').value.trim();
   const file = document.getElementById('img-file').files[0];
   const status = document.getElementById('upload-status');
   if (!city || !file) {{ alert('Ville et fichier requis'); return; }}
-  if (file.size > 4 * 1024 * 1024) {{
-    status.textContent = '❌ Image trop lourde (max 4 Mo). Compressez-la avant d\'uploader.';
-    return;
-  }}
+  status.textContent = '⏳ Compression de l\'image...';
+  let blob;
+  try {{ blob = await _compressImg(file); }}
+  catch(e) {{ blob = file; }}
+  const sizeMb = (blob.size / 1024 / 1024).toFixed(1);
+  status.textContent = `⏳ Upload (${{sizeMb}} Mo)...`;
   const fd = new FormData();
   fd.append('city', city); fd.append('profession', '');
-  fd.append('file', file);
-  status.textContent = '⏳ Upload en cours...';
+  fd.append('file', new File([blob], 'image.jpg', {{type: 'image/jpeg'}}));
   let r, d;
   try {{
     r = await fetch(`/api/v3/upload-image?token=${{TOKEN}}`, {{method:'POST', body:fd}});
-    if (r.status === 413) {{ status.textContent = '❌ Image trop lourde pour le serveur. Compressez-la.'; return; }}
+    if (r.status === 413) {{
+      status.textContent = '❌ Encore trop lourd après compression (' + sizeMb + ' Mo). Essayez avec une image plus petite.';
+      return;
+    }}
     const ct = r.headers.get('content-type') || '';
     d = ct.includes('json') ? await r.json() : {{}};
   }} catch(e) {{ status.textContent = '❌ Erreur réseau : ' + e.message; return; }}
-  if (r.ok) {{
+  if (r.ok && d.ok) {{
     status.textContent = '✓ Image enregistrée pour ' + city;
     setTimeout(() => location.reload(), 1000);
   }} else {{
-    status.textContent = '❌ Erreur upload (' + r.status + ')';
+    status.textContent = '❌ Erreur upload (' + (r.status) + ')';
   }}
 }}
 
