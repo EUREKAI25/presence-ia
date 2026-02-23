@@ -28,9 +28,9 @@ def init_db():
             ("prospects", "city_image_url TEXT"),
             ("prospects", "paid INTEGER DEFAULT 0"),
             ("prospects", "stripe_session_id TEXT"),
-            ("v3_landing_text", "email_subject TEXT"),
-            ("v3_landing_text", "budget_min TEXT"),
-            ("v3_landing_text", "budget_max TEXT"),
+            ("v3_landing_texts", "email_subject TEXT"),
+            ("v3_landing_texts", "budget_min TEXT"),
+            ("v3_landing_texts", "budget_max TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col}"))
