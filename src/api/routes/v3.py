@@ -92,6 +92,8 @@ def _normalize_phone(phone: str) -> str:
         p = "+33" + p[1:]
     return p
 
+_DEFAULT_EMAIL_SUBJECT = "Votre visibilité IA à {ville} — résultat personnalisé"
+
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
     "Je travaille sur la visibilité des {metiers} dans les intelligences artificielles "
@@ -1040,8 +1042,10 @@ tr:hover{{background:#fafafa}}
     <p style="font-size:.82rem;color:#666;margin-bottom:14px">Ces templates s'appliquent à tous les envois. Placeholders disponibles : <code>{{{{metier}}}}</code> <code>{{{{metiers}}}}</code> <code>{{{{ville}}}}</code> <code>{{{{name}}}}</code> <code>{{{{landing_url}}}}</code></p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div>
+        <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Objet email</label>
+        <input id="gtpl-subject" type="text" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;margin-bottom:8px" placeholder="ex: Votre visibilité IA à {{ville}} — résultat personnalisé">
         <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message email</label>
-        <textarea id="gtpl-email" rows="8" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
+        <textarea id="gtpl-email" rows="7" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
       </div>
       <div>
         <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message SMS</label>
@@ -1219,19 +1223,22 @@ async function bulkSendSelected(method, isTest) {{
 
 const DEFAULT_EMAIL_TPL = {json.dumps(_DEFAULT_EMAIL_TEMPLATE)};
 const DEFAULT_SMS_TPL = {json.dumps(_DEFAULT_SMS_TEMPLATE)};
+const DEFAULT_EMAIL_SUBJECT = {json.dumps(_DEFAULT_EMAIL_SUBJECT)};
 
 // ── Templates globaux ─────────────────────────────────────────────────────────
 async function loadGlobalTemplate() {{
   const r = await fetch(`/api/v3/global-template?token=${{TOKEN}}`);
   if (!r.ok) return;
   const d = await r.json();
-  document.getElementById('gtpl-email').value = d.email_template || DEFAULT_EMAIL_TPL;
-  document.getElementById('gtpl-sms').value   = d.sms_template   || DEFAULT_SMS_TPL;
+  document.getElementById('gtpl-subject').value = d.email_subject || DEFAULT_EMAIL_SUBJECT;
+  document.getElementById('gtpl-email').value   = d.email_template || DEFAULT_EMAIL_TPL;
+  document.getElementById('gtpl-sms').value     = d.sms_template   || DEFAULT_SMS_TPL;
 }}
 async function saveGlobalTemplate() {{
   const body = {{
-    email_template: document.getElementById('gtpl-email').value.trim() || null,
-    sms_template:   document.getElementById('gtpl-sms').value.trim()   || null,
+    email_subject:  document.getElementById('gtpl-subject').value.trim() || null,
+    email_template: document.getElementById('gtpl-email').value.trim()   || null,
+    sms_template:   document.getElementById('gtpl-sms').value.trim()     || null,
   }};
   const r = await fetch(`/api/v3/global-template?token=${{TOKEN}}`, {{
     method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -1684,6 +1691,7 @@ async def save_landing_text(req: LandingTextRequest, token: str = "", request: R
 
 
 class GlobalTemplateRequest(BaseModel):
+    email_subject:  Optional[str] = None
     email_template: Optional[str] = None
     sms_template:   Optional[str] = None
 
@@ -1694,6 +1702,7 @@ def get_global_template(token: str = "", request: Request = None):
     with SessionLocal() as db:
         lt = db.get(V3LandingTextDB, "__global__")
         return {
+            "email_subject":  lt.email_subject  if lt else None,
             "email_template": lt.email_template if lt else None,
             "sms_template":   lt.sms_template   if lt else None,
         }
@@ -1707,6 +1716,7 @@ async def save_global_template(req: GlobalTemplateRequest, token: str = "", requ
         if not lt:
             lt = V3LandingTextDB(id="__global__", city="__global__", profession="__global__")
             db.add(lt)
+        lt.email_subject  = req.email_subject  or None
         lt.email_template = req.email_template or None
         lt.sms_template   = req.sms_template   or None
         lt.updated_at     = datetime.utcnow()
@@ -1726,8 +1736,11 @@ async def send_email_prospect(tok: str, request: Request):
             return JSONResponse({"ok": False, "error": "Pas d'email pour ce prospect"})
         lt_global = db.get(V3LandingTextDB, "__global__")
         tpl       = lt_global.email_template if lt_global and lt_global.email_template else None
+        subj_tpl  = lt_global.email_subject  if lt_global and lt_global.email_subject  else _DEFAULT_EMAIL_SUBJECT
         msg   = _contact_message(p.name, p.city, p.profession, p.landing_url, tpl)
-        subj  = f"Votre visibilité IA à {p.city} — résultat personnalisé"
+        metier = p.profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
+        subj  = subj_tpl.format(ville=p.city, metier=metier, metiers=metiers,
+                                city=p.city, profession=p.profession, name=p.name)
         ok    = _send_brevo_email(p.email, p.name, subj, msg)
         if ok:
             p.sent_at     = datetime.utcnow()
@@ -1789,6 +1802,7 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
         lt_global  = db.get(V3LandingTextDB, "__global__")
         email_tpl  = lt_global.email_template if lt_global and lt_global.email_template else None
         sms_tpl    = lt_global.sms_template   if lt_global and lt_global.sms_template   else None
+        subj_tpl   = lt_global.email_subject  if lt_global and lt_global.email_subject  else _DEFAULT_EMAIL_SUBJECT
 
     _bulk_status.update({"running": True, "done": 0, "total": len(tokens), "errors": [],
                          "test_mode": test_mode})
@@ -1798,8 +1812,10 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
             if req.method == "email":
                 dest   = req.test_email if test_mode else email
                 msg    = _contact_message(name, city, profession, landing_url, email_tpl)
-                subj   = f"[TEST] Votre visibilité IA à {city}" if test_mode else \
-                         f"Votre visibilité IA à {city} — résultat personnalisé"
+                metier = profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
+                subj_real = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
+                                            city=city, profession=profession, name=name)
+                subj   = f"[TEST] {subj_real}" if test_mode else subj_real
                 ok     = _send_brevo_email(dest, name, subj, msg) if dest else False
             elif req.method == "sms":
                 dest   = req.test_phone if test_mode else phone

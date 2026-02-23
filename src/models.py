@@ -359,6 +359,7 @@ class V3LandingTextDB(Base):
     cta_subtitle:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     proof_texts:    Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{text, source}]
     proof_videos:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{url}]
+    email_subject:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)   # objet email
     email_template: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{profession},{landing_url}
     sms_template:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{landing_url}
     updated_at:     Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
