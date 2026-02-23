@@ -672,13 +672,19 @@ footer a{{color:var(--g3)}}
   </div>
   <p>Réponses réelles obtenues lors des derniers tests sur les {pro_label}s de {city_cap}&nbsp;:</p>
   {chat_html}
-  <div style="margin-top:32px;padding:28px 32px;background:#0a0a0a;color:#fff;border-radius:12px">
-    <p style="font-size:1.05rem;line-height:1.75;margin-bottom:20px">
-      Ce n'est pas une question de réputation ou de classement sur Google Places.<br>
-      <strong>Vous devez connaître et parler la langue que comprennent les IA.</strong><br><br>
+  <div style="margin-top:32px;padding:28px 0">
+    <p style="font-size:1rem;line-height:1.75;margin-bottom:12px;color:var(--t)">
+      Ce n'est pas une question de réputation ou de classement sur Google Places.
+    </p>
+    <p style="font-size:1.15rem;font-weight:700;line-height:1.6;margin-bottom:12px;color:var(--t)">
+      Vous devez connaître et parler la langue que comprennent les IA.
+    </p>
+    <p style="font-size:1rem;line-height:1.75;margin-bottom:28px;color:var(--t)">
       Nous analysons et optimisons votre positionnement dans les réponses générées par les IA.
     </p>
-    <a href="{CALENDLY_URL}" target="_blank" style="display:inline-block;background:#2563eb;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:.95rem">Réserver mon appel stratégique →</a>
+    <div style="text-align:center">
+      <a href="{CALENDLY_URL}" target="_blank" style="display:inline-block;background:#2563eb;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:.95rem">Réserver mon appel stratégique →</a>
+    </div>
   </div>
 </div>
 
