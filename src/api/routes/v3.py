@@ -447,22 +447,33 @@ def _render_landing(
     )
 
     # ── Hero ──────────────────────────────────────────────────────────────
-    _hero_h1   = landing_text.hero_headline if landing_text and landing_text.hero_headline else None
-    _hero_sub  = landing_text.hero_subtitle  if landing_text and landing_text.hero_subtitle  else None
-    h1_text    = _hero_h1 or f'À <em style="font-style:normal;color:#93c5fd">{city_cap}</em>, les IA recommandent<br>des {pro_plural} à vos clients.<br>Êtes-vous dans leurs réponses&nbsp;?'
-    sub_text   = _hero_sub or "ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale."
+    _hero_h1  = landing_text.hero_headline if landing_text and landing_text.hero_headline else None
+    _hero_sub = landing_text.hero_subtitle  if landing_text and landing_text.hero_subtitle  else None
+    sub_text  = _hero_sub or "ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale."
+    # Sur fond sombre (image) : em clair #93c5fd. Sur fond blanc : em bleu via CSS
+    _em_img   = 'style="font-style:normal;color:#93c5fd"'
+    h1_img    = _hero_h1 or (
+        f'À <em {_em_img}>{city_cap}</em>, les IA recommandent<br>'
+        f'des <em {_em_img}>{pro_plural}</em> à vos clients.<br>'
+        f'Êtes-vous dans leurs réponses&nbsp;?'
+    )
+    h1_plain  = _hero_h1 or (
+        f'À <em>{city_cap}</em>, les IA recommandent<br>'
+        f'des <em>{pro_plural}</em> à vos clients.<br>'
+        f'Êtes-vous dans leurs réponses&nbsp;?'
+    )
 
     hero_html = (
         f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
         f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.2) 100%)"></div>'
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
-        f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_text}</h1>'
+        f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
         f'<p style="color:rgba(255,255,255,.8);font-size:1.1rem;max-width:520px;margin:0 auto;line-height:1.7;">{sub_text}</p>'
         f'</div></div>'
     ) if city_image_url else (
         f'<div class="hero"><div class="hero-badge">Audit personnalisé</div>'
-        f'<h1>{h1_text}</h1>'
+        f'<h1>{h1_plain}</h1>'
         f'<p style="margin-top:20px">{sub_text}</p></div>'
     )
 
@@ -477,13 +488,17 @@ def _render_landing(
         proof_videos_list = json.loads(landing_text.proof_videos) if landing_text.proof_videos else []
 
         if proof_texts_list:
-            items = "".join(
-                f'<blockquote style="border-left:3px solid #2563eb;padding:12px 20px;margin:16px 0;background:#eff4ff;border-radius:0 8px 8px 0">'
-                f'<p style="font-size:.95rem;font-style:italic;color:#1a1a1a">{pt.get("text","")}</p>'
-                f'{"<cite style=\\"font-size:.78rem;color:#666;margin-top:6px;display:block\\">— " + pt["source"] + "</cite>" if pt.get("source") else ""}'
-                f'</blockquote>'
-                for pt in proof_texts_list
-            )
+            # Pas de backslash dans expression f-string (Python < 3.12)
+            items_parts = []
+            for pt in proof_texts_list:
+                src  = pt.get("source", "")
+                cite = f'<cite style="font-size:.78rem;color:#666;margin-top:6px;display:block">— {src}</cite>' if src else ""
+                items_parts.append(
+                    f'<blockquote style="border-left:3px solid #2563eb;padding:12px 20px;margin:16px 0;background:#eff4ff;border-radius:0 8px 8px 0">'
+                    f'<p style="font-size:.95rem;font-style:italic;color:#1a1a1a">{pt.get("text","")}</p>'
+                    + cite + "</blockquote>"
+                )
+            items = "".join(items_parts)
             proof_section += f'<div class="section"><h2>Témoignages</h2>{items}</div><hr style="border:none;border-top:1px solid var(--g2);">'
 
         if proof_videos_list:
