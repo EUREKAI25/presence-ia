@@ -96,9 +96,9 @@ _DEFAULT_EMAIL_SUBJECT = "Votre visibilité IA à {ville} — résultat personna
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
-    "Je travaille sur la visibilité des {metiers} dans les intelligences artificielles "
+    "Je travaille sur la visibilité des {profession}s dans les intelligences artificielles "
     "(ChatGPT, Gemini, Claude).\n\n"
-    "J'ai effectué un test pour votre entreprise à {ville} — "
+    "J'ai effectué un test pour votre entreprise à {city} — "
     "le résultat vous concerne directement.\n\n"
     "Accès à votre rapport personnalisé : {landing_url}\n\n"
     "Cordialement,\n"
@@ -106,7 +106,7 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "Bonjour, test visibilité IA effectué pour votre entreprise à {ville}. "
+    "Bonjour, test visibilité IA effectué pour votre entreprise à {city}. "
     "Rapport : {landing_url} - Présence IA. STOP: contact@presence-ia.com"
 )
 
@@ -402,13 +402,11 @@ def _render_landing(
         dt = p.ia_tested_at if isinstance(p.ia_tested_at, datetime) else datetime.fromisoformat(str(p.ia_tested_at))
         last_test_date = dt.strftime("%d/%m/%Y")
 
-    ia_label_txt = "IA testée" if n_ia == 1 else "IA testées"
-    ia_names = " · ".join(r["model"] for r in ia_results_list) if ia_results_list else "ChatGPT · Gemini · Claude"
     stats_html = f"""
 <div class="stats">
-  <div class="stat-item"><strong>{n_ia}</strong><span>{ia_label_txt}<br>{ia_names}</span></div>
-  {'<div class="stat-item"><strong>' + str(n_competitors) + '</strong><span>concurrents<br>identifiés à ' + city_cap + '</span></div>' if n_competitors else ''}
-  {'<div class="stat-item"><strong style="font-size:1.2rem;letter-spacing:0">' + last_test_date + '</strong><span>date du test</span></div>' if last_test_date else ''}
+  <div class="stat-item"><strong>3 IA</strong><span>testées<br>ChatGPT · Gemini · Claude</span></div>
+  <div class="stat-item"><strong>3×</strong><span>fois par semaine</span></div>
+  <div class="stat-item"><strong>3</strong><span>prompts différents<br>par test</span></div>
 </div>"""
 
     # ── Chat boxes ────────────────────────────────────────────────────────
@@ -416,22 +414,22 @@ def _render_landing(
         ts = ""
         if tested_at_str:
             try:
-                ts = datetime.fromisoformat(str(tested_at_str)).strftime("%d/%m/%Y à %H:%M")
+                ts = datetime.fromisoformat(str(tested_at_str)).strftime("%d/%m à %H:%M")
             except Exception:
                 ts = str(tested_at_str)[:16]
         resp_html = (response or "").replace("\n", "<br>")
+        ts_label = f" (test du {ts})" if ts else ""
         return f"""
   <div class="chat-box">
-    <div class="chat-meta">
-      <strong>{model_name}</strong>
-      {f'<span class="chat-time">Test du {ts}</span>' if ts else ""}
+    <div class="chat-prompt">
+      <span class="chat-label">Prompt{ts_label}</span>
+      <em>&laquo;&nbsp;{prompt}&nbsp;&raquo;</em>
     </div>
-    <div class="chat-prompt"><span class="chat-label">Prompt</span><em>{prompt}</em></div>
-    <div class="chat-response">
-      <span class="chat-label">Réponse obtenue</span>
+    <div class="chat-response" style="margin-top:14px">
+      <span class="chat-label">{model_name}</span>
       <div class="chat-text">{resp_html}</div>
     </div>
-    <p style="margin-top:12px;font-weight:700">→ {model_name} ne sait même pas que vous existez.</p>
+    <p style="margin-top:10px;font-weight:700;color:#dc2626">→ {model_name} ne vous connait pas.</p>
   </div>"""
 
     if ia_results_list:
@@ -479,7 +477,7 @@ def _render_landing(
     _bmax = (landing_text.budget_max or "") if landing_text else ""
     _sub_ctx = {
         "metier": pro_label, "metiers": pro_plural, "ville": city_cap,
-        "name": name, "budget_min": _bmin, "budget_max": _bmax,
+        "name": name, "nom": name, "budget_min": _bmin, "budget_max": _bmax,
         "city": city_cap, "profession": pro_label,  # compat anciens templates
     }
     def _sub(t):
@@ -493,18 +491,25 @@ def _render_landing(
     # ── Hero ──────────────────────────────────────────────────────────────
     _hero_h1  = _sub(landing_text.hero_headline) if landing_text and landing_text.hero_headline else None
     _hero_sub = _sub(landing_text.hero_subtitle)  if landing_text and landing_text.hero_subtitle  else None
-    sub_text  = _hero_sub or "ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale."
+    sub_text  = _hero_sub or (
+        "Avec 44\u00a0% des internautes utilisant une IA conversationnelle chaque mois en 2025 "
+        "et un usage quotidien multipli\u00e9 par +250\u00a0% en un an, les assistants IA s'installent "
+        "en amont du parcours de d\u00e9cision\u00a0\u2014 parfois avant la recherche Google."
+    )
+    _show_source = not (landing_text and landing_text.hero_subtitle)
+    _source_img  = '<span style="display:block;margin-top:14px;font-size:.75rem;color:rgba(255,255,255,.45)">Source\u00a0: M\u00e9diam\u00e9trie</span>' if _show_source else ""
+    _source_plain= '<span style="display:block;margin-top:12px;font-size:.75rem;color:#aaa">Source\u00a0: M\u00e9diam\u00e9trie</span>' if _show_source else ""
     # Sur fond sombre (image) : em clair #93c5fd. Sur fond blanc : em bleu via CSS
     _em_img   = 'style="font-style:normal;color:#93c5fd"'
     h1_img    = _hero_h1 or (
         f'À <em {_em_img}>{city_cap}</em>, les IA recommandent<br>'
-        f'des <em {_em_img}>{pro_plural}</em> à vos clients.<br>'
-        f'Êtes-vous dans leurs réponses&nbsp;?'
+        f'des <em {_em_img}>{pro_plural}</em> à vos potentiels clients.<br>'
+        f'Mais pas <em {_em_img}>{name}</em>.'
     )
     h1_plain  = _hero_h1 or (
         f'À <em>{city_cap}</em>, les IA recommandent<br>'
-        f'des <em>{pro_plural}</em> à vos clients.<br>'
-        f'Êtes-vous dans leurs réponses&nbsp;?'
+        f'des <em>{pro_plural}</em> à vos potentiels clients.<br>'
+        f'Mais pas <em>{name}</em>.'
     )
 
     hero_html = (
@@ -513,17 +518,18 @@ def _render_landing(
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
         f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
-        f'<p style="color:rgba(255,255,255,.8);font-size:1.1rem;max-width:520px;margin:0 auto;line-height:1.7;">{sub_text}</p>'
+        f'<p style="color:rgba(255,255,255,.8);font-size:1rem;max-width:600px;margin:0 auto;line-height:1.75;">{sub_text}{_source_img}</p>'
         f'</div></div>'
     ) if city_image_url else (
         f'<div class="hero"><div class="hero-badge">Audit personnalisé</div>'
         f'<h1>{h1_plain}</h1>'
-        f'<p style="margin-top:20px">{sub_text}</p></div>'
+        f'<p style="margin-top:20px;font-size:1rem;color:#555;max-width:600px;margin-left:auto;margin-right:auto;line-height:1.75">{sub_text}{_source_plain}</p>'
+        f'</div>'
     )
 
     # ── CTA custom ────────────────────────────────────────────────────────
-    cta_title = _sub(landing_text.cta_headline) if landing_text and landing_text.cta_headline else "Réservez votre<br>audit gratuit"
-    cta_sub   = _sub(landing_text.cta_subtitle)  if landing_text and landing_text.cta_subtitle  else "30 minutes. Résultats sur votre visibilité réelle.<br>Sans engagement."
+    cta_title = _sub(landing_text.cta_headline) if landing_text and landing_text.cta_headline else "Réservez votre appel<br>stratégique"
+    cta_sub   = _sub(landing_text.cta_subtitle)  if landing_text and landing_text.cta_subtitle  else "Découvrez en 30 minutes votre positionnement réel sur les IA."
 
     # ── Preuves texte + vidéo (depuis landing_text) ───────────────────────
     proof_section = ""
@@ -623,16 +629,23 @@ footer a{{color:var(--g3)}}
 {stats_html}
 
 <div class="section">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-    <h2 style="margin-bottom:0">Ce que vos futurs clients voient<br>quand ils interrogent une IA</h2>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+    <h2 style="margin-bottom:0">Ce que voient vos futurs clients<br>quand ils interrogent une IA</h2>
     <div style="text-align:right">
       <div style="font-size:.88rem;font-weight:600">{name}</div>
       {rating_html}
     </div>
   </div>
-  <p>Réponse réelle obtenue en interrogeant {"les IA" if n_ia > 1 else "une IA"} sur les {pro_label}s à {city_cap}&nbsp;:</p>
+  <p>Réponses réelles obtenues lors des derniers tests sur les {pro_label}s de {city_cap}&nbsp;:</p>
   {chat_html}
-  <p style="margin-top:0">Ce n'est pas une question de réputation. C'est une question de <strong>signaux</strong> — et ils se corrigent méthodiquement.</p>
+  <div style="margin-top:32px;padding:28px 32px;background:#0a0a0a;color:#fff;border-radius:12px">
+    <p style="font-size:1.05rem;line-height:1.75;margin-bottom:20px">
+      Ce n'est pas une question de réputation ou de classement sur Google Places.<br>
+      <strong>Vous devez connaître et parler la langue que comprennent les IA.</strong><br><br>
+      Nous analysons et optimisons votre positionnement dans les réponses générées par les IA.
+    </p>
+    <a href="{CALENDLY_URL}" target="_blank" style="display:inline-block;background:#2563eb;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:.95rem">Réserver mon appel stratégique →</a>
+  </div>
 </div>
 
 <hr style="border:none;border-top:1px solid var(--g2);">
@@ -650,8 +663,13 @@ footer a{{color:var(--g3)}}
 <div class="cta-section">
   <h2>{cta_title}</h2>
   <p>{cta_sub}</p>
-  <a href="{CALENDLY_URL}" target="_blank" class="btn-cta">Choisir un créneau →</a>
-  <span class="btn-sub">Audit offert · Aucun engagement · Résultats en 48h</span>
+  <ul style="list-style:none;text-align:left;display:inline-block;margin:0 auto 36px;padding:0">
+    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Votre positionnement réel sur les 3 IA</li>
+    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Ce que font vos concurrents</li>
+    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Comment inverser la tendance</li>
+  </ul><br>
+  <a href="{CALENDLY_URL}" target="_blank" class="btn-cta">Je réserve mon créneau →</a>
+  <span class="btn-sub">Sans engagement · Résultats concrets</span>
 </div>
 
 <footer>© 2026 Présence IA &nbsp;·&nbsp;<a href="https://presence-ia.com">presence-ia.com</a> &nbsp;·&nbsp;<a href="https://presence-ia.com/cgv">CGV</a></footer>
@@ -1056,7 +1074,7 @@ tr:hover{{background:#fafafa}}
   <!-- SECTION 1 : Templates de contact GLOBAUX -->
   <div class="card" style="margin-bottom:20px">
     <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">✉ Templates de contact (global)</h2>
-    <p style="font-size:.82rem;color:#666;margin-bottom:14px">Ces templates s'appliquent à tous les envois. Placeholders disponibles : <code>{{{{metier}}}}</code> <code>{{{{metiers}}}}</code> <code>{{{{ville}}}}</code> <code>{{{{name}}}}</code> <code>{{{{landing_url}}}}</code></p>
+    <p style="font-size:.82rem;color:#666;margin-bottom:14px">Placeholders : <code>{{{{profession}}}}</code> <code>{{{{city}}}}</code> <code>{{{{metier}}}}</code> <code>{{{{metiers}}}}</code> <code>{{{{ville}}}}</code> <code>{{{{name}}}}</code> <code>{{{{landing_url}}}}</code></p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div>
         <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Objet email</label>
@@ -1081,7 +1099,7 @@ tr:hover{{background:#fafafa}}
   <div class="card" style="margin-bottom:20px">
     <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🖋 Personnalisation landing par paire</h2>
     <p style="font-size:.83rem;color:#666;margin-bottom:4px">Textes spécifiques à une paire ville/métier. Placeholders disponibles :</p>
-    <p style="font-size:.78rem;color:#555;background:#f3f4f6;padding:6px 10px;border-radius:6px;font-family:monospace;margin-bottom:12px"><code>{{metier}}</code> <code>{{metiers}}</code> <code>{{ville}}</code> <code>{{budget_min}}</code> <code>{{budget_max}}</code> <code>{{name}}</code></p>
+    <p style="font-size:.78rem;color:#555;background:#f3f4f6;padding:6px 10px;border-radius:6px;font-family:monospace;margin-bottom:12px"><code>{{metier}}</code> <code>{{metiers}}</code> <code>{{ville}}</code> <code>{{budget_min}}</code> <code>{{budget_max}}</code> <code>{{nom}}</code> <code>{{name}}</code></p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
       <div class="form-group">
         <label>Ville</label>
@@ -1487,17 +1505,26 @@ async function uploadImage() {{
   const file = document.getElementById('img-file').files[0];
   const status = document.getElementById('upload-status');
   if (!city || !file) {{ alert('Ville et fichier requis'); return; }}
+  if (file.size > 4 * 1024 * 1024) {{
+    status.textContent = '❌ Image trop lourde (max 4 Mo). Compressez-la avant d\'uploader.';
+    return;
+  }}
   const fd = new FormData();
   fd.append('city', city); fd.append('profession', '');
   fd.append('file', file);
   status.textContent = '⏳ Upload en cours...';
-  const r = await fetch(`/api/v3/upload-image?token=${{TOKEN}}`, {{method:'POST', body:fd}});
-  const d = await r.json();
+  let r, d;
+  try {{
+    r = await fetch(`/api/v3/upload-image?token=${{TOKEN}}`, {{method:'POST', body:fd}});
+    if (r.status === 413) {{ status.textContent = '❌ Image trop lourde pour le serveur. Compressez-la.'; return; }}
+    const ct = r.headers.get('content-type') || '';
+    d = ct.includes('json') ? await r.json() : {{}};
+  }} catch(e) {{ status.textContent = '❌ Erreur réseau : ' + e.message; return; }}
   if (r.ok) {{
     status.textContent = '✓ Image enregistrée pour ' + city;
     setTimeout(() => location.reload(), 1000);
   }} else {{
-    status.textContent = '❌ Erreur upload';
+    status.textContent = '❌ Erreur upload (' + r.status + ')';
   }}
 }}
 

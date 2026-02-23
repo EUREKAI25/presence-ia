@@ -541,7 +541,6 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 
 <div class="section section--alt" id="how">
   <div class="container">
-    <p class="section__eyebrow">Méthodologie</p>
     <h2 class="section__title">Comment fonctionne l'audit</h2>
     <p class="section__sub">Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché.</p>
     <div class="steps-grid">{steps_html}</div>
