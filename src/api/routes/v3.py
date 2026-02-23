@@ -676,7 +676,8 @@ footer a{{color:var(--g3)}}
     <p style="font-size:1rem;line-height:1.75;margin-bottom:12px;color:var(--t)">
       Ce n'est pas une question de réputation ou de classement sur Google Places.
     </p>
-    <p style="font-size:1.15rem;font-weight:700;line-height:1.6;margin-bottom:12px;color:var(--t)">
+    <p style="font-size:1.15rem;font-weight:700;line-height:1.6;margin:24px 0;color:var(--t);display:flex;align-items:baseline;gap:10px">
+      <span style="color:#2563eb;flex-shrink:0">→</span>
       Vous devez connaître et parler la langue que comprennent les IA.
     </p>
     <p style="font-size:1rem;line-height:1.75;margin-bottom:28px;color:var(--t)">
