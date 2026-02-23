@@ -857,6 +857,7 @@ def admin_v3(
             actions += f'<button onclick="sendEmail(\'{r.token}\')" title="Envoyer email" style="{_btn_style(blue=True)}">✉</button> '
         if r.phone:
             actions += f'<button onclick="sendSMS(\'{r.token}\')" title="Envoyer SMS" style="{_btn_style(blue=True)}">💬</button>'
+        actions += f' <button onclick="deleteProspect(\'{r.token}\',\'{r.name.replace(chr(39), "")}\' )" title="Supprimer" style="{_btn_style()};color:#dc2626;border-color:#fca5a5">🗑</button>'
 
         rating_str = f"{r.rating:.1f}★" if r.rating else "—"
         avis_str   = str(r.reviews_count) if r.reviews_count else "—"
@@ -1294,9 +1295,9 @@ async function saveHomeBlocks() {{
     ['hero', 'title',    document.getElementById('home-hero-title').value],
     ['hero', 'subtitle', document.getElementById('home-hero-subtitle').value],
     ['hero', 'cta_primary', document.getElementById('home-hero-cta').value],
-    ['cta_final', 'title',    document.getElementById('home-cta-title').value],
-    ['cta_final', 'subtitle', document.getElementById('home-cta-sub').value],
-    ['cta_final', 'btn_label',document.getElementById('home-cta-btn').value],
+    ['cta', 'title',    document.getElementById('home-cta-title').value],
+    ['cta', 'subtitle', document.getElementById('home-cta-sub').value],
+    ['cta', 'btn_label',document.getElementById('home-cta-btn').value],
   ];
   let ok = true;
   for (const [sec, fk, val] of blocks) {{
@@ -1336,7 +1337,7 @@ async function loadTexts() {{
       <div style="font-size:.75rem;color:#999;margin-top:4px">${{e.provider}} — ${{e.ts ? e.ts.slice(0,16) : ''}}</div></div>`
     ).join('');
   }} else {{
-    evEl.innerHTML = '<p style="color:#999">Aucune capture d\'écran pour cette paire. Utilisez le refresh-IA ou uploadez des preuves.</p>';
+    evEl.innerHTML = "<p style='color:#999'>Aucune capture d&#39;écran pour cette paire. Utilisez le refresh-IA ou uploadez des preuves.</p>";
   }}
 }}
 async function saveTexts() {{
@@ -1504,6 +1505,15 @@ async function deleteImage(imgId) {{
   if (!confirm('Supprimer cette image ?')) return;
   await fetch(`/api/v3/city-image/${{imgId}}?token=${{TOKEN}}`, {{method:'DELETE'}});
   location.reload();
+}}
+
+async function deleteProspect(tok, name) {{
+  if (!confirm('Supprimer ' + name + ' ?')) return;
+  const r = await fetch(`/api/v3/prospect/${{tok}}?token=${{TOKEN}}`, {{method:'DELETE'}});
+  if (r.ok) {{
+    const row = document.getElementById('row-' + tok);
+    if (row) row.remove();
+  }} else {{ alert('Erreur suppression'); }}
 }}
 </script>
 </body></html>""")
@@ -1934,6 +1944,18 @@ async def mark_contacted(tok: str, request: Request):
     return {"ok": True}
 
 
+@router.delete("/api/v3/prospect/{tok}")
+def delete_prospect(tok: str, token: str = "", request: Request = None):
+    _require_admin(token, request)
+    with SessionLocal() as db:
+        p = db.get(V3ProspectDB, tok)
+        if not p:
+            raise HTTPException(404)
+        db.delete(p)
+        db.commit()
+    return {"ok": True}
+
+
 @router.get("/api/v3/prospects")
 def list_v3_prospects(token: str = ""):
     _require_admin(token)
@@ -1985,9 +2007,9 @@ def get_home_blocks(token: str = "", request: Request = None):
             "hero_title":    get_block(db, "home", "hero",      "title"),
             "hero_subtitle": get_block(db, "home", "hero",      "subtitle"),
             "hero_cta":      get_block(db, "home", "hero",      "cta_primary"),
-            "cta_title":     get_block(db, "home", "cta_final", "title"),
-            "cta_subtitle":  get_block(db, "home", "cta_final", "subtitle"),
-            "cta_btn":       get_block(db, "home", "cta_final", "btn_label"),
+            "cta_title":     get_block(db, "home", "cta", "title"),
+            "cta_subtitle":  get_block(db, "home", "cta", "subtitle"),
+            "cta_btn":       get_block(db, "home", "cta", "btn_label"),
         }
 
 

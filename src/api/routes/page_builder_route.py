@@ -383,9 +383,9 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     hero_title    = B("hero", "title",        "Quand vos clients demandent à ChatGPT,\nil cite vos concurrents. Pas vous.").replace("\n", "<br>")
     hero_subtitle = B("hero", "subtitle",     "Nous testons votre visibilité sur 3 IA et 5 requêtes. Rapport en 48h. Plan d'action concret.")
     hero_cta      = B("hero", "cta_primary",  "Tester ma visibilité — 97€")
-    cta_title     = B("cta_final", "title",    "Votre audit IA en 48h — 97€")
-    cta_subtitle  = B("cta_final", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
-    cta_btn       = B("cta_final", "btn_label","Commander mon audit")
+    cta_title     = B("cta", "title",    "Votre audit IA en 48h — 97€")
+    cta_subtitle  = B("cta", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
+    cta_btn       = B("cta", "btn_label","Commander mon audit")
 
     # FAQ (jusqu'à 8 Q/R depuis ContentBlockDB, sinon défauts)
     _faq_defaults = [
@@ -439,50 +439,73 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
         )
 
     css = """
-:root{--p:#4f46e5;--pd:#3730a3;--t:#111827;--m:#6b7280;--bg:#f9fafb;--r:12px}
+:root{--blue:#2563eb;--dark:#0f172a;--slate:#1e293b;--t:#1e293b;--m:#64748b;--bg:#f8fafc;--r:10px}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--t);line-height:1.6}
+body{font-family:-apple-system,'Segoe UI',sans-serif;color:var(--t);line-height:1.6;background:#fff}
 a{color:inherit}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0;z-index:10}
-.nav__brand{font-weight:800;font-size:1.1rem;color:var(--p);text-decoration:none;letter-spacing:-.02em}
-.nav__cta{background:var(--p);color:#fff;padding:10px 22px;border-radius:8px;font-weight:600;font-size:.9rem;text-decoration:none}
-.hero{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;text-align:center;padding:96px 24px 80px}
-.hero h1{font-size:clamp(1.9rem,5vw,3rem);font-weight:800;line-height:1.2;max-width:800px;margin:0 auto 24px}
-.hero p{font-size:1.1rem;max-width:560px;margin:0 auto 40px;opacity:.88;line-height:1.75}
-.btn-hero{display:inline-block;background:#fff;color:var(--p);font-weight:700;padding:16px 38px;border-radius:50px;text-decoration:none;font-size:1rem;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:transform .15s,box-shadow .15s}
-.btn-hero:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.2)}
-.stats-bar{background:#fff;border-bottom:1px solid #e5e7eb;padding:40px 24px}
-.stats-bar__grid{display:flex;justify-content:center;gap:56px;flex-wrap:wrap;max-width:900px;margin:0 auto}
-.stat{text-align:center}
-.stat__val{font-size:2.2rem;font-weight:800;color:var(--p)}
-.stat__lbl{font-size:.82rem;color:var(--m);margin-top:4px;max-width:140px}
-.section{padding:80px 24px}
+/* NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:64px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:20}
+.nav__brand{font-weight:800;font-size:1.05rem;color:var(--dark);text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.nav__brand-dot{width:8px;height:8px;background:var(--blue);border-radius:50%;display:inline-block}
+.nav__cta{background:var(--blue);color:#fff;padding:10px 24px;border-radius:8px;font-weight:600;font-size:.875rem;text-decoration:none;transition:background .15s}
+.nav__cta:hover{background:#1d4ed8}
+/* HERO */
+.hero{background:var(--dark);color:#fff;padding:100px 24px 88px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(37,99,235,.35) 0%,transparent 70%);pointer-events:none}
+.hero__badge{display:inline-flex;align-items:center;gap:6px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#93c5fd;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:32px}
+.hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;max-width:820px;margin:0 auto 24px;letter-spacing:-.03em}
+.hero h1 em{font-style:normal;color:#60a5fa}
+.hero p{font-size:1.1rem;max-width:540px;margin:0 auto 44px;color:#94a3b8;line-height:1.8}
+.btn-hero{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:16px 36px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(37,99,235,.4);transition:all .15s}
+.btn-hero:hover{background:#1d4ed8;transform:translateY(-1px);box-shadow:0 8px 32px rgba(37,99,235,.5)}
+.btn-hero-arrow{font-size:1.1rem;transition:transform .15s}
+.btn-hero:hover .btn-hero-arrow{transform:translateX(3px)}
+/* STATS */
+.stats-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:44px 24px}
+.stats-bar__grid{display:flex;justify-content:center;gap:0;flex-wrap:wrap;max-width:860px;margin:0 auto}
+.stat{text-align:center;padding:0 48px;border-right:1px solid #e2e8f0}
+.stat:last-child{border-right:none}
+.stat__val{font-size:2rem;font-weight:800;color:var(--dark);letter-spacing:-.04em}
+.stat__lbl{font-size:.8rem;color:var(--m);margin-top:4px;line-height:1.4}
+/* SECTIONS */
+.section{padding:88px 24px}
 .section--alt{background:var(--bg)}
-.container{max-width:1000px;margin:0 auto}
-.section__title{text-align:center;font-size:clamp(1.5rem,3vw,2rem);font-weight:800;margin-bottom:12px}
-.section__sub{text-align:center;color:var(--m);margin-bottom:52px;font-size:1.05rem}
-.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:24px}
-.step{background:#fff;border-radius:var(--r);padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.step__num{width:40px;height:40px;background:var(--p);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;margin-bottom:16px}
-.step__title{font-weight:700;margin-bottom:8px}
-.step__desc{font-size:.9rem;color:var(--m);line-height:1.6}
-.faq-list{max-width:760px;margin:0 auto}
-.faq-item{border-bottom:1px solid #e5e7eb}
-.faq-q{width:100%;text-align:left;padding:20px 0;font-weight:600;font-size:1rem;background:none;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--t)}
-.faq-icon{flex-shrink:0;color:var(--p);transition:transform .2s;font-style:normal}
+.container{max-width:1040px;margin:0 auto}
+.section__eyebrow{text-align:center;font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:12px}
+.section__title{text-align:center;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;margin-bottom:12px;letter-spacing:-.03em;color:var(--dark)}
+.section__sub{text-align:center;color:var(--m);margin-bottom:56px;font-size:1rem;max-width:560px;margin-left:auto;margin-right:auto}
+/* STEPS */
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.step{background:#fff;border:1px solid #e2e8f0;border-radius:var(--r);padding:28px 24px;position:relative}
+.step__num{width:36px;height:36px;background:var(--dark);color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;margin-bottom:16px;font-variant-numeric:tabular-nums}
+.step__title{font-weight:700;margin-bottom:8px;font-size:.95rem;color:var(--dark)}
+.step__desc{font-size:.88rem;color:var(--m);line-height:1.65}
+/* FAQ */
+.faq-list{max-width:720px;margin:0 auto;border:1px solid #e2e8f0;border-radius:var(--r);overflow:hidden}
+.faq-item{border-bottom:1px solid #e2e8f0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{width:100%;text-align:left;padding:20px 24px;font-weight:600;font-size:.95rem;background:#fff;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--dark);transition:background .1s}
+.faq-q:hover{background:#f8fafc}
+.faq-icon{flex-shrink:0;color:var(--blue);transition:transform .2s;font-size:.8rem}
 .faq-item.open .faq-icon{transform:rotate(180deg)}
-.faq-a{padding:0 0 20px;color:var(--m);line-height:1.7}
-.cta-section{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;text-align:center;padding:80px 24px}
-.cta-section h2{font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;margin-bottom:16px}
-.cta-section p{font-size:1.05rem;opacity:.9;margin:0 auto 36px;max-width:520px;line-height:1.7}
-.btn-cta{display:inline-block;background:#fff;color:var(--p);font-weight:700;padding:18px 46px;border-radius:50px;text-decoration:none;font-size:1.05rem;box-shadow:0 4px 20px rgba(0,0,0,.15)}
-footer{background:#111827;color:#9ca3af;padding:60px 24px 32px}
-.footer__inner{max-width:1000px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:40px;margin-bottom:40px}
-.footer__col h4{color:#fff;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
-.footer__col a{display:block;color:#9ca3af;text-decoration:none;font-size:.85rem;margin-bottom:10px}
+.faq-a{display:none;padding:0 24px 20px;color:var(--m);line-height:1.75;font-size:.9rem;background:#fff}
+/* CTA */
+.cta-section{background:var(--dark);color:#fff;text-align:center;padding:88px 24px;position:relative;overflow:hidden}
+.cta-section::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 70% 80% at 50% 110%,rgba(37,99,235,.3) 0%,transparent 70%)}
+.cta-section h2{font-size:clamp(1.8rem,3vw,2.5rem);font-weight:800;margin-bottom:16px;letter-spacing:-.03em;position:relative}
+.cta-section p{font-size:1rem;color:#94a3b8;margin:0 auto 40px;max-width:480px;line-height:1.75;position:relative}
+.btn-cta{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:18px 44px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(37,99,235,.4);position:relative;transition:all .15s}
+.btn-cta:hover{background:#1d4ed8;transform:translateY(-1px)}
+/* FOOTER */
+footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
+.footer__inner{max-width:1040px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:40px;padding-bottom:40px}
+.footer__col h4{color:#e2e8f0;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px}
+.footer__col a{display:block;color:#94a3b8;text-decoration:none;font-size:.85rem;margin-bottom:10px;transition:color .1s}
 .footer__col a:hover{color:#fff}
-.footer__bottom{max-width:1000px;margin:0 auto;padding-top:24px;border-top:1px solid #374151;font-size:.8rem}
-@media(max-width:600px){.stats-bar__grid{gap:32px}.footer__inner{flex-direction:column;gap:24px}}
+.footer__logo{font-weight:800;font-size:1rem;color:#fff;margin-bottom:10px}
+.footer__tagline{font-size:.82rem;color:#64748b;line-height:1.5;max-width:220px}
+.footer__bottom{max-width:1040px;margin:0 auto;padding-top:24px;border-top:1px solid #334155;font-size:.78rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(max-width:640px){.stat{padding:0 24px;border-right:none;border-bottom:1px solid #e2e8f0;padding-bottom:24px;margin-bottom:8px}.stat:last-child{border-bottom:none}.steps-grid{grid-template-columns:1fr}.footer__inner{flex-direction:column;gap:28px}}
 """
 
     return f"""<!DOCTYPE html>
@@ -497,14 +520,15 @@ footer{background:#111827;color:#9ca3af;padding:60px 24px 32px}
 <body>
 
 <nav class="nav">
-  <a class="nav__brand" href="/">Présence IA</a>
+  <a class="nav__brand" href="/"><span class="nav__brand-dot"></span>Présence IA</a>
   <a class="nav__cta" href="#contact">Tester ma visibilité</a>
 </nav>
 
 <div class="hero">
+  <div class="hero__badge">⚡ Audit IA — Rapport en 48h</div>
   <h1>{hero_title}</h1>
   <p>{hero_subtitle}</p>
-  <a class="btn-hero" href="#contact">{hero_cta}</a>
+  <a class="btn-hero" href="#contact">{hero_cta} <span class="btn-hero-arrow">→</span></a>
 </div>
 
 <div class="stats-bar">
@@ -517,6 +541,7 @@ footer{background:#111827;color:#9ca3af;padding:60px 24px 32px}
 
 <div class="section section--alt" id="how">
   <div class="container">
+    <p class="section__eyebrow">Méthodologie</p>
     <h2 class="section__title">Comment fonctionne l'audit</h2>
     <p class="section__sub">Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché.</p>
     <div class="steps-grid">{steps_html}</div>
@@ -525,6 +550,7 @@ footer{background:#111827;color:#9ca3af;padding:60px 24px 32px}
 
 <div class="section" id="faq">
   <div class="container">
+    <p class="section__eyebrow">FAQ</p>
     <h2 class="section__title">Questions fréquentes</h2>
     <div class="faq-list">{faq_html}</div>
   </div>
