@@ -1015,21 +1015,19 @@ tr:hover{{background:#fafafa}}
       <div class="form-group">
         <label>Ville</label>
         <select id="txt-city" onchange="loadTexts()">
-          <option value="">— choisir —</option>
-          {"".join(f'<option value="{c}">{c.capitalize()}</option>' for c in all_cities)}
+          {"".join(f'<option value="{c}" {"selected" if c == all_cities[0] else ""}>{c.capitalize()}</option>' for c in all_cities) if all_cities else '<option value="">— choisir —</option>'}
         </select>
       </div>
       <div class="form-group">
         <label>Métier</label>
         <select id="txt-prof" onchange="loadTexts()">
-          <option value="">— choisir —</option>
-          {"".join(f'<option value="{p}">{p}</option>' for p in all_professions)}
+          {"".join(f'<option value="{p}" {"selected" if p == all_professions[0] else ""}>{p}</option>' for p in all_professions) if all_professions else '<option value="">— choisir —</option>'}
         </select>
       </div>
     </div>
   </div>
 
-  <div id="txt-editor" style="display:none">
+  <div id="txt-editor" style="display:{"block" if all_cities and all_professions else "none"}">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
       <div class="card">
         <h3 style="font-size:.9rem;font-weight:700;margin-bottom:16px">Textes de la landing</h3>
@@ -1090,6 +1088,14 @@ tr:hover{{background:#fafafa}}
 <script>
 const TOKEN = "{api_token}";
 
+// Auto-charger les textes si on est sur l'onglet textes et qu'une paire est dispo
+if ("{tab}" === "textes") {{ loadTextsOnce(); }}
+function loadTextsOnce() {{
+  const c = document.getElementById('txt-city');
+  const p = document.getElementById('txt-prof');
+  if (c && c.value && p && p.value) loadTexts();
+}}
+
 function applyFilter() {{
   const v = document.getElementById('f-ville').value;
   const e = document.getElementById('f-email').checked ? '1' : '';
@@ -1138,8 +1144,8 @@ async function bulkSendSelected(method, isTest) {{
     `${{d.test_mode ? '🧪 TEST' : '✉'}} ${{selected.length}} envois planifiés · ${{d.note}}`;
 }}
 
-const DEFAULT_EMAIL_TPL = `Bonjour,\n\nJe travaille sur la visibilité des {{profession}}s dans les intelligences artificielles (ChatGPT, Gemini, Claude).\n\nJ'ai effectué un test pour votre entreprise à {{city}} — le résultat vous concerne directement.\n\nAccès à votre rapport personnalisé : {{landing_url}}\n\nCordialement,\nPrésence IA — contact@presence-ia.com`;
-const DEFAULT_SMS_TPL = `Bonjour, test visibilité IA effectué pour votre entreprise à {{city}}. Rapport : {{landing_url}} - Présence IA. STOP: contact@presence-ia.com`;
+const DEFAULT_EMAIL_TPL = {json.dumps(_DEFAULT_EMAIL_TEMPLATE)};
+const DEFAULT_SMS_TPL = {json.dumps(_DEFAULT_SMS_TEMPLATE)};
 
 async function loadTexts() {{
   const city = document.getElementById('txt-city').value;
