@@ -24,19 +24,24 @@ from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 
 import requests as http_req
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi import APIRouter, Cookie, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from ...models import V3ProspectDB, V3CityImageDB
+from ...models import V3ProspectDB, V3CityImageDB, V3LandingTextDB
 from ...database import SessionLocal
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-CALENDLY_URL = "https://calendly.com/contact-presence-ia/30min"
-BASE_URL     = os.getenv("BASE_URL", "https://presence-ia.com")
-UPLOADS_DIR  = Path(os.getenv("UPLOADS_DIR", "/opt/presence-ia/dist/uploads"))
+CALENDLY_URL  = "https://calendly.com/contact-presence-ia/30min"
+BASE_URL      = os.getenv("BASE_URL", "https://presence-ia.com")
+UPLOADS_DIR   = Path(os.getenv("UPLOADS_DIR", "/opt/presence-ia/dist/uploads"))
+
+# Cookie d'authentification admin — mot de passe "zorbec"
+_ADMIN_PASSWORD   = os.getenv("ADMIN_PASSWORD", "zorbec")
+_ADMIN_COOKIE_KEY = "v3admin"
+_ADMIN_COOKIE_VAL = hashlib.sha256(_ADMIN_PASSWORD.encode()).hexdigest()
 
 _PHONE_FR_RE   = re.compile(r'(?:(?:\+|00)33[\s.\-]?|0)[1-9](?:[\s.\-]?\d{2}){4}')
 _EMAIL_RE      = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
@@ -66,8 +71,16 @@ def _make_token(name: str, city: str, profession: str) -> str:
 def _city_image_key(city: str) -> str:
     return city.lower().strip()
 
-def _require_admin(token: str):
-    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+def _check_admin(token: str = "", request: Request = None) -> bool:
+    """Renvoie True si authentifié (token param OU cookie)."""
+    if token == os.getenv("ADMIN_TOKEN", "changeme"):
+        return True
+    if request and request.cookies.get(_ADMIN_COOKIE_KEY) == _ADMIN_COOKIE_VAL:
+        return True
+    return False
+
+def _require_admin(token: str = "", request: Request = None):
+    if not _check_admin(token, request):
         raise HTTPException(403, "Accès refusé")
 
 def _normalize_phone(phone: str) -> str:
@@ -170,7 +183,10 @@ def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str) -> b
             },
             timeout=10,
         )
-        return resp.status_code == 201
+        if resp.status_code == 201:
+            return True
+        log.error("Brevo email status=%s body=%s", resp.status_code, resp.text[:300])
+        return False
     except Exception as e:
         log.error("Brevo email error: %s", e)
         return False
@@ -189,7 +205,10 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
                   "content": message, "type": "transactional"},
             timeout=10,
         )
-        return resp.status_code == 201
+        if resp.status_code == 201:
+            return True
+        log.error("Brevo SMS status=%s body=%s", resp.status_code, resp.text[:300])
+        return False
     except Exception as e:
         log.error("Brevo SMS error: %s", e)
         return False
@@ -393,6 +412,64 @@ footer a{{color:var(--g3)}}
 </body></html>"""
 
 
+# ── Authentification admin ────────────────────────────────────────────────────
+
+@router.get("/login/v3", response_class=HTMLResponse)
+def login_v3_page(request: Request):
+    if _check_admin(request=request):
+        return RedirectResponse("/admin/v3", status_code=302)
+    return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion — Présence IA</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f4ff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:14px;padding:48px 40px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;margin-bottom:6px}
+.sub{color:#666;font-size:.88rem;margin-bottom:32px}
+label{display:block;font-size:.78rem;font-weight:600;color:#444;margin-bottom:6px;margin-top:16px}
+input[type=password]{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.95rem;outline:none;transition:border .15s}
+input[type=password]:focus{border-color:#2563eb}
+button{margin-top:24px;width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;transition:background .15s}
+button:hover{background:#1d4ed8}
+.err{color:#dc2626;font-size:.82rem;margin-top:10px;display:none}
+</style></head><body>
+<div class="card">
+  <h1>Présence<span style="color:#2563eb">IA</span></h1>
+  <p class="sub">Admin V3 — Accès réservé</p>
+  <form method="POST" action="/login/v3">
+    <label for="pwd">Mot de passe</label>
+    <input type="password" name="password" id="pwd" autofocus autocomplete="current-password">
+    <button type="submit">Connexion</button>
+  </form>
+  <p class="err" id="err">Mot de passe incorrect.</p>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+if (params.get('err')) document.getElementById('err').style.display='block';
+</script>
+</body></html>""")
+
+
+@router.post("/login/v3")
+async def login_v3(request: Request):
+    form = await request.form()
+    password = form.get("password", "")
+    if hashlib.sha256(password.encode()).hexdigest() == _ADMIN_COOKIE_VAL:
+        resp = RedirectResponse("/admin/v3", status_code=302)
+        resp.set_cookie(_ADMIN_COOKIE_KEY, _ADMIN_COOKIE_VAL,
+                        httponly=True, samesite="lax", max_age=60*60*24*30)
+        return resp
+    return RedirectResponse("/login/v3?err=1", status_code=302)
+
+
+@router.get("/logout/v3")
+def logout_v3():
+    resp = RedirectResponse("/login/v3", status_code=302)
+    resp.delete_cookie(_ADMIN_COOKIE_KEY)
+    return resp
+
+
 # ── Route publique ────────────────────────────────────────────────────────────
 
 @router.get("/l/{token}", response_class=HTMLResponse)
@@ -418,13 +495,16 @@ def landing_v3(token: str):
 
 @router.get("/admin/v3", response_class=HTMLResponse)
 def admin_v3(
+    request: Request,
     token: str = "",
     tab: str = "prospects",
     f_ville: str = "",
     f_email: str = "",
     f_phone: str = "",
 ):
-    _require_admin(token)
+    _require_admin(token, request)
+    # Token pour les appels API JS (embedded dans la page, pas dans l'URL)
+    api_token = token or os.getenv("ADMIN_TOKEN", "changeme")
     with SessionLocal() as db:
         all_rows = db.query(V3ProspectDB).order_by(V3ProspectDB.city, V3ProspectDB.name).all()
         city_images = db.query(V3CityImageDB).order_by(V3CityImageDB.id).all()
@@ -518,6 +598,7 @@ def admin_v3(
         avis_str   = str(r.reviews_count) if r.reviews_count else "—"
 
         table_rows += f"""<tr id="row-{r.token}">
+          <td><input type="checkbox" class="prospect-cb" value="{r.token}"></td>
           <td style="font-size:.85rem"><strong>{r.name}</strong></td>
           <td style="font-size:.82rem">{r.city}</td>
           <td style="font-size:.82rem">{r.profession}</td>
@@ -592,14 +673,15 @@ tr:hover{{background:#fafafa}}
 
 <div class="topbar">
   <h1>Présence<strong style="color:#93c5fd">IA</strong> · Admin V3</h1>
-  <a href="/admin?token={token}">← Admin principal</a>
-  <a href="/api/v3/prospects.csv?token={token}" class="btn btn-primary btn-sm" style="margin-left:auto;text-decoration:none">⬇ CSV</a>
+  <a href="/admin?token={api_token}">← Admin principal</a>
+  <a href="/logout/v3" style="margin-left:auto;color:rgba(255,255,255,.5);font-size:.8rem">Déconnexion</a>
+  <a href="#" onclick="downloadCSV()" class="btn btn-primary btn-sm" style="text-decoration:none">⬇ CSV</a>
 </div>
 
 <div class="tabs">
-  <a class="tab {t1}" href="/admin/v3?token={token}&tab=prospects">👥 Prospects</a>
-  <a class="tab {t2}" href="/admin/v3?token={token}&tab=images">🖼 Images & Vidéos</a>
-  <a class="tab {t3}" href="/admin/v3?token={token}&tab=textes">✏️ Textes</a>
+  <a class="tab {t1}" href="/admin/v3?tab=prospects">👥 Prospects</a>
+  <a class="tab {t2}" href="/admin/v3?tab=images">🖼 Images & Vidéos</a>
+  <a class="tab {t3}" href="/admin/v3?tab=textes">✏️ Textes</a>
 </div>
 
 <div class="container">
@@ -656,8 +738,11 @@ tr:hover{{background:#fafafa}}
         <button class="btn btn-sm" onclick="scrapeAll()" title="Récupère emails/tels/URLs contact depuis les sites web">🔎 Scraper</button>
         <button class="btn btn-sm" onclick="bulkSend('email', true)" title="Test : envoie tous les messages à votre adresse email">🧪 Test email</button>
         <button class="btn btn-sm" onclick="bulkSend('sms', true)" title="Test : envoie tous les SMS à votre numéro">🧪 Test SMS</button>
-        <button class="btn btn-primary btn-sm" onclick="bulkSend('email', false)" title="Envoie à tous les prospects avec email (1 par minute)">✉ Email à tous</button>
-        <button class="btn btn-primary btn-sm" onclick="bulkSend('sms', false)">💬 SMS à tous</button>
+        <button class="btn btn-sm" onclick="bulkSendSelected('email', true)" title="Test sur la sélection">🧪 Test sélection ✉</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSendSelected('email', false)" title="Envoie aux prospects sélectionnés avec email">✉ Sélection</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSendSelected('sms', false)" title="SMS aux prospects sélectionnés">💬 Sélection</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSend('email', false)" title="Envoie à TOUS les prospects avec email (1 par minute)">✉ Tous</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkSend('sms', false)">💬 Tous</button>
       </div>
     </div>
 
@@ -666,6 +751,7 @@ tr:hover{{background:#fafafa}}
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
+          <th style="width:32px"><input type="checkbox" id="cb-all" onclick="toggleAll(this)" title="Sélectionner tout"></th>
           <th>Nom</th><th>Ville</th><th>Métier</th><th>Téléphone</th><th>Email</th>
           <th>Note</th><th>Avis</th><th>Statut</th><th>Actions</th>
         </tr></thead>
@@ -701,24 +787,171 @@ tr:hover{{background:#fafafa}}
 
 <!-- ── Onglet Textes ── -->
 <div class="panel {"active" if tab=="textes" else ""}">
-  <div class="card" style="text-align:center;padding:48px">
-    <p style="color:#999;font-size:.9rem">Édition des textes de la landing — à venir prochainement.</p>
+  <div class="card" style="margin-bottom:16px">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:12px">Éditer les textes de la landing</h2>
+    <p style="font-size:.83rem;color:#666;margin-bottom:16px">Sélectionnez une paire ville / métier pour personnaliser les textes et voir les preuves IA disponibles.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div class="form-group">
+        <label>Ville</label>
+        <select id="txt-city" onchange="loadTexts()">
+          <option value="">— choisir —</option>
+          {"".join(f'<option value="{c}">{c.capitalize()}</option>' for c in all_cities)}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Métier</label>
+        <select id="txt-prof" onchange="loadTexts()">
+          <option value="">— choisir —</option>
+          {"".join(f'<option value="{p}">{p}</option>' for p in all_professions)}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="txt-editor" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="card">
+        <h3 style="font-size:.9rem;font-weight:700;margin-bottom:16px">Textes de la landing</h3>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre hero (laisser vide = auto)</label>
+          <textarea id="txt-hero" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre hero</label>
+          <textarea id="txt-hero-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Titre CTA</label>
+          <input type="text" id="txt-cta" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem">
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Sous-titre CTA</label>
+          <textarea id="txt-cta-sub" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve texte (citation + source, une par ligne : "texte|source")</label>
+          <textarea id="txt-proofs" rows="4" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="Depuis que j'ai travaillé ma visibilité IA...|Jean D., plombier Lyon\n"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve vidéo (URL YouTube/Vimeo, une par ligne)</label>
+          <textarea id="txt-videos" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveTexts()">💾 Sauvegarder</button>
+        <span id="txt-save-status" style="font-size:.82rem;color:#16a34a;margin-left:10px"></span>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.9rem;font-weight:700;margin-bottom:16px">Preuves IA disponibles (captures d'écran)</h3>
+        <div id="txt-evidence" style="font-size:.82rem;color:#666">Sélectionnez une paire pour voir les captures.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <h3 style="font-size:.9rem;font-weight:700;margin-bottom:12px">Page d'accueil (home)</h3>
+    <p style="font-size:.83rem;color:#666">La page d'accueil présence-ia.com est en cours de développement. Les textes seront éditables ici.</p>
   </div>
 </div>
 
 </div><!-- /container -->
 
 <script>
-const TOKEN = "{token}";
+const TOKEN = "{api_token}";
 
 function applyFilter() {{
   const v = document.getElementById('f-ville').value;
   const e = document.getElementById('f-email').checked ? '1' : '';
   const p = document.getElementById('f-phone').checked ? '1' : '';
-  location.href = `/admin/v3?token=${{TOKEN}}&tab=prospects&f_ville=${{v}}&f_email=${{e}}&f_phone=${{p}}`;
+  location.href = `/admin/v3?tab=prospects&f_ville=${{v}}&f_email=${{e}}&f_phone=${{p}}`;
 }}
 function resetFilters() {{
-  location.href = `/admin/v3?token=${{TOKEN}}&tab=prospects`;
+  location.href = `/admin/v3?tab=prospects`;
+}}
+
+function downloadCSV() {{
+  window.location = `/api/v3/prospects.csv?token=${{TOKEN}}`;
+}}
+
+function toggleAll(cb) {{
+  document.querySelectorAll('.prospect-cb').forEach(c => c.checked = cb.checked);
+}}
+function getSelected() {{
+  return [...document.querySelectorAll('.prospect-cb:checked')].map(c => c.value);
+}}
+async function bulkSendSelected(method, isTest) {{
+  const selected = getSelected();
+  if (!selected.length) {{ alert('Sélectionnez au moins un prospect.'); return; }}
+  let testEmail = null, testPhone = null;
+  if (isTest) {{
+    if (method === 'email') {{
+      testEmail = prompt('Email de test :');
+      if (!testEmail) return;
+    }} else {{
+      testPhone = prompt('Numéro de test :');
+      if (!testPhone) return;
+    }}
+  }} else {{
+    if (!confirm(`Envoyer ${{method === 'email' ? 'email' : 'SMS'}} aux ${{selected.length}} prospect(s) sélectionné(s) ?`)) return;
+  }}
+  const body = {{method, delay_seconds: isTest ? 3 : 60, prospect_tokens: selected}};
+  if (testEmail) body.test_email = testEmail;
+  if (testPhone) body.test_phone = testPhone;
+  const r = await fetch(`/api/v3/bulk-send?token=${{TOKEN}}`, {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(body)
+  }});
+  const d = await r.json();
+  document.getElementById('bulk-progress').style.display = 'block';
+  document.getElementById('bulk-progress').textContent =
+    `${{d.test_mode ? '🧪 TEST' : '✉'}} ${{selected.length}} envois planifiés · ${{d.note}}`;
+}}
+
+async function loadTexts() {{
+  const city = document.getElementById('txt-city').value;
+  const prof = document.getElementById('txt-prof').value;
+  if (!city || !prof) {{ document.getElementById('txt-editor').style.display='none'; return; }}
+  document.getElementById('txt-editor').style.display='block';
+  const r = await fetch(`/api/v3/landing-text/${{encodeURIComponent(city)}}/${{encodeURIComponent(prof)}}?token=${{TOKEN}}`);
+  const d = await r.json();
+  document.getElementById('txt-hero').value = d.hero_headline || '';
+  document.getElementById('txt-hero-sub').value = d.hero_subtitle || '';
+  document.getElementById('txt-cta').value = d.cta_headline || '';
+  document.getElementById('txt-cta-sub').value = d.cta_subtitle || '';
+  const proofs = (d.proof_texts || []).map(p => `${{p.text}}|${{p.source}}`).join('\n');
+  document.getElementById('txt-proofs').value = proofs;
+  document.getElementById('txt-videos').value = (d.proof_videos || []).map(v => v.url).join('\n');
+  // Evidence screenshots
+  const evEl = document.getElementById('txt-evidence');
+  if (d.evidence && d.evidence.length) {{
+    evEl.innerHTML = d.evidence.map(e =>
+      `<div style="margin-bottom:12px"><img src="${{e.processed_url || e.url}}" style="max-width:100%;border-radius:6px;border:1px solid #eee">
+      <div style="font-size:.75rem;color:#999;margin-top:4px">${{e.provider}} — ${{e.ts ? e.ts.slice(0,16) : ''}}</div></div>`
+    ).join('');
+  }} else {{
+    evEl.innerHTML = '<p style="color:#999">Aucune capture d\'écran pour cette paire. Utilisez le refresh-IA ou uploadez des preuves.</p>';
+  }}
+}}
+async function saveTexts() {{
+  const city = document.getElementById('txt-city').value;
+  const prof = document.getElementById('txt-prof').value;
+  const proofsRaw = document.getElementById('txt-proofs').value.split('\n').filter(l => l.trim());
+  const proofs = proofsRaw.map(l => {{ const [text, source] = l.split('|'); return {{text: (text||'').trim(), source: (source||'').trim()}}; }});
+  const videos = document.getElementById('txt-videos').value.split('\n').filter(l => l.trim()).map(url => ({{url: url.trim()}}));
+  const body = {{
+    city, profession: prof,
+    hero_headline: document.getElementById('txt-hero').value,
+    hero_subtitle: document.getElementById('txt-hero-sub').value,
+    cta_headline: document.getElementById('txt-cta').value,
+    cta_subtitle: document.getElementById('txt-cta-sub').value,
+    proof_texts: proofs, proof_videos: videos,
+  }};
+  const r = await fetch(`/api/v3/landing-text?token=${{TOKEN}}`, {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(body)
+  }});
+  const d = await r.json();
+  const st = document.getElementById('txt-save-status');
+  st.textContent = d.ok ? '✓ Sauvegardé' : '✗ Erreur';
+  setTimeout(() => st.textContent = '', 3000);
 }}
 
 function copyMsg(tok) {{
@@ -869,6 +1102,17 @@ class BulkSendRequest(BaseModel):
     max_per_day: int = 50
     test_email: Optional[str] = None  # Mode test : envoie ici au lieu du vrai email
     test_phone: Optional[str] = None  # Mode test : envoie ici au lieu du vrai tel
+    prospect_tokens: Optional[List[str]] = None  # Si fourni, envoie uniquement à ces tokens
+
+
+class LandingTextRequest(BaseModel):
+    city: str; profession: str
+    hero_headline: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    cta_headline: Optional[str] = None
+    cta_subtitle: Optional[str] = None
+    proof_texts: Optional[List[dict]] = None   # [{text, source}]
+    proof_videos: Optional[List[dict]] = None  # [{url}]
 
 
 @router.post("/api/v3/generate")
@@ -997,6 +1241,50 @@ def delete_city_image(city_id: str, token: str = ""):
     return {"ok": True}
 
 
+@router.get("/api/v3/landing-text/{city}/{profession}")
+def get_landing_text(city: str, profession: str, token: str = "", request: Request = None):
+    _require_admin(token, request)
+    from ...models import CityEvidenceDB
+    lt_id = f"{city.lower().strip()}_{profession.lower().strip()}"
+    with SessionLocal() as db:
+        lt = db.get(V3LandingTextDB, lt_id)
+        evidence = db.query(CityEvidenceDB).filter_by(
+            city=city.lower().strip(), profession=profession.lower().strip()
+        ).first()
+    ev_list = []
+    if evidence and evidence.images:
+        imgs = json.loads(evidence.images) if isinstance(evidence.images, str) else evidence.images
+        ev_list = imgs[:6]  # max 6 captures
+    return {
+        "hero_headline": lt.hero_headline if lt else None,
+        "hero_subtitle": lt.hero_subtitle if lt else None,
+        "cta_headline":  lt.cta_headline  if lt else None,
+        "cta_subtitle":  lt.cta_subtitle  if lt else None,
+        "proof_texts":   json.loads(lt.proof_texts)  if lt and lt.proof_texts  else [],
+        "proof_videos":  json.loads(lt.proof_videos) if lt and lt.proof_videos else [],
+        "evidence":      ev_list,
+    }
+
+
+@router.post("/api/v3/landing-text")
+async def save_landing_text(req: LandingTextRequest, token: str = "", request: Request = None):
+    _require_admin(token, request)
+    lt_id = f"{req.city.lower().strip()}_{req.profession.lower().strip()}"
+    with SessionLocal() as db:
+        lt = db.get(V3LandingTextDB, lt_id)
+        if not lt:
+            lt = V3LandingTextDB(id=lt_id, city=req.city, profession=req.profession)
+            db.add(lt)
+        lt.hero_headline = req.hero_headline or None
+        lt.hero_subtitle = req.hero_subtitle or None
+        lt.cta_headline  = req.cta_headline  or None
+        lt.cta_subtitle  = req.cta_subtitle  or None
+        lt.proof_texts   = json.dumps(req.proof_texts,  ensure_ascii=False) if req.proof_texts  else None
+        lt.proof_videos  = json.dumps(req.proof_videos, ensure_ascii=False) if req.proof_videos else None
+        db.commit()
+    return {"ok": True}
+
+
 @router.post("/api/v3/prospect/{tok}/send-email")
 async def send_email_prospect(tok: str, request: Request):
     body = await request.json()
@@ -1044,16 +1332,24 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
     test_mode = bool(req.test_email or req.test_phone)
 
     with SessionLocal() as db:
-        if req.method == "email":
-            prospects = db.query(V3ProspectDB).filter(
-                V3ProspectDB.email.isnot(None),
-                *([V3ProspectDB.sent_at.is_(None)] if not test_mode else []),
-            ).limit(req.max_per_day).all()
+        q_email = V3ProspectDB.email.isnot(None)
+        q_phone = V3ProspectDB.phone.isnot(None)
+        q_unsent = [] if test_mode else [V3ProspectDB.sent_at.is_(None)]
+        if req.prospect_tokens:
+            # Sélection manuelle
+            if req.method == "email":
+                prospects = db.query(V3ProspectDB).filter(
+                    V3ProspectDB.token.in_(req.prospect_tokens), q_email
+                ).all()
+            else:
+                prospects = db.query(V3ProspectDB).filter(
+                    V3ProspectDB.token.in_(req.prospect_tokens), q_phone
+                ).all()
         else:
-            prospects = db.query(V3ProspectDB).filter(
-                V3ProspectDB.phone.isnot(None),
-                *([V3ProspectDB.sent_at.is_(None)] if not test_mode else []),
-            ).limit(req.max_per_day).all()
+            if req.method == "email":
+                prospects = db.query(V3ProspectDB).filter(q_email, *q_unsent).limit(req.max_per_day).all()
+            else:
+                prospects = db.query(V3ProspectDB).filter(q_phone, *q_unsent).limit(req.max_per_day).all()
         tokens = [(p.token, p.name, p.city, p.profession, p.email, p.phone, p.landing_url)
                   for p in prospects]
 

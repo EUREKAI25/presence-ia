@@ -345,6 +345,21 @@ class V3CityImageDB(Base):
     updated_at: Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class V3LandingTextDB(Base):
+    """Textes éditables de la landing V3 par paire ville+métier."""
+    __tablename__ = "v3_landing_texts"
+    id:            Mapped[str] = mapped_column(sa.String, primary_key=True)  # "{city}_{profession}"
+    city:          Mapped[str] = mapped_column(sa.String, nullable=False)
+    profession:    Mapped[str] = mapped_column(sa.String, nullable=False)
+    hero_headline: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    hero_subtitle: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    cta_headline:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    cta_subtitle:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    proof_texts:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{text, source}]
+    proof_videos:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{url, caption}]
+    updated_at:    Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
