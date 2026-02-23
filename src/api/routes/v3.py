@@ -2076,7 +2076,7 @@ def clean_prospect_names(token: str = "", request: Request = None):
     with SessionLocal() as db:
         prospects = db.query(V3ProspectDB).all()
         for p in prospects:
-            cleaned = _clean_name(p.name or "")
+            cleaned = _clean_name(p.name or "", city=p.city or "")
             if cleaned != p.name:
                 updated.append({"token": p.token, "before": p.name, "after": cleaned})
                 p.name = cleaned

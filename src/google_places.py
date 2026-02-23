@@ -10,26 +10,6 @@ import requests
 log = logging.getLogger(__name__)
 
 _TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-
-# Séparateurs marketing courants dans les noms Google Places
-_NAME_SEPARATORS = re.compile(
-    r'\s*[➽➜►▶→|·—–]\s*'          # flèches et barres
-    r'|\s+[\u2600-\u27ff\U0001f000-\U0001ffff✨⭐🔥💎]\s+'  # emoji entouré d'espaces
-    r'|\s+-\s+(?=[A-Z])'             # tiret suivi d'une majuscule
-)
-# Emojis et caractères décoratifs en fin de nom
-_TRAILING_JUNK   = re.compile(r'[\s\u2000-\u206f\u2600-\u27ff\U0001f000-\U0001ffff✨⭐🔥💎]+$')
-
-
-def _clean_name(name: str) -> str:
-    """Garde uniquement la partie commerciale du nom (avant séparateurs marketing)."""
-    if not name:
-        return name
-    # Couper sur le premier séparateur fort
-    part = _NAME_SEPARATORS.split(name)[0]
-    # Supprimer emojis/décorations en fin
-    part = _TRAILING_JUNK.sub("", part).strip()
-    return part or name
 _DETAILS_URL     = "https://maps.googleapis.com/maps/api/place/details/json"
 _DETAIL_FIELDS   = "name,website,formatted_phone_number,user_ratings_total,rating"
 
@@ -37,6 +17,61 @@ _DETAIL_FIELDS   = "name,website,formatted_phone_number,user_ratings_total,ratin
 _EMPTY_STATUSES = {"ZERO_RESULTS"}
 # Statuts OK
 _OK_STATUSES    = {"OK"}
+
+# ── Nettoyage des noms Google Places ──────────────────────────────────────
+
+# Séparateurs marketing forts (flèches, barres, emoji entouré d'espaces, tiret+majuscule)
+_NAME_SEP = re.compile(
+    r'\s*[➽➜►▶→|·—–]\s*'
+    r'|\s+[\u2600-\u27ff\U0001f000-\U0001ffff✨⭐🔥💎]\s+'
+    r'|\s+-\s+(?=[A-Z])'
+)
+# Emojis/décorations en fin de chaîne
+_TRAILING_JUNK = re.compile(r'[\s\u2000-\u206f\u2600-\u27ff\U0001f000-\U0001ffff✨⭐🔥💎]+$')
+# Fragments d'adresse (Route de X, Rue X, etc.)
+_ADDRESS_TAIL = re.compile(
+    r'\s+(?:Route|Rue|Avenue|Av\.|Boulevard|Bd|Allée|Impasse|ZA|ZI|Zone(?:\s+\w+)?)\b.*$',
+    re.IGNORECASE,
+)
+# Articles/conjonctions français : on ne coupe PAS le nom quand le tail commence par eux
+_FR_CONNECTORS = re.compile(r'^(?:et|de|du|des|de\s+la|au|aux|le|la|les)\s', re.IGNORECASE)
+
+
+def _clean_name(name: str, city: str = "") -> str:
+    """
+    Garde uniquement la partie commerciale du nom.
+    Applique par ordre :
+      1. Séparateurs marketing forts (➽, |, ·, —, emoji…)
+      2. Référence à la ville ("à Montpellier", "Nantes Route de…")
+      3. Fragments d'adresse (Route de, Rue, Boulevard…)
+      4. Descriptif de service en minuscules (≥ 2 mots, hors articles/conjonctions)
+    """
+    if not name:
+        return name
+
+    part = name
+
+    # 1. Séparateurs forts
+    part = _NAME_SEP.split(part)[0]
+    part = _TRAILING_JUNK.sub("", part).strip()
+
+    # 2. Ville : "à {city}" ou "{city}" en fin/milieu, + tout ce qui suit
+    if city:
+        c = re.escape(city.strip())
+        part = re.sub(rf'\s+(?:à\s+)?{c}\b.*$', '', part, flags=re.IGNORECASE).strip()
+
+    # 3. Adresse
+    part = _ADDRESS_TAIL.sub("", part).strip()
+
+    # 4. Queue descriptive en minuscules (≥ 2 mots, sauf si elle commence par un connecteur)
+    #    ex: "rénovation de piscine" → supprimé ; "et salles de bains" → conservé
+    m = re.search(r'(\s+[a-zàâéèêëîïôùûüçœæ]\S*)(\s+\S+)+$', part)
+    if m:
+        tail = m.group(0).strip()
+        if not _FR_CONNECTORS.match(tail):
+            part = part[: m.start()].strip()
+
+    return part or name
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -115,7 +150,7 @@ def search_prospects(profession: str, city: str, api_key: str,
             break
 
         place_id = place.get("place_id", "")
-        name     = _clean_name(place.get("name", ""))
+        name     = _clean_name(place.get("name", ""), city=city)
 
         try:
             details = fetch_place_details(place_id, api_key)
