@@ -22,12 +22,18 @@ def init_db():
     # Migration colonnes ajoutées après création initiale
     from sqlalchemy import text
     with ENGINE.connect() as conn:
-        for col in [
-            "email TEXT", "proof_image_url TEXT", "city_image_url TEXT",
-            "paid INTEGER DEFAULT 0", "stripe_session_id TEXT",
+        for tbl, col in [
+            ("prospects", "email TEXT"),
+            ("prospects", "proof_image_url TEXT"),
+            ("prospects", "city_image_url TEXT"),
+            ("prospects", "paid INTEGER DEFAULT 0"),
+            ("prospects", "stripe_session_id TEXT"),
+            ("v3_landing_text", "email_subject TEXT"),
+            ("v3_landing_text", "budget_min TEXT"),
+            ("v3_landing_text", "budget_max TEXT"),
         ]:
             try:
-                conn.execute(text(f"ALTER TABLE prospects ADD COLUMN {col}"))
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col}"))
             except Exception:
                 pass
         conn.commit()
