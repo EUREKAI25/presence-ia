@@ -92,23 +92,51 @@ def _normalize_phone(phone: str) -> str:
         p = "+33" + p[1:]
     return p
 
-def _contact_message(name: str, city: str, profession: str, landing_url: str) -> str:
-    return (
-        f"Bonjour,\n\n"
-        f"Je travaille sur la visibilité des {profession}s dans les intelligences artificielles "
-        f"(ChatGPT, Gemini, Claude).\n\n"
-        f"J'ai effectué un test pour votre entreprise à {city} — "
-        f"le résultat vous concerne directement.\n\n"
-        f"Accès à votre rapport personnalisé : {landing_url}\n\n"
-        f"Cordialement,\n"
-        f"Présence IA — contact@presence-ia.com"
-    )
+_DEFAULT_EMAIL_TEMPLATE = (
+    "Bonjour,\n\n"
+    "Je travaille sur la visibilité des {profession}s dans les intelligences artificielles "
+    "(ChatGPT, Gemini, Claude).\n\n"
+    "J'ai effectué un test pour votre entreprise à {city} — "
+    "le résultat vous concerne directement.\n\n"
+    "Accès à votre rapport personnalisé : {landing_url}\n\n"
+    "Cordialement,\n"
+    "Présence IA — contact@presence-ia.com"
+)
 
-def _contact_message_sms(name: str, city: str, landing_url: str) -> str:
-    return (
-        f"Bonjour, test visibilité IA effectué pour votre entreprise à {city}. "
-        f"Rapport : {landing_url} - Présence IA. STOP: contact@presence-ia.com"
-    )
+_DEFAULT_SMS_TEMPLATE = (
+    "Bonjour, test visibilité IA effectué pour votre entreprise à {city}. "
+    "Rapport : {landing_url} - Présence IA. STOP: contact@presence-ia.com"
+)
+
+def _contact_message(name: str, city: str, profession: str, landing_url: str,
+                     template: Optional[str] = None) -> str:
+    tpl = template or _DEFAULT_EMAIL_TEMPLATE
+    try:
+        return tpl.format(name=name, city=city, profession=profession, landing_url=landing_url)
+    except Exception:
+        return _DEFAULT_EMAIL_TEMPLATE.format(name=name, city=city, profession=profession, landing_url=landing_url)
+
+def _contact_message_sms(name: str, city: str, landing_url: str,
+                         template: Optional[str] = None) -> str:
+    tpl = template or _DEFAULT_SMS_TEMPLATE
+    try:
+        return tpl.format(name=name, city=city, landing_url=landing_url)
+    except Exception:
+        return _DEFAULT_SMS_TEMPLATE.format(name=name, city=city, landing_url=landing_url)
+
+
+def _youtube_embed(url: str) -> str:
+    """Convertit une URL YouTube/Vimeo en URL embed."""
+    if "youtube.com/watch?v=" in url:
+        vid = url.split("v=")[1].split("&")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    if "youtu.be/" in url:
+        vid = url.split("youtu.be/")[1].split("?")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    if "vimeo.com/" in url:
+        vid = url.rstrip("/").split("/")[-1]
+        return f"https://player.vimeo.com/video/{vid}"
+    return url
 
 
 # ── Scraping ──────────────────────────────────────────────────────────────────
@@ -217,40 +245,93 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 # ── IA test ───────────────────────────────────────────────────────────────────
 
 def _run_ia_test(profession: str, city: str) -> dict:
-    import openai
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        return {}
+    """Interroge ChatGPT, Gemini et Claude sur la même question. Retourne les 3 résultats."""
     prompt = (f"Quels {profession}s recommandes-tu à {city} ? "
               f"Cite les 3 meilleurs avec une courte description de chacun.")
+    results = []
+
+    # 1. ChatGPT
     try:
-        client = openai.OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=350, temperature=0.7,
-        )
-        return {"prompt": prompt, "response": resp.choices[0].message.content.strip(),
-                "model": "ChatGPT (gpt-4o-mini)", "tested_at": datetime.utcnow()}
+        import openai
+        key = os.getenv("OPENAI_API_KEY", "")
+        if key:
+            client = openai.OpenAI(api_key=key)
+            r = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=350, temperature=0.3,
+            )
+            results.append({"model": "ChatGPT", "prompt": prompt,
+                            "response": r.choices[0].message.content.strip(),
+                            "tested_at": datetime.utcnow().isoformat()})
     except Exception as e:
-        log.error("IA test error: %s", e)
+        log.error("IA test ChatGPT: %s", e)
+
+    # 2. Gemini
+    try:
+        import google.generativeai as genai  # type: ignore
+        key = os.getenv("GEMINI_API_KEY", "")
+        if key:
+            genai.configure(api_key=key)
+            gmodel = genai.GenerativeModel("gemini-1.5-flash")
+            r = gmodel.generate_content(prompt)
+            results.append({"model": "Gemini", "prompt": prompt,
+                            "response": r.text.strip(),
+                            "tested_at": datetime.utcnow().isoformat()})
+    except Exception as e:
+        log.error("IA test Gemini: %s", e)
+
+    # 3. Claude
+    try:
+        import anthropic  # type: ignore
+        key = os.getenv("ANTHROPIC_API_KEY", "")
+        if key:
+            client = anthropic.Anthropic(api_key=key)
+            r = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=350,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            results.append({"model": "Claude", "prompt": prompt,
+                            "response": r.content[0].text.strip(),
+                            "tested_at": datetime.utcnow().isoformat()})
+    except Exception as e:
+        log.error("IA test Claude: %s", e)
+
+    if not results:
         return {}
+
+    first = results[0]
+    return {
+        "results": results,                    # nouveau : les 3
+        "prompt": prompt,                      # compat
+        "response": first["response"],         # compat
+        "model":    first["model"],            # compat
+        "tested_at": datetime.fromisoformat(first["tested_at"]),  # compat
+    }
 
 
 # ── Landing HTML ──────────────────────────────────────────────────────────────
 
-def _render_landing(p: "V3ProspectDB", competitors: list, city_image_url: str) -> str:  # type: ignore
+def _render_landing(
+    p: "V3ProspectDB",  # type: ignore
+    competitors: list,
+    city_image_url: str,
+    ia_results_list: Optional[list] = None,
+    landing_text=None,       # V3LandingTextDB or None
+    evidence_images: Optional[list] = None,
+) -> str:
     name       = p.name
     city_cap   = p.city.capitalize()
     pro_label  = p.profession.lower()
     pro_plural = pro_label + "s" if not pro_label.endswith("s") else pro_label
 
-    # Concurrents
-    c = competitors[:3]
+    # ── Concurrents (fallback si liste courte) ────────────────────────────
+    c = list(competitors[:3])
     while len(c) < 3:
         c.append("un concurrent local")
 
-    # Note Google
+    # ── Note Google ───────────────────────────────────────────────────────
     rating_html = ""
     if p.rating or p.reviews_count:
         stars = "★" * round(p.rating or 0) + "☆" * (5 - round(p.rating or 0))
@@ -261,26 +342,80 @@ def _render_landing(p: "V3ProspectDB", competitors: list, city_image_url: str) -
             f'</div>'
         )
 
-    # Chat demo
-    if p.ia_response:
+    # ── Construire ia_results_list depuis ia_results JSON si pas fourni ──
+    if not ia_results_list:
+        ia_results_list = []
+        if hasattr(p, "ia_results") and p.ia_results:
+            try:
+                ia_results_list = json.loads(p.ia_results)
+            except Exception:
+                pass
+        if not ia_results_list and p.ia_response:
+            ia_results_list = [{
+                "model":     p.ia_model or "ChatGPT",
+                "prompt":    p.ia_prompt or f"Quels {pro_label}s recommandes-tu à {city_cap} ?",
+                "response":  p.ia_response,
+                "tested_at": p.ia_tested_at.isoformat() if isinstance(p.ia_tested_at, datetime)
+                             else str(p.ia_tested_at) if p.ia_tested_at else None,
+            }]
+
+    # ── Stats réelles ─────────────────────────────────────────────────────
+    n_ia = len(ia_results_list) if ia_results_list else 3
+    n_competitors = len([x for x in competitors if x])
+    last_test_date = ""
+    if ia_results_list:
+        ts_raw = ia_results_list[0].get("tested_at", "")
+        if ts_raw:
+            try:
+                last_test_date = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m/%Y")
+            except Exception:
+                last_test_date = str(ts_raw)[:10]
+    elif p.ia_tested_at:
+        dt = p.ia_tested_at if isinstance(p.ia_tested_at, datetime) else datetime.fromisoformat(str(p.ia_tested_at))
+        last_test_date = dt.strftime("%d/%m/%Y")
+
+    ia_label_txt = "IA testée" if n_ia == 1 else "IA testées"
+    ia_names = " · ".join(r["model"] for r in ia_results_list) if ia_results_list else "ChatGPT · Gemini · Claude"
+    stats_html = f"""
+<div class="stats">
+  <div class="stat-item"><strong>{n_ia}</strong><span>{ia_label_txt}<br>{ia_names}</span></div>
+  {'<div class="stat-item"><strong>' + str(n_competitors) + '</strong><span>concurrents<br>identifiés à ' + city_cap + '</span></div>' if n_competitors else ''}
+  {'<div class="stat-item"><strong style="font-size:1.2rem;letter-spacing:0">' + last_test_date + '</strong><span>date du test</span></div>' if last_test_date else ''}
+</div>"""
+
+    # ── Chat boxes ────────────────────────────────────────────────────────
+    def _make_chat_box(model_name, prompt, response, tested_at_str):
         ts = ""
-        if p.ia_tested_at:
-            ts_dt = p.ia_tested_at if isinstance(p.ia_tested_at, datetime) else datetime.fromisoformat(str(p.ia_tested_at))
-            ts = ts_dt.strftime("%d/%m/%Y à %H:%M")
-        chat_html = f"""
+        if tested_at_str:
+            try:
+                ts = datetime.fromisoformat(str(tested_at_str)).strftime("%d/%m/%Y à %H:%M")
+            except Exception:
+                ts = str(tested_at_str)[:16]
+        resp_html = (response or "").replace("\n", "<br>")
+        return f"""
   <div class="chat-box">
     <div class="chat-meta">
-      <strong>{p.ia_model or "ChatGPT"}</strong>
+      <strong>{model_name}</strong>
       {f'<span class="chat-time">Test du {ts}</span>' if ts else ""}
     </div>
-    <div class="chat-prompt"><span class="chat-label">Prompt</span><em>{p.ia_prompt}</em></div>
+    <div class="chat-prompt"><span class="chat-label">Prompt</span><em>{prompt}</em></div>
     <div class="chat-response">
       <span class="chat-label">Réponse obtenue</span>
-      <div class="chat-text">{p.ia_response.replace(chr(10), "<br>")}</div>
+      <div class="chat-text">{resp_html}</div>
     </div>
-    <div class="chat-absent">↳ <strong>{name}</strong> n'apparaît pas dans cette réponse.</div>
+    <p style="margin-top:12px;font-weight:700">→ {model_name} ne sait même pas que vous existez.</p>
   </div>"""
+
+    if ia_results_list:
+        chat_html = "\n".join(
+            _make_chat_box(r["model"],
+                           r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?",
+                           r.get("response", ""),
+                           r.get("tested_at"))
+            for r in ia_results_list
+        )
     else:
+        # Aucune donnée IA — fallback illustratif avec mention explicite
         chat_html = f"""
   <div class="chat-box">
     <div class="chat-meta"><strong>ChatGPT</strong></div>
@@ -296,31 +431,86 @@ def _render_landing(p: "V3ProspectDB", competitors: list, city_image_url: str) -
         Ces professionnels sont bien référencés et interviennent localement.&nbsp;»
       </div>
     </div>
-    <div class="chat-absent">↳ <strong>{name}</strong> n'apparaît pas dans cette réponse.</div>
+    <p style="margin-top:12px;font-weight:700">→ ChatGPT ne sait même pas que vous existez.</p>
   </div>"""
 
+    # ── Audit points ──────────────────────────────────────────────────────
     audit_points = [
         ("01","Visibilité sur 3 IA", f"ChatGPT, Gemini et Claude testés sur les requêtes réelles de vos clients à {city_cap}."),
         ("02","Concurrents identifiés", f"Nous identifions quels {pro_plural} locaux apparaissent à votre place dans les réponses IA."),
         ("03","Diagnostic des causes", "Analyse des signaux manquants : structuration, cohérence sémantique, autorité locale."),
         ("04","Plan d'action concret", "Recommandations priorisées, applicables sans refonte technique de votre site."),
     ]
-    pts = "".join(f'<div class="audit-point"><div class="audit-num">{n}</div><div><strong>{t}</strong><p>{d}</p></div></div>'
-                  for n, t, d in audit_points)
+    pts = "".join(
+        f'<div class="audit-point"><div class="audit-num">{n}</div><div><strong>{t}</strong><p>{d}</p></div></div>'
+        for n, t, d in audit_points
+    )
+
+    # ── Hero ──────────────────────────────────────────────────────────────
+    _hero_h1   = landing_text.hero_headline if landing_text and landing_text.hero_headline else None
+    _hero_sub  = landing_text.hero_subtitle  if landing_text and landing_text.hero_subtitle  else None
+    h1_text    = _hero_h1 or f'À <em style="font-style:normal;color:#93c5fd">{city_cap}</em>, les IA recommandent<br>des {pro_plural} à vos clients.<br>Êtes-vous dans leurs réponses&nbsp;?'
+    sub_text   = _hero_sub or "ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale."
 
     hero_html = (
         f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
         f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.2) 100%)"></div>'
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
-        f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">À <em style="font-style:normal;color:#93c5fd">{city_cap}</em>, les IA recommandent<br>des {pro_plural} à vos clients.<br>Êtes-vous dans leurs réponses&nbsp;?</h1>'
-        f'<p style="color:rgba(255,255,255,.8);font-size:1.1rem;max-width:520px;margin:0 auto;line-height:1.7;">ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale.</p>'
+        f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_text}</h1>'
+        f'<p style="color:rgba(255,255,255,.8);font-size:1.1rem;max-width:520px;margin:0 auto;line-height:1.7;">{sub_text}</p>'
         f'</div></div>'
     ) if city_image_url else (
         f'<div class="hero"><div class="hero-badge">Audit personnalisé</div>'
-        f'<h1>À <em>{city_cap}</em>, les IA recommandent<br>des {pro_plural} à vos clients.<br>Êtes-vous dans leurs réponses&nbsp;?</h1>'
-        f'<p style="margin-top:20px">ChatGPT, Gemini et Claude sont devenus les nouveaux moteurs de recommandation locale.</p></div>'
+        f'<h1>{h1_text}</h1>'
+        f'<p style="margin-top:20px">{sub_text}</p></div>'
     )
+
+    # ── CTA custom ────────────────────────────────────────────────────────
+    cta_title = landing_text.cta_headline if landing_text and landing_text.cta_headline else "Réservez votre<br>audit gratuit"
+    cta_sub   = landing_text.cta_subtitle  if landing_text and landing_text.cta_subtitle  else "30 minutes. Résultats sur votre visibilité réelle.<br>Sans engagement."
+
+    # ── Preuves texte + vidéo (depuis landing_text) ───────────────────────
+    proof_section = ""
+    if landing_text:
+        proof_texts_list  = json.loads(landing_text.proof_texts)  if landing_text.proof_texts  else []
+        proof_videos_list = json.loads(landing_text.proof_videos) if landing_text.proof_videos else []
+
+        if proof_texts_list:
+            items = "".join(
+                f'<blockquote style="border-left:3px solid #2563eb;padding:12px 20px;margin:16px 0;background:#eff4ff;border-radius:0 8px 8px 0">'
+                f'<p style="font-size:.95rem;font-style:italic;color:#1a1a1a">{pt.get("text","")}</p>'
+                f'{"<cite style=\\"font-size:.78rem;color:#666;margin-top:6px;display:block\\">— " + pt["source"] + "</cite>" if pt.get("source") else ""}'
+                f'</blockquote>'
+                for pt in proof_texts_list
+            )
+            proof_section += f'<div class="section"><h2>Témoignages</h2>{items}</div><hr style="border:none;border-top:1px solid var(--g2);">'
+
+        if proof_videos_list:
+            vids = "".join(
+                f'<div style="margin:16px 0"><iframe src="{_youtube_embed(v["url"])}" width="100%" height="315" frameborder="0" allowfullscreen style="border-radius:8px;max-width:560px;display:block"></iframe></div>'
+                for v in proof_videos_list if v.get("url")
+            )
+            if vids:
+                proof_section += f'<div class="section"><h2>Vidéos</h2>{vids}</div><hr style="border:none;border-top:1px solid var(--g2);">'
+
+    # ── Evidence screenshots (city_evidence) ─────────────────────────────
+    if evidence_images:
+        ev_imgs = "".join(
+            f'<img src="{img.get("processed_url") or img.get("url","")}" '
+            f'alt="Capture IA {img.get("provider","")} {city_cap}" '
+            f'style="max-width:100%;border-radius:8px;margin-bottom:16px;border:1px solid #e5e7eb;display:block">'
+            for img in evidence_images[:4]
+            if img.get("processed_url") or img.get("url")
+        )
+        if ev_imgs:
+            proof_section += (
+                f'<div class="section">'
+                f'<h2>Ce que voient vos futurs clients sur les IA</h2>'
+                f'<p>Captures d\'écran réelles des réponses IA sur les {pro_label}s à {city_cap}.</p>'
+                f'{ev_imgs}</div>'
+                f'<hr style="border:none;border-top:1px solid var(--g2);">'
+            )
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -348,9 +538,8 @@ nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-bet
 .chat-meta strong{{font-size:.9rem}}.chat-time{{font-size:.78rem;color:var(--g3);margin-left:auto}}
 .chat-label{{display:block;font-size:.72rem;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}}
 .chat-prompt{{margin-bottom:16px}}.chat-prompt em{{font-style:italic;font-size:.88rem;color:#444}}
-.chat-response{{margin-bottom:16px}}
+.chat-response{{margin-bottom:8px}}
 .chat-text{{font-size:.95rem;color:var(--black);line-height:1.75;background:#fff;border:1px solid var(--g2);border-radius:8px;padding:14px 18px;margin-top:4px}}
-.chat-absent{{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#fff8f8;border:1px solid #fde8e8;border-radius:8px;font-size:.85rem;color:#c0392b;margin-top:4px}}
 .audit-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:32px}}
 .audit-point{{display:flex;gap:16px;align-items:flex-start;padding:20px 24px;border:1px solid var(--g2);border-radius:10px;background:var(--white)}}
 .audit-num{{flex-shrink:0;width:28px;height:28px;background:var(--blue-bg);color:var(--blue);font-size:.72rem;font-weight:700;border-radius:6px;display:flex;align-items:center;justify-content:center}}
@@ -372,11 +561,7 @@ footer a{{color:var(--g3)}}
 
 {hero_html}
 
-<div class="stats">
-  <div class="stat-item"><strong>3</strong><span>IA testées<br>ChatGPT · Gemini · Claude</span></div>
-  <div class="stat-item"><strong>74%</strong><span>des {pro_plural} locaux<br>absents des réponses IA</span></div>
-  <div class="stat-item"><strong>15</strong><span>requêtes analysées<br>par profil</span></div>
-</div>
+{stats_html}
 
 <div class="section">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
@@ -386,12 +571,14 @@ footer a{{color:var(--g3)}}
       {rating_html}
     </div>
   </div>
-  <p>Réponse réelle obtenue en interrogeant une IA sur les {pro_label}s à {city_cap}&nbsp;:</p>
+  <p>Réponse réelle obtenue en interrogeant {"les IA" if n_ia > 1 else "une IA"} sur les {pro_label}s à {city_cap}&nbsp;:</p>
   {chat_html}
   <p style="margin-top:0">Ce n'est pas une question de réputation. C'est une question de <strong>signaux</strong> — et ils se corrigent méthodiquement.</p>
 </div>
 
 <hr style="border:none;border-top:1px solid var(--g2);">
+
+{proof_section}
 
 <div style="background:var(--g1);padding:72px 48px;">
   <div style="max-width:780px;margin:0 auto;">
@@ -402,8 +589,8 @@ footer a{{color:var(--g3)}}
 </div>
 
 <div class="cta-section">
-  <h2>Réservez votre<br>audit gratuit</h2>
-  <p>30 minutes. Résultats sur votre visibilité réelle.<br>Sans engagement.</p>
+  <h2>{cta_title}</h2>
+  <p>{cta_sub}</p>
   <a href="{CALENDLY_URL}" target="_blank" class="btn-cta">Choisir un créneau →</a>
   <span class="btn-sub">Audit offert · Aucun engagement · Résultats en 48h</span>
 </div>
@@ -474,13 +661,14 @@ def logout_v3():
 
 @router.get("/l/{token}", response_class=HTMLResponse)
 def landing_v3(token: str):
+    from ...models import CityEvidenceDB
     with SessionLocal() as db:
         p = db.get(V3ProspectDB, token)
         if not p:
             return HTMLResponse("<h1 style='font-family:sans-serif;padding:40px'>Page non trouvée.</h1>", status_code=404)
-        city_img   = db.get(V3CityImageDB, _city_image_key(p.city))
+        city_img       = db.get(V3CityImageDB, _city_image_key(p.city))
         city_image_url = city_img.image_url if city_img else ""
-        competitors = json.loads(p.competitors) if p.competitors else []
+        competitors    = json.loads(p.competitors) if p.competitors else []
         if not competitors:
             others = db.query(V3ProspectDB).filter(
                 V3ProspectDB.city == p.city,
@@ -488,7 +676,23 @@ def landing_v3(token: str):
                 V3ProspectDB.token != token,
             ).limit(3).all()
             competitors = [o.name for o in others]
-    return HTMLResponse(_render_landing(p, competitors, city_image_url))
+        # Landing texts (hero/CTA/preuves)
+        lt_id        = f"{p.city.lower().strip()}_{p.profession.lower().strip()}"
+        landing_text = db.get(V3LandingTextDB, lt_id)
+        # Captures IA (city_evidence)
+        evidence = db.query(CityEvidenceDB).filter_by(
+            city=p.city.lower().strip(), profession=p.profession.lower().strip()
+        ).first()
+        evidence_images = json.loads(evidence.images) if evidence and evidence.images else []
+        # Résultats IA (JSON multi-moteurs)
+        ia_results_list: list = []
+        if hasattr(p, "ia_results") and p.ia_results:
+            try:
+                ia_results_list = json.loads(p.ia_results)
+            except Exception:
+                pass
+    return HTMLResponse(_render_landing(p, competitors, city_image_url,
+                                        ia_results_list, landing_text, evidence_images))
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
@@ -833,11 +1037,23 @@ tr:hover{{background:#fafafa}}
           <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve texte (citation + source, une par ligne : "texte|source")</label>
           <textarea id="txt-proofs" rows="4" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="Depuis que j'ai travaillé ma visibilité IA...|Jean D., plombier Lyon\n"></textarea>
         </div>
-        <div class="form-group" style="margin-bottom:16px">
+        <div class="form-group" style="margin-bottom:12px">
           <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Preuve vidéo (URL YouTube/Vimeo, une par ligne)</label>
           <textarea id="txt-videos" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;resize:vertical" placeholder="https://www.youtube.com/watch?v=..."></textarea>
         </div>
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0">
+        <div style="font-size:.78rem;font-weight:600;color:#2563eb;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Templates de contact</div>
+        <div style="font-size:.75rem;color:#888;margin-bottom:10px">Placeholders : <code>{{name}}</code> <code>{{city}}</code> <code>{{profession}}</code> <code>{{landing_url}}</code></div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message email (laisser vide = message par défaut)</label>
+          <textarea id="txt-email-tpl" rows="7" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="font-size:.75rem;font-weight:600;color:#444;display:block;margin-bottom:4px">Message SMS (laisser vide = SMS par défaut)</label>
+          <textarea id="txt-sms-tpl" rows="3" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;resize:vertical;font-family:monospace"></textarea>
+        </div>
         <button class="btn btn-primary" onclick="saveTexts()">💾 Sauvegarder</button>
+        <button class="btn btn-sm" onclick="previewEmail()" style="margin-left:8px">👁 Aperçu email</button>
         <span id="txt-save-status" style="font-size:.82rem;color:#16a34a;margin-left:10px"></span>
       </div>
       <div class="card">
@@ -906,6 +1122,9 @@ async function bulkSendSelected(method, isTest) {{
     `${{d.test_mode ? '🧪 TEST' : '✉'}} ${{selected.length}} envois planifiés · ${{d.note}}`;
 }}
 
+const DEFAULT_EMAIL_TPL = `Bonjour,\n\nJe travaille sur la visibilité des {{profession}}s dans les intelligences artificielles (ChatGPT, Gemini, Claude).\n\nJ'ai effectué un test pour votre entreprise à {{city}} — le résultat vous concerne directement.\n\nAccès à votre rapport personnalisé : {{landing_url}}\n\nCordialement,\nPrésence IA — contact@presence-ia.com`;
+const DEFAULT_SMS_TPL = `Bonjour, test visibilité IA effectué pour votre entreprise à {{city}}. Rapport : {{landing_url}} - Présence IA. STOP: contact@presence-ia.com`;
+
 async function loadTexts() {{
   const city = document.getElementById('txt-city').value;
   const prof = document.getElementById('txt-prof').value;
@@ -913,13 +1132,15 @@ async function loadTexts() {{
   document.getElementById('txt-editor').style.display='block';
   const r = await fetch(`/api/v3/landing-text/${{encodeURIComponent(city)}}/${{encodeURIComponent(prof)}}?token=${{TOKEN}}`);
   const d = await r.json();
-  document.getElementById('txt-hero').value = d.hero_headline || '';
-  document.getElementById('txt-hero-sub').value = d.hero_subtitle || '';
-  document.getElementById('txt-cta').value = d.cta_headline || '';
-  document.getElementById('txt-cta-sub').value = d.cta_subtitle || '';
+  document.getElementById('txt-hero').value      = d.hero_headline || '';
+  document.getElementById('txt-hero-sub').value  = d.hero_subtitle || '';
+  document.getElementById('txt-cta').value       = d.cta_headline  || '';
+  document.getElementById('txt-cta-sub').value   = d.cta_subtitle  || '';
   const proofs = (d.proof_texts || []).map(p => `${{p.text}}|${{p.source}}`).join('\n');
-  document.getElementById('txt-proofs').value = proofs;
-  document.getElementById('txt-videos').value = (d.proof_videos || []).map(v => v.url).join('\n');
+  document.getElementById('txt-proofs').value    = proofs;
+  document.getElementById('txt-videos').value    = (d.proof_videos || []).map(v => v.url).join('\n');
+  document.getElementById('txt-email-tpl').value = d.email_template || DEFAULT_EMAIL_TPL;
+  document.getElementById('txt-sms-tpl').value   = d.sms_template   || DEFAULT_SMS_TPL;
   // Evidence screenshots
   const evEl = document.getElementById('txt-evidence');
   if (d.evidence && d.evidence.length) {{
@@ -937,13 +1158,17 @@ async function saveTexts() {{
   const proofsRaw = document.getElementById('txt-proofs').value.split('\n').filter(l => l.trim());
   const proofs = proofsRaw.map(l => {{ const [text, source] = l.split('|'); return {{text: (text||'').trim(), source: (source||'').trim()}}; }});
   const videos = document.getElementById('txt-videos').value.split('\n').filter(l => l.trim()).map(url => ({{url: url.trim()}}));
+  const emailTpl = document.getElementById('txt-email-tpl').value.trim();
+  const smsTpl   = document.getElementById('txt-sms-tpl').value.trim();
   const body = {{
     city, profession: prof,
-    hero_headline: document.getElementById('txt-hero').value,
-    hero_subtitle: document.getElementById('txt-hero-sub').value,
-    cta_headline: document.getElementById('txt-cta').value,
-    cta_subtitle: document.getElementById('txt-cta-sub').value,
-    proof_texts: proofs, proof_videos: videos,
+    hero_headline:  document.getElementById('txt-hero').value || null,
+    hero_subtitle:  document.getElementById('txt-hero-sub').value || null,
+    cta_headline:   document.getElementById('txt-cta').value || null,
+    cta_subtitle:   document.getElementById('txt-cta-sub').value || null,
+    proof_texts:    proofs, proof_videos: videos,
+    email_template: emailTpl || null,
+    sms_template:   smsTpl   || null,
   }};
   const r = await fetch(`/api/v3/landing-text?token=${{TOKEN}}`, {{
     method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -953,6 +1178,18 @@ async function saveTexts() {{
   const st = document.getElementById('txt-save-status');
   st.textContent = d.ok ? '✓ Sauvegardé' : '✗ Erreur';
   setTimeout(() => st.textContent = '', 3000);
+}}
+function previewEmail() {{
+  const tpl = document.getElementById('txt-email-tpl').value || DEFAULT_EMAIL_TPL;
+  const city = document.getElementById('txt-city').value || 'Votre ville';
+  const prof = document.getElementById('txt-prof').value || 'votre métier';
+  const preview = tpl
+    .replace(/\{{name\}}/g, 'Jean Dupont')
+    .replace(/\{{city\}}/g, city)
+    .replace(/\{{profession\}}/g, prof)
+    .replace(/\{{landing_url\}}/g, 'https://presence-ia.com/l/exemple');
+  const w = window.open('', '_blank', 'width=600,height=500');
+  w.document.write('<pre style="font-family:sans-serif;padding:24px;white-space:pre-wrap">' + preview + '</pre>');
 }}
 
 function copyMsg(tok) {{
@@ -1108,12 +1345,14 @@ class BulkSendRequest(BaseModel):
 
 class LandingTextRequest(BaseModel):
     city: str; profession: str
-    hero_headline: Optional[str] = None
-    hero_subtitle: Optional[str] = None
-    cta_headline: Optional[str] = None
-    cta_subtitle: Optional[str] = None
-    proof_texts: Optional[List[dict]] = None   # [{text, source}]
-    proof_videos: Optional[List[dict]] = None  # [{url}]
+    hero_headline:  Optional[str]       = None
+    hero_subtitle:  Optional[str]       = None
+    cta_headline:   Optional[str]       = None
+    cta_subtitle:   Optional[str]       = None
+    proof_texts:    Optional[List[dict]] = None   # [{text, source}]
+    proof_videos:   Optional[List[dict]] = None   # [{url}]
+    email_template: Optional[str]       = None
+    sms_template:   Optional[str]       = None
 
 
 @router.post("/api/v3/generate")
@@ -1147,6 +1386,7 @@ def generate_v3(req: GenerateRequest, token: str = ""):
                 landing_url = f"{BASE_URL}/l/{tok}"
                 competitors = [n for n in all_names if n != p["name"]][:3]
                 existing = db.get(V3ProspectDB, tok)
+                ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) if ia_data.get("results") else None
                 if not existing:
                     new_count += 1
                     db.add(V3ProspectDB(
@@ -1157,15 +1397,17 @@ def generate_v3(req: GenerateRequest, token: str = ""):
                         competitors=json.dumps(competitors, ensure_ascii=False),
                         ia_prompt=ia_data.get("prompt"), ia_response=ia_data.get("response"),
                         ia_model=ia_data.get("model"), ia_tested_at=ia_data.get("tested_at"),
+                        ia_results=ia_results_json,
                     ))
                 else:
                     existing.competitors = json.dumps(competitors, ensure_ascii=False)
                     existing.rating = p.get("rating") or existing.rating
                     if ia_data:
-                        existing.ia_prompt = ia_data.get("prompt")
-                        existing.ia_response = ia_data.get("response")
-                        existing.ia_model = ia_data.get("model")
+                        existing.ia_prompt    = ia_data.get("prompt")
+                        existing.ia_response  = ia_data.get("response")
+                        existing.ia_model     = ia_data.get("model")
                         existing.ia_tested_at = ia_data.get("tested_at")
+                        existing.ia_results   = ia_results_json
                 db.commit()
                 results.append({
                     "nom": p["name"], "ville": t.city, "metier": t.profession,
@@ -1257,13 +1499,15 @@ def get_landing_text(city: str, profession: str, token: str = "", request: Reque
         imgs = json.loads(evidence.images) if isinstance(evidence.images, str) else evidence.images
         ev_list = imgs[:6]  # max 6 captures
     return {
-        "hero_headline": lt.hero_headline if lt else None,
-        "hero_subtitle": lt.hero_subtitle if lt else None,
-        "cta_headline":  lt.cta_headline  if lt else None,
-        "cta_subtitle":  lt.cta_subtitle  if lt else None,
-        "proof_texts":   json.loads(lt.proof_texts)  if lt and lt.proof_texts  else [],
-        "proof_videos":  json.loads(lt.proof_videos) if lt and lt.proof_videos else [],
-        "evidence":      ev_list,
+        "hero_headline":  lt.hero_headline  if lt else None,
+        "hero_subtitle":  lt.hero_subtitle  if lt else None,
+        "cta_headline":   lt.cta_headline   if lt else None,
+        "cta_subtitle":   lt.cta_subtitle   if lt else None,
+        "proof_texts":    json.loads(lt.proof_texts)  if lt and lt.proof_texts  else [],
+        "proof_videos":   json.loads(lt.proof_videos) if lt and lt.proof_videos else [],
+        "email_template": lt.email_template if lt else None,
+        "sms_template":   lt.sms_template   if lt else None,
+        "evidence":       ev_list,
     }
 
 
@@ -1276,12 +1520,14 @@ async def save_landing_text(req: LandingTextRequest, token: str = "", request: R
         if not lt:
             lt = V3LandingTextDB(id=lt_id, city=req.city, profession=req.profession)
             db.add(lt)
-        lt.hero_headline = req.hero_headline or None
-        lt.hero_subtitle = req.hero_subtitle or None
-        lt.cta_headline  = req.cta_headline  or None
-        lt.cta_subtitle  = req.cta_subtitle  or None
-        lt.proof_texts   = json.dumps(req.proof_texts,  ensure_ascii=False) if req.proof_texts  else None
-        lt.proof_videos  = json.dumps(req.proof_videos, ensure_ascii=False) if req.proof_videos else None
+        lt.hero_headline  = req.hero_headline  or None
+        lt.hero_subtitle  = req.hero_subtitle  or None
+        lt.cta_headline   = req.cta_headline   or None
+        lt.cta_subtitle   = req.cta_subtitle   or None
+        lt.proof_texts    = json.dumps(req.proof_texts,  ensure_ascii=False) if req.proof_texts  else None
+        lt.proof_videos   = json.dumps(req.proof_videos, ensure_ascii=False) if req.proof_videos else None
+        lt.email_template = req.email_template or None
+        lt.sms_template   = req.sms_template   or None
         db.commit()
     return {"ok": True}
 
@@ -1296,9 +1542,12 @@ async def send_email_prospect(tok: str, request: Request):
             raise HTTPException(404)
         if not p.email:
             return JSONResponse({"ok": False, "error": "Pas d'email pour ce prospect"})
-        msg  = _contact_message(p.name, p.city, p.profession, p.landing_url)
-        subj = f"Votre visibilité IA à {p.city} — résultat personnalisé"
-        ok   = _send_brevo_email(p.email, p.name, subj, msg)
+        lt_id = f"{p.city.lower().strip()}_{p.profession.lower().strip()}"
+        lt    = db.get(V3LandingTextDB, lt_id)
+        tpl   = lt.email_template if lt and lt.email_template else None
+        msg   = _contact_message(p.name, p.city, p.profession, p.landing_url, tpl)
+        subj  = f"Votre visibilité IA à {p.city} — résultat personnalisé"
+        ok    = _send_brevo_email(p.email, p.name, subj, msg)
         if ok:
             p.sent_at     = datetime.utcnow()
             p.sent_method = "email"
@@ -1317,8 +1566,11 @@ async def send_sms_prospect(tok: str, request: Request):
             raise HTTPException(404)
         if not p.phone:
             return JSONResponse({"ok": False, "error": "Pas de téléphone"})
-        msg = _contact_message_sms(p.name, p.city, p.landing_url)
-        ok  = _send_brevo_sms(p.phone, msg)
+        lt_id = f"{p.city.lower().strip()}_{p.profession.lower().strip()}"
+        lt    = db.get(V3LandingTextDB, lt_id)
+        tpl   = lt.sms_template if lt and lt.sms_template else None
+        msg   = _contact_message_sms(p.name, p.city, p.landing_url, tpl)
+        ok    = _send_brevo_sms(p.phone, msg)
         if ok:
             p.sent_at     = datetime.utcnow()
             p.sent_method = "sms"
@@ -1353,21 +1605,27 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                 prospects = db.query(V3ProspectDB).filter(q_phone, *q_unsent).limit(req.max_per_day).all()
         tokens = [(p.token, p.name, p.city, p.profession, p.email, p.phone, p.landing_url)
                   for p in prospects]
+        # Pré-charger les templates custom
+        lt_cache = {f"{lt.city.lower().strip()}_{lt.profession.lower().strip()}": lt
+                    for lt in db.query(V3LandingTextDB).all()}
 
     _bulk_status.update({"running": True, "done": 0, "total": len(tokens), "errors": [],
                          "test_mode": test_mode})
 
     def _do_bulk():
         for i, (tok, name, city, profession, email, phone, landing_url) in enumerate(tokens):
+            lt   = lt_cache.get(f"{city.lower().strip()}_{profession.lower().strip()}")
             if req.method == "email":
                 dest   = req.test_email if test_mode else email
-                msg    = _contact_message(name, city, profession, landing_url)
+                tpl    = lt.email_template if lt and lt.email_template else None
+                msg    = _contact_message(name, city, profession, landing_url, tpl)
                 subj   = f"[TEST] Votre visibilité IA à {city}" if test_mode else \
                          f"Votre visibilité IA à {city} — résultat personnalisé"
                 ok     = _send_brevo_email(dest, name, subj, msg) if dest else False
             elif req.method == "sms":
                 dest   = req.test_phone if test_mode else phone
-                msg    = _contact_message_sms(name, city, landing_url)
+                tpl    = lt.sms_template if lt and lt.sms_template else None
+                msg    = _contact_message_sms(name, city, landing_url, tpl)
                 ok     = _send_brevo_sms(dest, msg) if dest else False
             else:
                 ok = False
@@ -1415,12 +1673,14 @@ def refresh_ia(token: str = ""):
                 ia_data = _run_ia_test(profession, city)
                 if not ia_data:
                     continue
+                ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) if ia_data.get("results") else None
                 with SessionLocal() as db:
                     for p in db.query(V3ProspectDB).filter_by(city=city, profession=profession).all():
                         p.ia_prompt    = ia_data.get("prompt")
                         p.ia_response  = ia_data.get("response")
                         p.ia_model     = ia_data.get("model")
                         p.ia_tested_at = ia_data.get("tested_at")
+                        p.ia_results   = ia_results_json
                     db.commit()
                 log.info("refresh-ia OK: %s %s", profession, city)
             except Exception as exc:

@@ -329,6 +329,8 @@ class V3ProspectDB(Base):
     contact_url:   Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
     rating:        Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
     scrape_status: Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # pending/done/error
+    # Résultats IA complets (JSON list[{model, prompt, response, tested_at}])
+    ia_results:    Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     # Envoi
     sent_at:       Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     sent_method:   Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # email/sms/form
@@ -355,9 +357,11 @@ class V3LandingTextDB(Base):
     hero_subtitle: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     cta_headline:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     cta_subtitle:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
-    proof_texts:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{text, source}]
-    proof_videos:  Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{url, caption}]
-    updated_at:    Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    proof_texts:    Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{text, source}]
+    proof_videos:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # JSON [{url}]
+    email_template: Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{profession},{landing_url}
+    sms_template:   Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)  # {name},{city},{landing_url}
+    updated_at:     Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class JobDB(Base):
