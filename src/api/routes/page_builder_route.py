@@ -381,7 +381,7 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     B = lambda sk, fk, d="": get_block(db, "home", sk, fk) or d
 
     hero_title    = B("hero", "title",        "Quand vos clients demandent à ChatGPT,\nil cite vos concurrents. Pas vous.").replace("\n", "<br>")
-    hero_subtitle = B("hero", "subtitle",     "Nous testons votre visibilité sur 3 IA et 5 requêtes. Rapport en 48h. Plan d'action concret.")
+    hero_subtitle = B("hero", "subtitle",     "Nous testons votre visibilité et réalisons votre plan d'action personnalisé.")
     hero_cta      = B("hero", "cta_primary",  "Tester ma visibilité — 97€")
     cta_title     = B("cta", "title",    "Votre audit IA en 48h — 97€")
     cta_subtitle  = B("cta", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
@@ -525,7 +525,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 </nav>
 
 <div class="hero">
-  <div class="hero__badge">⚡ Audit IA — Rapport en 48h</div>
+  <div class="hero__badge">Audit Présence IA</div>
   <h1>{hero_title}</h1>
   <p>{hero_subtitle}</p>
   <a class="btn-hero" href="#contact">{hero_cta} <span class="btn-hero-arrow">→</span></a>
