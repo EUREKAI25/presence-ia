@@ -306,16 +306,8 @@ def _run_ia_test(profession: str, city: str) -> dict:
     except Exception as e:
         log.error("IA init ChatGPT: %s", e)
 
-    gemini_model = None
-    try:
-        import google.generativeai as genai  # type: ignore
-        key = os.getenv("GEMINI_API_KEY", "")
-        if key:
-            genai.configure(api_key=key)
-            # Google Search Grounding — dict-based (compatible toutes versions SDK)
-            gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-    except Exception as e:
-        log.error("IA init Gemini: %s", e)
+    # Gemini : REST API direct (bypass SDK trop vieux pour Google Search Grounding)
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
 
     anthropic_client = None
     try:
@@ -355,40 +347,56 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 except Exception as e2:
                     log.error("IA test ChatGPT fallback: %s", e2)
 
-        if gemini_model:
+        if gemini_key:
             try:
-                # Google Search Grounding via dict (compatible toutes versions SDK)
-                r = gemini_model.generate_content(
-                    prompt,
-                    tools=[{"google_search": {}}]
+                # REST API direct → Google Search Grounding (SDK trop vieux sur VPS)
+                resp = http_req.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "tools": [{"googleSearch": {}}],
+                    },
+                    timeout=30,
                 )
+                resp.raise_for_status()
+                data = resp.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
                 results.append({"model": "Gemini", "prompt": prompt,
-                                "response": _strip_markdown(r.text.strip()),
+                                "response": _strip_markdown(text.strip()),
                                 "tested_at": ts})
             except Exception as e:
-                log.error("IA test Gemini prompt=%r: %s", prompt[:40], e)
-                # Fallback sans grounding
-                try:
-                    r = gemini_model.generate_content(prompt)
-                    results.append({"model": "Gemini", "prompt": prompt,
-                                    "response": _strip_markdown(r.text.strip()),
-                                    "tested_at": ts})
-                except Exception as e2:
-                    log.error("IA test Gemini fallback: %s", e2)
+                log.error("IA test Gemini REST prompt=%r: %s", prompt[:40], e)
 
         if anthropic_client:
             try:
-                # claude-sonnet-4-6 : modèle par défaut sur Claude.ai
+                # claude-sonnet-4-6 + web_search intégré (comme Claude.ai web)
                 r = anthropic_client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=600,
+                    max_tokens=1024,
+                    tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
                     messages=[{"role": "user", "content": prompt}],
                 )
+                # Extraire uniquement les blocs texte (ignorer web_search_tool_result)
+                text_parts = [b.text for b in r.content if getattr(b, "type", "") == "text"]
+                response_text = "\n".join(text_parts).strip()
+                if not response_text and r.content:
+                    response_text = getattr(r.content[0], "text", "")
                 results.append({"model": "Claude", "prompt": prompt,
-                                "response": _strip_markdown(r.content[0].text.strip()),
+                                "response": _strip_markdown(response_text),
                                 "tested_at": ts})
             except Exception as e:
                 log.error("IA test Claude prompt=%r: %s", prompt[:40], e)
+                # Fallback sans web search
+                try:
+                    r = anthropic_client.messages.create(
+                        model="claude-sonnet-4-6", max_tokens=600,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    results.append({"model": "Claude", "prompt": prompt,
+                                    "response": _strip_markdown(r.content[0].text.strip()),
+                                    "tested_at": ts})
+                except Exception as e2:
+                    log.error("IA test Claude fallback: %s", e2)
 
     if not results:
         return {}
@@ -2103,29 +2111,26 @@ def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couv
     except Exception as e:
         errors.append({"model": "ChatGPT init", "error": str(e)})
 
-    try:
-        import google.generativeai as genai
-        key = os.getenv("GEMINI_API_KEY", "")
-        if key:
-            genai.configure(api_key=key)
-            try:
-                m = genai.GenerativeModel("gemini-2.0-flash")
-                r = m.generate_content(prompt, tools=[{"google_search": {}}])
-                results.append({"model": "gemini+grounding", "ok": True,
-                                "response": r.text[:200]})
-            except Exception as e:
-                errors.append({"model": "gemini+grounding", "error": str(e)})
-                try:
-                    m = genai.GenerativeModel("gemini-2.0-flash")
-                    r = m.generate_content(prompt)
-                    results.append({"model": "gemini (fallback)", "ok": True,
-                                    "response": r.text[:200]})
-                except Exception as e2:
-                    errors.append({"model": "gemini fallback", "error": str(e2)})
-        else:
-            errors.append({"model": "Gemini", "error": "GEMINI_API_KEY manquant"})
-    except Exception as e:
-        errors.append({"model": "Gemini init", "error": str(e)})
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if gemini_key:
+        try:
+            resp = http_req.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "tools": [{"googleSearch": {}}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            results.append({"model": "gemini-2.0-flash+search", "ok": True,
+                            "response": text[:200]})
+        except Exception as e:
+            errors.append({"model": "gemini-2.0-flash+search", "error": str(e)})
+    else:
+        errors.append({"model": "Gemini", "error": "GEMINI_API_KEY manquant"})
 
     try:
         import anthropic
@@ -2134,13 +2139,16 @@ def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couv
             client = anthropic.Anthropic(api_key=key)
             try:
                 r = client.messages.create(
-                    model="claude-sonnet-4-6", max_tokens=400,
+                    model="claude-sonnet-4-6", max_tokens=600,
+                    tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
                     messages=[{"role": "user", "content": prompt}],
                 )
-                results.append({"model": "claude-sonnet-4-6", "ok": True,
-                                "response": r.content[0].text[:200]})
+                text_parts = [b.text for b in r.content if getattr(b, "type", "") == "text"]
+                response_text = "\n".join(text_parts).strip() or getattr(r.content[0], "text", "")
+                results.append({"model": "claude-sonnet-4-6+search", "ok": True,
+                                "response": response_text[:200]})
             except Exception as e:
-                errors.append({"model": "claude-sonnet-4-6", "error": str(e)})
+                errors.append({"model": "claude-sonnet-4-6+search", "error": str(e)})
         else:
             errors.append({"model": "Claude", "error": "ANTHROPIC_API_KEY manquant"})
     except Exception as e:
