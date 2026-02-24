@@ -2058,6 +2058,92 @@ def bulk_status(token: str = ""):
     return _bulk_status
 
 
+@router.get("/api/v3/ia-test-debug")
+def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couvreur"):
+    """Test IA unique pour diagnostiquer les modèles — retourne les erreurs détaillées."""
+    _require_admin(token)
+    errors = []
+    results = []
+    city_cap = city.capitalize()
+    prompt = f"Quels {profession}s recommandes-tu à {city_cap} ?"
+
+    try:
+        import openai
+        key = os.getenv("OPENAI_API_KEY", "")
+        if key:
+            client = openai.OpenAI(api_key=key)
+            try:
+                r = client.chat.completions.create(
+                    model="gpt-4o-search-preview",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=400,
+                )
+                results.append({"model": "gpt-4o-search-preview", "ok": True,
+                                "response": r.choices[0].message.content[:200]})
+            except Exception as e:
+                errors.append({"model": "gpt-4o-search-preview", "error": str(e)})
+                try:
+                    r = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=400, temperature=0.3,
+                    )
+                    results.append({"model": "gpt-4o (fallback)", "ok": True,
+                                    "response": r.choices[0].message.content[:200]})
+                except Exception as e2:
+                    errors.append({"model": "gpt-4o fallback", "error": str(e2)})
+        else:
+            errors.append({"model": "ChatGPT", "error": "OPENAI_API_KEY manquant"})
+    except Exception as e:
+        errors.append({"model": "ChatGPT init", "error": str(e)})
+
+    try:
+        import google.generativeai as genai
+        key = os.getenv("GEMINI_API_KEY", "")
+        if key:
+            genai.configure(api_key=key)
+            try:
+                search_tool = genai.protos.Tool(google_search=genai.protos.GoogleSearch())
+                m = genai.GenerativeModel("gemini-2.0-flash", tools=[search_tool])
+                r = m.generate_content(prompt)
+                results.append({"model": "gemini+grounding", "ok": True,
+                                "response": r.text[:200]})
+            except Exception as e:
+                errors.append({"model": "gemini+grounding", "error": str(e)})
+                try:
+                    m = genai.GenerativeModel("gemini-2.0-flash")
+                    r = m.generate_content(prompt)
+                    results.append({"model": "gemini (fallback)", "ok": True,
+                                    "response": r.text[:200]})
+                except Exception as e2:
+                    errors.append({"model": "gemini fallback", "error": str(e2)})
+        else:
+            errors.append({"model": "Gemini", "error": "GEMINI_API_KEY manquant"})
+    except Exception as e:
+        errors.append({"model": "Gemini init", "error": str(e)})
+
+    try:
+        import anthropic
+        key = os.getenv("ANTHROPIC_API_KEY", "")
+        if key:
+            client = anthropic.Anthropic(api_key=key)
+            try:
+                r = client.messages.create(
+                    model="claude-sonnet-4-6", max_tokens=400,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                results.append({"model": "claude-sonnet-4-6", "ok": True,
+                                "response": r.content[0].text[:200]})
+            except Exception as e:
+                errors.append({"model": "claude-sonnet-4-6", "error": str(e)})
+        else:
+            errors.append({"model": "Claude", "error": "ANTHROPIC_API_KEY manquant"})
+    except Exception as e:
+        errors.append({"model": "Claude init", "error": str(e)})
+
+    return {"prompt": prompt, "results": results, "errors": errors}
+
+
 @router.post("/api/v3/refresh-ia")
 def refresh_ia(token: str = ""):
     """Relance les tests IA pour toutes les paires ville/métier (background).
