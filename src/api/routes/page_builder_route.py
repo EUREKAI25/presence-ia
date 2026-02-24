@@ -515,12 +515,13 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Présence IA — Audit de visibilité sur ChatGPT, Gemini et Claude</title>
   <meta name="description" content="Testez si votre entreprise apparaît dans les réponses de ChatGPT, Gemini et Claude. Rapport personnalisé en 48h.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232563eb'/><circle cx='16' cy='16' r='3.5' fill='white'/><circle cx='16' cy='16' r='8' stroke='white' stroke-width='1.5' fill='none' opacity='.55'/><circle cx='16' cy='16' r='13' stroke='white' stroke-width='1' fill='none' opacity='.25'/></svg>">
   <style>{css}</style>
 </head>
 <body>
 
 <nav class="nav">
-  <a class="nav__brand" href="/"><span class="nav__brand-dot"></span>Présence IA</a>
+  <a class="nav__brand" href="/" style="display:flex;align-items:center;gap:9px;text-decoration:none"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#2563eb"/><circle cx="14" cy="14" r="3" fill="white"/><circle cx="14" cy="14" r="7" stroke="white" stroke-width="1.5" fill="none" opacity=".55"/><circle cx="14" cy="14" r="11" stroke="white" stroke-width="1" fill="none" opacity=".25"/></svg><span>Présence&nbsp;<span style="color:#2563eb">IA</span></span></a>
   <a class="nav__cta" href="#contact">Tester ma visibilité</a>
 </nav>
 

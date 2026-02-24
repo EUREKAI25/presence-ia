@@ -620,7 +620,7 @@ def _render_landing(
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Présence IA — Audit pour {name}</title><meta name="robots" content="noindex">
+<title>Présence IA — Audit pour {name}</title><meta name="robots" content="noindex"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232563eb'/><circle cx='16' cy='16' r='3.5' fill='white'/><circle cx='16' cy='16' r='8' stroke='white' stroke-width='1.5' fill='none' opacity='.55'/><circle cx='16' cy='16' r='13' stroke='white' stroke-width='1' fill='none' opacity='.25'/></svg>">
 <style>
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
 :root{{--black:#0a0a0a;--white:#fff;--g1:#f5f5f5;--g2:#e8e8e8;--g3:#999;--blue:#2563eb;--blue-bg:#eff4ff}}
@@ -670,7 +670,7 @@ footer a{{color:var(--g3)}}
 </style></head><body>
 
 <nav>
-  <div class="logo">Présence<span>IA</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:9px"><svg width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#2563eb"/><circle cx="14" cy="14" r="3" fill="white"/><circle cx="14" cy="14" r="7" stroke="white" stroke-width="1.5" fill="none" opacity=".55"/><circle cx="14" cy="14" r="11" stroke="white" stroke-width="1" fill="none" opacity=".25"/></svg>Présence&nbsp;<span>IA</span></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 
@@ -734,7 +734,7 @@ def login_v3_page(request: Request):
         return RedirectResponse("/admin/v3", status_code=302)
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connexion — Présence IA</title>
+<title>Connexion — Présence IA</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232563eb'/><circle cx='16' cy='16' r='3.5' fill='white'/><circle cx='16' cy='16' r='8' stroke='white' stroke-width='1.5' fill='none' opacity='.55'/><circle cx='16' cy='16' r='13' stroke='white' stroke-width='1' fill='none' opacity='.25'/></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f4ff;min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -749,7 +749,7 @@ button:hover{background:#1d4ed8}
 .err{color:#dc2626;font-size:.82rem;margin-top:10px;display:none}
 </style></head><body>
 <div class="card">
-  <h1>Présence<span style="color:#2563eb">IA</span></h1>
+  <h1 style="display:flex;align-items:center;gap:10px;justify-content:center"><svg width="32" height="32" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#2563eb"/><circle cx="14" cy="14" r="3" fill="white"/><circle cx="14" cy="14" r="7" stroke="white" stroke-width="1.5" fill="none" opacity=".55"/><circle cx="14" cy="14" r="11" stroke="white" stroke-width="1" fill="none" opacity=".25"/></svg>Présence&nbsp;<span style="color:#2563eb">IA</span></h1>
   <p class="sub">Admin V3 — Accès réservé</p>
   <form method="POST" action="/login/v3">
     <label for="pwd">Mot de passe</label>
@@ -971,7 +971,7 @@ def admin_v3(
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin V3 — Présence IA</title>
+<title>Admin V3 — Présence IA</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232563eb'/><circle cx='16' cy='16' r='3.5' fill='white'/><circle cx='16' cy='16' r='8' stroke='white' stroke-width='1.5' fill='none' opacity='.55'/><circle cx='16' cy='16' r='13' stroke='white' stroke-width='1' fill='none' opacity='.25'/></svg>">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f9fa;color:#1a1a1a}}
@@ -1006,7 +1006,7 @@ tr:hover{{background:#fafafa}}
 </head><body>
 
 <div class="topbar">
-  <h1>Présence<strong style="color:#93c5fd">IA</strong> · Admin V3</h1>
+  <h1 style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#2563eb"/><circle cx="14" cy="14" r="3" fill="white"/><circle cx="14" cy="14" r="7" stroke="white" stroke-width="1.5" fill="none" opacity=".55"/><circle cx="14" cy="14" r="11" stroke="white" stroke-width="1" fill="none" opacity=".25"/></svg>Présence&nbsp;<span style="color:#93c5fd">IA</span> · Admin V3</h1>
   <a href="/admin?token={api_token}">← Admin principal</a>
   <a href="/logout/v3" style="margin-left:auto;color:rgba(255,255,255,.5);font-size:.8rem">Déconnexion</a>
   <a href="#" onclick="downloadCSV()" class="btn btn-primary btn-sm" style="text-decoration:none">⬇ CSV</a>
