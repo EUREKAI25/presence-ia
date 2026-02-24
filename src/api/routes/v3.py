@@ -443,6 +443,26 @@ def _render_landing(
   <div class="stat-item"><strong>3</strong><span>prompts différents<br>par test</span></div>
 </div>"""
 
+    def _ia_accordion_label(model: str, response: str, prospect_name: str, profession: str) -> str:
+        """Deux phrases : 'ne vous cite pas' si d'autres sont cités, 'ne connaît aucun' si personne."""
+        resp_l = (response or "").lower()
+        # Le prospect est cité (rare mais possible)
+        if prospect_name and prospect_name.lower() in resp_l:
+            return f"{model} vous cite ✓"
+        # L'IA ne connaît aucun professionnel local
+        no_reco = ["je n'ai pas", "je ne dispose pas", "aucune recommandation",
+                   "sans connaître", "je ne connais pas", "je ne peux pas fournir",
+                   "je ne suis pas en mesure", "difficile de recommander",
+                   "il m'est difficile", "je vous recommande de consulter",
+                   "pages jaunes", "google maps", "je n'ai aucune information"]
+        if any(s in resp_l for s in no_reco):
+            pro_p = profession.lower()
+            if not pro_p.endswith("s"):
+                pro_p += "s"
+            return f"{model} ne connaît aucun {pro_p}"
+        # L'IA cite d'autres entreprises mais pas le prospect
+        return f"{model} ne vous cite pas"
+
     # ── Chat groups (1 prompt → accordéon par IA) ─────────────────────────
     if ia_results_list:
         from collections import OrderedDict
@@ -462,22 +482,26 @@ def _render_landing(
                     ts = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m à %H:%M")
                 except Exception:
                     ts = str(ts_raw)[:16]
-            ts_label = f" (test du {ts})" if ts else ""
+            prompt_header = (
+                f'<div class="chat-prompt">'
+                f'<span class="chat-ts">{ts}</span> : <em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em>'
+                f'</div>'
+            ) if ts else (
+                f'<div class="chat-prompt"><em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em></div>'
+            )
             acc_items = ""
             for r in group["models"]:
                 resp_html = (r.get("response", "") or "").replace("\n", "<br>")
+                label = _ia_accordion_label(r["model"], r.get("response", ""), p.name, p.profession)
                 acc_items += (
                     f'<details class="chat-detail">'
-                    f'<summary>{r["model"]} ne vous connait pas</summary>'
+                    f'<summary>{label}</summary>'
                     f'<div class="chat-detail-body">{resp_html}</div>'
                     f'</details>'
                 )
             chat_html += (
                 f'<div class="chat-group">'
-                f'<div class="chat-prompt">'
-                f'<span class="chat-label">Prompt{ts_label}</span>'
-                f'<em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em>'
-                f'</div>'
+                f'{prompt_header}'
                 f'<div class="chat-accordion">{acc_items}</div>'
                 f'</div>'
             )
@@ -644,15 +668,17 @@ nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-bet
 .chat-accordion{{margin-top:12px;border:1px solid var(--g2);border-radius:10px;overflow:hidden}}
 .chat-detail{{border-bottom:1px solid var(--g2)}}
 .chat-detail:last-child{{border-bottom:none}}
-.chat-detail summary{{padding:13px 18px;font-size:.9rem;font-weight:600;color:#dc2626;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;user-select:none}}
-.chat-detail summary::before{{content:"▸";font-size:.8rem;transition:transform .2s;display:inline-block}}
+.chat-detail summary{{padding:13px 18px;font-size:.9rem;font-weight:600;color:#dc2626;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;user-select:none}}
+.chat-detail summary::before{{content:"▶";font-size:1rem;color:#2563eb;transition:transform .2s;display:inline-block;flex-shrink:0}}
 .chat-detail[open] summary::before{{transform:rotate(90deg)}}
+.chat-detail summary::after{{content:"voir";margin-left:auto;font-size:.72rem;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.05em}}
+.chat-detail[open] summary::after{{content:"fermer"}}
 .chat-detail summary:hover{{background:#fafafa}}
 .chat-detail-body{{padding:14px 18px 16px;font-size:.88rem;color:#444;line-height:1.7;border-top:1px solid var(--g2);background:#fff}}
 .chat-meta{{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--g2)}}
 .chat-meta strong{{font-size:.9rem}}.chat-time{{font-size:.78rem;color:var(--g3);margin-left:auto}}
 .chat-label{{display:block;font-size:.72rem;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}}
-.chat-prompt{{margin-bottom:16px}}.chat-prompt em{{font-style:italic;font-size:.88rem;color:#444}}
+.chat-prompt{{margin-bottom:16px;font-size:.88rem;color:#555}}.chat-prompt em{{font-style:italic;color:#1a1a1a}}.chat-ts{{font-weight:600;color:#888}}
 .chat-response{{margin-bottom:8px}}
 .chat-text{{font-size:.95rem;color:var(--black);line-height:1.75;background:#fff;border:1px solid var(--g2);border-radius:8px;padding:14px 18px;margin-top:4px}}
 .audit-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:32px}}
@@ -722,7 +748,20 @@ footer a{{color:var(--g3)}}
   <span class="btn-sub">Sans engagement · Résultats concrets</span>
 </div>
 
-<footer>© 2026 Présence IA &nbsp;·&nbsp;<a href="https://presence-ia.com">presence-ia.com</a> &nbsp;·&nbsp;<a href="https://presence-ia.com/cgv">CGV</a></footer>
+<footer>
+  © 2026 Présence IA &nbsp;·&nbsp;
+  <a href="https://presence-ia.com/mentions-legales">Mentions légales</a> &nbsp;·&nbsp;
+  <a href="https://presence-ia.com/contact">Contact</a>
+</footer>
+<script>
+document.addEventListener('toggle', function(e) {{
+  if (e.target.tagName === 'DETAILS' && e.target.classList.contains('chat-detail') && e.target.open) {{
+    document.querySelectorAll('details.chat-detail[open]').forEach(function(d) {{
+      if (d !== e.target) d.open = false;
+    }});
+  }}
+}}, true);
+</script>
 </body></html>"""
 
 
