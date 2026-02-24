@@ -292,7 +292,11 @@ def _run_ia_test(profession: str, city: str) -> dict:
     prompts    = [p.format(profession=profession.lower(), city=city_cap) for p in _load_prompts()]
     results    = []
 
-    # Clients IA (initialisés une seule fois)
+    # ── Clients IA — modèles identiques aux versions web utilisées par les prospects ──
+    # ChatGPT : gpt-4o-search-preview (web search intégré, comme ChatGPT web)
+    # Gemini  : gemini-2.0-flash avec Google Search Grounding
+    # Claude  : claude-sonnet-4-6 (modèle par défaut sur Claude.ai)
+
     chatgpt_client = None
     try:
         import openai
@@ -308,7 +312,14 @@ def _run_ia_test(profession: str, city: str) -> dict:
         key = os.getenv("GEMINI_API_KEY", "")
         if key:
             genai.configure(api_key=key)
-            gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+            # Google Search Grounding pour avoir les mêmes résultats que Gemini web
+            try:
+                search_tool = genai.protos.Tool(
+                    google_search=genai.protos.GoogleSearch()
+                )
+                gemini_model = genai.GenerativeModel("gemini-2.0-flash", tools=[search_tool])
+            except Exception:
+                gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     except Exception as e:
         log.error("IA init Gemini: %s", e)
 
@@ -326,16 +337,29 @@ def _run_ia_test(profession: str, city: str) -> dict:
 
         if chatgpt_client:
             try:
+                # gpt-4o-search-preview : même modèle + web search que ChatGPT web
                 r = chatgpt_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-4o-search-preview",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=350, temperature=0.3,
+                    max_tokens=600,
                 )
                 results.append({"model": "ChatGPT", "prompt": prompt,
                                 "response": _strip_markdown(r.choices[0].message.content.strip()),
                                 "tested_at": ts})
             except Exception as e:
                 log.error("IA test ChatGPT prompt=%r: %s", prompt[:40], e)
+                # Fallback gpt-4o sans web search
+                try:
+                    r = chatgpt_client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=600, temperature=0.3,
+                    )
+                    results.append({"model": "ChatGPT", "prompt": prompt,
+                                    "response": _strip_markdown(r.choices[0].message.content.strip()),
+                                    "tested_at": ts})
+                except Exception as e2:
+                    log.error("IA test ChatGPT fallback: %s", e2)
 
         if gemini_model:
             try:
@@ -348,9 +372,10 @@ def _run_ia_test(profession: str, city: str) -> dict:
 
         if anthropic_client:
             try:
+                # claude-sonnet-4-6 : modèle par défaut sur Claude.ai
                 r = anthropic_client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=350,
+                    model="claude-sonnet-4-6",
+                    max_tokens=600,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 results.append({"model": "Claude", "prompt": prompt,
