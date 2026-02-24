@@ -312,14 +312,8 @@ def _run_ia_test(profession: str, city: str) -> dict:
         key = os.getenv("GEMINI_API_KEY", "")
         if key:
             genai.configure(api_key=key)
-            # Google Search Grounding pour avoir les mêmes résultats que Gemini web
-            try:
-                search_tool = genai.protos.Tool(
-                    google_search=genai.protos.GoogleSearch()
-                )
-                gemini_model = genai.GenerativeModel("gemini-2.0-flash", tools=[search_tool])
-            except Exception:
-                gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+            # Google Search Grounding — dict-based (compatible toutes versions SDK)
+            gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     except Exception as e:
         log.error("IA init Gemini: %s", e)
 
@@ -363,12 +357,24 @@ def _run_ia_test(profession: str, city: str) -> dict:
 
         if gemini_model:
             try:
-                r = gemini_model.generate_content(prompt)
+                # Google Search Grounding via dict (compatible toutes versions SDK)
+                r = gemini_model.generate_content(
+                    prompt,
+                    tools=[{"google_search": {}}]
+                )
                 results.append({"model": "Gemini", "prompt": prompt,
                                 "response": _strip_markdown(r.text.strip()),
                                 "tested_at": ts})
             except Exception as e:
                 log.error("IA test Gemini prompt=%r: %s", prompt[:40], e)
+                # Fallback sans grounding
+                try:
+                    r = gemini_model.generate_content(prompt)
+                    results.append({"model": "Gemini", "prompt": prompt,
+                                    "response": _strip_markdown(r.text.strip()),
+                                    "tested_at": ts})
+                except Exception as e2:
+                    log.error("IA test Gemini fallback: %s", e2)
 
         if anthropic_client:
             try:
@@ -2103,9 +2109,8 @@ def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couv
         if key:
             genai.configure(api_key=key)
             try:
-                search_tool = genai.protos.Tool(google_search=genai.protos.GoogleSearch())
-                m = genai.GenerativeModel("gemini-2.0-flash", tools=[search_tool])
-                r = m.generate_content(prompt)
+                m = genai.GenerativeModel("gemini-2.0-flash")
+                r = m.generate_content(prompt, tools=[{"google_search": {}}])
                 results.append({"model": "gemini+grounding", "ok": True,
                                 "response": r.text[:200]})
             except Exception as e:
