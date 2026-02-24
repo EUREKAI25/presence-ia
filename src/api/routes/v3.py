@@ -288,9 +288,8 @@ def _load_prompts() -> list:
 
 def _run_ia_test(profession: str, city: str) -> dict:
     """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
-    pro_plural = profession.lower() + "s" if not profession.lower().endswith("s") else profession.lower()
     city_cap   = city.capitalize()
-    prompts    = [p.format(profession=pro_plural, city=city_cap) for p in _load_prompts()]
+    prompts    = [p.format(profession=profession.lower(), city=city_cap) for p in _load_prompts()]
     results    = []
 
     # Clients IA (initialisés une seule fois)
@@ -456,10 +455,7 @@ def _render_landing(
                    "il m'est difficile", "je vous recommande de consulter",
                    "pages jaunes", "google maps", "je n'ai aucune information"]
         if any(s in resp_l for s in no_reco):
-            pro_p = profession.lower()
-            if not pro_p.endswith("s"):
-                pro_p += "s"
-            return f"{model} ne connaît aucun {pro_p}"
+            return f"{model} ne connaît aucun {profession.lower()}"
         # L'IA cite d'autres entreprises mais pas le prospect
         return f"{model} ne vous cite pas"
 
