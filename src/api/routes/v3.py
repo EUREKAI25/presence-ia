@@ -831,6 +831,7 @@ def admin_v3(
     token: str = "",
     tab: str = "prospects",
     f_ville: str = "",
+    f_metier: str = "",
     f_email: str = "",
     f_phone: str = "",
 ):
@@ -848,6 +849,8 @@ def admin_v3(
     rows = all_rows
     if f_ville:
         rows = [r for r in rows if r.city.lower() == f_ville.lower()]
+    if f_metier:
+        rows = [r for r in rows if r.profession.lower() == f_metier.lower()]
     if f_email == "1":
         rows = [r for r in rows if r.email]
     if f_phone == "1":
@@ -931,6 +934,9 @@ def admin_v3(
         rating_str = f"{r.rating:.1f}★" if r.rating else "—"
         avis_str   = str(r.reviews_count) if r.reviews_count else "—"
 
+        links_html = f'<a href="{r.landing_url}" target="_blank" title="Landing page" style="{_btn_style()}">🔗</a>'
+        if r.website:
+            links_html += f' <a href="{r.website}" target="_blank" title="Site web" style="{_btn_style()}">🌐</a>'
         table_rows += f"""<tr id="row-{r.token}">
           <td><input type="checkbox" class="prospect-cb" value="{r.token}"></td>
           <td style="font-size:.85rem"><strong>{r.name}</strong></td>
@@ -940,6 +946,7 @@ def admin_v3(
           <td style="font-size:.82rem">{r.email or '<span style="color:#ccc">—</span>'}</td>
           <td style="font-size:.8rem;color:#666;text-align:center">{rating_str}</td>
           <td style="font-size:.8rem;color:#666;text-align:center">{avis_str}</td>
+          <td style="white-space:nowrap">{links_html}</td>
           <td id="status-{r.token}">{sent_info}</td>
           <td style="white-space:nowrap">{actions}</td>
           <textarea id="msg-{r.token}" style="display:none">{_contact_message(r.name, r.city, r.profession, r.landing_url)}</textarea>
@@ -961,7 +968,8 @@ def admin_v3(
           </button>
         </div>"""
 
-    city_options = "".join(f'<option value="{c}"{"selected" if c==f_ville else ""}>{c.capitalize()}</option>' for c in all_cities)
+    city_options       = "".join(f'<option value="{c}"{"selected" if c==f_ville else ""}>{c.capitalize()}</option>' for c in all_cities)
+    profession_options = "".join(f'<option value="{p}"{"selected" if p==f_metier else ""}>{p.capitalize()}</option>' for p in all_professions)
 
     # Tab active
     t1 = "active" if tab == "prospects" else ""
@@ -1061,6 +1069,10 @@ tr:hover{{background:#fafafa}}
         <option value="">Toutes les villes</option>
         {city_options}
       </select>
+      <select onchange="applyFilter()" id="f-metier">
+        <option value="">Tous les métiers</option>
+        {profession_options}
+      </select>
       <label style="display:flex;align-items:center;gap:6px;font-size:.82rem">
         <input type="checkbox" id="f-email" {"checked" if f_email=="1" else ""} onchange="applyFilter()"> Email présent
       </label>
@@ -1087,7 +1099,7 @@ tr:hover{{background:#fafafa}}
         <thead><tr>
           <th style="width:32px"><input type="checkbox" id="cb-all" onclick="toggleAll(this)" title="Sélectionner tout"></th>
           <th>Nom</th><th>Ville</th><th>Métier</th><th>Téléphone</th><th>Email</th>
-          <th>Note</th><th>Avis</th><th>Statut</th><th>Actions</th>
+          <th>Note</th><th>Avis</th><th>Liens</th><th>Statut</th><th>Actions</th>
         </tr></thead>
         <tbody>{table_rows}</tbody>
       </table>
@@ -1272,9 +1284,10 @@ if ("{tab}" === "textes") {{
 
 function applyFilter() {{
   const v = document.getElementById('f-ville').value;
+  const m = document.getElementById('f-metier').value;
   const e = document.getElementById('f-email').checked ? '1' : '';
   const p = document.getElementById('f-phone').checked ? '1' : '';
-  location.href = `/admin/v3?tab=prospects&f_ville=${{v}}&f_email=${{e}}&f_phone=${{p}}`;
+  location.href = `/admin/v3?tab=prospects&f_ville=${{v}}&f_metier=${{m}}&f_email=${{e}}&f_phone=${{p}}`;
 }}
 function resetFilters() {{
   location.href = `/admin/v3?tab=prospects`;
