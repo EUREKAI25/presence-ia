@@ -487,13 +487,18 @@ def _render_landing(
         # Le prospect est cité (rare mais possible)
         if prospect_name and prospect_name.lower() in resp_l:
             return f"{model} vous cite ✓"
-        # L'IA ne connaît aucun professionnel local
+        # L'IA ne connaît aucun professionnel local — uniquement si elle ne cite vraiment personne
+        # Note: "sans connaître vos besoins" peut précéder une vraie liste → on l'exclut
         no_reco = ["je n'ai pas", "je ne dispose pas", "aucune recommandation",
-                   "sans connaître", "je ne connais pas", "je ne peux pas fournir",
-                   "je ne suis pas en mesure", "difficile de recommander",
-                   "il m'est difficile", "je vous recommande de consulter",
-                   "pages jaunes", "google maps", "je n'ai aucune information"]
-        if any(s in resp_l for s in no_reco):
+                   "je ne connais pas", "je ne peux pas fournir",
+                   "je ne suis pas en mesure", "il m'est difficile",
+                   "je vous recommande de consulter",
+                   "je n'ai aucune information"]
+        # Exclure "pages jaunes"/"google maps" si une vraie entreprise est aussi citée
+        has_entity = bool(re.search(r'[A-Z][a-zàâéèêëîïôùûü]{2,}', response or ""))
+        if any(s in resp_l for s in no_reco) and not has_entity:
+            return f"{model} ne connaît aucun {profession.lower()}"
+        if not has_entity and ("pages jaunes" in resp_l or "google maps" in resp_l):
             return f"{model} ne connaît aucun {profession.lower()}"
         # L'IA cite d'autres entreprises mais pas le prospect
         return f"{model} ne vous cite pas"
