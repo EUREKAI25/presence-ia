@@ -521,17 +521,8 @@ def _render_landing(
     <p style="margin-top:12px;font-weight:700">→ ChatGPT ne sait même pas que vous existez.</p>
   </div>"""
 
-    # ── Audit points ──────────────────────────────────────────────────────
-    audit_points = [
-        ("01","Visibilité sur 3 IA", f"ChatGPT, Gemini et Claude testés sur les requêtes réelles de vos clients à {city_cap}."),
-        ("02","Concurrents identifiés", f"Nous identifions quels {pro_plural} locaux apparaissent à votre place dans les réponses IA."),
-        ("03","Diagnostic des causes", "Analyse des signaux manquants : structuration, cohérence sémantique, autorité locale."),
-        ("04","Plan d'action concret", "Recommandations priorisées, applicables sans refonte technique de votre site."),
-    ]
-    pts = "".join(
-        f'<div class="audit-point"><div class="audit-num">{n}</div><div><strong>{t}</strong><p>{d}</p></div></div>'
-        for n, t, d in audit_points
-    )
+    # ── Audit points (inutilisé, conservé pour compatibilité) ─────────────
+    pts = ""
 
     # ── Contexte de substitution des placeholders ─────────────────────────
     _bmin = (landing_text.budget_min or "") if landing_text else ""
@@ -725,21 +716,20 @@ footer a{{color:var(--g3)}}
 
 {proof_section}
 
-<div style="background:var(--g1);padding:72px 48px;">
-  <div style="max-width:780px;margin:0 auto;">
-    <h2 style="font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.03em;margin-bottom:16px;">Ce que couvre l'audit gratuit</h2>
-    <div class="audit-grid">{pts}</div>
+<div style="background:var(--g1);padding:56px 48px;">
+  <div style="max-width:640px;margin:0 auto;">
+    <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:20px;">Ce que couvre cet appel :</h2>
+    <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px">
+      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Votre positionnement réel sur les 3 IA</li>
+      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Ce que font vos concurrents</li>
+      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Comment inverser la tendance</li>
+    </ul>
   </div>
 </div>
 
 <div class="cta-section">
   <h2>{cta_title}</h2>
   <p>{cta_sub}</p>
-  <ul style="list-style:none;text-align:left;display:inline-block;margin:0 auto 36px;padding:0">
-    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Votre positionnement réel sur les 3 IA</li>
-    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Ce que font vos concurrents</li>
-    <li style="padding:6px 0;color:rgba(255,255,255,.75);font-size:.95rem">• Comment inverser la tendance</li>
-  </ul><br>
   <a href="{CALENDLY_URL}" target="_blank" class="btn-cta">Je réserve mon créneau →</a>
   <span class="btn-sub">Sans engagement · Résultats concrets</span>
 </div>
