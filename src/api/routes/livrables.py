@@ -16,6 +16,7 @@ from ...livrables.faq import generate_faq
 from ...livrables.jsonld import generate_jsonld
 from ...livrables.checklist import generate_checklist
 from ...livrables.dossier import generate_dossier
+from ...livrables.outreach import generate_outreach
 
 router = APIRouter(tags=["Livrables"])
 
@@ -178,6 +179,23 @@ def api_all_livrables(pid: str, db: Session = Depends(get_db)):
         ),
         "error": {"code": "PARTIAL_ERROR", "detail": errors} if errors else None,
     }
+
+
+# ── Outreach sans email (07) ─────────────────────────────────────────────────
+
+@router.post("/api/generate/prospect/{pid}/outreach-messages")
+def api_outreach(pid: str, db: Session = Depends(get_db)):
+    p = _prospect_or_404(pid, db)
+    try:
+        result = generate_outreach(p)
+        return {
+            "success": True,
+            "result": result,
+            "message": f"Messages outreach générés pour {p.name} ({result['char_count_court']} car. SMS)",
+            "error": None,
+        }
+    except Exception as e:
+        return {"success": False, "result": None, "message": "", "error": {"code": "OUTREACH_ERROR", "detail": str(e)}}
 
 
 # ── Liste des livrables disponibles ─────────────────────────────────────────
