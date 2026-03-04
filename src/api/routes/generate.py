@@ -54,8 +54,8 @@ def api_mark_ready(pid: str, db: Session = Depends(get_db)):
 
 # ── Landing page ──────────────────────────────────────────────────────
 
-@router.get("/couvreur", response_class=HTMLResponse)
-def landing(t: str, db: Session = Depends(get_db)):
+@router.get("/{profession}", response_class=HTMLResponse)
+def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     import os, json as _json
     p = db_get_by_token(db, t)
     if not p: raise HTTPException(404)

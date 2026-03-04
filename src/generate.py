@@ -43,7 +43,7 @@ def _summary(db: Session, p: ProspectDB) -> Dict:
     }
 
 def landing_url(p: ProspectDB) -> str:
-    return f"{BASE_URL}/couvreur?t={p.landing_token}"
+    return f"{BASE_URL}/{p.profession}?t={p.landing_token}"
 
 
 # ── Audit HTML ────────────────────────────────────────────────────────
