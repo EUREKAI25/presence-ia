@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRESENCE_IA — Fiche Produit</title>
+<style>
+:root {
+  --acc: #e8355a;
+  --dark: #1a0a4e;
+  --txt: #111827;
+  --muted: #6b7280;
+  --light: #f9fafb;
+  --border: #e5e7eb;
+  --green: #16a34a;
+  --orange: #d97706;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #fff; color: var(--txt); font-size: 14px; line-height: 1.6; }
+.page { max-width: 900px; margin: 0 auto; padding: 48px 32px; }
+
+/* COVER */
+.cover { border-bottom: 4px solid var(--acc); padding-bottom: 40px; margin-bottom: 48px; }
+.cover .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--acc); margin-bottom: 16px; }
+.cover h1 { font-size: 36px; font-weight: 900; letter-spacing: -.5px; margin-bottom: 8px; color: var(--dark); }
+.cover .sub { font-size: 17px; color: var(--muted); margin-bottom: 24px; }
+.cover .core-promise {
+  background: var(--dark); color: #fff; border-radius: 12px;
+  padding: 20px 28px; font-size: 15px; line-height: 1.7; font-style: italic;
+}
+.cover .core-promise strong { color: #f9a8d4; }
+
+/* SECTIONS */
+section { margin-bottom: 52px; }
+section > h2 {
+  font-size: 20px; font-weight: 800; color: var(--dark);
+  border-left: 4px solid var(--acc); padding-left: 14px; margin-bottom: 24px;
+}
+section > .section-intro { color: var(--muted); margin-bottom: 24px; font-size: 13px; }
+
+/* PHASES */
+.phases { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+.phase {
+  border: 2px solid var(--border); border-radius: 12px; padding: 20px;
+  position: relative;
+}
+.phase.phase--active { border-color: var(--acc); }
+.phase-num {
+  width: 32px; height: 32px; background: var(--acc); color: #fff;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; margin-bottom: 12px;
+}
+.phase-num.green { background: var(--green); }
+.phase-num.dark { background: var(--dark); }
+.phase h3 { font-size: 14px; font-weight: 800; margin-bottom: 4px; }
+.phase .phase-offer { font-size: 11px; color: var(--muted); margin-bottom: 12px; font-weight: 600; }
+.phase ul { list-style: none; }
+.phase ul li { font-size: 12px; color: #374151; padding: 3px 0; padding-left: 16px; position: relative; }
+.phase ul li::before { content: "→"; position: absolute; left: 0; color: var(--acc); font-size: 11px; }
+.phase-arrow {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--muted);
+}
+
+/* DELIVERABLES */
+.deliverable {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px 24px; margin-bottom: 14px;
+  display: grid; grid-template-columns: 60px 1fr 160px; gap: 16px; align-items: start;
+}
+.deliverable .d-icon { font-size: 28px; text-align: center; padding-top: 4px; }
+.deliverable .d-name { font-size: 15px; font-weight: 800; color: var(--dark); margin-bottom: 4px; }
+.deliverable .d-desc { font-size: 13px; color: #374151; margin-bottom: 8px; }
+.deliverable .d-why {
+  background: #fff7ed; border-left: 3px solid var(--orange);
+  padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 12px; color: #92400e;
+}
+.deliverable .d-why strong { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+.deliverable .d-meta { text-align: right; }
+.d-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.d-badge.kit { background: #dbeafe; color: #1d4ed8; }
+.d-badge.tout { background: #dcfce7; color: #166534; }
+.d-badge.all { background: #f3f4f6; color: var(--muted); }
+.d-format { font-size: 11px; color: var(--muted); }
+
+/* SYNERGY */
+.synergy-table { width: 100%; border-collapse: collapse; }
+.synergy-table th {
+  background: var(--dark); color: #fff; padding: 10px 14px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: left;
+}
+.synergy-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+.synergy-table tr:last-child td { border-bottom: none; }
+.synergy-table .dep { color: var(--acc); font-weight: 600; font-size: 12px; }
+
+/* PRICING */
+.pricing { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.price-card {
+  border: 2px solid var(--border); border-radius: 14px; padding: 24px; text-align: center;
+}
+.price-card.best { border-color: var(--acc); }
+.price-card .p-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+.price-card .p-price { font-size: 32px; font-weight: 900; color: var(--dark); margin-bottom: 4px; }
+.price-card.best .p-price { color: var(--acc); }
+.price-card .p-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.price-card ul { list-style: none; text-align: left; }
+.price-card ul li { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.price-card ul li:last-child { border: none; }
+.price-card ul li::before { content: "✓ "; color: var(--green); font-weight: 700; }
+
+/* CLOSER */
+.closer-box {
+  background: var(--light); border: 1px solid var(--border); border-radius: 12px; padding: 28px;
+}
+.closer-box h3 { font-size: 15px; font-weight: 800; margin-bottom: 16px; color: var(--dark); }
+.pitch-step {
+  display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start;
+}
+.pitch-step .step-num {
+  min-width: 28px; height: 28px; background: var(--dark); color: #fff;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; flex-shrink: 0;
+}
+.pitch-step .step-content h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.pitch-step .step-content p { font-size: 12px; color: var(--muted); }
+.pitch-step .step-content .phrase {
+  font-style: italic; color: var(--dark); background: #fff;
+  border-left: 3px solid var(--acc); padding: 6px 10px; margin-top: 6px; font-size: 12px; border-radius: 0 4px 4px 0;
+}
+
+/* OBJECTIONS */
+.obj-table { width: 100%; border-collapse: collapse; }
+.obj-table th { background: #111827; color: #fff; padding: 8px 14px; font-size: 11px; font-weight: 700; text-align: left; }
+.obj-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+.obj-table tr:last-child td { border: none; }
+.obj { font-style: italic; color: var(--muted); }
+.rep { color: #111827; }
+.rep strong { color: var(--acc); }
+
+@media print {
+  .phases { grid-template-columns: 1fr 1fr 1fr; }
+  .pricing { grid-template-columns: 1fr 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ── COUVERTURE ─────────────────────────────────────────────────────── -->
+<div class="cover">
+  <div class="tag">PRESENCE_IA — Fiche Produit Interne · Usage commercial · Confidentiel</div>
+  <h1>Programme de Visibilité IA</h1>
+  <p class="sub">Référence interne · Closers · Opérations · Mise à jour : mars 2026</p>
+  <div class="core-promise">
+    Ce qu'on vend : <strong>la certitude de contrôler ce que les IA disent d'une entreprise.</strong><br>
+    Pas un outil. Pas un rapport. Un programme en 3 phases — Diagnostic, Activation, Suivi —
+    qui transforme une entreprise invisible pour ChatGPT en référence locale citée spontanément.
+  </div>
+</div>
+
+
+<!-- ── 1. LE PROBLÈME QU'ON RÉSOUT ──────────────────────────────────── -->
+<section>
+  <h2>1. Le problème qu'on résout</h2>
+  <p class="section-intro">Ce que le client vit, formulé pour qu'il se reconnaisse immédiatement.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="background:#fef2f2;border-radius:10px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:12px">🔴 Ce qui se passe aujourd'hui</div>
+      <ul style="list-style:none">
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #fecaca">Un client cherche "meilleur couvreur à Brest" sur ChatGPT</li>
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #fecaca">L'IA répond avec 3 noms — aucun n'est le sien</li>
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #fecaca">Le concurrent cité n'a pas plus d'avis, pas meilleur site</li>
+        <li style="padding:5px 0;font-size:13px">Il perd des clients sans le savoir, sans comprendre pourquoi</li>
+      </ul>
+    </div>
+    <div style="background:#f0fdf4;border-radius:10px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:12px">✅ Ce qu'on lui apporte</div>
+      <ul style="list-style:none">
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #bbf7d0">Preuve chiffrée de son invisibilité (score /10)</li>
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #bbf7d0">Explication des signaux que les IA lisent (pas de magie)</li>
+        <li style="padding:5px 0;font-size:13px;border-bottom:1px solid #bbf7d0">Fichiers prêts à intégrer (pas de refonte)</li>
+        <li style="padding:5px 0;font-size:13px">Mesure mensuelle de la progression</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;background:var(--light);border-radius:10px;padding:20px">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Pourquoi c'est différent du SEO classique</div>
+    <p style="font-size:13px;color:#374151">
+      Le SEO Google = backlinks, PageRank, publicité. Les IA ne fonctionnent pas comme ça.
+      Elles cherchent des <strong>entités nommées cohérentes</strong> (nom + métier + ville répétés sur des sources fiables),
+      des <strong>données structurées</strong> (JSON-LD), et des <strong>signaux d'autorité locale</strong> (avis, citations, presse).
+      Un site bien référencé sur Google peut être totalement absent des IA — et vice versa.
+    </p>
+  </div>
+</section>
+
+
+<!-- ── 2. LES 3 PHASES ───────────────────────────────────────────────── -->
+<section>
+  <h2>2. Le programme en 3 phases</h2>
+  <p class="section-intro">
+    La cohérence entre les phases est l'argument commercial central.
+    Chaque phase nourrit la suivante. On ne peut pas "juste faire le JSON-LD" sans savoir d'abord ce que les IA disent réellement.
+  </p>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="phase-num">1</div>
+      <h3>DIAGNOSTIC</h3>
+      <p class="phase-offer">Inclus dans toutes les offres</p>
+      <ul>
+        <li>3 IA testées × 5 requêtes ciblées</li>
+        <li>Score de visibilité /10</li>
+        <li>Concurrents cités identifiés</li>
+        <li>Rapport personnalisé + landing</li>
+        <li>Analyse des signaux manquants</li>
+      </ul>
+    </div>
+
+    <div class="phase phase--active">
+      <div class="phase-num green">2</div>
+      <h3>ACTIVATION</h3>
+      <p class="phase-offer">Kit 500€ — client fait lui-même<br>Tout Inclus 3500€ — on fait à sa place</p>
+      <ul>
+        <li>Dossier stratégique 6 mois</li>
+        <li>JSON-LD prêt à coller</li>
+        <li>Pages FAQ à publier (5-10)</li>
+        <li>Checklist d'actions priorisées</li>
+        <li>Guide implémentation par CMS</li>
+        <li>Réécriture contenu site (option)</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num dark">3</div>
+      <h3>SUIVI</h3>
+      <p class="phase-offer">100€/mois (Kit) — inclus (Tout Inclus)</p>
+      <ul>
+        <li>Re-test mensuel automatique</li>
+        <li>Rapport de progression</li>
+        <li>Dashboard client en ligne</li>
+        <li>Alerte nouveau concurrent</li>
+        <li>Ajustements recommandés</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 20px;font-size:13px;color:#92400e">
+    <strong>Pourquoi les 3 phases sont indissociables :</strong> Sans le Diagnostic, on ne sait pas quelles requêtes tester ni quels concurrents surveiller. Sans l'Activation, le client sait qu'il a un problème mais n'a pas les outils pour le corriger. Sans le Suivi, on ne sait jamais si les corrections ont fonctionné — et le client peut re-glisser sans s'en rendre compte.
+  </div>
+</section>
+
+
+<!-- ── 3. LES LIVRABLES EN DÉTAIL ─────────────────────────────────────── -->
+<section>
+  <h2>3. Les livrables — ce qu'on remet concrètement</h2>
+  <p class="section-intro">Chaque livrable est généré automatiquement, personnalisé avec les données du prospect.</p>
+
+  <!-- AUDIT -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 10px">Phase 1 — Diagnostic</div>
+
+  <div class="deliverable">
+    <div class="d-icon">📊</div>
+    <div>
+      <div class="d-name">Rapport d'audit IA</div>
+      <div class="d-desc">Score /10, détail des 5 requêtes testées sur 3 IA, liste des concurrents cités, analyse des signaux manquants. C'est le document qui crée le besoin et légitime le programme.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Sans ce rapport, le client n'a aucune preuve de son problème. C'est le déclencheur de tout.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge all">Toutes offres</span><br>
+      <span class="d-format">HTML personnalisé<br>Envoyé avant l'appel</span>
+    </div>
+  </div>
+
+  <!-- KIT -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 10px">Phase 2 — Activation</div>
+
+  <div class="deliverable">
+    <div class="d-icon">🗺️</div>
+    <div>
+      <div class="d-name">Dossier stratégique</div>
+      <div class="d-desc">Document HTML 20-30 pages (imprimable). 4 sections : analyse des causes racines, concurrents décortiqués (quelles IA les citent), plan d'action 6 mois priorisé, projections de score à 3 et 6 mois.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Sans ce dossier, le client sait qu'il a un problème mais pas par où commencer. C'est le plan de route — sans lui, les autres livrables sont des outils sans stratégie.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">HTML exportable PDF<br>dist/livrables/dossier.html</span>
+    </div>
+  </div>
+
+  <div class="deliverable">
+    <div class="d-icon">🏷️</div>
+    <div>
+      <div class="d-name">Données structurées JSON-LD</div>
+      <div class="d-desc">Bloc de code prêt à coller dans le site du client : LocalBusiness + AggregateRating + FAQPage. Pré-rempli avec son nom, adresse, métier, ville, avis. Guide d'intégration inclus pour son CMS (WordPress / Wix / HTML).</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>C'est le signal le plus direct que les IA lisent pour identifier une entreprise locale. Sans lui, tous les autres efforts ont 3x moins d'impact.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">HTML snippet + JSON<br>+ guide CMS intégré</span>
+    </div>
+  </div>
+
+  <div class="deliverable">
+    <div class="d-icon">❓</div>
+    <div>
+      <div class="d-name">Pages FAQ optimisées IA</div>
+      <div class="d-desc">5 à 10 pages HTML prêtes à publier. Une page par requête testée lors de l'audit. Chaque page répond à une question précise et positionne l'entreprise comme référence. Titre, contenu et structure optimisés pour que les IA les lisent.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Si on n'a pas de page qui répond à la question que pose le client à l'IA, l'IA ne peut pas citer l'entreprise. Les FAQ créent le contenu manquant.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">5-10 fichiers HTML<br>+ index</span>
+    </div>
+  </div>
+
+  <div class="deliverable">
+    <div class="d-icon">✅</div>
+    <div>
+      <div class="d-name">Checklist éditoriale interactive</div>
+      <div class="d-desc">10 actions priorisées par impact IA, pré-remplies avec les données du client (nombre d'avis manquants, nom, ville, métier). Cases à cocher, barre de progression, guides d'implémentation intégrés pour chaque action selon le CMS détecté.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Le dossier dit QUOI faire. La checklist dit COMMENT faire, étape par étape, sans qu'on ait besoin d'être là. C'est l'outil d'autonomie du client.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span><br>
+      <span class="d-format">HTML interactif<br>localStorage</span>
+    </div>
+  </div>
+
+  <div class="deliverable">
+    <div class="d-icon">✍️</div>
+    <div>
+      <div class="d-name">Proposition de réécriture site</div>
+      <div class="d-desc">Analyse du site actuel + réécriture proposée des pages principales (accueil, à propos, services) avec entités nommées explicites et sémantique IA-first. Le client compare avant/après et applique les changements.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Toutes les actions externes (JSON-LD, FAQ, citations) sont affaiblies si le site lui-même ne parle pas clairement de ce qu'il fait et où.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">HTML avant/après<br>par page</span>
+    </div>
+  </div>
+
+  <!-- SUIVI -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 10px">Phase 3 — Suivi mensuel</div>
+
+  <div class="deliverable">
+    <div class="d-icon">📈</div>
+    <div>
+      <div class="d-name">Rapport de progression mensuel</div>
+      <div class="d-desc">Généré automatiquement chaque mois après re-test des mêmes requêtes sur les mêmes IA. Score avant/après, delta, nouveaux concurrents apparus, concurrents disparus. Envoyé au client par email + visible dans son dashboard.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Sans mesure mensuelle, le client ne sait pas si ses efforts ont servi. C'est ce qui justifie les 100€/mois et fidélise.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">HTML auto-généré<br>1er du mois</span>
+    </div>
+  </div>
+
+  <div class="deliverable">
+    <div class="d-icon">🖥️</div>
+    <div>
+      <div class="d-name">Dashboard client</div>
+      <div class="d-desc">Page web sécurisée par token (même lien que la landing). Historique des scores avec graphe, détail des requêtes testées, liste des concurrents, checklist de progression, livrables téléchargeables, date du prochain re-test.</div>
+      <div class="d-why"><strong>Pourquoi c'est indispensable</strong>Le client accède seul à l'état de son programme. Ça remplace les appels de suivi manuels pour l'offre Kit et valorise l'abonnement mensuel de façon tangible.</div>
+    </div>
+    <div class="d-meta">
+      <span class="d-badge kit">Kit</span>
+      <span class="d-badge tout">Tout Inclus</span><br>
+      <span class="d-format">Page web permanente<br>/client/{id}?t=token</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── 4. SYNERGIES — POURQUOI ON NE PEUT PAS DÉCOUPER ────────────────── -->
+<section>
+  <h2>4. Pourquoi on ne peut pas "juste faire une partie"</h2>
+  <p class="section-intro">Argument à utiliser si le client veut choisir un seul livrable.</p>
+
+  <table class="synergy-table">
+    <tr>
+      <th>Si le client demande…</th>
+      <th>Le problème sans le reste</th>
+      <th>La réponse</th>
+    </tr>
+    <tr>
+      <td>"Juste le JSON-LD"</td>
+      <td>Sans les FAQ, les IA ont le signal de structure mais pas de contenu à citer. Impact divisé par 3.</td>
+      <td class="rep">Le JSON-LD dit aux IA <em>qui vous êtes</em>. Les FAQ leur donnent <em>quoi dire</em> sur vous. Les deux ensemble créent la citation.</td>
+    </tr>
+    <tr>
+      <td>"Juste les FAQ"</td>
+      <td>Sans JSON-LD, les IA ne savent pas que les pages viennent de votre entreprise. Sans audit, on ne sait pas quelles FAQ créer.</td>
+      <td class="rep">Les FAQ sans JSON-LD, c'est un livre sans couverture. L'IA ne sait pas à qui les attribuer.</td>
+    </tr>
+    <tr>
+      <td>"Juste le rapport, je fais le reste seul"</td>
+      <td>Le rapport dit QUOI corriger. Sans les fichiers prêts à l'emploi, le client doit tout créer de zéro — il ne le fera pas.</td>
+      <td class="rep">On lui donne le diagnostic ET les médicaments. Juste l'ordonnance, ça ne guérit pas.</td>
+    </tr>
+    <tr>
+      <td>"Pas besoin du suivi mensuel"</td>
+      <td>Les IA évoluent. Un concurrent peut apparaître. Les corrections peuvent prendre 3-6 mois à produire des effets. Sans mesure, il ne sait pas si ça marche.</td>
+      <td class="rep">La visibilité IA n'est pas un état stable. C'est comme un feu : ça s'entretient.</td>
+    </tr>
+  </table>
+</section>
+
+
+<!-- ── 5. OFFRES ET TARIFS ──────────────────────────────────────────── -->
+<section>
+  <h2>5. Offres et tarifs</h2>
+
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:20px">
+    <strong>Stratégie de présentation :</strong> Toujours ancrer sur le Tout Inclus en premier. Le Kit est l'alternative pour ceux qui veulent gérer eux-mêmes. L'Audit Flash est la porte d'entrée, pas la destination.
+  </div>
+
+  <div class="pricing">
+    <div class="price-card best">
+      <div class="p-name">⭐ Tout Inclus — Offre principale</div>
+      <div class="p-price">3 500€</div>
+      <div class="p-sub">forfait · suivi 6 mois inclus</div>
+      <ul>
+        <li>Audit complet inclus</li>
+        <li>Dossier stratégique complet</li>
+        <li>On intègre tout sur leur site</li>
+        <li>FAQ rédigées et publiées</li>
+        <li>Citations locales (15-20)</li>
+        <li>Google Business optimisé</li>
+        <li>Re-tests hebdomadaires</li>
+        <li>Dashboard client</li>
+        <li>Garantie résultats 6 mois</li>
+      </ul>
+    </div>
+
+    <div class="price-card">
+      <div class="p-name">Kit — Alternative autonome</div>
+      <div class="p-price">500€</div>
+      <div class="p-sub">+ 100€/mois · engagement 6 mois</div>
+      <ul>
+        <li>Audit complet inclus</li>
+        <li>Dossier stratégique complet</li>
+        <li>JSON-LD prêt à intégrer</li>
+        <li>5-10 pages FAQ à publier</li>
+        <li>Checklist + guides CMS</li>
+        <li>Re-tests hebdomadaires</li>
+        <li>Alerte uniquement si nouveautés</li>
+        <li>Dashboard client</li>
+        <li>Le client implémente lui-même</li>
+      </ul>
+    </div>
+
+    <div class="price-card">
+      <div class="p-name">Audit Flash — Porte d'entrée</div>
+      <div class="p-price">97€</div>
+      <div class="p-sub">une fois — sans engagement</div>
+      <ul>
+        <li>3 IA × 5 requêtes</li>
+        <li>Score /10</li>
+        <li>Concurrents identifiés</li>
+        <li>Rapport + landing personnalisée</li>
+        <li>→ Déclencheur de l'appel closer</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;background:var(--light);border-radius:10px;padding:16px 20px;font-size:13px;color:#374151">
+    <strong>Du Tout Inclus vers le Kit :</strong> "La différence entre les deux, c'est qui implémente. Dans le Tout Inclus, c'est nous — vous recevez des résultats. Dans le Kit, vous avez tous les fichiers prêts, avec les guides pas-à-pas adaptés à votre site. Pour la plupart des artisans, leur heure de travail vaut bien plus que la différence de prix entre les deux."
+  </div>
+</section>
+
+
+<!-- ── 6. SCRIPT CLOSER ─────────────────────────────────────────────── -->
+<section>
+  <h2>6. Script de l'appel — closer</h2>
+  <p class="section-intro">Structure de l'appel en 5 étapes. Durée cible : 20-30 min.</p>
+
+  <div class="closer-box">
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:16px">
+      <strong>Avant l'appel :</strong> Le prospect a reçu son rapport d'audit par email (landing personnalisée + score). Relire ce rapport avant d'appeler — les données exactes (score, nom des concurrents cités, requêtes testées) sont les seuls arguments dont on a besoin.
+    </div>
+
+    <div class="pitch-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Ancrer dans le concret (3 min)</h4>
+        <p>Utiliser uniquement les données du rapport — pas de stats génériques. Le concret choque plus que les grandes phrases.</p>
+        <div class="phrase">"Vous avez reçu le rapport. Votre score, c'est X/10. Concrètement : sur les 5 façons dont vos clients cherchent un [métier] à [ville] sur ChatGPT, [n] fois c'est [concurrent] qui apparaît — pas vous. On a le relevé exact, je vous le lis si vous voulez."</div>
+      </div>
+    </div>
+
+    <div class="pitch-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Expliquer le mécanisme, pas la technique (5 min)</h4>
+        <p>Le "pourquoi" sans jargon. Les 3 signaux que les IA lisent. Ne pas entrer dans les détails techniques — juste l'intuition.</p>
+        <div class="phrase">"Les IA ne fonctionnent pas comme Google. Elles cherchent 3 choses : est-ce que votre nom apparaît clairement sur des sources sérieuses, est-ce que votre site leur dit explicitement ce que vous faites et où, et est-ce que d'autres gens parlent de vous en dehors de votre site. On a identifié lesquels vous manquent — c'est dans le rapport."</div>
+      </div>
+    </div>
+
+    <div class="pitch-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Présenter les 3 phases comme un programme (5 min)</h4>
+        <p>Ne pas lister les livrables. Raconter le chemin. "Chaque semaine" pas "chaque mois".</p>
+        <div class="phrase">"On travaille en 3 temps. Le diagnostic, c'est déjà fait — c'est le rapport que vous avez reçu avant cet appel. Ensuite on vous prépare tous les fichiers et le plan d'action — c'est la phase Activation, livrée en 48h. Et chaque semaine on re-teste pour voir comment ça progresse — on vous prévient seulement quand il y a quelque chose de nouveau à vous montrer. Les trois sont liés : sans le diagnostic on travaille à l'aveugle, sans l'activation vous savez que vous avez un problème mais vous n'avez pas les outils, et sans le suivi vous ne saurez jamais ce qui a marché et comment optimiser."</div>
+      </div>
+    </div>
+
+    <div class="pitch-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Ancrer sur le Tout Inclus, proposer le Kit en alternative (5 min)</h4>
+        <p>Partir du haut. Le Kit n'est pas le produit par défaut — c'est l'alternative pour ceux qui veulent faire eux-mêmes.</p>
+        <div class="phrase">"La solution complète, c'est 3500€ — on s'occupe de tout : les fichiers, l'intégration sur votre site, les pages à publier, les citations locales. Vous n'avez rien à faire techniquement. Pour ceux qui préfèrent avoir les outils en main et les appliquer eux-mêmes, il y a le Kit à 500€ + 100€/mois. Dans les deux cas, le suivi hebdomadaire est inclus. Laquelle correspond à votre façon de travailler ?"</div>
+      </div>
+    </div>
+
+    <div class="pitch-step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <h4>Traiter les objections et conclure (5 min)</h4>
+        <p>Voir tableau ci-dessous. Toujours ramener à la perte concrète.</p>
+        <div class="phrase">"Ce que je vous propose, c'est qu'on démarre dès cette semaine. L'Activation est prête en 48h. Vous recevez tout dans votre espace client et on vous explique chaque étape."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── 7. OBJECTIONS FRÉQUENTES ─────────────────────────────────────── -->
+<section>
+  <h2>7. Objections fréquentes</h2>
+
+  <table class="obj-table">
+    <tr>
+      <th>Objection</th>
+      <th>Réponse</th>
+    </tr>
+    <tr>
+      <td class="obj">"Je ne comprends pas bien ce que c'est l'IA pour les entreprises"</td>
+      <td class="rep">
+        "Quand vous cherchez un plombier sur votre téléphone aujourd'hui, vous demandez peut-être à Siri ou à ChatGPT avant même d'aller sur Google. Vos clients font pareil. <strong>On vous dit juste si vous apparaissez dans cette réponse-là, et comment y rester.</strong>"
+      </td>
+    </tr>
+    <tr>
+      <td class="obj">"J'ai déjà un SEO / une agence web"</td>
+      <td class="rep">
+        "Le SEO Google et la visibilité IA sont deux choses différentes. Un site bien référencé sur Google peut être totalement absent de ChatGPT. <strong>Votre score de X/10 le prouve.</strong> Ce n'est pas un reproche à votre agence — c'est un nouveau terrain qu'elle ne couvre pas encore."
+      </td>
+    </tr>
+    <tr>
+      <td class="obj">"C'est trop cher"</td>
+      <td class="rep">
+        "Un chantier de couverture, combien ça vaut ? <strong>Si l'IA vous amène un client de plus par mois, le programme est remboursé.</strong> Et on vous montre chaque mois si ça progresse."
+      </td>
+    </tr>
+    <tr>
+      <td class="obj">"Je vais d'abord réfléchir"</td>
+      <td class="rep">
+        "Bien sûr. Pendant ce temps, [concurrent cité dans le rapport] continue d'être recommandé à votre place. <strong>Le problème ne se résout pas en attendant.</strong> Qu'est-ce qui vous ferait décider ?"
+      </td>
+    </tr>
+    <tr>
+      <td class="obj">"Je ne suis pas sûr de savoir intégrer ça sur mon site"</td>
+      <td class="rep">
+        "C'est exactement pour ça qu'on intègre les guides d'utilisation directement dans les fichiers. Mais si vous préférez qu'on s'en occupe entièrement, c'est l'option Tout Inclus. <strong>Combien de temps pouvez-vous consacrer à ça par semaine ?</strong>"
+      </td>
+    </tr>
+  </table>
+</section>
+
+
+<!-- ── 8. LOGIQUE FRACTALE — UPSELLS ET RÉPLICATION ─────────────────── -->
+<section>
+  <h2>8. La logique fractale — comment le programme se réplique</h2>
+  <p class="section-intro">
+    Chaque niveau du programme reproduit la même structure : observer → corriger → mesurer.
+    C'est cette cohérence qui crée des upsells naturels sans forcer.
+  </p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:var(--light);border-radius:10px;padding:20px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px">À l'échelle d'un livrable</div>
+      <p style="font-size:13px;color:#374151">Chaque page FAQ est elle-même un mini-dossier : elle observe une question (la requête), y répond (positionne l'entreprise), et peut être re-testée. Le JSON-LD fait la même chose à l'échelle du site entier.</p>
+    </div>
+    <div style="background:var(--light);border-radius:10px;padding:20px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px">À l'échelle du suivi</div>
+      <p style="font-size:13px;color:#374151">Chaque semaine de re-test reproduit le cycle en miniature : on teste (observe), on voit ce qui a changé (analyse), on recommande un ajustement (action). Le programme ne s'arrête jamais — il se densifie.</p>
+    </div>
+  </div>
+
+  <div style="background:#1a0a4e;color:#fff;border-radius:12px;padding:24px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#f9a8d4">Upsells naturels — à proposer au bon moment</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:8px">Expansion géographique</div>
+        <p style="font-size:12px;color:rgba(255,255,255,.8)">Client à Brest avec bons résultats → "Vous avez aussi une zone d'intervention sur Quimper ? On peut faire le même programme sur cette ville."</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:8px">Expansion sectorielle</div>
+        <p style="font-size:12px;color:rgba(255,255,255,.8)">Couvreur bien positionné → "Vous faites aussi de la zinguerie ? On n'a pas encore testé ces requêtes-là. On peut les ajouter au suivi."</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:8px">Réseau / Groupement</div>
+        <p style="font-size:12px;color:rgba(255,255,255,.8)">Client satisfait dans un réseau d'artisans → "Vous connaissez d'autres couvreurs dans votre groupement ? On peut leur proposer le même audit — tarif groupement."</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:8px">Upgrade Kit → Tout Inclus</div>
+        <p style="font-size:12px;color:rgba(255,255,255,.8)">Après 2 mois de Kit : "Vous avez appliqué combien d'actions sur la checklist ? Si vous n'avez pas eu le temps d'en faire la moitié, on peut reprendre là où vous êtes et finir en Tout Inclus."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── 9. CE QU'ON NE FAIT PAS (LIMITES) ────────────────────────────── -->
+<section>
+  <h2>8. Ce qu'on ne fait pas (limites à connaître)</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="background:#fef2f2;border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:10px">🚫 Hors périmètre Kit</div>
+      <ul style="list-style:none">
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #fecaca">Intégration technique sur le site du client</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #fecaca">Rédaction des pages (on fournit, client publie)</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #fecaca">Création / optimisation Google Business</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #fecaca">Création de citations locales</li>
+        <li style="padding:4px 0;font-size:12px">Refonte du site web</li>
+      </ul>
+    </div>
+    <div style="background:#f0fdf4;border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:10px">✅ Inclus Tout Inclus (3500€)</div>
+      <ul style="list-style:none">
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #bbf7d0">Intégration JSON-LD sur le site</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #bbf7d0">Publication des pages FAQ</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #bbf7d0">Optimisation Google Business Profile</li>
+        <li style="padding:4px 0;font-size:12px;border-bottom:1px solid #bbf7d0">Création citations locales (15-20)</li>
+        <li style="padding:4px 0;font-size:12px">Réécriture pages principales</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer style="margin-top:60px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);text-align:center">
+  PRESENCE_IA — Fiche Produit Interne · Confidentiel · Mars 2026<br>
+  Ne pas diffuser au client · Usage : équipe commerciale + opérations
+</footer>
+
+</div>
+</body>
+</html>
