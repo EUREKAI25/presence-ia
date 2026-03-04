@@ -5,6 +5,7 @@ POST /api/generate/prospect/{pid}/jsonld
 POST /api/generate/prospect/{pid}/checklist
 POST /api/generate/prospect/{pid}/dossier
 POST /api/generate/prospect/{pid}/all-livrables
+POST /api/generate/prospect/{pid}/content-rewrite
 GET  /api/livrables/{pid}
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +18,7 @@ from ...livrables.jsonld import generate_jsonld
 from ...livrables.checklist import generate_checklist
 from ...livrables.dossier import generate_dossier
 from ...livrables.outreach import generate_outreach
+from ...livrables.content_rewriter import generate_content_rewrite
 
 router = APIRouter(tags=["Livrables"])
 
@@ -196,6 +198,27 @@ def api_outreach(pid: str, db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"success": False, "result": None, "message": "", "error": {"code": "OUTREACH_ERROR", "detail": str(e)}}
+
+
+# ── Content Rewrite (10C) ────────────────────────────────────────────────────
+
+@router.post("/api/generate/prospect/{pid}/content-rewrite")
+def api_content_rewrite(pid: str, db: Session = Depends(get_db)):
+    p = _prospect_or_404(pid, db)
+    try:
+        result = generate_content_rewrite(p)
+        return {
+            "success": True,
+            "result": {
+                "pages_scraped": result["pages_scraped"],
+                "pages_failed": result["pages_failed"],
+                "file": result["file"],
+            },
+            "message": f"{result['pages_scraped']} page(s) réécrite(s) pour {p.name}",
+            "error": None,
+        }
+    except Exception as e:
+        return {"success": False, "result": None, "message": "", "error": {"code": "REWRITE_ERROR", "detail": str(e)}}
 
 
 # ── Liste des livrables disponibles ─────────────────────────────────────────
