@@ -415,7 +415,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <div class="hero">
   <div class="c">
     <div class="hero-pill">Audit Visibilité IA &mdash; {p.name.upper()}</div>
-    <h1>Vos concurrents sont recommandés par les IA.<em>Et vous&nbsp;?</em></h1>
+    <h1>À {p.city}, vos concurrents sont recommandés par les IA.<em>Et vous&nbsp;?</em></h1>
     <button class="hero-cta" onclick="document.getElementById('ia-demo').scrollIntoView({{behavior:'smooth'}})">
       Voir les résultats &darr;
     </button>
