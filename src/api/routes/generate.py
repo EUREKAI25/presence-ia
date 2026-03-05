@@ -61,6 +61,23 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     if not p: raise HTTPException(404)
     s = _summary(db, p); comps = _comps(p, 3)
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
+
+    # Concurrents par modèle (pour la section démo IA)
+    from ...models import TestRunDB as _TRunDB
+    _runs = db.query(_TRunDB).filter_by(prospect_id=p.prospect_id).all()
+    _cby = {}
+    for _r in _runs:
+        for _e in jl(_r.competitors_entities):
+            if isinstance(_e, str):
+                _cby.setdefault(_r.model, [])
+                if _e not in _cby[_r.model]:
+                    _cby[_r.model].append(_e)
+    _demo_date = s["dates"][0] if s.get("dates") else "récemment"
+    _demo_models = [
+        ("openai",    "ChatGPT",          "#10a37f"),
+        ("anthropic", "Claude (Anthropic)", "#d97706"),
+        ("gemini",    "Gemini (Google)",    "#4285f4"),
+    ]
     n_queries = sum(1 for q in s["ql"] if q)
     _MODEL_LABEL = {"openai": "ChatGPT", "anthropic": "Anthropic", "gemini": "Gemini"}
     models_str = ", ".join(_MODEL_LABEL.get(m, m.title()) for m in s["models"]) or "—"
@@ -68,9 +85,9 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     # Header image de la ville (si uploadée)
     city_header = db_get_header(db, p.city.lower())
     hero_bg = (
-        f"background-image:linear-gradient(to bottom,rgba(15,10,50,.35) 0%,rgba(10,18,60,.65) 100%),"
+        f"background-image:linear-gradient(to bottom,rgba(0,0,15,.78) 0%,rgba(0,0,15,.85) 100%),"
         f"url('{city_header.url}');background-size:cover;background-position:center;"
-    ) if city_header else "background:linear-gradient(135deg,#1a0a4e 0%,#0e2560 50%,#0d1f5c 100%);"
+    ) if city_header else "background:linear-gradient(135deg,#0d0820 0%,#0a1840 50%,#071030 100%);"
 
     # Content blocks
     L = lambda sk, fk: get_block(db, "landing", sk, fk, profession=p.profession, city=p.city)
@@ -222,11 +239,13 @@ a{{color:inherit;text-decoration:none}}
 .hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);
   color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
   padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
-.hero h1{{font-size:clamp(30px,5.5vw,58px);font-weight:800;color:#fff;max-width:760px;
-  margin:0 auto 8px;letter-spacing:-.8px;line-height:1.1}}
-.hero-name{{display:block;font-size:.55em;font-weight:600;color:rgba(255,255,255,.7);
+.hero h1{{font-size:clamp(28px,5vw,54px);font-weight:800;color:#fff;max-width:760px;
+  margin:0 auto 8px;letter-spacing:-.8px;line-height:1.15;
+  text-shadow:0 2px 12px rgba(0,0,0,.5)}}
+.hero-name{{display:block;font-size:.55em;font-weight:600;color:rgba(255,255,255,.85);
   letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase}}
-.hero-sub{{color:rgba(255,255,255,.65);font-size:16px;max-width:480px;margin:16px auto 40px}}
+.hero-sub{{color:rgba(255,255,255,.88);font-size:16px;max-width:480px;margin:16px auto 40px;
+  text-shadow:0 1px 6px rgba(0,0,0,.4)}}
 .hero-cta{{display:inline-flex;align-items:center;gap:8px;
   background:#fff;color:var(--txt);font-weight:700;font-size:14px;
   padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);
@@ -332,6 +351,53 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
   border-left:3px solid var(--acc);border-radius:0 8px 8px 0;
   font-size:15px;color:#374151;font-weight:500;line-height:1.6}}
 
+/* STATS BAR */
+.stats-bar{{background:#fff;border-bottom:1px solid var(--border);padding:36px 24px}}
+.stats-bar__inner{{max-width:820px;margin:0 auto;display:flex;justify-content:center;flex-wrap:wrap;gap:0}}
+.stats-bar .stat{{text-align:center;padding:0 44px;border-right:1px solid var(--border)}}
+.stats-bar .stat:last-child{{border-right:none}}
+.stats-bar .stat__val{{font-size:1.25rem;font-weight:800;color:var(--txt);letter-spacing:-.02em;line-height:1.2}}
+.stats-bar .stat__lbl{{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}}
+@media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:16px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
+
+/* IA DEMO */
+.sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
+.ia-query-bar{{background:#1e293b;color:#e2e8f0;border-radius:10px;padding:14px 20px;
+  font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
+.ia-query-ts{{color:#94a3b8;font-size:11px;white-space:nowrap}}
+.ia-query-text{{font-style:italic;color:#f1f5f9}}
+.ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
+@media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
+.ia-col{{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}}
+.ia-col__brand{{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}}
+.ia-col__list{{list-style:none;padding:0}}
+.ia-col__list li{{font-size:13px;color:#374151;padding:6px 0;border-bottom:1px solid #f1f5f9;
+  display:flex;align-items:center;gap:8px}}
+.ia-col__list li:last-child{{border-bottom:none}}
+.ia-col__list li::before{{content:"";display:inline-block;width:6px;height:6px;
+  border-radius:50%;background:var(--acc);flex-shrink:0}}
+.ia-col__empty{{font-size:12px;color:var(--muted);font-style:italic}}
+.ia-demo-cta{{text-align:center;padding-top:8px}}
+.ia-demo-cta p{{font-size:1rem;font-weight:600;color:var(--txt);margin-bottom:20px;max-width:540px;margin-left:auto;margin-right:auto}}
+
+/* PITCH SECTION */
+.sect-pitch{{background:#fff}}
+.pitch-card{{background:#f8fafc;border:1px solid var(--border);border-radius:12px;
+  padding:32px 36px;max-width:680px;margin:0 auto}}
+.pitch-card p{{font-size:1.05rem;color:#1f2937;font-weight:500;line-height:1.7;margin-bottom:24px}}
+.pitch-list{{list-style:none;padding:0;margin-bottom:28px}}
+.pitch-list li{{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#374151;
+  padding:8px 0;border-bottom:1px solid #e2e8f0}}
+.pitch-list li:last-child{{border-bottom:none}}
+.pitch-list li::before{{content:"→";color:var(--acc);font-weight:700;flex-shrink:0;margin-top:1px}}
+.pitch-cta-wrap{{text-align:center}}
+.btn-pitch{{display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;
+  font-weight:700;font-size:15px;padding:16px 40px;border-radius:50px;
+  text-decoration:none;box-shadow:0 4px 20px rgba(232,53,90,.35);transition:all .2s;cursor:pointer;border:none}}
+.btn-pitch:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(232,53,90,.45)}}
+
 /* VIDEO + FOOTER */
 .video-link{{text-align:center;margin-top:36px}}
 .video-link a{{color:var(--muted);font-size:13px}}
@@ -345,13 +411,49 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <div class="hero">
   <div class="c">
     <div class="hero-pill">Audit Visibilite IA &mdash; {p.city}</div>
-    <h1><span class="hero-name">{p.name}</span>On a testé vos chances<br>d&rsquo;être recommandé par les IA</h1>
+    <h1><span class="hero-name">{p.name}</span>Vos concurrents sont recommandés<br>par les IA. Et vous&nbsp;?</h1>
     <p class="hero-sub">{n_queries} requetes testees sur {len(s["models"])} modeles &mdash; {models_str}</p>
     <button class="hero-cta" onclick="document.getElementById('resultats').scrollIntoView({{behavior:'smooth'}})">
       Voir les resultats &darr;
     </button>
   </div>
 </div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-bar__inner">
+    <div class="stat"><div class="stat__val">Concurrents<br>identifiés</div><div class="stat__lbl">Leur nom. Ce qu'ils font. Votre angle d'attaque.</div></div>
+    <div class="stat"><div class="stat__val">Rapport<br>en 48h</div><div class="stat__lbl">Chiffré. Personnalisé. Prêt à exploiter.</div></div>
+    <div class="stat"><div class="stat__val">Plan d'action<br>inclus</div><div class="stat__lbl">Pas un bilan. Une feuille de route.</div></div>
+  </div>
+</div>
+
+<!-- IA DEMO -->
+<section class="sect-ia-demo">
+  <div class="c">
+    <p class="sect-label">En ce moment même</p>
+    <h2>Voici ce que voient vos prospects<br>quand ils posent la question à leur IA</h2>
+    <p class="sect-sub">Vos futurs clients demandent à ChatGPT, Claude et Gemini quel {p.profession} choisir à {p.city}. Voici ce que les IA leur répondent.</p>
+    <div class="ia-query-bar">
+      <span class="ia-query-ts">{_demo_date}</span>
+      <span class="ia-query-text">« Quel {p.profession} recommandes-tu à {p.city} ? »</span>
+    </div>
+    <div class="ia-columns">
+      {"".join(
+        f'<div class="ia-col">'
+        f'<div class="ia-col__brand" style="color:{color}">{label}</div>'
+        f'<ul class="ia-col__list">'
+        + ("".join(f'<li>{c}</li>' for c in _cby.get(key, [])[:3]) or '<li class="ia-col__empty">Pas de réponse obtenue</li>')
+        + f'</ul></div>'
+        for key, label, color in _demo_models
+      )}
+    </div>
+    <div class="ia-demo-cta">
+      <p>Voulez-vous savoir ce que font vos concurrents — et ce qu'il vous manque pour les dépasser&nbsp;?</p>
+      <a class="btn-pitch" href="#plans">Voir comment inverser la tendance &darr;</a>
+    </div>
+  </div>
+</section>
 
 <!-- RÉSULTATS -->
 <section class="sect-results" id="resultats">
@@ -368,12 +470,31 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- PREUVES -->
 {ev_section}
 
+<!-- PITCH -->
+<section class="sect-pitch">
+  <div class="c">
+    <p class="sect-label">Ce que vous recevez</p>
+    <h2>Le rapport exact que viennent de voir<br>vos concurrents sur vous</h2>
+    <div class="pitch-card">
+      <p>Vos concurrents ne sont pas meilleurs que vous.<br>Ils parlent simplement la langue que comprennent les IA.<br>Ce rapport vous montre quoi — et comment faire pareil.</p>
+      <ul class="pitch-list">
+        <li>Votre score de visibilité réel sur ChatGPT, Gemini et Claude</li>
+        <li>Les concurrents qui vous précèdent — nommés, avec leur avantage</li>
+        <li>Le plan d'action priorisé pour inverser la tendance</li>
+      </ul>
+      <div class="pitch-cta-wrap">
+        <a class="btn-pitch" href="#plans">Choisir mon offre et démarrer &darr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- PLANS -->
 <section class="sect-plans" id="plans">
   <div class="c">
     <p class="sect-label">Offres</p>
-    <h2>Agissez avant que vos concurrents le fassent</h2>
-    <p class="sect-sub">Les IA apprennent en permanence. Etre cite demain depend de ce que vous faites aujourd&rsquo;hui. Choisissez le plan adapte a votre ambition.</p>
+    <h2>Démarrez avant que vos concurrents ne le fassent</h2>
+    <p class="sect-sub">Les IA apprennent en permanence. Être cité demain dépend de ce que vous faites aujourd&rsquo;hui.</p>
     <div class="plans-grid">
       {plans_html}
     </div>
