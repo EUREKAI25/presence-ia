@@ -62,23 +62,18 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     s = _summary(db, p); comps = _comps(p, 3)
     base_url = os.getenv("BASE_URL", "http://localhost:8001")
 
-    # Concurrents par modèle (pour la section démo IA)
+    # Données IA par requête (accordéon)
     from ...models import TestRunDB as _TRunDB
-    _runs = db.query(_TRunDB).filter_by(prospect_id=p.prospect_id).all()
-    _cby = {}
-    for _r in _runs:
-        for _e in jl(_r.competitors_entities):
-            if isinstance(_e, str):
-                _cby.setdefault(_r.model, [])
-                if _e not in _cby[_r.model]:
-                    _cby[_r.model].append(_e)
-    # Formatage date/heure du test pour la démo
     from datetime import datetime as _dtcls
+    _runs = db.query(_TRunDB).filter_by(prospect_id=p.prospect_id).all()
+    _latest_by_model = {}
+    for _r in sorted(_runs, key=lambda r: str(r.ts)):
+        _latest_by_model[_r.model] = _r
+    _ref_run = next(iter(_latest_by_model.values()), None)
     _demo_dt_str = s["dates"][0] if s.get("dates") else "récemment"
-    if _runs:
+    if _ref_run:
         try:
-            _ts = str(_runs[0].ts)[:16]
-            _dto = _dtcls.fromisoformat(_ts)
+            _dto = _dtcls.fromisoformat(str(_ref_run.ts)[:16])
             _demo_dt_str = _dto.strftime("%d/%m/%Y à %Hh%M")
         except Exception:
             pass
@@ -87,6 +82,24 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
         ("anthropic", "Claude",   "(Anthropic)", "#d97706"),
         ("gemini",    "Gemini",   "(Google)",    "#4285f4"),
     ]
+    _all_queries = jl(_ref_run.queries) if _ref_run else []
+    _queries_data = []
+    for _qi, _q in enumerate(_all_queries[:3]):
+        _q_comps = {}
+        for _model_key, _, _, _ in _demo_models:
+            _r = _latest_by_model.get(_model_key)
+            if _r:
+                _ents = jl(_r.extracted_entities)
+                if _qi < len(_ents):
+                    _qe = _ents[_qi]
+                    if isinstance(_qe, list):
+                        _q_comps[_model_key] = [
+                            e["value"] for e in _qe
+                            if isinstance(e, dict) and e.get("type") == "company"
+                        ][:3]
+        _queries_data.append({"query": _q, "models": _q_comps})
+    if not _queries_data:
+        _queries_data = [{"query": f"Quel {p.profession} recommandes-tu à {p.city} ?", "models": {}}]
 
     # Header image de la ville (si uploadée)
     city_header = db_get_header(db, p.city.lower())
@@ -207,8 +220,33 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     n_named = sum(1 for c in s["qm"] if c > 0)
     comp_items = "".join(f'<span class="comp-tag">{c}</span>' for c in comps)
 
-    # ── 3 requêtes de démo ───────────────────────────────────────────────
-    _demo_queries = [q for q in s.get("ql", []) if q][:3]
+    # ── Accordéon IA démo (3 requêtes réelles, par modèle) ──────────────
+    _acc_items = []
+    for _idx, _qd in enumerate(_queries_data):
+        _cols = "".join(
+            f'<div class="ia-col">'
+            f'<div class="ia-col__brand" style="color:{_color}">{_name}'
+            f' <span style="font-size:.78em;font-weight:400;color:#94a3b8">{_company}</span></div>'
+            f'<ul class="ia-col__list">'
+            + ("".join(f"<li>{c}</li>" for c in _qd["models"].get(_key, []))
+               or '<li class="ia-col__empty">Aucun concurrent cité</li>')
+            + f'</ul></div>'
+            for _key, _name, _company, _color in _demo_models
+        )
+        _open_cls = " open" if _idx == 0 else ""
+        _icon = "−" if _idx == 0 else "+"
+        _hidden_attr = "" if _idx == 0 else " hidden"
+        _acc_items.append(
+            f'<div class="acc-item{_open_cls}">'
+            f'<button class="acc-q" onclick="toggleAcc(this)">'
+            f'<span class="acc-ts">{_demo_dt_str}</span>'
+            f'<span class="acc-text">« {_qd["query"]} »</span>'
+            f'<span class="acc-icon">{_icon}</span></button>'
+            f'<div class="acc-body"{_hidden_attr}>'
+            f'<div class="ia-columns">{_cols}</div>'
+            f'</div></div>'
+        )
+    _accordion_html = "\n".join(_acc_items)
 
     # ── FAQ (accordéon JS, un à la fois) ────────────────────────────────
     faq_html = "".join(
@@ -384,10 +422,15 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 
 /* IA DEMO */
 .sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
-.ia-query-bar{{background:#1e293b;color:#e2e8f0;border-radius:10px;padding:14px 20px;
-  font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
-.ia-query-ts{{color:#94a3b8;font-size:12px;white-space:nowrap;font-weight:600}}
-.ia-query-text{{font-style:italic;color:#f1f5f9;font-size:16px;font-weight:500}}
+.ia-accordion{{margin-bottom:28px}}
+.acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
+.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;
+  padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
+.acc-ts{{color:#94a3b8;font-size:11px;white-space:nowrap;font-weight:600;flex-shrink:0}}
+.acc-text{{font-style:italic;color:#f1f5f9;font-size:15px;font-weight:500;flex:1}}
+.acc-icon{{color:#64748b;font-size:20px;font-weight:300;flex-shrink:0;margin-left:auto;transition:color .15s}}
+.acc-item.open .acc-icon{{color:#60a5fa}}
+.acc-body{{padding:0 16px 16px}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
 @media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
 .ia-col{{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}}
@@ -461,23 +504,8 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
   <div class="c">
     <h2 style="font-size:clamp(28px,4vw,44px);margin-bottom:6px">En ce moment</h2>
     <p class="sect-sub" style="margin-bottom:32px">Voici ce que voient vos prospects quand ils consultent leur IA pour trouver un {p.profession} à {p.city}</p>
-    {"".join(
-      f'<div class="ia-query-bar" style="opacity:{1 - i*0.18:.2f}">'
-      f'<span class="ia-query-ts">{_demo_dt_str}</span>'
-      f'<span class="ia-query-text">« {q} »</span>'
-      f'</div>'
-      for i, q in enumerate(_demo_queries or [f"Quel {p.profession} recommandes-tu à {p.city} ?"])
-    )}
-    <div class="ia-columns">
-      {"".join(
-        f'<div class="ia-col">'
-        f'<div class="ia-col__brand" style="color:{color}">{name}'
-        f' <span style="font-size:.78em;font-weight:400;color:#94a3b8">{company}</span></div>'
-        f'<ul class="ia-col__list">'
-        + ("".join(f'<li>{c}</li>' for c in _cby.get(key, [])[:3]) or '<li class="ia-col__empty">Aucun concurrent cité</li>')
-        + f'</ul></div>'
-        for key, name, company, color in _demo_models
-      )}
+    <div class="ia-accordion">
+      {_accordion_html}
     </div>
     <div class="ia-demo-cta">
       <p class="ia-demo-cta__title">Vous n&rsquo;y êtes pas&nbsp;?</p>
@@ -497,6 +525,20 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 </footer>
 
 <script>
+function toggleAcc(btn) {{
+  const item = btn.closest('.acc-item');
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.acc-item').forEach(i => {{
+    i.classList.remove('open');
+    i.querySelector('.acc-body').hidden = true;
+    i.querySelector('.acc-icon').textContent = '+';
+  }});
+  if (!isOpen) {{
+    item.classList.add('open');
+    item.querySelector('.acc-body').hidden = false;
+    item.querySelector('.acc-icon').textContent = '−';
+  }}
+}}
 function toggleFaq(btn) {{
   const isOpen = btn.classList.contains('open');
   document.querySelectorAll('.faq-q').forEach(b => {{

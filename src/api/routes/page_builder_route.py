@@ -465,8 +465,8 @@ a{color:inherit}
 .stats-bar__grid{display:flex;justify-content:center;gap:0;flex-wrap:wrap;max-width:860px;margin:0 auto}
 .stat{text-align:center;padding:0 48px;border-right:1px solid #e2e8f0}
 .stat:last-child{border-right:none}
-.stat__val{font-size:2rem;font-weight:800;color:var(--dark);letter-spacing:-.04em}
-.stat__lbl{font-size:.8rem;color:var(--m);margin-top:4px;line-height:1.4}
+.stat__val{font-size:1.2rem;font-weight:800;color:var(--dark);letter-spacing:-.02em;line-height:1.2}
+.stat__lbl{font-size:.82rem;color:var(--m);margin-top:5px;line-height:1.4}
 /* SECTIONS */
 .section{padding:88px 24px}
 .section--alt{background:var(--bg)}
@@ -534,9 +534,9 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 
 <div class="stats-bar">
   <div class="stats-bar__grid">
-    <div class="stat"><div class="stat__val">87%</div><div class="stat__lbl">des pros testés sont invisibles sur les IA</div></div>
-    <div class="stat"><div class="stat__val">3 IA</div><div class="stat__lbl">testées : ChatGPT · Gemini · Claude</div></div>
-    <div class="stat"><div class="stat__val">48h</div><div class="stat__lbl">délai de livraison rapport + plan d'action</div></div>
+    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
+    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
+    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
   </div>
 </div>
 
