@@ -141,9 +141,24 @@ section > .section-intro { color: var(--muted); margin-bottom: 24px; font-size: 
 .rep { color: #111827; }
 .rep strong { color: var(--acc); }
 
+/* ACCORDIONS */
+section > h2 { cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+section > h2 .acc-icon { font-size: 13px; color: var(--acc); transition: transform .25s; flex-shrink: 0; }
+section > h2.open .acc-icon { transform: rotate(180deg); }
+.acc-content { display: none; }
+.acc-content.open { display: block; }
+.phase { cursor: pointer; }
+.phase h3 { display: flex; justify-content: space-between; align-items: center; }
+.phase h3 .phase-icon { font-size: 11px; color: var(--muted); transition: transform .2s; }
+.phase.ph-open h3 .phase-icon { transform: rotate(180deg); }
+.phase-body { display: none; }
+.phase.ph-open .phase-body { display: block; }
+
 @media print {
   .phases { grid-template-columns: 1fr 1fr 1fr; }
   .pricing { grid-template-columns: 1fr 1fr 1fr; }
+  .acc-content { display: block !important; }
+  .phase-body { display: block !important; }
 }
 </style>
 </head>
@@ -733,11 +748,52 @@ section > .section-intro { color: var(--muted); margin-bottom: 24px; font-size: 
 </footer>
 
 <script>
-// Injecte le token closer dans tous les liens exemples
 (function(){
+  // 1. Token injection
   const t = new URLSearchParams(window.location.search).get('t') || '';
   document.querySelectorAll('[data-exemple]').forEach(function(a){
     a.href = a.href.replace('__TOKEN__', encodeURIComponent(t));
+  });
+
+  // 2. Accordéons sections
+  document.querySelectorAll('section').forEach(function(section){
+    const h2 = section.querySelector(':scope > h2');
+    if (!h2) return;
+    // Ajouter l'icône toggle
+    const icon = document.createElement('span');
+    icon.className = 'acc-icon';
+    icon.textContent = '▼';
+    h2.appendChild(icon);
+    // Envelopper tout le contenu après h2 dans .acc-content
+    const wrap = document.createElement('div');
+    wrap.className = 'acc-content';
+    while (h2.nextSibling) wrap.appendChild(h2.nextSibling);
+    section.appendChild(wrap);
+    // Toggle
+    h2.addEventListener('click', function(){
+      const open = wrap.classList.toggle('open');
+      h2.classList.toggle('open', open);
+    });
+  });
+
+  // 3. Accordéons imbriqués pour les phases
+  document.querySelectorAll('.phase').forEach(function(phase){
+    const h3 = phase.querySelector('h3');
+    if (!h3) return;
+    const icon = document.createElement('span');
+    icon.className = 'phase-icon';
+    icon.textContent = '▼';
+    h3.appendChild(icon);
+    // Envelopper tout sauf phase-num et h3
+    const body = document.createElement('div');
+    body.className = 'phase-body';
+    let node = h3.nextSibling;
+    while (node) { const next = node.nextSibling; body.appendChild(node); node = next; }
+    phase.appendChild(body);
+    phase.addEventListener('click', function(e){
+      if (e.target.closest('a')) return; // ne pas bloquer les liens
+      phase.classList.toggle('ph-open');
+    });
   });
 })();
 </script>
