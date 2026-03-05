@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapport de progression — Leroux Couverture · 15 mars 2026</title>
+<style>
+:root { --acc:#e8355a; --dark:#1a0a4e; --green:#16a34a; --orange:#d97706; --muted:#6b7280; --border:#e5e7eb; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,'Segoe UI',sans-serif; background:#f9fafb; color:#111827; font-size:14px; line-height:1.6; }
+.wrap { max-width:720px; margin:0 auto; padding:40px 24px; }
+.header { background:var(--dark); color:#fff; border-radius:14px; padding:24px 28px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:flex-start; }
+.header h1 { font-size:18px; font-weight:800; margin-bottom:4px; }
+.header .sub { font-size:12px; color:rgba(255,255,255,.6); }
+.header .report-date { text-align:right; }
+.header .report-date .rd-label { font-size:11px; color:rgba(255,255,255,.5); }
+.header .report-date .rd-val { font-size:14px; font-weight:700; }
+.score-comparison { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; margin-bottom:24px; }
+.score-box { background:#fff; border-radius:12px; padding:20px; text-align:center; border:1px solid var(--border); }
+.score-box .sb-date { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:8px; }
+.score-box .sb-num { font-size:40px; font-weight:900; }
+.score-box.before .sb-num { color:var(--acc); }
+.score-box.after .sb-num { color:var(--dark); }
+.score-box .sb-denom { font-size:16px; color:var(--muted); }
+.delta-box { background:var(--green); color:#fff; border-radius:10px; padding:16px 12px; text-align:center; }
+.delta-box .d-arrow { font-size:24px; margin-bottom:4px; }
+.delta-box .d-val { font-size:20px; font-weight:900; }
+.delta-box .d-label { font-size:10px; opacity:.8; }
+.section-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:24px 0 12px; }
+.ia-compare { background:#fff; border-radius:10px; border:1px solid var(--border); overflow:hidden; margin-bottom:20px; }
+.ia-compare-row { display:grid; grid-template-columns:140px 1fr 1fr; border-bottom:1px solid #f3f4f6; }
+.ia-compare-row:last-child { border:none; }
+.ia-compare-row.header-row { background:#f9fafb; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+.ia-compare-row > div { padding:10px 14px; font-size:13px; }
+.cited { color:var(--green); font-weight:600; }
+.not-cited { color:var(--acc); }
+.event-list { }
+.event-item { display:flex; gap:12px; background:#fff; border-radius:10px; border:1px solid var(--border); padding:14px 16px; margin-bottom:10px; align-items:flex-start; }
+.event-icon { font-size:18px; flex-shrink:0; margin-top:2px; }
+.event-content h4 { font-size:13px; font-weight:700; margin-bottom:3px; }
+.event-content p { font-size:12px; color:var(--muted); }
+.reco-box { background:var(--dark); color:#fff; border-radius:12px; padding:22px 24px; margin-top:24px; }
+.reco-box h3 { font-size:15px; font-weight:700; margin-bottom:14px; color:#f9a8d4; }
+.reco-item { display:flex; gap:10px; margin-bottom:10px; align-items:flex-start; }
+.reco-num { min-width:22px; height:22px; background:rgba(255,255,255,.15); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0; }
+.reco-item p { font-size:13px; color:rgba(255,255,255,.85); }
+.next-test { background:#fff; border:2px solid var(--border); border-radius:10px; padding:16px 20px; margin-top:20px; display:flex; justify-content:space-between; align-items:center; }
+.next-test .nt-label { font-size:13px; color:var(--muted); }
+.next-test .nt-date { font-size:15px; font-weight:700; color:var(--dark); }
+footer { margin-top:40px; font-size:11px; color:var(--muted); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div>
+    <h1>Rapport de progression bimensuel</h1>
+    <div class="sub">Leroux Couverture · Rennes · Exemple fictif</div>
+  </div>
+  <div class="report-date">
+    <div class="rd-label">Rapport du</div>
+    <div class="rd-val">15 mars 2026</div>
+    <div class="rd-label" style="margin-top:6px">Période couverte</div>
+    <div class="rd-val">1 → 15 mars</div>
+  </div>
+</div>
+
+<div class="section-title">Évolution du score de visibilité</div>
+
+<div class="score-comparison">
+  <div class="score-box before">
+    <div class="sb-date">1er mars</div>
+    <div><span class="sb-num">2</span><span class="sb-denom">/10</span></div>
+  </div>
+  <div class="delta-box">
+    <div class="d-arrow">↑</div>
+    <div class="d-val">+1,5</div>
+    <div class="d-label">points</div>
+  </div>
+  <div class="score-box after">
+    <div class="sb-date">15 mars</div>
+    <div><span class="sb-num">3,5</span><span class="sb-denom">/10</span></div>
+  </div>
+</div>
+
+<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;font-size:13px;color:#166534;margin-bottom:24px">
+  Bonne progression ! L'ajout du code d'identité sur votre site a déjà eu un effet mesurable sur ChatGPT. Les pages FAQ n'ont pas encore été indexées — leur impact se verra sur le prochain rapport.
+</div>
+
+<div class="section-title">Résultats détaillés par assistant IA</div>
+
+<div class="ia-compare">
+  <div class="ia-compare-row header-row">
+    <div>Assistant IA</div>
+    <div>1er mars (J-15)</div>
+    <div>15 mars (aujourd'hui)</div>
+  </div>
+  <div class="ia-compare-row">
+    <div style="font-weight:600">ChatGPT</div>
+    <div class="not-cited">0 citation / 9</div>
+    <div class="cited">2 citations / 9 ↑</div>
+  </div>
+  <div class="ia-compare-row">
+    <div style="font-weight:600">Gemini</div>
+    <div class="not-cited">0 citation / 9</div>
+    <div class="not-cited">0 citation / 9 —</div>
+  </div>
+  <div class="ia-compare-row">
+    <div style="font-weight:600">Perplexity</div>
+    <div style="color:var(--orange)">1 citation / 9</div>
+    <div class="cited">2 citations / 9 ↑</div>
+  </div>
+</div>
+
+<div class="section-title">Événements détectés depuis le dernier rapport</div>
+
+<div class="event-list">
+  <div class="event-item">
+    <div class="event-icon">✅</div>
+    <div class="event-content">
+      <h4>Code d'identité site détecté et indexé</h4>
+      <p>ChatGPT et Perplexity ont commencé à vous citer sur la requête "couvreur Rennes avis". Impact visible : +2 citations.</p>
+    </div>
+  </div>
+  <div class="event-item">
+    <div class="event-icon">⚠️</div>
+    <div class="event-content">
+      <h4>Nouveau concurrent détecté : "Couverture Rennaise Express"</h4>
+      <p>Apparu sur Gemini pour la requête "couvreur urgence Rennes" — n'existait pas lors de l'audit initial. À surveiller.</p>
+    </div>
+  </div>
+  <div class="event-item">
+    <div class="event-icon">⏳</div>
+    <div class="event-content">
+      <h4>Pages FAQ publiées — indexation en cours</h4>
+      <p>Vos 6 pages FAQ ont été publiées le 8 mars. Les IA mettent généralement 3-5 semaines à les indexer. Impact attendu sur le rapport du 1er avril.</p>
+    </div>
+  </div>
+</div>
+
+<div class="reco-box">
+  <h3>Nos recommandations pour les 15 prochains jours</h3>
+  <div class="reco-item">
+    <div class="reco-num">1</div>
+    <p>Vérifier votre fiche Google Business — c'est le principal signal manquant pour Gemini. Votre zone d'intervention n'y est pas renseignée.</p>
+  </div>
+  <div class="reco-item">
+    <div class="reco-num">2</div>
+    <p>Demander 3-5 nouveaux avis Google à des clients récents. Vos concurrents en gagnent en moyenne 4/mois.</p>
+  </div>
+  <div class="reco-item">
+    <div class="reco-num">3</div>
+    <p>Surveiller "Couverture Rennaise Express" — ce concurrent est récent et monte vite sur Gemini pour les urgences.</p>
+  </div>
+</div>
+
+<div class="next-test">
+  <div>
+    <div class="nt-label">Prochain rapport</div>
+    <div class="nt-date">1er avril 2026</div>
+  </div>
+  <div style="text-align:right">
+    <div class="nt-label">Prochain test complet</div>
+    <div class="nt-date">Semaine du 22 mars</div>
+  </div>
+</div>
+
+<footer>
+  PRESENCE_IA · Rapport bimensuel · Exemple fictif — Leroux Couverture<br>
+  Ne pas diffuser · Espace client : presence-ia.fr/client
+</footer>
+
+</div>
+</body>
+</html>

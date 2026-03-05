@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checklist Visibilité IA — Leroux Couverture</title>
+<style>
+:root { --acc:#e8355a; --dark:#1a0a4e; --green:#16a34a; --orange:#d97706; --muted:#6b7280; --border:#e5e7eb; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,'Segoe UI',sans-serif; background:#f9fafb; color:#111827; font-size:14px; line-height:1.6; }
+.wrap { max-width:740px; margin:0 auto; padding:40px 24px; }
+.header { background:var(--dark); color:#fff; border-radius:14px; padding:24px 28px; margin-bottom:28px; display:flex; justify-content:space-between; align-items:center; }
+.header h1 { font-size:20px; font-weight:800; margin-bottom:4px; }
+.header .sub { font-size:12px; color:rgba(255,255,255,.6); }
+.progress-wrap { text-align:right; }
+.progress-pct { font-size:28px; font-weight:900; }
+.progress-label { font-size:11px; color:rgba(255,255,255,.6); }
+.progress-bar { height:8px; background:rgba(255,255,255,.2); border-radius:4px; width:120px; margin-left:auto; margin-top:6px; }
+.progress-fill { height:100%; border-radius:4px; background:var(--acc); transition:width .3s; }
+.score-banner { background:#fff; border-radius:10px; padding:14px 18px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; border:1px solid var(--border); }
+.score-banner .sb-label { font-size:12px; color:var(--muted); }
+.score-banner .sb-val { font-size:18px; font-weight:800; }
+.score-banner .sb-progress { color:var(--green); }
+.action-card { background:#fff; border-radius:12px; border:1px solid var(--border); margin-bottom:14px; overflow:hidden; }
+.action-header { padding:16px 20px; display:flex; gap:14px; align-items:flex-start; cursor:pointer; }
+.action-header:hover { background:#f9fafb; }
+.check-wrap { width:22px; height:22px; border:2px solid var(--border); border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; margin-top:2px; cursor:pointer; }
+.check-wrap.checked { background:var(--green); border-color:var(--green); color:#fff; }
+.action-info { flex:1; }
+.action-info h3 { font-size:14px; font-weight:700; margin-bottom:3px; }
+.action-info .ai-meta { display:flex; gap:8px; align-items:center; }
+.badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+.badge.critical { background:#fef2f2; color:#dc2626; }
+.badge.high { background:#fff7ed; color:var(--orange); }
+.badge.medium { background:#f0fdf4; color:var(--green); }
+.impact { font-size:11px; color:var(--muted); }
+.action-body { padding:0 20px 18px 56px; }
+.action-body p { font-size:13px; color:#374151; margin-bottom:12px; }
+.steps { list-style:none; }
+.steps li { font-size:12px; padding:5px 0 5px 20px; position:relative; border-bottom:1px solid #f3f4f6; }
+.steps li:last-child { border:none; }
+.steps li::before { content:counter(step); counter-increment:step; position:absolute; left:0; width:16px; height:16px; background:var(--dark); color:#fff; border-radius:50%; font-size:9px; font-weight:700; display:flex; align-items:center; justify-content:center; top:6px; }
+.steps { counter-reset:step; }
+.upsell-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin-top:12px; font-size:12px; color:#92400e; }
+.upsell-box strong { display:block; margin-bottom:3px; }
+footer { margin-top:40px; font-size:12px; color:var(--muted); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div>
+    <h1>Votre plan d'action visibilité IA</h1>
+    <div class="sub">Leroux Couverture · Rennes · Généré le 5 mars 2026</div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-pct" id="pct">0%</div>
+    <div class="progress-label">complété</div>
+    <div class="progress-bar"><div class="progress-fill" id="fill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="score-banner">
+  <div><div class="sb-label">Score actuel</div><div class="sb-val">2/10</div></div>
+  <div>→</div>
+  <div><div class="sb-label">Objectif J+90</div><div class="sb-val">5/10</div></div>
+  <div>→</div>
+  <div><div class="sb-label">Objectif J+180</div><div class="sb-val sb-progress">8/10</div></div>
+  <div style="font-size:12px;color:var(--muted)">10 actions · cochez au fur et à mesure</div>
+</div>
+
+<!-- Actions -->
+<div class="action-card">
+  <div class="action-header" onclick="toggle(this)">
+    <div class="check-wrap" id="c1" onclick="check(event,'c1')"></div>
+    <div class="action-info">
+      <h3>1. Ajouter le code d'identité à votre site</h3>
+      <div class="ai-meta"><span class="badge critical">Critique</span><span class="impact">Impact estimé : +2 points</span></div>
+    </div>
+  </div>
+  <div class="action-body" style="display:none">
+    <p>Ce bloc de code permet aux IA de comprendre immédiatement qui vous êtes, ce que vous faites et où vous opérez. C'est le signal le plus direct que lisent ChatGPT et Gemini.</p>
+    <p><strong>Pour WordPress :</strong></p>
+    <ol class="steps">
+      <li>Connectez-vous à votre tableau de bord WordPress</li>
+      <li>Allez dans Apparence → Éditeur de thème</li>
+      <li>Ouvrez le fichier <em>header.php</em></li>
+      <li>Collez le bloc de code (fourni dans votre dossier) juste avant <code>&lt;/head&gt;</code></li>
+      <li>Enregistrez et vérifiez en affichant votre site</li>
+    </ol>
+    <div class="upsell-box">
+      <strong>Vous préférez déléguer ?</strong>
+      Dans l'offre Tout Inclus (3500€), on s'occupe de cette intégration directement sur votre site — sans que vous ayez à toucher au code. <a href="#" style="color:#92400e">En savoir plus →</a>
+    </div>
+  </div>
+</div>
+
+<div class="action-card">
+  <div class="action-header" onclick="toggle(this)">
+    <div class="check-wrap" id="c2" onclick="check(event,'c2')"></div>
+    <div class="action-info">
+      <h3>2. Mettre à jour votre fiche Google Business</h3>
+      <div class="ai-meta"><span class="badge critical">Critique</span><span class="impact">Impact estimé : +1,5 point</span></div>
+    </div>
+  </div>
+  <div class="action-body" style="display:none">
+    <p>Votre fiche Google Business alimente directement les réponses de Google Gemini. Elle doit être complète, cohérente avec votre site, et à jour.</p>
+    <ol class="steps">
+      <li>Connectez-vous sur <em>business.google.com</em></li>
+      <li>Vérifiez que le nom, adresse, téléphone et catégorie correspondent exactement à votre site</li>
+      <li>Ajoutez vos zones d'intervention (Rennes, Cesson-Sévigné, Bruz…)</li>
+      <li>Publiez au moins 3 photos récentes de chantiers</li>
+      <li>Répondez à tous les avis non répondus</li>
+    </ol>
+    <div class="upsell-box">
+      <strong>Vous préférez déléguer ?</strong>
+      On optimise votre fiche Google Business en intégralité dans le cadre du Tout Inclus.
+    </div>
+  </div>
+</div>
+
+<div class="action-card">
+  <div class="action-header" onclick="toggle(this)">
+    <div class="check-wrap" id="c3" onclick="check(event,'c3')"></div>
+    <div class="action-info">
+      <h3>3. Publier les 6 pages FAQ sur votre site</h3>
+      <div class="ai-meta"><span class="badge critical">Critique</span><span class="impact">Impact estimé : +2,5 points</span></div>
+    </div>
+  </div>
+  <div class="action-body" style="display:none">
+    <p>Vos 6 pages FAQ sont déjà rédigées et prêtes à copier-coller. Elles répondent exactement aux questions que posent vos clients aux IA.</p>
+    <p><strong>Pour WordPress :</strong></p>
+    <ol class="steps">
+      <li>Ouvrez votre espace client pour télécharger les 6 fichiers HTML</li>
+      <li>Dans WordPress : Pages → Ajouter une page</li>
+      <li>Copiez le contenu de chaque fichier dans l'éditeur (mode HTML)</li>
+      <li>Publiez chaque page avec l'URL indiquée dans le fichier</li>
+      <li>Ajoutez un lien vers ces pages depuis votre menu ou pied de page</li>
+    </ol>
+    <div class="upsell-box">
+      <strong>Vous préférez déléguer ?</strong>
+      Dans le Tout Inclus, on publie directement les 6 pages sur votre site — vous n'avez rien à faire.
+    </div>
+  </div>
+</div>
+
+<div class="action-card">
+  <div class="action-header" onclick="toggle(this)">
+    <div class="check-wrap" id="c4" onclick="check(event,'c4')"></div>
+    <div class="action-info">
+      <h3>4. Vérifier votre présence sur les 3 annuaires prioritaires</h3>
+      <div class="ai-meta"><span class="badge high">Important</span><span class="impact">Impact estimé : +0,8 point</span></div>
+    </div>
+  </div>
+  <div class="action-body" style="display:none">
+    <p>Les IA lisent les annuaires locaux pour croiser les informations. Une présence cohérente sur Pages Jaunes, Houzz et Habitissimo est particulièrement importante pour les couvreurs à Rennes.</p>
+    <ol class="steps">
+      <li>Vérifiez votre fiche Pages Jaunes (pagejaunes.fr) — nom, adresse, téléphone</li>
+      <li>Vérifiez ou créez votre profil Houzz — idéal pour les artisans du bâtiment</li>
+      <li>Vérifiez ou créez votre profil Habitissimo — très indexé par les IA</li>
+    </ol>
+  </div>
+</div>
+
+<div class="action-card">
+  <div class="action-header" onclick="toggle(this)">
+    <div class="check-wrap" id="c5" onclick="check(event,'c5')"></div>
+    <div class="action-info">
+      <h3>5. Demander 5 nouveaux avis Google à vos clients récents</h3>
+      <div class="ai-meta"><span class="badge high">Important</span><span class="impact">Impact estimé : +0,5 point</span></div>
+    </div>
+  </div>
+  <div class="action-body" style="display:none">
+    <p>Vous avez 47 avis — c'est bien. Mais vos concurrents principaux en ont 80+. 5 nouveaux avis cette semaine feront la différence.</p>
+    <ol class="steps">
+      <li>Récupérez votre lien direct d'avis Google (business.google.com → Demander des avis)</li>
+      <li>Envoyez-le par SMS à vos 5 derniers clients satisfaits avec un message simple</li>
+      <li>Message suggéré : "Bonjour [Prénom], j'espère que vous êtes satisfait de notre intervention. Si vous avez 2 min, un avis Google m'aiderait beaucoup : [lien]"</li>
+    </ol>
+  </div>
+</div>
+
+<div class="action-card" style="opacity:.6">
+  <div class="action-header">
+    <div class="check-wrap" id="c6" onclick="check(event,'c6')"></div>
+    <div class="action-info">
+      <h3>6-10. Actions mois 2-6</h3>
+      <div class="ai-meta"><span class="badge medium">Après les priorités</span><span class="impact">Disponibles après J+30</span></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  PRESENCE_IA · Checklist visibilité IA · Exemple fictif — Leroux Couverture<br>
+  Progression sauvegardée localement dans votre navigateur
+</footer>
+
+<script>
+function toggle(header) {
+  const body = header.nextElementSibling;
+  if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+function check(e, id) {
+  e.stopPropagation();
+  const el = document.getElementById(id);
+  el.classList.toggle('checked');
+  el.innerHTML = el.classList.contains('checked') ? '✓' : '';
+  updateProgress();
+  localStorage.setItem(id, el.classList.contains('checked') ? '1' : '0');
+}
+function updateProgress() {
+  const total = 5;
+  const done = ['c1','c2','c3','c4','c5'].filter(id => document.getElementById(id).classList.contains('checked')).length;
+  const pct = Math.round(done / total * 100);
+  document.getElementById('pct').textContent = pct + '%';
+  document.getElementById('fill').style.width = pct + '%';
+}
+// Restore
+['c1','c2','c3','c4','c5'].forEach(id => {
+  if (localStorage.getItem(id) === '1') {
+    const el = document.getElementById(id);
+    el.classList.add('checked');
+    el.innerHTML = '✓';
+  }
+});
+updateProgress();
+</script>
+</body>
+</html>

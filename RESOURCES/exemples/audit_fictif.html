@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Votre visibilité sur les IA — Leroux Couverture, Rennes</title>
+<style>
+:root { --acc:#e8355a; --dark:#1a0a4e; --txt:#111827; --muted:#6b7280; --green:#16a34a; --orange:#d97706; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,'Segoe UI',sans-serif; background:#f9fafb; color:var(--txt); font-size:15px; }
+.wrap { max-width:700px; margin:0 auto; padding:40px 24px; }
+.header { background:var(--dark); color:#fff; border-radius:16px; padding:32px; margin-bottom:32px; text-align:center; }
+.header .tag { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#f9a8d4; margin-bottom:12px; }
+.header h1 { font-size:24px; font-weight:900; margin-bottom:6px; }
+.header .sub { font-size:14px; color:rgba(255,255,255,.7); }
+.score-block { display:flex; align-items:center; justify-content:center; gap:32px; background:#fff; border-radius:14px; padding:28px; margin-bottom:24px; border:2px solid #e5e7eb; }
+.score-circle { width:110px; height:110px; border-radius:50%; background:var(--acc); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+.score-circle .num { font-size:42px; font-weight:900; line-height:1; }
+.score-circle .denom { font-size:14px; opacity:.8; }
+.score-explain h2 { font-size:18px; font-weight:800; color:var(--dark); margin-bottom:6px; }
+.score-explain p { font-size:13px; color:var(--muted); line-height:1.6; }
+.section-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:28px 0 12px; }
+.ia-row { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px 20px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+.ia-row .ia-name { font-weight:700; font-size:14px; }
+.ia-row .ia-result { font-size:13px; color:var(--muted); }
+.ia-row .badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; }
+.badge.absent { background:#fef2f2; color:#dc2626; }
+.badge.partial { background:#fff7ed; color:#d97706; }
+.concurrents { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:20px; margin-bottom:24px; }
+.concurrents h3 { font-size:14px; font-weight:700; margin-bottom:14px; color:var(--dark); }
+.concurrent-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6; }
+.concurrent-row:last-child { border:none; }
+.c-name { font-size:13px; font-weight:600; }
+.c-count { font-size:12px; color:var(--muted); }
+.c-bar { height:6px; border-radius:3px; background:var(--acc); min-width:4px; }
+.signals { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:28px; }
+.signal { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px; }
+.signal .s-icon { font-size:20px; margin-bottom:6px; }
+.signal .s-label { font-size:12px; font-weight:700; margin-bottom:4px; }
+.signal .s-status { font-size:12px; }
+.signal.ok .s-status { color:var(--green); }
+.signal.nok .s-status { color:var(--acc); }
+.signal.warn .s-status { color:var(--orange); }
+.cta { background:var(--dark); color:#fff; border-radius:14px; padding:28px; text-align:center; }
+.cta h2 { font-size:20px; font-weight:800; margin-bottom:10px; }
+.cta p { font-size:14px; color:rgba(255,255,255,.75); margin-bottom:20px; line-height:1.6; }
+.cta .btn { display:inline-block; background:var(--acc); color:#fff; padding:13px 32px; border-radius:8px; font-weight:700; font-size:15px; text-decoration:none; }
+.note { font-size:11px; color:rgba(255,255,255,.4); margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div class="tag">Analyse IA — Exemple fictif · Leroux Couverture · Rennes</div>
+  <h1>Votre visibilité sur les IA</h1>
+  <p class="sub">Résultats des tests effectués les 28 févr., 1er et 2 mars 2026 · 27 points de mesure</p>
+</div>
+
+<div class="score-block">
+  <div class="score-circle">
+    <span class="num">2</span>
+    <span class="denom">/ 10</span>
+  </div>
+  <div class="score-explain">
+    <h2>Score de visibilité : faible</h2>
+    <p>Sur 27 tests réalisés sur 3 assistants IA différents, <strong>votre entreprise n'a été citée qu'1 fois</strong>. Vos concurrents ont été mentionnés 18 fois à votre place.</p>
+  </div>
+</div>
+
+<div class="section-title">Résultats par assistant IA</div>
+
+<div class="ia-row">
+  <div>
+    <div class="ia-name">ChatGPT</div>
+    <div class="ia-result">Cité 0 fois sur 9 tests</div>
+  </div>
+  <span class="badge absent">Absent</span>
+</div>
+<div class="ia-row">
+  <div>
+    <div class="ia-name">Gemini (Google)</div>
+    <div class="ia-result">Cité 0 fois sur 9 tests</div>
+  </div>
+  <span class="badge absent">Absent</span>
+</div>
+<div class="ia-row">
+  <div>
+    <div class="ia-name">Perplexity</div>
+    <div class="ia-result">Cité 1 fois sur 9 tests</div>
+  </div>
+  <span class="badge partial">Partiel</span>
+</div>
+
+<div class="section-title">Qui apparaît à votre place ?</div>
+
+<div class="concurrents">
+  <h3>Entreprises citées lors de vos 27 tests</h3>
+  <div class="concurrent-row">
+    <div class="c-name">Couverture Bretagne SARL</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="c-bar" style="width:80px"></div>
+      <div class="c-count">8 citations</div>
+    </div>
+  </div>
+  <div class="concurrent-row">
+    <div class="c-name">Toitures Martin &amp; Fils</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="c-bar" style="width:55px"></div>
+      <div class="c-count">6 citations</div>
+    </div>
+  </div>
+  <div class="concurrent-row">
+    <div class="c-name">Rennes Couverture Pro</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="c-bar" style="width:35px"></div>
+      <div class="c-count">4 citations</div>
+    </div>
+  </div>
+  <div class="concurrent-row" style="opacity:.5">
+    <div class="c-name">Leroux Couverture</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="c-bar" style="width:8px;background:#9ca3af"></div>
+      <div class="c-count">1 citation</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Ce qui manque pour être cité</div>
+
+<div class="signals">
+  <div class="signal ok">
+    <div class="s-icon">⭐</div>
+    <div class="s-label">Avis Google</div>
+    <div class="s-status">47 avis · 4,8/5 ✓</div>
+  </div>
+  <div class="signal nok">
+    <div class="s-icon">🏷️</div>
+    <div class="s-label">Code d'identification site</div>
+    <div class="s-status">Absent — les IA ne savent pas qui vous êtes</div>
+  </div>
+  <div class="signal nok">
+    <div class="s-icon">📄</div>
+    <div class="s-label">Pages de contenu ciblées</div>
+    <div class="s-status">Aucune page ne répond aux questions de vos clients</div>
+  </div>
+  <div class="signal warn">
+    <div class="s-icon">📍</div>
+    <div class="s-label">Présence sur annuaires locaux</div>
+    <div class="s-status">Partiel — 3/12 annuaires couverts</div>
+  </div>
+</div>
+
+<div class="cta">
+  <h2>On peut corriger ça en 48h</h2>
+  <p>Tous les fichiers dont vous avez besoin pour passer de 2/10 à 7/10 en 3 mois sont prêts. On vous appelle pour vous expliquer comment — sans jargon technique.</p>
+  <a href="#" class="btn">Réserver un appel gratuit</a>
+  <p class="note">Exemple fictif — PRESENCE_IA · présence-ia.fr</p>
+</div>
+
+</div>
+</body>
+</html>

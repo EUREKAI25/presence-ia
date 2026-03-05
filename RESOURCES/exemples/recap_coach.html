@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRESENCE_IA — Où j'en suis et où je vais</title>
+<style>
+:root { --acc:#e8355a; --dark:#1a0a4e; --txt:#111827; --muted:#6b7280; --green:#16a34a; --border:#e5e7eb; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,'Segoe UI',sans-serif; background:#fff; color:var(--txt); font-size:15px; line-height:1.7; }
+.page { max-width:820px; margin:0 auto; padding:52px 32px; }
+
+.cover { border-bottom:3px solid var(--acc); padding-bottom:40px; margin-bottom:48px; }
+.cover .tag { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:var(--acc); margin-bottom:14px; }
+.cover h1 { font-size:34px; font-weight:900; color:var(--dark); margin-bottom:8px; letter-spacing:-.5px; }
+.cover .date { font-size:14px; color:var(--muted); margin-bottom:24px; }
+.cover .logline { background:var(--dark); color:#fff; border-radius:12px; padding:20px 28px; font-size:15px; line-height:1.7; }
+.cover .logline strong { color:#f9a8d4; }
+
+section { margin-bottom:52px; }
+h2 { font-size:20px; font-weight:800; color:var(--dark); border-left:4px solid var(--acc); padding-left:14px; margin-bottom:22px; }
+.intro { color:var(--muted); font-size:13px; margin-bottom:20px; }
+
+/* PROBLEM / SOLUTION */
+.ps { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.ps-box { border-radius:12px; padding:20px; }
+.ps-box.problem { background:#fef2f2; }
+.ps-box.solution { background:#f0fdf4; }
+.ps-box .ps-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.ps-box.problem .ps-title { color:#dc2626; }
+.ps-box.solution .ps-title { color:var(--green); }
+.ps-box ul { list-style:none; }
+.ps-box ul li { font-size:13px; padding:5px 0; border-bottom:1px solid rgba(0,0,0,.07); }
+.ps-box ul li:last-child { border:none; }
+
+/* PIPELINE */
+.pipeline { display:flex; align-items:center; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+.pipe-step { background:var(--dark); color:#fff; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:700; white-space:nowrap; }
+.pipe-step.done { background:var(--green); }
+.pipe-arrow { color:var(--muted); font-size:16px; }
+
+/* OFFERS */
+.offers { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.offer { border:2px solid var(--border); border-radius:14px; padding:20px; }
+.offer.best { border-color:var(--acc); }
+.offer .o-name { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px; }
+.offer .o-price { font-size:28px; font-weight:900; color:var(--dark); }
+.offer.best .o-price { color:var(--acc); }
+.offer .o-sub { font-size:12px; color:var(--muted); margin-bottom:14px; }
+.offer ul { list-style:none; }
+.offer ul li { font-size:12px; padding:4px 0; border-bottom:1px solid var(--border); }
+.offer ul li:last-child { border:none; }
+.offer ul li::before { content:"✓ "; color:var(--green); font-weight:700; }
+
+/* STATUS */
+.status-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.status-item { border:1px solid var(--border); border-radius:10px; padding:16px; }
+.status-item .s-label { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; }
+.status-item .s-val { font-size:14px; font-weight:700; color:var(--dark); }
+.status-item .s-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* ROADMAP */
+.roadmap { }
+.road-item { display:flex; gap:16px; margin-bottom:18px; align-items:flex-start; }
+.road-num { min-width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; }
+.road-num.done { background:var(--green); color:#fff; }
+.road-num.next { background:var(--acc); color:#fff; }
+.road-num.later { background:#e5e7eb; color:var(--muted); }
+.road-content h4 { font-size:14px; font-weight:700; margin-bottom:3px; }
+.road-content p { font-size:13px; color:var(--muted); }
+
+/* FINANCIALS */
+.fin-table { width:100%; border-collapse:collapse; }
+.fin-table th { background:var(--dark); color:#fff; padding:10px 14px; font-size:11px; font-weight:700; text-transform:uppercase; text-align:left; letter-spacing:.5px; }
+.fin-table td { padding:12px 14px; border-bottom:1px solid var(--border); font-size:13px; }
+.fin-table tr:last-child td { border:none; font-weight:700; background:#f9fafb; }
+.pos { color:var(--green); font-weight:700; }
+.neg { color:var(--acc); }
+
+/* DIFFERENTIATORS */
+.diff { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.diff-item { background:#f9fafb; border-radius:10px; padding:16px; }
+.diff-item .d-title { font-size:13px; font-weight:700; margin-bottom:6px; color:var(--dark); }
+.diff-item p { font-size:12px; color:var(--muted); }
+
+footer { margin-top:60px; padding-top:24px; border-top:1px solid var(--border); font-size:12px; color:var(--muted); text-align:center; }
+
+@media print {
+  .offers { grid-template-columns:1fr 1fr 1fr; }
+  .ps { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- COVER -->
+<div class="cover">
+  <div class="tag">PRESENCE_IA — Récap stratégique · Mars 2026</div>
+  <h1>Où j'en suis et où je vais</h1>
+  <p class="date">Document de travail · Pour le coaching du 5 mars 2026</p>
+  <div class="logline">
+    Je développe <strong>PRESENCE_IA</strong> : un service automatisé qui aide les artisans locaux (couvreurs, plombiers, électriciens…)
+    à apparaître dans les réponses des assistants IA quand leurs clients cherchent un professionnel.
+    Le problème est réel, peu d'acteurs s'en occupent, et j'ai déjà le produit fonctionnel.
+    Il me manque les premiers clients.
+  </div>
+</div>
+
+
+<!-- LE PROBLÈME -->
+<section>
+  <h2>1. Le problème que je résous</h2>
+  <p class="intro">Un changement de comportement des consommateurs qui s'accélère.</p>
+
+  <div class="ps">
+    <div class="ps-box problem">
+      <div class="ps-title">🔴 Ce qui se passe</div>
+      <ul>
+        <li>Les gens demandent "meilleur plombier à Lyon" à ChatGPT, Gemini, Siri</li>
+        <li>L'IA cite 3 noms — pas celui de mon client</li>
+        <li>Les concurrents cités n'ont pas forcément plus d'avis ou un meilleur site</li>
+        <li>Mon client perd des chantiers sans savoir pourquoi</li>
+      </ul>
+    </div>
+    <div class="ps-box solution">
+      <div class="ps-title">✅ Ce que j'apporte</div>
+      <ul>
+        <li>Preuve chiffrée de l'invisibilité (score /10, 27 tests)</li>
+        <li>Identification des concurrents cités à leur place</li>
+        <li>Tous les fichiers nécessaires pour corriger le problème</li>
+        <li>Mesure de la progression tous les 15 jours</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- LE PRODUIT -->
+<section>
+  <h2>2. Le produit — programme en 3 phases</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="border:2px solid var(--border);border-radius:12px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--acc);margin-bottom:8px">Phase 1</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--dark)">Diagnostic</div>
+      <p style="font-size:12px;color:var(--muted)">Tests automatisés sur 3 IA × 3 jours × 3 créneaux × 3 requêtes ciblées. Score /10, concurrents identifiés, rapport envoyé avant l'appel.</p>
+    </div>
+    <div style="border:2px solid var(--acc);border-radius:12px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--acc);margin-bottom:8px">Phase 2</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--dark)">Activation</div>
+      <p style="font-size:12px;color:var(--muted)">Génération automatique de tous les fichiers : dossier stratégique, code d'identité site, 6 pages FAQ, checklist, réécriture de contenu. Livrés en 48h.</p>
+    </div>
+    <div style="border:2px solid var(--border);border-radius:12px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--dark);margin-bottom:8px">Phase 3</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--dark)">Suivi</div>
+      <p style="font-size:12px;color:var(--muted)">Re-tests hebdomadaires automatiques, rapport bimensuel envoyé au client, dashboard en ligne, alertes si nouveau concurrent détecté.</p>
+    </div>
+  </div>
+
+  <div class="offers">
+    <div class="offer best">
+      <div class="o-name">Offre principale</div>
+      <div class="o-price">3 500€</div>
+      <div class="o-sub">forfait · suivi 6 mois inclus</div>
+      <ul>
+        <li>On intègre tout sur le site client</li>
+        <li>FAQ publiées par nos soins</li>
+        <li>Google Business optimisé</li>
+        <li>Citations locales créées (15-20)</li>
+        <li>Suivi bimensuel inclus 6 mois</li>
+      </ul>
+    </div>
+    <div class="offer">
+      <div class="o-name">Kit autonome</div>
+      <div class="o-price">500€</div>
+      <div class="o-sub">+ 100€/mois · 6 mois min.</div>
+      <ul>
+        <li>Tous les fichiers livrés</li>
+        <li>Guides pas-à-pas inclus</li>
+        <li>Client intègre lui-même</li>
+        <li>Suivi bimensuel inclus</li>
+        <li>Upsell Tout Inclus possible</li>
+      </ul>
+    </div>
+    <div class="offer">
+      <div class="o-name">Porte d'entrée</div>
+      <div class="o-price">97€</div>
+      <div class="o-sub">inbound · sans engagement</div>
+      <ul>
+        <li>Audit complet 27 tests</li>
+        <li>Score + concurrents</li>
+        <li>Pour clients via pub/referral</li>
+        <li>Déclencheur d'achat Kit/TI</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- OÙ J'EN SUIS -->
+<section>
+  <h2>3. Où j'en suis — état du produit</h2>
+  <p class="intro">Le MVP est construit et déployé. Il reste à vendre.</p>
+
+  <div style="margin-bottom:20px">
+    <div class="pipeline">
+      <div class="pipe-step done">Scan suspects</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Tests IA automatisés</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Score /10</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Landing personnalisée</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Queue SMS/email</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Génération livrables</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step done">Dashboard client</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Pipeline complet automatisé — de la prospection à la livraison</div>
+  </div>
+
+  <div class="status-grid">
+    <div class="status-item">
+      <div class="s-label">Tests automatisés</div>
+      <div class="s-val">261 tests passent</div>
+      <div class="s-sub">Couverture complète du pipeline</div>
+    </div>
+    <div class="status-item">
+      <div class="s-label">Déploiement</div>
+      <div class="s-val">En production</div>
+      <div class="s-sub">VPS Ionos · API FastAPI · mars 2026</div>
+    </div>
+    <div class="status-item">
+      <div class="s-label">Clients actifs</div>
+      <div class="s-val" style="color:var(--acc)">0 pour l'instant</div>
+      <div class="s-sub">Test pipeline complet prévu cette semaine</div>
+    </div>
+    <div class="status-item">
+      <div class="s-label">Closers</div>
+      <div class="s-val" style="color:var(--acc)">À recruter</div>
+      <div class="s-sub">Fiche produit + script d'appel prêts</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHIFFRES -->
+<section>
+  <h2>4. Les chiffres — modèle économique</h2>
+
+  <table class="fin-table">
+    <tr>
+      <th>Poste</th>
+      <th>Coût / prospect</th>
+      <th>Hypothèse</th>
+    </tr>
+    <tr>
+      <td>Tests IA (27 points de données)</td>
+      <td class="neg">~0,15€</td>
+      <td>API OpenAI + Gemini + Anthropic</td>
+    </tr>
+    <tr>
+      <td>Génération landing personnalisée</td>
+      <td class="neg">~0,05€</td>
+      <td>Rendu HTML + hébergement VPS</td>
+    </tr>
+    <tr>
+      <td>SMS de prospection</td>
+      <td class="neg">~0,07€</td>
+      <td>Via Brevo / Twilio</td>
+    </tr>
+    <tr>
+      <td>Génération livrables (si achat)</td>
+      <td class="neg">~0,50€</td>
+      <td>GPT-4o pour dossier + FAQ + checklist</td>
+    </tr>
+    <tr>
+      <td><strong>Coût total par prospect</strong></td>
+      <td class="neg"><strong>~0,77€</strong></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Valeur client Kit (6 mois)</td>
+      <td class="pos">1 100€</td>
+      <td>500€ + 6 × 100€</td>
+    </tr>
+    <tr>
+      <td>Valeur client Tout Inclus</td>
+      <td class="pos">3 500€</td>
+      <td>Forfait unique</td>
+    </tr>
+    <tr>
+      <td>Commission closer (~18%)</td>
+      <td class="neg">198€ – 630€</td>
+      <td>Selon offre vendue</td>
+    </tr>
+    <tr>
+      <td><strong>Marge nette par client (Kit)</strong></td>
+      <td class="pos"><strong>~850€</strong></td>
+      <td>Hors coûts fixes VPS (~20€/mois)</td>
+    </tr>
+    <tr>
+      <td><strong>Marge nette par client (TI)</strong></td>
+      <td class="pos"><strong>~2 600€</strong></td>
+      <td>Hors coûts fixes + temps intégration</td>
+    </tr>
+  </table>
+
+  <div style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;font-size:13px;color:#166534">
+    <strong>Point d'équilibre :</strong> 1 vente Kit par mois couvre tous les coûts fixes. 2 ventes Tout Inclus par mois = revenu mensuel significatif sans aucune charge salariale.
+  </div>
+</section>
+
+
+<!-- DIFFÉRENCIATEURS -->
+<section>
+  <h2>5. Pourquoi c'est difficile à copier</h2>
+
+  <div class="diff">
+    <div class="diff-item">
+      <div class="d-title">Automatisation de bout en bout</div>
+      <p>Du scan de prospects à la livraison des fichiers — tout est automatisé. Pas de travail manuel par client. Coût marginal quasi nul.</p>
+    </div>
+    <div class="diff-item">
+      <div class="d-title">Pipeline intégré complet</div>
+      <p>Prospection + score + landing + livrables + suivi + dashboard : tout dans un seul système. Une agence classique mettrait 6 mois à assembler ça.</p>
+    </div>
+    <div class="diff-item">
+      <div class="d-title">Preuve avant la vente</div>
+      <p>Le prospect reçoit son score personnalisé avant même de parler à un closer. La landing fait 80% du travail de conviction.</p>
+    </div>
+    <div class="diff-item">
+      <div class="d-title">Marché encore libre</div>
+      <p>La "visibilité IA locale" n'est pas encore un service mainstream. C'est une fenêtre de 18-24 mois avant que le marché soit saturé.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ROADMAP -->
+<section>
+  <h2>6. La feuille de route — les 60 prochains jours</h2>
+
+  <div class="roadmap">
+    <div class="road-item">
+      <div class="road-num done">✓</div>
+      <div class="road-content">
+        <h4>MVP construit et déployé en production</h4>
+        <p>Pipeline complet, 261 tests, admin, livrables auto-générés, page closers</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num next">1</div>
+      <div class="road-content">
+        <h4>Tester le pipeline complet avec un vrai prospect</h4>
+        <p>Lancer un scan sur une paire ville/métier réelle, valider chaque étape jusqu'au livrable</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num next">2</div>
+      <div class="road-content">
+        <h4>Recruter les 2 premiers closers</h4>
+        <p>LinkedIn + groupes closers francophones · commission 18% · formation avec la fiche produit</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num next">3</div>
+      <div class="road-content">
+        <h4>Premiers contacts sortants — 100 prospects</h4>
+        <p>Sélectionner 2-3 paires métier/ville, scanner, envoyer les landings, mesurer le taux de réponse</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num later">4</div>
+      <div class="road-content">
+        <h4>Finaliser les guides d'installation Kit</h4>
+        <p>Guides pas-à-pas par CMS (WordPress, Wix, HTML) avec captures d'écran + upsells intégrés</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num later">5</div>
+      <div class="road-content">
+        <h4>Rapport d'exécution Tout Inclus</h4>
+        <p>Document remis au client à la fin du programme : ce qui a été fait, où, avec preuves</p>
+      </div>
+    </div>
+    <div class="road-item">
+      <div class="road-num later">6</div>
+      <div class="road-content">
+        <h4>Prévisionnel et tableau de bord acquisition</h4>
+        <p>Intégrer coût par prospect, taux de conversion, projection revenus dans l'admin</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- QUESTION PRINCIPALE -->
+<section>
+  <h2>7. Mes questions pour le coaching</h2>
+
+  <div style="display:grid;gap:14px">
+    <div style="background:#fef2f2;border-left:4px solid var(--acc);border-radius:0 10px 10px 0;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Comment identifier et qualifier les bons closers ?</div>
+      <div style="font-size:12px;color:var(--muted)">Où les trouver, comment tester leur capacité à vendre ce type de service, quelle structure de commission ?</div>
+    </div>
+    <div style="background:#fef2f2;border-left:4px solid var(--acc);border-radius:0 10px 10px 0;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Quelle paire métier/ville pour les premiers tests ?</div>
+      <div style="font-size:12px;color:var(--muted)">Commencer large (multi-métiers) ou se concentrer sur un secteur vertical pour valider le message ?</div>
+    </div>
+    <div style="background:#fff7ed;border-left:4px solid var(--orange);border-radius:0 10px 10px 0;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Viser Kit 500€ ou Tout Inclus 3500€ en premier ?</div>
+      <div style="font-size:12px;color:var(--muted)">Le Kit est plus facile à vendre mais moins rentable. Le TI demande plus de confiance mais génère de meilleures marges et des clients plus engagés.</div>
+    </div>
+    <div style="background:#fff7ed;border-left:4px solid var(--orange);border-radius:0 10px 10px 0;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Quel rythme de prospection réaliste ?</div>
+      <div style="font-size:12px;color:var(--muted)">Combien de prospects par semaine pour avoir assez d'appels ? Quel taux de conversion estimer pour la phase de validation ?</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  PRESENCE_IA · Nathalie · Mars 2026 · Document préparé pour coaching stratégique
+</footer>
+
+</div>
+</body>
+</html>
