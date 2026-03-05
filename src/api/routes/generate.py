@@ -72,15 +72,21 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
                 _cby.setdefault(_r.model, [])
                 if _e not in _cby[_r.model]:
                     _cby[_r.model].append(_e)
-    _demo_date = s["dates"][0] if s.get("dates") else "récemment"
+    # Formatage date/heure du test pour la démo
+    from datetime import datetime as _dtcls
+    _demo_dt_str = s["dates"][0] if s.get("dates") else "récemment"
+    if _runs:
+        try:
+            _ts = str(_runs[0].ts)[:16]
+            _dto = _dtcls.fromisoformat(_ts)
+            _demo_dt_str = _dto.strftime("%d/%m/%Y à %Hh%M")
+        except Exception:
+            pass
     _demo_models = [
-        ("openai",    "ChatGPT",          "#10a37f"),
-        ("anthropic", "Claude (Anthropic)", "#d97706"),
-        ("gemini",    "Gemini (Google)",    "#4285f4"),
+        ("openai",    "ChatGPT (OpenAI)",    "#10a37f"),
+        ("anthropic", "Claude (Anthropic)",  "#d97706"),
+        ("gemini",    "Gemini (Google)",     "#4285f4"),
     ]
-    n_queries = sum(1 for q in s["ql"] if q)
-    _MODEL_LABEL = {"openai": "ChatGPT", "anthropic": "Anthropic", "gemini": "Gemini"}
-    models_str = ", ".join(_MODEL_LABEL.get(m, m.title()) for m in s["models"]) or "—"
 
     # Header image de la ville (si uploadée)
     city_header = db_get_header(db, p.city.lower())
@@ -240,12 +246,9 @@ a{{color:inherit;text-decoration:none}}
   color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
   padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
 .hero h1{{font-size:clamp(28px,5vw,54px);font-weight:800;color:#fff;max-width:760px;
-  margin:0 auto 8px;letter-spacing:-.8px;line-height:1.15;
+  margin:0 auto 36px;letter-spacing:-.8px;line-height:1.2;
   text-shadow:0 2px 12px rgba(0,0,0,.5)}}
-.hero-name{{display:block;font-size:.55em;font-weight:600;color:rgba(255,255,255,.85);
-  letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase}}
-.hero-sub{{color:rgba(255,255,255,.88);font-size:16px;max-width:480px;margin:16px auto 40px;
-  text-shadow:0 1px 6px rgba(0,0,0,.4)}}
+.hero h1 em{{font-style:normal;font-size:1.2em;display:block;margin-top:4px}}
 .hero-cta{{display:inline-flex;align-items:center;gap:8px;
   background:#fff;color:var(--txt);font-weight:700;font-size:14px;
   padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);
@@ -364,8 +367,8 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
 .ia-query-bar{{background:#1e293b;color:#e2e8f0;border-radius:10px;padding:14px 20px;
   font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
-.ia-query-ts{{color:#94a3b8;font-size:11px;white-space:nowrap}}
-.ia-query-text{{font-style:italic;color:#f1f5f9}}
+.ia-query-ts{{color:#94a3b8;font-size:12px;white-space:nowrap;font-weight:600}}
+.ia-query-text{{font-style:italic;color:#f1f5f9;font-size:16px;font-weight:500}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
 @media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
 .ia-col{{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}}
@@ -378,8 +381,9 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .ia-col__list li::before{{content:"";display:inline-block;width:6px;height:6px;
   border-radius:50%;background:var(--acc);flex-shrink:0}}
 .ia-col__empty{{font-size:12px;color:var(--muted);font-style:italic}}
-.ia-demo-cta{{text-align:center;padding-top:8px}}
-.ia-demo-cta p{{font-size:1rem;font-weight:600;color:var(--txt);margin-bottom:20px;max-width:540px;margin-left:auto;margin-right:auto}}
+.ia-demo-cta{{text-align:center;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}}
+.ia-demo-cta__title{{font-size:1.6rem;font-weight:800;color:var(--txt);margin-bottom:10px}}
+.ia-demo-cta__sub{{font-size:1rem;color:#374151;margin-bottom:28px;max-width:560px;margin-left:auto;margin-right:auto;line-height:1.7}}
 
 /* PITCH SECTION */
 .sect-pitch{{background:#fff}}
@@ -410,11 +414,10 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- HERO -->
 <div class="hero">
   <div class="c">
-    <div class="hero-pill">Audit Visibilite IA &mdash; {p.city}</div>
-    <h1><span class="hero-name">{p.name}</span>Vos concurrents sont recommandés<br>par les IA. Et vous&nbsp;?</h1>
-    <p class="hero-sub">{n_queries} requetes testees sur {len(s["models"])} modeles &mdash; {models_str}</p>
-    <button class="hero-cta" onclick="document.getElementById('resultats').scrollIntoView({{behavior:'smooth'}})">
-      Voir les resultats &darr;
+    <div class="hero-pill">Audit Visibilité IA &mdash; {p.name.upper()}</div>
+    <h1>Vos concurrents sont recommandés par les IA.<em>Et vous&nbsp;?</em></h1>
+    <button class="hero-cta" onclick="document.getElementById('ia-demo').scrollIntoView({{behavior:'smooth'}})">
+      Voir les résultats &darr;
     </button>
   </div>
 </div>
@@ -422,20 +425,19 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- STATS BAR -->
 <div class="stats-bar">
   <div class="stats-bar__inner">
-    <div class="stat"><div class="stat__val">Concurrents<br>identifiés</div><div class="stat__lbl">Leur nom. Ce qu'ils font. Votre angle d'attaque.</div></div>
-    <div class="stat"><div class="stat__val">Rapport<br>en 48h</div><div class="stat__lbl">Chiffré. Personnalisé. Prêt à exploiter.</div></div>
-    <div class="stat"><div class="stat__val">Plan d'action<br>inclus</div><div class="stat__lbl">Pas un bilan. Une feuille de route.</div></div>
+    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
+    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
+    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
   </div>
 </div>
 
 <!-- IA DEMO -->
-<section class="sect-ia-demo">
+<section class="sect-ia-demo" id="ia-demo">
   <div class="c">
     <p class="sect-label">En ce moment même</p>
-    <h2>Voici ce que voient vos prospects<br>quand ils posent la question à leur IA</h2>
-    <p class="sect-sub">Vos futurs clients demandent à ChatGPT, Claude et Gemini quel {p.profession} choisir à {p.city}. Voici ce que les IA leur répondent.</p>
+    <h2>Actuellement, voici ce que voient vos prospects<br>quand ils consultent leur IA pour trouver un {p.profession} à {p.city}</h2>
     <div class="ia-query-bar">
-      <span class="ia-query-ts">{_demo_date}</span>
+      <span class="ia-query-ts">{_demo_dt_str}</span>
       <span class="ia-query-text">« Quel {p.profession} recommandes-tu à {p.city} ? »</span>
     </div>
     <div class="ia-columns">
@@ -443,63 +445,19 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
         f'<div class="ia-col">'
         f'<div class="ia-col__brand" style="color:{color}">{label}</div>'
         f'<ul class="ia-col__list">'
-        + ("".join(f'<li>{c}</li>' for c in _cby.get(key, [])[:3]) or '<li class="ia-col__empty">Pas de réponse obtenue</li>')
+        + ("".join(f'<li>{c}</li>' for c in _cby.get(key, [])[:3]) or '<li class="ia-col__empty">Aucun concurrent cité</li>')
         + f'</ul></div>'
         for key, label, color in _demo_models
       )}
     </div>
     <div class="ia-demo-cta">
-      <p>Voulez-vous savoir ce que font vos concurrents — et ce qu'il vous manque pour les dépasser&nbsp;?</p>
-      <a class="btn-pitch" href="#plans">Voir comment inverser la tendance &darr;</a>
+      <p class="ia-demo-cta__title">Vous n&rsquo;y êtes pas&nbsp;?</p>
+      <p class="ia-demo-cta__sub">Réservez votre rendez-vous pour comprendre pourquoi vos concurrents y sont — et comment prendre votre place.<br><strong>On vous envoie gratuitement votre audit.</strong></p>
+      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon rendez-vous gratuit &rarr;</a>
     </div>
   </div>
 </section>
 
-<!-- RÉSULTATS -->
-<section class="sect-results" id="resultats">
-  <div class="c">
-    <p class="results-intro">Nous avons simulé les recherches que font vos futurs clients sur ChatGPT, Claude et Gemini pour trouver un {p.profession} à {p.city}.<br>Voici ce que ces IA leur répondent...</p>
-    <div class="results-meta">{models_str} &nbsp;&middot;&nbsp; {", ".join(s["dates"])}</div>
-    {result_rows}
-    {f'<div class="comps-wrap"><p class="comps-label">Nommes a votre place :</p>{comp_items}</div>' if comps else ""}
-    {"<p class='interlude'>Sur " + str(n_queries) + " requetes testees, " + str(n_named) + " citent un concurrent directement. Chaque mention perdue, c&rsquo;est un client qui appelle quelqu&rsquo;un d&rsquo;autre.</p>" if n_named > 0 else ""}
-    {video_html}
-  </div>
-</section>
-
-<!-- PREUVES -->
-{ev_section}
-
-<!-- PITCH -->
-<section class="sect-pitch">
-  <div class="c">
-    <p class="sect-label">Ce que vous recevez</p>
-    <h2>Le rapport exact que viennent de voir<br>vos concurrents sur vous</h2>
-    <div class="pitch-card">
-      <p>Vos concurrents ne sont pas meilleurs que vous.<br>Ils parlent simplement la langue que comprennent les IA.<br>Ce rapport vous montre quoi — et comment faire pareil.</p>
-      <ul class="pitch-list">
-        <li>Votre score de visibilité réel sur ChatGPT, Gemini et Claude</li>
-        <li>Les concurrents qui vous précèdent — nommés, avec leur avantage</li>
-        <li>Le plan d'action priorisé pour inverser la tendance</li>
-      </ul>
-      <div class="pitch-cta-wrap">
-        <a class="btn-pitch" href="#plans">Choisir mon offre et démarrer &darr;</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PLANS -->
-<section class="sect-plans" id="plans">
-  <div class="c">
-    <p class="sect-label">Offres</p>
-    <h2>Démarrez avant que vos concurrents ne le fassent</h2>
-    <p class="sect-sub">Les IA apprennent en permanence. Être cité demain dépend de ce que vous faites aujourd&rsquo;hui.</p>
-    <div class="plans-grid">
-      {plans_html}
-    </div>
-  </div>
-</section>
 
 <!-- FAQ -->
 {f'<section class="sect-faq"><div class="c"><p class="sect-label">FAQ</p><h2>Questions frequentes</h2><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
