@@ -83,9 +83,9 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
         except Exception:
             pass
     _demo_models = [
-        ("openai",    "ChatGPT (OpenAI)",    "#10a37f"),
-        ("anthropic", "Claude (Anthropic)",  "#d97706"),
-        ("gemini",    "Gemini (Google)",     "#4285f4"),
+        ("openai",    "ChatGPT",  "(OpenAI)",    "#10a37f"),
+        ("anthropic", "Claude",   "(Anthropic)", "#d97706"),
+        ("gemini",    "Gemini",   "(Google)",    "#4285f4"),
     ]
 
     # Header image de la ville (si uploadée)
@@ -459,8 +459,8 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- IA DEMO -->
 <section class="sect-ia-demo" id="ia-demo">
   <div class="c">
-    <p class="sect-label">En ce moment même</p>
-    <h2>Actuellement, voici ce que voient vos prospects<br>quand ils consultent leur IA pour trouver un {p.profession} à {p.city}</h2>
+    <h2 style="font-size:clamp(28px,4vw,44px);margin-bottom:6px">En ce moment</h2>
+    <p class="sect-sub" style="margin-bottom:32px">Voici ce que voient vos prospects quand ils consultent leur IA pour trouver un {p.profession} à {p.city}</p>
     {"".join(
       f'<div class="ia-query-bar" style="opacity:{1 - i*0.18:.2f}">'
       f'<span class="ia-query-ts">{_demo_dt_str}</span>'
@@ -471,11 +471,12 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
     <div class="ia-columns">
       {"".join(
         f'<div class="ia-col">'
-        f'<div class="ia-col__brand" style="color:{color}">{label}</div>'
+        f'<div class="ia-col__brand" style="color:{color}">{name}'
+        f' <span style="font-size:.78em;font-weight:400;color:#94a3b8">{company}</span></div>'
         f'<ul class="ia-col__list">'
         + ("".join(f'<li>{c}</li>' for c in _cby.get(key, [])[:3]) or '<li class="ia-col__empty">Aucun concurrent cité</li>')
         + f'</ul></div>'
-        for key, label, color in _demo_models
+        for key, name, company, color in _demo_models
       )}
     </div>
     <div class="ia-demo-cta">
