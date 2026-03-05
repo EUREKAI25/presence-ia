@@ -207,10 +207,16 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     n_named = sum(1 for c in s["qm"] if c > 0)
     comp_items = "".join(f'<span class="comp-tag">{c}</span>' for c in comps)
 
-    # ── FAQ ──────────────────────────────────────────────────────────────
+    # ── 3 requêtes de démo ───────────────────────────────────────────────
+    _demo_queries = [q for q in s.get("ql", []) if q][:3]
+
+    # ── FAQ (accordéon JS, un à la fois) ────────────────────────────────
     faq_html = "".join(
-        f'<details class="faq"><summary>{q}</summary><p>{a}</p></details>'
-        for i in range(1, 5)
+        f'<div class="faq-item">'
+        f'<button class="faq-q" onclick="toggleFaq(this)">{q}<span class="faq-icon">+</span></button>'
+        f'<div class="faq-a" hidden>{a}</div>'
+        f'</div>'
+        for i in range(1, 8)
         for q, a in [(L("faq", f"q{i}"), L("faq", f"a{i}"))]
         if q
     )
@@ -338,16 +344,29 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .plans-note{{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}}
 .plan-monthly{{font-size:13px;color:var(--muted);margin-top:-8px;margin-bottom:4px}}
 
+/* STICKY HEADER */
+.sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);
+  backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:58px}}
+.sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none}}
+.sn-logo span{{color:#60a5fa}}
+.sn-cta{{background:#2563eb;color:#fff;font-weight:700;font-size:13px;
+  padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
+.sn-cta:hover{{background:#1d4ed8}}
+
 /* FAQ */
 .sect-faq{{background:var(--light)}}
 .faq-wrap{{max-width:680px;margin-top:40px}}
-.faq{{background:#fff;border-radius:10px;margin-bottom:10px;
-  border:1px solid var(--border);overflow:hidden}}
-.faq summary{{font-size:15px;font-weight:600;color:var(--txt);cursor:pointer;
-  padding:18px 20px;list-style:none;display:flex;justify-content:space-between;align-items:center}}
-.faq summary::after{{content:"+";font-size:20px;color:var(--muted);font-weight:300;flex-shrink:0;margin-left:16px}}
-.faq[open] summary::after{{content:"−";color:var(--acc)}}
-.faq p{{color:var(--muted);font-size:14px;padding:0 20px 18px;line-height:1.7}}
+.faq-item{{background:#fff;border-radius:10px;margin-bottom:8px;border:1px solid var(--border);overflow:hidden}}
+.faq-q{{width:100%;text-align:left;padding:18px 20px;font-size:15px;font-weight:600;
+  color:var(--txt);background:#fff;border:none;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;gap:16px;transition:background .1s}}
+.faq-q:hover{{background:#f8fafc}}
+.faq-q.open{{color:var(--acc)}}
+.faq-icon{{flex-shrink:0;font-size:20px;font-weight:300;color:var(--muted);line-height:1}}
+.faq-q.open .faq-icon{{color:var(--acc)}}
+.faq-a{{padding:0 20px 18px;color:var(--muted);font-size:14px;line-height:1.75}}
 
 /* INTERLUDE */
 .interlude{{margin-top:28px;padding:20px 24px;background:linear-gradient(90deg,#fff5f7,#fff);
@@ -411,6 +430,12 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 </head>
 <body>
 
+<!-- STICKY NAV -->
+<nav class="sticky-nav">
+  <a class="sn-logo" href="/">Présence<span>IA</span></a>
+  <a class="sn-cta" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit</a>
+</nav>
+
 <!-- HERO -->
 <div class="hero">
   <div class="c">
@@ -436,10 +461,13 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
   <div class="c">
     <p class="sect-label">En ce moment même</p>
     <h2>Actuellement, voici ce que voient vos prospects<br>quand ils consultent leur IA pour trouver un {p.profession} à {p.city}</h2>
-    <div class="ia-query-bar">
-      <span class="ia-query-ts">{_demo_dt_str}</span>
-      <span class="ia-query-text">« Quel {p.profession} recommandes-tu à {p.city} ? »</span>
-    </div>
+    {"".join(
+      f'<div class="ia-query-bar" style="opacity:{1 - i*0.18:.2f}">'
+      f'<span class="ia-query-ts">{_demo_dt_str}</span>'
+      f'<span class="ia-query-text">« {q} »</span>'
+      f'</div>'
+      for i, q in enumerate(_demo_queries or [f"Quel {p.profession} recommandes-tu à {p.city} ?"])
+    )}
     <div class="ia-columns">
       {"".join(
         f'<div class="ia-col">'
@@ -460,7 +488,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 
 
 <!-- FAQ -->
-{f'<section class="sect-faq"><div class="c"><p class="sect-label">FAQ</p><h2>Questions frequentes</h2><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
+{f'<section class="sect-faq"><div class="c"><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
 
 <footer>
   &copy; 2026 PRESENCE_IA &nbsp;&middot;&nbsp;
@@ -468,6 +496,19 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 </footer>
 
 <script>
+function toggleFaq(btn) {{
+  const isOpen = btn.classList.contains('open');
+  document.querySelectorAll('.faq-q').forEach(b => {{
+    b.classList.remove('open');
+    b.nextElementSibling.hidden = true;
+    b.querySelector('.faq-icon').textContent = '+';
+  }});
+  if (!isOpen) {{
+    btn.classList.add('open');
+    btn.nextElementSibling.hidden = false;
+    btn.querySelector('.faq-icon').textContent = '−';
+  }}
+}}
 async function checkout(btn, offerId) {{
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Redirection…';
