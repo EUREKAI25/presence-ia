@@ -44,3 +44,14 @@ def recap_coach():
     if not filepath.exists():
         raise HTTPException(404, "Récap introuvable")
     return filepath.read_text(encoding="utf-8")
+
+
+@router.get("/exemple/{slug}", response_class=HTMLResponse)
+def exemple_public(slug: str):
+    """Exemples de livrables publics (pas de token requis — contenu démo uniquement)."""
+    if not VALID_SLUG.match(slug):
+        raise HTTPException(400, "Slug invalide")
+    filepath = _EXEMPLES_DIR / f"{slug}.html"
+    if not filepath.exists():
+        raise HTTPException(404, f"Exemple '{slug}' introuvable")
+    return filepath.read_text(encoding="utf-8")
