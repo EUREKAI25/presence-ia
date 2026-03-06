@@ -39,6 +39,17 @@ def startup():
     init_db()
     log.info("DB initialisée (SQLite)")
 
+    # marketing_module — monté sur /mkt
+    try:
+        from marketing_module.api.main import app as mkt_app
+        import os as _os
+        mkt_db = _os.getenv("MKT_DB_PATH", str(Path(__file__).parent.parent.parent / "data" / "marketing.db"))
+        _os.environ.setdefault("MKT_DB_PATH", mkt_db)
+        app.mount("/mkt", mkt_app)
+        log.info("marketing_module monté sur /mkt")
+    except Exception as e:
+        log.warning("marketing_module non monté : %s", e)
+
     # offers_module — branché sur la même DB SQLite
     from offers_module import init_module as offers_init
     db_path = os.getenv("DB_PATH", str(Path(__file__).parent.parent.parent / "data" / "presence_ia.db"))
