@@ -443,9 +443,14 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .ia-col__list li::before{{content:"";display:inline-block;width:6px;height:6px;
   border-radius:50%;background:var(--acc);flex-shrink:0}}
 .ia-col__empty{{font-size:12px;color:var(--muted);font-style:italic}}
+.ia-insight{{background:#fff;border:2px solid var(--border);border-radius:12px;padding:22px 26px;margin:28px 0 14px}}
+.ia-insight__title{{font-size:1.15rem;font-weight:800;color:var(--txt);margin-bottom:8px}}
+.ia-insight__text{{font-size:14px;color:var(--muted);line-height:1.65}}
+.ia-explain{{font-size:13.5px;color:#374151;background:#f0f9ff;border-left:3px solid #0ea5e9;
+  padding:14px 20px;border-radius:0 8px 8px 0;margin-bottom:6px;line-height:1.65}}
+.ia-mention{{text-align:center;font-size:11.5px;color:var(--muted);margin:6px 0 28px;letter-spacing:.2px}}
 .ia-demo-cta{{text-align:center;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}}
-.ia-demo-cta__title{{font-size:1.6rem;font-weight:800;color:var(--txt);margin-bottom:10px}}
-.ia-demo-cta__sub{{font-size:1rem;color:#374151;margin-bottom:28px;max-width:560px;margin-left:auto;margin-right:auto;line-height:1.7}}
+.ia-demo-cta__limit{{font-size:12px;color:var(--muted);margin-top:14px;font-style:italic}}
 
 /* PITCH SECTION */
 .sect-pitch{{background:#fff}}
@@ -463,6 +468,11 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
   font-weight:700;font-size:15px;padding:16px 40px;border-radius:50px;
   text-decoration:none;box-shadow:0 4px 20px rgba(232,53,90,.35);transition:all .2s;cursor:pointer;border:none}}
 .btn-pitch:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(232,53,90,.45)}}
+
+/* PRE-FAQ */
+.sect-pre-faq{{background:linear-gradient(135deg,#0d0820 0%,#0a1840 100%);padding:72px 24px}}
+.pre-faq-title{{font-size:clamp(22px,3.5vw,34px);font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-.3px;line-height:1.2}}
+.pre-faq-text{{font-size:15px;color:#94a3b8;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.7}}
 
 /* VIDEO + FOOTER */
 .video-link{{text-align:center;margin-top:36px}}
@@ -483,7 +493,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <div class="hero">
   <div class="c">
     <div class="hero-pill">Audit Visibilité IA &mdash; {p.name.upper()}</div>
-    <h1>À {p.city}, vos concurrents sont recommandés par les IA.<em>Et vous&nbsp;?</em></h1>
+    <h1>À {p.city}, ChatGPT et Gemini recommandent des {p.profession}s.<em>Mais pas vous.</em></h1>
     <button class="hero-cta" onclick="document.getElementById('ia-demo').scrollIntoView({{behavior:'smooth'}})">
       Voir les résultats &darr;
     </button>
@@ -507,14 +517,30 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
     <div class="ia-accordion">
       {_accordion_html}
     </div>
+    <div class="ia-insight">
+      <h3 class="ia-insight__title">Votre entreprise n&rsquo;apparaît dans aucune réponse.</h3>
+      <p class="ia-insight__text">Lorsque vos prospects demandent un {p.profession} à {p.city} à leur IA, ce sont ces entreprises qui sont recommandées.</p>
+    </div>
+    <div class="ia-explain">
+      Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet.
+    </div>
+    <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <p class="ia-demo-cta__title">Vous n&rsquo;y êtes pas&nbsp;?</p>
-      <p class="ia-demo-cta__sub">Réservez votre rendez-vous pour comprendre pourquoi vos concurrents y sont — et comment prendre votre place.<br><strong>On vous envoie gratuitement votre audit.</strong></p>
-      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon rendez-vous gratuit &rarr;</a>
+      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+      <p class="ia-demo-cta__limit">Nous analysons un nombre limité d&rsquo;entreprises par secteur et par ville.</p>
     </div>
   </div>
 </section>
 
+
+<!-- PRE-FAQ -->
+<section class="sect-pre-faq">
+  <div class="c" style="text-align:center">
+    <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n&rsquo;apparaît pas.</h2>
+    <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu&rsquo;elles recommandent.</p>
+    <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+  </div>
+</section>
 
 <!-- FAQ -->
 {f'<section class="sect-faq"><div class="c"><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
