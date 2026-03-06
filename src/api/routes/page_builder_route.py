@@ -559,7 +559,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 <div class="cta-section" id="contact">
   <h2>{cta_title}</h2>
   <p>{cta_subtitle}</p>
-  <a class="btn-cta" href="https://calendly.com/contact-presence-ia/30min">{cta_btn}</a>
+  <a class="btn-cta" href="https://calendly.com/contact-presence-ia/20min">{cta_btn}</a>
 </div>
 
 <footer>

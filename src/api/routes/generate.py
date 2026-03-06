@@ -486,7 +486,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- STICKY NAV -->
 <nav class="sticky-nav">
   <a class="sn-logo" href="/">Présence<span>IA</span></a>
-  <a class="sn-cta" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit</a>
+  <a class="sn-cta" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit</a>
 </nav>
 
 <!-- HERO -->
@@ -526,7 +526,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit &rarr;</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d&rsquo;entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -538,7 +538,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n&rsquo;apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu&rsquo;elles recommandent.</p>
-    <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/30min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+    <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit &rarr;</a>
   </div>
 </section>
 

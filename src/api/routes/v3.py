@@ -34,7 +34,7 @@ from ...database import SessionLocal, get_block, set_block
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-CALENDLY_URL  = "https://calendly.com/contact-presence-ia/30min"
+CALENDLY_URL  = "https://calendly.com/contact-presence-ia/20min"
 BASE_URL      = os.getenv("BASE_URL", "https://presence-ia.com")
 UPLOADS_DIR   = Path(os.getenv("UPLOADS_DIR", "/opt/presence-ia/dist/uploads"))
 

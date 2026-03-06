@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rejoindre Présence IA — Closer</title>
+<style>
+:root {
+  --acc: #e8355a;
+  --acc2: #ff7043;
+  --dark: #0d0820;
+  --dark2: #0a1840;
+  --txt: #111827;
+  --muted: #6b7280;
+  --light: #f9fafb;
+  --border: #e5e7eb;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #fff; color: var(--txt); line-height: 1.7; }
+a { color: inherit; text-decoration: none; }
+.c { max-width: 820px; margin: 0 auto; padding: 0 28px; }
+
+/* NAV */
+nav { background: var(--dark); padding: 0 28px; height: 58px; display: flex; align-items: center; }
+.nav-logo { color: #fff; font-weight: 800; font-size: 1rem; letter-spacing: -.02em; }
+.nav-logo span { color: #60a5fa; }
+
+/* HERO */
+.hero {
+  background: linear-gradient(135deg, var(--dark) 0%, var(--dark2) 60%, #071030 100%);
+  padding: 88px 28px 80px;
+  text-align: center;
+}
+.hero-tag {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--acc); background: rgba(232,53,90,.12);
+  border: 1px solid rgba(232,53,90,.3); padding: 5px 18px; border-radius: 30px;
+  margin-bottom: 28px;
+}
+.hero h1 {
+  font-size: clamp(28px, 5vw, 52px); font-weight: 900; color: #fff;
+  letter-spacing: -.04em; line-height: 1.1; max-width: 700px; margin: 0 auto 20px;
+}
+.hero h1 em { font-style: normal; color: #f9a8d4; }
+.hero-sub {
+  font-size: clamp(14px, 2vw, 17px); color: #94a3b8; max-width: 520px;
+  margin: 0 auto 44px; line-height: 1.7;
+}
+.hero-stats {
+  display: flex; justify-content: center; gap: 0; flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,.1); padding-top: 36px; margin-top: 4px;
+}
+.hero-stat { text-align: center; padding: 0 40px; border-right: 1px solid rgba(255,255,255,.1); }
+.hero-stat:last-child { border-right: none; }
+.hero-stat__val { font-size: 1.6rem; font-weight: 900; color: #fff; letter-spacing: -.04em; }
+.hero-stat__lbl { font-size: .8rem; color: #64748b; margin-top: 4px; }
+@media(max-width:560px) {
+  .hero-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,.1); padding: 16px 0; width: 100%; }
+  .hero-stat:last-child { border-bottom: none; }
+}
+
+/* SECTIONS */
+section { padding: 72px 0; }
+section.alt { background: var(--light); }
+.section-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--acc); margin-bottom: 10px; }
+h2 { font-size: clamp(22px, 3.5vw, 34px); font-weight: 800; color: var(--txt); letter-spacing: -.03em; line-height: 1.2; margin-bottom: 16px; }
+.section-intro { color: var(--muted); font-size: 15px; max-width: 580px; margin-bottom: 40px; line-height: 1.7; }
+
+/* MARCHÉ */
+.market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+@media(max-width:600px) { .market-grid { grid-template-columns: 1fr; } }
+.market-card {
+  border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; background: #fff;
+}
+.market-card__sector { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 6px; }
+.market-card__range { font-size: 22px; font-weight: 900; color: var(--acc); letter-spacing: -.04em; }
+.market-card__unit { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* CALCUL */
+.calc-box {
+  background: var(--dark); color: #fff; border-radius: 14px;
+  padding: 32px 36px; margin-top: 36px;
+}
+.calc-box h3 { font-size: 16px; font-weight: 700; color: #94a3b8; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
+.calc-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; color: #cbd5e1; }
+.calc-row:last-child { border-bottom: none; }
+.calc-row.total { font-size: 16px; font-weight: 800; color: #fff; padding-top: 16px; margin-top: 4px; border-bottom: none; }
+.calc-val { font-weight: 700; color: #f9a8d4; }
+.calc-row.total .calc-val { color: #4ade80; font-size: 1.4rem; }
+
+/* MISSION */
+.mission-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+@media(max-width:660px) { .mission-cols { grid-template-columns: 1fr; } }
+.mission-block h3 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 16px; }
+.mission-list { list-style: none; padding: 0; }
+.mission-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 14px; color: #374151; padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.mission-list li:last-child { border-bottom: none; }
+.mission-list li::before { content: "→"; color: var(--acc); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+/* COMMISSION */
+.commission-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+.comm-card {
+  flex: 1; min-width: 160px; background: #fff; border: 2px solid var(--border);
+  border-radius: 12px; padding: 24px 22px; text-align: center;
+}
+.comm-card.highlight { border-color: var(--acc); background: #fff5f7; }
+.comm-card__val { font-size: 2.2rem; font-weight: 900; color: var(--txt); letter-spacing: -.06em; line-height: 1; }
+.comm-card.highlight .comm-card__val { color: var(--acc); }
+.comm-card__lbl { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.bonus-strip {
+  background: linear-gradient(90deg, rgba(232,53,90,.08), rgba(255,112,67,.08));
+  border: 1px solid rgba(232,53,90,.2); border-radius: 10px;
+  padding: 16px 22px; margin-top: 16px; font-size: 14px; color: #374151;
+}
+.bonus-strip strong { color: var(--acc); }
+
+/* PROFIL */
+.profil-items { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+@media(max-width:560px) { .profil-items { grid-template-columns: 1fr; } }
+.profil-item {
+  background: var(--light); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px; font-size: 14px; font-weight: 500; color: #374151;
+}
+.profil-item::before { content: "✓"; color: var(--acc); font-weight: 700; margin-right: 8px; }
+
+/* POSTULER */
+.postuler-section {
+  background: linear-gradient(135deg, var(--dark) 0%, var(--dark2) 100%);
+  padding: 80px 28px; text-align: center;
+}
+.postuler-section h2 { color: #fff; margin-bottom: 16px; }
+.postuler-section p { color: #94a3b8; font-size: 15px; max-width: 520px; margin: 0 auto 12px; line-height: 1.7; }
+.postuler-steps {
+  display: flex; flex-direction: column; gap: 12px;
+  max-width: 520px; margin: 32px auto; text-align: left;
+}
+.postuler-step {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px; padding: 16px 20px; display: flex; gap: 14px; align-items: flex-start;
+}
+.step-num {
+  width: 28px; height: 28px; background: var(--acc); color: #fff;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; flex-shrink: 0;
+}
+.step-text { font-size: 13.5px; color: #e2e8f0; line-height: 1.6; }
+.step-text strong { color: #fff; display: block; margin-bottom: 2px; }
+.btn-postuler {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  color: #fff; font-weight: 700; font-size: 16px; padding: 18px 44px;
+  border-radius: 50px; box-shadow: 0 6px 28px rgba(232,53,90,.4);
+  transition: all .2s; margin-top: 36px;
+}
+.btn-postuler:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(232,53,90,.5); }
+.postuler-note { font-size: 12px; color: #475569; margin-top: 16px; }
+
+/* AVANTAGES */
+.avantages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media(max-width:660px) { .avantages-grid { grid-template-columns: 1fr 1fr; } }
+@media(max-width:420px) { .avantages-grid { grid-template-columns: 1fr; } }
+.avantage {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px 18px; background: #fff; font-size: 13.5px; color: #374151; line-height: 1.5;
+}
+.avantage__icon { font-size: 20px; margin-bottom: 10px; }
+.avantage__title { font-weight: 700; color: var(--txt); margin-bottom: 4px; font-size: 13px; }
+
+footer { background: #0d0820; padding: 28px 24px; text-align: center; color: #475569; font-size: 11px; letter-spacing: .3px; }
+footer span { color: #60a5fa; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/">Présence<span>IA</span></a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="c">
+    <div class="hero-tag">Recrutement — 5 postes ouverts</div>
+    <h1>Un marché en train<br>d'<em>exploser</em>.<br>Une place à prendre.</h1>
+    <p class="hero-sub">Les entreprises investissent des millions pour être visibles sur Google. Un nouveau canal vient de s'ouvrir — et il est encore quasiment vide.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat__val">1,3 M</div>
+        <div class="hero-stat__lbl">d'entreprises artisanales<br>en France</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat__val">9 000 €</div>
+        <div class="hero-stat__lbl">panier max<br>par vente</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat__val">18 %</div>
+        <div class="hero-stat__lbl">de commission<br>par vente</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LE MARCHÉ -->
+<section>
+  <div class="c">
+    <div class="section-tag">Le contexte</div>
+    <h2>Un problème réel, mesurable, urgent.</h2>
+    <p class="section-intro">De plus en plus d'utilisateurs commencent leurs recherches directement dans ChatGPT, Gemini ou Perplexity. Ces IA recommandent des entreprises — mais une immense majorité n'y apparaissent pas. Pendant ce temps, leurs concurrents, si.</p>
+    <div class="market-grid">
+      <div class="market-card">
+        <div class="market-card__sector">Couverture</div>
+        <div class="market-card__range">4 000 – 15 000 €</div>
+        <div class="market-card__unit">par chantier</div>
+      </div>
+      <div class="market-card">
+        <div class="market-card__sector">Rénovation / isolation</div>
+        <div class="market-card__range">6 000 – 30 000 €</div>
+        <div class="market-card__unit">par chantier</div>
+      </div>
+      <div class="market-card">
+        <div class="market-card__sector">Menuiserie</div>
+        <div class="market-card__range">3 000 – 20 000 €</div>
+        <div class="market-card__unit">par chantier</div>
+      </div>
+      <div class="market-card">
+        <div class="market-card__sector">Installation énergétique</div>
+        <div class="market-card__range">8 000 – 25 000 €</div>
+        <div class="market-card__unit">par chantier</div>
+      </div>
+    </div>
+    <div class="calc-box">
+      <h3>Exemple concret</h3>
+      <div class="calc-row">
+        <span>Panier moyen d'un client</span>
+        <span class="calc-val">4 000 €</span>
+      </div>
+      <div class="calc-row">
+        <span>Nouveaux clients / mois grâce à la visibilité IA</span>
+        <span class="calc-val">3 clients</span>
+      </div>
+      <div class="calc-row">
+        <span>Impact mensuel pour l'entreprise</span>
+        <span class="calc-val">12 000 €</span>
+      </div>
+      <div class="calc-row total">
+        <span>Impact annuel potentiel</span>
+        <span class="calc-val">144 000 €</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VOTRE MISSION -->
+<section class="alt">
+  <div class="c">
+    <div class="section-tag">Votre rôle</div>
+    <h2>Vous ne prospectez pas. Vous closez.</h2>
+    <p class="section-intro">Nous générons les opportunités et réalisons les audits. Vous présentez les résultats et accompagnez la décision.</p>
+    <div class="mission-cols">
+      <div class="mission-block">
+        <h3>Ce que vous faites</h3>
+        <ul class="mission-list">
+          <li>Présenter l'audit au prospect</li>
+          <li>Expliquer sa situation actuelle</li>
+          <li>Démontrer l'opportunité business</li>
+          <li>Accompagner la décision</li>
+        </ul>
+      </div>
+      <div class="mission-block">
+        <h3>Ce qu'on vous fournit</h3>
+        <ul class="mission-list">
+          <li>Les prospects déjà qualifiés et audités</li>
+          <li>L'analyse complète de leur visibilité IA</li>
+          <li>Les concurrents cités à leur place</li>
+          <li>Un CRM propriétaire</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMISSION -->
+<section>
+  <div class="c">
+    <div class="section-tag">Rémunération</div>
+    <h2>Une commission significative, sans plafond.</h2>
+    <p class="section-intro">Plus vous vendez, plus vous gagnez. Aucune limite imposée.</p>
+    <div class="commission-row">
+      <div class="comm-card">
+        <div class="comm-card__val">9 000 €</div>
+        <div class="comm-card__lbl">panier maximum<br>par vente</div>
+      </div>
+      <div class="comm-card highlight">
+        <div class="comm-card__val">18 %</div>
+        <div class="comm-card__lbl">commission maximum<br>par vente</div>
+      </div>
+      <div class="comm-card">
+        <div class="comm-card__val">Fin de mois</div>
+        <div class="comm-card__lbl">paiement<br>garanti</div>
+      </div>
+    </div>
+    <div class="bonus-strip">
+      <strong>Bonus performance</strong> — Les 2 meilleurs closers du mois reçoivent +5 % de commission sur toutes leurs ventes du mois.
+    </div>
+  </div>
+</section>
+
+<!-- AVANTAGES -->
+<section class="alt">
+  <div class="c">
+    <div class="section-tag">Pourquoi cette opportunité</div>
+    <h2>Un produit conçu pour être vendu.</h2>
+    <p class="section-intro">Un problème clair, une démonstration concrète, des prospects qui le voient en temps réel.</p>
+    <div class="avantages-grid">
+      <div class="avantage">
+        <div class="avantage__icon">📈</div>
+        <div class="avantage__title">Marché en forte croissance</div>
+        Les IA remplacent rapidement les moteurs de recherche traditionnels.
+      </div>
+      <div class="avantage">
+        <div class="avantage__icon">🎯</div>
+        <div class="avantage__title">Prospects qualifiés</div>
+        Chaque prospect a été audité avant que vous le contactiez.
+      </div>
+      <div class="avantage">
+        <div class="avantage__icon">📊</div>
+        <div class="avantage__title">Démonstration en live</div>
+        Vous montrez les données réelles pendant l'appel.
+      </div>
+      <div class="avantage">
+        <div class="avantage__icon">🔧</div>
+        <div class="avantage__title">CRM propriétaire</div>
+        Suivi, pipeline et historique inclus dès le premier jour.
+      </div>
+      <div class="avantage">
+        <div class="avantage__icon">💬</div>
+        <div class="avantage__title">Problème mesurable</div>
+        Le prospect voit son absence dans les réponses IA — en direct.
+      </div>
+      <div class="avantage">
+        <div class="avantage__icon">🚀</div>
+        <div class="avantage__title">Marché encore vide</div>
+        Peu de concurrents. Une fenêtre d'opportunité courte.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROFIL -->
+<section>
+  <div class="c">
+    <div class="section-tag">Profil recherché</div>
+    <h2>Nous recrutons 5 closers.</h2>
+    <p class="section-intro">Pas besoin d'être expert en IA. Vous devez être capable d'avoir une conversation sérieuse avec un dirigeant d'entreprise.</p>
+    <div class="profil-items">
+      <div class="profil-item">Motivé par la performance</div>
+      <div class="profil-item">À l'aise avec les outils numériques</div>
+      <div class="profil-item">Capable d'échanger avec des dirigeants</div>
+      <div class="profil-item">Structuré et orienté résultats</div>
+    </div>
+  </div>
+</section>
+
+<!-- POSTULER -->
+<div class="postuler-section">
+  <h2>Postuler</h2>
+  <p>Envoyez-nous un message vocal ou une courte vidéo (2 à 3 minutes).</p>
+  <div class="postuler-steps">
+    <div class="postuler-step">
+      <div class="step-num">1</div>
+      <div class="step-text">
+        <strong>Message audio ou vidéo (2-3 min)</strong>
+        Votre expérience en closing ou vente, pourquoi cette opportunité vous intéresse, votre compréhension du marché IA.
+      </div>
+    </div>
+    <div class="postuler-step">
+      <div class="step-num">2</div>
+      <div class="step-text">
+        <strong>Facultatif</strong>
+        Profil LinkedIn, résultats commerciaux passés, toute information utile.
+      </div>
+    </div>
+  </div>
+  <a class="btn-postuler" href="mailto:contact@presence-ia.com?subject=Candidature%20Closer%20Présence%20IA">
+    Envoyer ma candidature &rarr;
+  </a>
+  <p class="postuler-note">Les profils sélectionnés sont contactés rapidement.</p>
+</div>
+
+<footer>
+  &copy; 2026 <span>Présence IA</span> &nbsp;&middot;&nbsp; Document confidentiel
+</footer>
+
+</body>
+</html>

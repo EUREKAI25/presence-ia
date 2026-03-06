@@ -10,6 +10,7 @@ CLOSER_TOKEN = os.getenv("CLOSER_TOKEN", "closer-secret")
 _ROOT = Path(__file__).parent.parent.parent.parent / "RESOURCES"
 _FICHE_PATH = _ROOT / "FICHE_PRODUIT_PRESENCE_IA.html"
 _EXEMPLES_DIR = _ROOT / "exemples"
+_RECRUTEMENT_PATH = _ROOT / "recrutement_closers.html"
 
 router = APIRouter(tags=["Closing Pack"])
 
@@ -98,6 +99,14 @@ def confirmation():
   </div>
 </body>
 </html>""")
+
+
+@router.get("/recrutement", response_class=HTMLResponse)
+def recrutement():
+    """Page de recrutement closers (publique)."""
+    if not _RECRUTEMENT_PATH.exists():
+        raise HTTPException(404, "Page introuvable")
+    return _RECRUTEMENT_PATH.read_text(encoding="utf-8")
 
 
 @router.get("/exemple/{slug}", response_class=HTMLResponse)
