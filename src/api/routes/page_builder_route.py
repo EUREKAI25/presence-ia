@@ -495,7 +495,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Présence IA — Audit de visibilité sur ChatGPT, Gemini et Claude</title>
-  <meta name="description" content="Testez si votre entreprise apparaît dans les réponses de ChatGPT, Gemini et Claude. Rapport personnalisé en 48h.">
+  <meta name="description" content="Découvrez si votre entreprise apparaît dans les réponses de ChatGPT, Gemini et Claude et pourquoi vos concurrents sont recommandés.">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='3.5' fill='%232563eb'/><circle cx='16' cy='16' r='8' stroke='%232563eb' stroke-width='1.5' fill='none' opacity='.65'/><circle cx='16' cy='16' r='13' stroke='%232563eb' stroke-width='1' fill='none' opacity='.35'/></svg>">
   <style>{css}</style>
 </head>
