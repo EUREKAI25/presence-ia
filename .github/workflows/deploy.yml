@@ -21,6 +21,7 @@ jobs:
             .venv/bin/pip install -q --no-deps -e ./libs/theme_composer
             .venv/bin/pip install -q --no-deps -e ./libs/theme_generator
             .venv/bin/pip install -q --no-deps --force-reinstall -e ./libs/page_builder
+            .venv/bin/pip install -q -e ./libs/marketing_module
             systemctl restart presence-ia
             sleep 3
             echo "=== STATUS ==="
