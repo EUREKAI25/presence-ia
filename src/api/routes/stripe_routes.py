@@ -16,14 +16,49 @@ import json
 import logging
 import os
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_by_token
+from ...models import ContactDB, ContactStatus
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["Stripe"])
+
+
+def _convert_to_client(db: Session, p) -> None:
+    """Marque le prospect comme payé et crée/met à jour un ContactDB CLIENT."""
+    from datetime import datetime as _dt
+    p.paid = True
+    # Chercher un contact existant par email ou nom+ville
+    contact = None
+    if p.email:
+        contact = db.query(ContactDB).filter_by(email=p.email).first()
+    if not contact:
+        contact = db.query(ContactDB).filter_by(
+            company_name=p.name, city=p.city
+        ).first()
+    if contact:
+        contact.status = ContactStatus.CLIENT.value
+        contact.paid = True
+        contact.date_payment = _dt.utcnow()
+        log.info("Contact %s passe en CLIENT", contact.id)
+    else:
+        db.add(ContactDB(
+            company_name=p.name,
+            email=p.email,
+            phone=p.phone,
+            city=p.city,
+            profession=p.profession,
+            status=ContactStatus.CLIENT.value,
+            paid=True,
+            date_payment=_dt.utcnow(),
+            campaign_id=p.campaign_id,
+        ))
+        log.info("Nouveau contact CLIENT cree pour %s", p.name)
 
 
 def _stripe():
@@ -132,10 +167,10 @@ def success_page(session_id: str, token: str = "", db: Session = Depends(get_db)
     if token:
         p = db_get_by_token(db, token)
         if p and not p.paid:
-            p.paid = True
+            _convert_to_client(db, p)
             p.stripe_session_id = session_id
             db.commit()
-            log.info("Prospect %s marqué PAID via success page", p.prospect_id)
+            log.info("Prospect %s converti CLIENT via success page", p.prospect_id)
 
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Merci !</title>
@@ -180,9 +215,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if token:
             p = db_get_by_token(db, token)
             if p and not p.paid:
-                p.paid = True
+                _convert_to_client(db, p)
                 p.stripe_session_id = session["id"]
                 db.commit()
-                log.info("Webhook: prospect %s (token=%s) marqué PAID", pid, token)
+                log.info("Webhook: prospect %s converti CLIENT", pid)
 
     return {"received": True}

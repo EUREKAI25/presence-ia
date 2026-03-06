@@ -32,3 +32,11 @@ industrialisables.
 -   Obligation de moyens
 -   RGPD
 -   Modularité Eurkai-compatible
+
+                                                   
+              
+  enlève le bouton démarrer en haut il ne sert à rien, ainsi que le header blanc
+  La galerie doit etre  paramétrable : on indique combien de photos sont visibles et ajoute les <> pour naviguer sur la page     
+  La source doit impérativement etre affichée en dessous de la preuve   
+`c'est n'importe quoi cette admin. propose moi un fonctionnement plus rationnel
+on ne devrait pas etre limité à une seule occurrence de type de section,

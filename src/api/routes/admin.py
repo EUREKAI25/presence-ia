@@ -216,6 +216,7 @@ def admin_send_queue(request: Request, db: Session = Depends(get_db)):
         db.query(ProspectDB)
         .filter(ProspectDB.eligibility_flag == True)
         .filter(ProspectDB.status.in_(_ok_statuses))
+        .filter(ProspectDB.paid == False)
         .order_by(ProspectDB.ia_visibility_score.desc().nullslast())
         .all()
     )

@@ -21,7 +21,7 @@ def _check(request: Request):
 @router.get("/admin/templates", response_class=HTMLResponse)
 def admin_templates(request: Request, db: Session = Depends(get_db)):
     _check(request)
-    token = request.query_params.get("token", ADMIN_TOKEN())
+    token = request.query_params.get("token", admin_token())
     templates = db_list_templates(db)
 
     CHANNEL_LABEL = {"email": "Email", "sms": "SMS"}
@@ -74,7 +74,7 @@ def admin_templates(request: Request, db: Session = Depends(get_db)):
 @router.get("/admin/templates/{slug}", response_class=HTMLResponse)
 def admin_template_edit(slug: str, request: Request, db: Session = Depends(get_db)):
     _check(request)
-    token = request.query_params.get("token", ADMIN_TOKEN())
+    token = request.query_params.get("token", admin_token())
     t = db_get_template(db, slug)
     if not t:
         raise HTTPException(404, "Template introuvable")
