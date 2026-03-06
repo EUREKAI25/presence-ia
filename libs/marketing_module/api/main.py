@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..database import init_db
 from .routes import (
-    campaigns_router, compliance_router, crm_router, domains_router,
+    calendly_router, campaigns_router, compliance_router, crm_router, domains_router,
     mailboxes_router, reporting_router, rotation_router, send_router,
     sequences_router, social_router, warmup_router, webhooks_router,
 )
@@ -57,6 +57,7 @@ app.include_router(reporting_router)
 app.include_router(social_router)
 app.include_router(crm_router)
 app.include_router(webhooks_router)
+app.include_router(calendly_router)
 
 
 @app.get("/health")
