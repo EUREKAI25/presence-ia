@@ -1,4 +1,5 @@
 from .calendly import router as calendly_router
+from .google_calendar import router as gcal_router
 from .campaigns import router as campaigns_router
 from .compliance import router as compliance_router
 from .crm import router as crm_router
@@ -14,6 +15,6 @@ from .webhooks import router as webhooks_router
 
 __all__ = [
     "calendly_router", "campaigns_router", "compliance_router", "crm_router",
-    "domains_router", "mailboxes_router", "reporting_router", "rotation_router",
+    "domains_router", "gcal_router", "mailboxes_router", "reporting_router", "rotation_router",
     "send_router", "sequences_router", "social_router", "warmup_router", "webhooks_router",
 ]
