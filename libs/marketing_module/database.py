@@ -232,6 +232,18 @@ def db_update_sequence_step(db: Session, step_id: str, updates: dict) -> Optiona
     db.commit(); db.refresh(obj)
     return obj
 
+def db_delete_sequence_step(db: Session, step_id: str) -> bool:
+    obj = db_get_sequence_step(db, step_id)
+    if not obj: return False
+    db.delete(obj); db.commit()
+    return True
+
+def db_delete_sequence(db: Session, sequence_id: str) -> bool:
+    obj = db_get_sequence(db, sequence_id)
+    if not obj: return False
+    db.delete(obj); db.commit()
+    return True
+
 
 # ── ProspectDelivery ───────────────────────────────────────────────────────────
 

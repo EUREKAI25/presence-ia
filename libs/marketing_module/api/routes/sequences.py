@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ...database import (
-    db_create_sequence, db_create_sequence_step, db_get_sequence,
-    db_get_sequence_step, db_list_sequences, db_list_sequence_steps,
+    db_create_sequence, db_create_sequence_step, db_delete_sequence,
+    db_delete_sequence_step, db_get_sequence, db_get_sequence_step,
+    db_list_sequences, db_list_sequence_steps,
     db_update_sequence, db_update_sequence_step, get_db,
 )
 from ...models import EurkaiOutput, SequenceCreate, SequenceStepCreate
@@ -88,3 +89,19 @@ def update_step(sequence_id: str, step_id: str, updates: dict, db: Session = Dep
     if not obj:
         raise HTTPException(404, "Step not found")
     return EurkaiOutput(success=True, result={"id": step_id}, message="Updated")
+
+
+@router.delete("/{sequence_id}/steps/{step_id}", response_model=EurkaiOutput)
+def delete_step(sequence_id: str, step_id: str, db: Session = Depends(get_db)):
+    ok = db_delete_sequence_step(db, step_id)
+    if not ok:
+        raise HTTPException(404, "Step not found")
+    return EurkaiOutput(success=True, result={"id": step_id}, message="Deleted")
+
+
+@router.delete("/{sequence_id}", response_model=EurkaiOutput)
+def delete_sequence(sequence_id: str, db: Session = Depends(get_db)):
+    ok = db_delete_sequence(db, sequence_id)
+    if not ok:
+        raise HTTPException(404, "Sequence not found")
+    return EurkaiOutput(success=True, result={"id": sequence_id}, message="Deleted")

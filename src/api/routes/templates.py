@@ -5,42 +5,17 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_list_templates, db_get_template, db_update_template
+from ._nav import admin_nav, admin_token
 
 router = APIRouter(tags=["Admin Templates"])
-
-ADMIN_TOKEN = lambda: os.getenv("ADMIN_TOKEN", "changeme")
 
 
 def _check(request: Request):
     t = (request.headers.get("X-Admin-Token")
          or request.query_params.get("token")
          or request.cookies.get("admin_token", ""))
-    if t != ADMIN_TOKEN():
+    if t != admin_token():
         raise HTTPException(403, "Acces refuse")
-
-
-def _nav(token: str) -> str:
-    tabs = [
-        ("contacts",   "Contacts"),
-        ("offers",     "Offres"),
-        ("analytics",  "Analytics"),
-        ("evidence",   "Preuves"),
-        ("headers",    "Headers"),
-        ("content",    "Contenus"),
-        ("templates",  "Messages"),
-        ("send-queue", "Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t=="templates" else "normal"};'
-        f'background:{"#e94560" if t=="templates" else "transparent"};color:{"#fff" if t=="templates" else "#374151"}">{label}</a>'
-        for t, label in tabs
-    )
-    return (f'<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;'
-            f'display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-            f'<a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;'
-            f'padding:12px 16px 12px 0;text-decoration:none">PRESENCE_IA</a>'
-            f'{links}</div>')
 
 
 @router.get("/admin/templates", response_class=HTMLResponse)
@@ -88,7 +63,7 @@ def admin_templates(request: Request, db: Session = Depends(get_db)):
 <meta charset="UTF-8"><title>Templates — PRESENCE_IA</title>
 <style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;margin:0;color:#1a1a2e}}</style>
 </head><body>
-{_nav(token)}
+{admin_nav(token, "templates")}
 <div style="max-width:860px;margin:32px auto;padding:0 20px">
   <h1 style="font-size:18px;margin-bottom:24px">Templates email & SMS</h1>
   {cards}
@@ -131,7 +106,7 @@ def admin_template_edit(slug: str, request: Request, db: Session = Depends(get_d
 <meta charset="UTF-8"><title>Modifier — {t.name}</title>
 <style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;margin:0;color:#1a1a2e}}</style>
 </head><body>
-{_nav(token)}
+{admin_nav(token, "templates")}
 <div style="max-width:760px;margin:32px auto;padding:0 20px">
   <a href="/admin/templates?token={token}" style="color:#6b7280;font-size:13px;text-decoration:none">&larr; Retour</a>
   <h1 style="font-size:18px;margin:16px 0 4px">{t.name}</h1>
