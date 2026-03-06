@@ -121,6 +121,14 @@ def db_list_warmups(db: Session, project_id: str) -> list[WarmupStrategyDB]:
 def db_get_warmup(db: Session, warmup_id: str) -> Optional[WarmupStrategyDB]:
     return db.query(WarmupStrategyDB).filter_by(id=warmup_id).first()
 
+def db_update_warmup(db: Session, warmup_id: str, updates: dict) -> Optional[WarmupStrategyDB]:
+    obj = db_get_warmup(db, warmup_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    return obj
+
 
 # ── RotationStrategy ───────────────────────────────────────────────────────────
 
@@ -135,6 +143,14 @@ def db_list_rotations(db: Session, project_id: str) -> list[RotationStrategyDB]:
 def db_get_rotation(db: Session, rotation_id: str) -> Optional[RotationStrategyDB]:
     return db.query(RotationStrategyDB).filter_by(id=rotation_id).first()
 
+def db_update_rotation(db: Session, rotation_id: str, updates: dict) -> Optional[RotationStrategyDB]:
+    obj = db_get_rotation(db, rotation_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    return obj
+
 
 # ── Campaign ───────────────────────────────────────────────────────────────────
 
@@ -143,8 +159,11 @@ def db_create_campaign(db: Session, data: dict) -> CampaignDB:
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
 
-def db_list_campaigns(db: Session, project_id: str) -> list[CampaignDB]:
-    return db.query(CampaignDB).filter_by(project_id=project_id).all()
+def db_list_campaigns(db: Session, project_id: str, status: Optional[str] = None) -> list[CampaignDB]:
+    q = db.query(CampaignDB).filter_by(project_id=project_id)
+    if status:
+        q = q.filter_by(status=status)
+    return q.all()
 
 def db_get_campaign(db: Session, campaign_id: str) -> Optional[CampaignDB]:
     return db.query(CampaignDB).filter_by(id=campaign_id).first()
@@ -166,25 +185,52 @@ def db_create_sequence(db: Session, data: dict) -> CampaignSequenceDB:
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
 
-def db_list_sequences(db: Session, campaign_id: str) -> list[CampaignSequenceDB]:
-    return db.query(CampaignSequenceDB).filter_by(campaign_id=campaign_id).all()
+def db_list_sequences(db: Session, project_id: str,
+                      campaign_id: Optional[str] = None) -> list[CampaignSequenceDB]:
+    q = db.query(CampaignSequenceDB).filter_by(project_id=project_id)
+    if campaign_id:
+        q = q.filter_by(campaign_id=campaign_id)
+    return q.all()
 
 def db_get_sequence(db: Session, sequence_id: str) -> Optional[CampaignSequenceDB]:
     return db.query(CampaignSequenceDB).filter_by(id=sequence_id).first()
 
-def db_create_step(db: Session, data: dict) -> CampaignSequenceStepDB:
+def db_update_sequence(db: Session, sequence_id: str, updates: dict) -> Optional[CampaignSequenceDB]:
+    obj = db_get_sequence(db, sequence_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    return obj
+
+# Aliases pour la compatibilité avec les routes
+def db_create_sequence_step(db: Session, data: dict) -> CampaignSequenceStepDB:
     obj = CampaignSequenceStepDB(**data)
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
 
-def db_list_steps(db: Session, sequence_id: str) -> list[CampaignSequenceStepDB]:
+db_create_step = db_create_sequence_step  # alias
+
+def db_list_sequence_steps(db: Session, sequence_id: str) -> list[CampaignSequenceStepDB]:
     return (db.query(CampaignSequenceStepDB)
             .filter_by(sequence_id=sequence_id)
-            .order_by(CampaignSequenceStepDB.step_order)
+            .order_by(CampaignSequenceStepDB.step_number)
             .all())
 
-def db_get_step(db: Session, step_id: str) -> Optional[CampaignSequenceStepDB]:
+db_list_steps = db_list_sequence_steps  # alias
+
+def db_get_sequence_step(db: Session, step_id: str) -> Optional[CampaignSequenceStepDB]:
     return db.query(CampaignSequenceStepDB).filter_by(id=step_id).first()
+
+db_get_step = db_get_sequence_step  # alias
+
+def db_update_sequence_step(db: Session, step_id: str, updates: dict) -> Optional[CampaignSequenceStepDB]:
+    obj = db_get_sequence_step(db, step_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    return obj
 
 
 # ── ProspectDelivery ───────────────────────────────────────────────────────────
@@ -196,6 +242,13 @@ def db_create_delivery(db: Session, data: dict) -> ProspectDeliveryDB:
 
 def db_get_delivery(db: Session, delivery_id: str) -> Optional[ProspectDeliveryDB]:
     return db.query(ProspectDeliveryDB).filter_by(id=delivery_id).first()
+
+def db_list_deliveries(db: Session, campaign_id: str,
+                       prospect_id: Optional[str] = None) -> list[ProspectDeliveryDB]:
+    q = db.query(ProspectDeliveryDB).filter_by(campaign_id=campaign_id)
+    if prospect_id:
+        q = q.filter_by(prospect_id=prospect_id)
+    return q.all()
 
 def db_update_delivery(db: Session, delivery_id: str, updates: dict) -> Optional[ProspectDeliveryDB]:
     obj = db_get_delivery(db, delivery_id)
@@ -234,6 +287,18 @@ def db_list_rules(db: Session, project_id: str, scope: Optional[str] = None) -> 
     if scope:
         q = q.filter_by(scope=scope)
     return q.all()
+
+def db_get_rule(db: Session, rule_id: str) -> Optional[ComplianceRuleDB]:
+    return db.query(ComplianceRuleDB).filter_by(id=rule_id).first()
+
+def db_update_rule(db: Session, rule_id: str, updates: dict) -> Optional[ComplianceRuleDB]:
+    obj = db_get_rule(db, rule_id)
+    if not obj:
+        return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    return obj
 
 
 # ── SocialAccount ──────────────────────────────────────────────────────────────
