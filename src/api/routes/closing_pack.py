@@ -1,10 +1,14 @@
 """Routes /closing_pack, /closing_pack/exemple/* et /recap."""
+import json
 import os
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from ...database import get_db
 
 CLOSER_TOKEN = os.getenv("CLOSER_TOKEN", "closer-secret")
 _ROOT = Path(__file__).parent.parent.parent.parent / "RESOURCES"
@@ -17,13 +21,52 @@ router = APIRouter(tags=["Closing Pack"])
 VALID_SLUG = re.compile(r'^[a-z0-9_-]+$')
 
 
+def _fmt_price(p: float) -> str:
+    """Format float price → '9 000 €' with non-breaking space."""
+    return f"{int(round(p)):,} €".replace(",", "\u202f")
+
+
+def _inject_prices(html: str, db: Session) -> str:
+    """Replace __P1__, __P2__, __P3__ placeholders with DB prices."""
+    try:
+        from offers_module.models import OfferDB
+        offers = db.query(OfferDB).filter(OfferDB.active == True).order_by(OfferDB.price.desc()).all()
+    except Exception:
+        return html  # fallback : garde les valeurs existantes
+
+    def _monthly_note(o) -> str:
+        try:
+            feats = json.loads(o.features) if isinstance(o.features, str) else (o.features or [])
+            if feats and feats[0].lower().startswith("puis"):
+                return feats[0]
+        except Exception:
+            pass
+        return ""
+
+    p = [_fmt_price(o.price) for o in offers]
+    while len(p) < 3:
+        p.append("—")
+
+    note3 = _monthly_note(offers[2]) if len(offers) > 2 else ""
+    p3_table = f"{p[2]} + {note3}" if note3 else p[2]
+    p3_note = note3 if note3 else ""
+
+    return (html
+            .replace("__P1__", p[0])
+            .replace("__P2__", p[1])
+            .replace("__P3__", p[2])
+            .replace("__P3_TABLE__", p3_table)
+            .replace("__P3_NOTE__", p3_note))
+
+
 @router.get("/closing_pack", response_class=HTMLResponse)
-def closing_pack(t: str = ""):
+def closing_pack(t: str = "", db: Session = Depends(get_db)):
     if not t or t != CLOSER_TOKEN:
         raise HTTPException(403, "Accès refusé")
     if not _FICHE_PATH.exists():
         raise HTTPException(404, "Fiche produit introuvable")
-    return _FICHE_PATH.read_text(encoding="utf-8")
+    html = _FICHE_PATH.read_text(encoding="utf-8")
+    return _inject_prices(html, db)
 
 
 @router.get("/closing_pack/exemple/{slug}", response_class=HTMLResponse)
