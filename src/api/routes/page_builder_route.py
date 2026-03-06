@@ -389,60 +389,34 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     """Page d'accueil — HTML direct (indépendant de page_builder)."""
     B = lambda sk, fk, d="": get_block(db, "home", sk, fk) or d
 
-    hero_title    = B("hero", "title",        "Quand vos clients demandent à ChatGPT,\nil cite vos concurrents. Pas vous.").replace("\n", "<br>")
-    hero_subtitle = B("hero", "subtitle",     "Nous testons votre visibilité et réalisons votre plan d'action personnalisé.")
-    hero_cta      = B("hero", "cta_primary",  "Tester ma visibilité — 97€")
+    hero_title    = B("hero", "title",        "Vos concurrents sont recommandés par les IA.<br><em>Pas vous.</em>").replace("\n", "<br>")
+    hero_subtitle = B("hero", "subtitle",     "Nous analysons ce que les IA recommandent dans votre ville et pourquoi votre entreprise n'apparaît pas.")
+    hero_cta      = B("hero", "cta_primary",  "Réserver mon audit gratuit")
     cta_title     = B("cta", "title",    "Votre audit IA en 48h — 97€")
     cta_subtitle  = B("cta", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
     cta_btn       = B("cta", "btn_label","Commander mon audit")
 
-    # FAQ (jusqu'à 8 Q/R depuis ContentBlockDB, sinon défauts)
-    _faq_defaults = [
-        ("Pourquoi suis-je invisible sur les IA ?",
-         "Les IA recommandent les entreprises qu'elles connaissent. Si votre présence en ligne est faible (pas de fiche Google, peu d'avis, site mal référencé), elles citent vos concurrents."),
-        ("Pour quel type d'entreprise ?",
-         "Tout professionnel en contact avec des particuliers : artisans, prestataires de services, cuisinistes, piscinistes, professions libérales..."),
-        ("Combien de temps pour recevoir mon rapport ?",
-         "48 heures après votre commande, vous recevez votre rapport complet par email avec votre score et le plan d'action."),
-        ("Qu'est-ce que le plan d'action contient ?",
-         "Une liste des actions prioritaires pour améliorer votre visibilité sur ChatGPT, Gemini et Claude : fiche Google, contenu, avis clients, présence sur les annuaires IA..."),
-        ("Est-ce que ça remplace le SEO ?",
-         "Non, c'est complémentaire. Le SEO optimise votre visibilité sur Google. Le référencement IA optimise votre présence dans les réponses de ChatGPT, Gemini et Claude."),
-        ("Comment améliorer ma visibilité après l'audit ?",
-         "Nous proposons un accompagnement mensuel pour mettre en œuvre le plan d'action et suivre l'évolution de votre score sur les IA."),
+    # Section "Comment se déroule l'appel"
+    _call_steps = [
+        B("call", "step1", "Nous vous montrons les résultats observés"),
+        B("call", "step2", "Nous expliquons pourquoi certaines entreprises sont recommandées"),
+        B("call", "step3", "Nous vous présentons les actions possibles"),
     ]
-    faq_items = []
-    for i in range(1, 9):
-        q = B("faq", f"q{i}")
-        a = B("faq", f"a{i}")
-        if q and a:
-            faq_items.append((q, a))
-    if not faq_items:
-        faq_items = _faq_defaults
-
-    faq_html = ""
-    for i, (q, a) in enumerate(faq_items):
-        faq_html += (
-            f'<div class="faq-item">'
-            f'<button class="faq-q" aria-expanded="false" onclick="toggleFaq(this)">'
-            f'{q}<span class="faq-icon">▾</span></button>'
-            f'<div class="faq-a" hidden>{a}</div>'
-            f'</div>'
-        )
 
     # Steps
     _steps_defaults = [
-        ("Simulation client", "Nous simulons les requêtes de vos futurs clients sur ChatGPT, Gemini et Claude."),
-        ("Analyse de la réponse", "Nous vérifions si votre entreprise est citée, en quelle position, et comment."),
-        ("Rapport personnalisé", "Vous recevez un rapport détaillé avec votre score de visibilité IA et celui de vos concurrents."),
-        ("Plan d'action", "Vous obtenez une liste des actions concrètes pour améliorer votre référencement IA."),
+        ("", "Nous simulons les questions que vos futurs clients posent aux IA."),
+        ("", "Nous analysons quelles entreprises sont recommandées."),
+        ("", "Nous vérifions si votre entreprise apparaît dans ces réponses."),
+        ("", "Vous recevez un audit clair et les actions pour corriger cela."),
     ]
     steps_html = ""
     for i, (title, desc) in enumerate(_steps_defaults, 1):
+        title_html = f'<div class="step__title">{title}</div>' if title else ""
         steps_html += (
             f'<div class="step">'
             f'<div class="step__num">{i}</div>'
-            f'<div class="step__title">{title}</div>'
+            f'{title_html}'
             f'<div class="step__desc">{desc}</div>'
             f'</div>'
         )
@@ -463,7 +437,7 @@ a{color:inherit}
 .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(37,99,235,.35) 0%,transparent 70%);pointer-events:none}
 .hero__badge{display:inline-flex;align-items:center;gap:6px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#93c5fd;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:32px}
 .hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;max-width:820px;margin:0 auto 24px;letter-spacing:-.03em}
-.hero h1 em{font-style:normal;color:#60a5fa}
+.hero h1 em{font-style:normal;color:#60a5fa;display:block;font-size:1.25em;margin-top:10px}
 .hero p{font-size:1.1rem;max-width:540px;margin:0 auto 44px;color:#94a3b8;line-height:1.8}
 .btn-hero{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:16px 36px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(37,99,235,.4);transition:all .15s}
 .btn-hero:hover{background:#1d4ed8;transform:translateY(-1px);box-shadow:0 8px 32px rgba(37,99,235,.5)}
@@ -474,6 +448,7 @@ a{color:inherit}
 .stats-bar__grid{display:flex;justify-content:center;gap:0;flex-wrap:wrap;max-width:860px;margin:0 auto}
 .stat{text-align:center;padding:0 48px;border-right:1px solid #e2e8f0}
 .stat:last-child{border-right:none}
+.stat__icon{display:flex;justify-content:center;margin-bottom:12px}
 .stat__val{font-size:1.2rem;font-weight:800;color:var(--dark);letter-spacing:-.02em;line-height:1.2}
 .stat__lbl{font-size:.82rem;color:var(--m);margin-top:5px;line-height:1.4}
 /* SECTIONS */
@@ -489,15 +464,12 @@ a{color:inherit}
 .step__num{width:36px;height:36px;background:var(--dark);color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;margin-bottom:16px;font-variant-numeric:tabular-nums}
 .step__title{font-weight:700;margin-bottom:8px;font-size:.95rem;color:var(--dark)}
 .step__desc{font-size:.88rem;color:var(--m);line-height:1.65}
-/* FAQ */
-.faq-list{max-width:720px;margin:0 auto;border:1px solid #e2e8f0;border-radius:var(--r);overflow:hidden}
-.faq-item{border-bottom:1px solid #e2e8f0}
-.faq-item:last-child{border-bottom:none}
-.faq-q{width:100%;text-align:left;padding:20px 24px;font-weight:600;font-size:.95rem;background:#fff;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--dark);transition:background .1s}
-.faq-q:hover{background:#f8fafc}
-.faq-icon{flex-shrink:0;color:var(--blue);transition:transform .2s;font-size:.8rem}
-.faq-item.open .faq-icon{transform:rotate(180deg)}
-.faq-a{display:none;padding:0 24px 20px;color:var(--m);line-height:1.75;font-size:.9rem;background:#fff}
+/* CALL STEPS */
+.call-steps{list-style:none;padding:0;margin:40px auto 0;max-width:560px}
+.call-steps li{display:flex;align-items:flex-start;gap:20px;padding:20px 0;border-bottom:1px solid #e2e8f0;font-size:1.05rem;color:var(--t);line-height:1.6}
+.call-steps li:last-child{border-bottom:none}
+.call-steps li::before{content:counter(item);counter-increment:item;min-width:36px;height:36px;background:var(--dark);color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.call-steps{counter-reset:item}
 /* CTA */
 .cta-section{background:var(--dark);color:#fff;text-align:center;padding:88px 24px;position:relative;overflow:hidden}
 .cta-section::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 70% 80% at 50% 110%,rgba(37,99,235,.3) 0%,transparent 70%)}
@@ -531,7 +503,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 
 <nav class="nav">
   <a class="nav__brand" href="/" style="display:flex;align-items:center;gap:9px;text-decoration:none"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="14" cy="14" r="3" fill="#2563eb"/><circle cx="14" cy="14" r="7" stroke="#2563eb" stroke-width="1.5" fill="none" opacity=".65"/><circle cx="14" cy="14" r="11" stroke="#2563eb" stroke-width="1" fill="none" opacity=".35"/></svg><span>Présence&nbsp;<span style="color:#2563eb">IA</span></span></a>
-  <a class="nav__cta" href="#contact">Tester ma visibilité</a>
+  <a class="nav__cta" href="#contact">Réserver mon audit gratuit</a>
 </nav>
 
 <div class="hero">
@@ -543,25 +515,34 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 
 <div class="stats-bar">
   <div class="stats-bar__grid">
-    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
-    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
-    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg></div>
+      <div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4h-3"/><circle cx="15" cy="7" r="4"/><path d="M1 21v-2a4 4 0 0 1 4-4h3"/><circle cx="5" cy="7" r="3"/></svg></div>
+      <div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div>
+    </div>
   </div>
 </div>
 
 <div class="section section--alt" id="how">
   <div class="container">
-    <h2 class="section__title">Comment fonctionne l'audit</h2>
-    <p class="section__sub">Un test automatisé, rigoureux, répété sur les 3 grandes IA du marché.</p>
+    <h2 class="section__title">Comment fonctionne l'analyse</h2>
     <div class="steps-grid">{steps_html}</div>
   </div>
 </div>
 
-<div class="section" id="faq">
-  <div class="container">
-    <p class="section__eyebrow">FAQ</p>
-    <h2 class="section__title">Questions fréquentes</h2>
-    <div class="faq-list">{faq_html}</div>
+<div class="section" id="appel">
+  <div class="container" style="max-width:640px">
+    <h2 class="section__title">Comment se déroule l'appel</h2>
+    <ol class="call-steps">
+      {"".join(f'<li>{s}</li>' for s in _call_steps if s)}
+    </ol>
   </div>
 </div>
 
@@ -594,16 +575,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
   </div>
 </footer>
 
-<script>
-function toggleFaq(btn) {{
-  const item = btn.closest('.faq-item');
-  const ans  = btn.nextElementSibling;
-  const open = !ans.hidden;
-  ans.hidden = open;
-  btn.setAttribute('aria-expanded', !open);
-  item.classList.toggle('open', !open);
-}}
-</script>
+<script></script>
 
 {extra_body_end}
 </body>
