@@ -35,6 +35,8 @@ libsass>=0.23.0
 -e ./libs/theme_generator
 # Génération HTML modulaire (blocs, manifest, SCSS)
 -e ./libs/page_builder
+# Marketing unifié : email (Brevo) + SMS + social + CRM
+-e ./libs/marketing_module
 
 # Tests
 pytest>=8.0.0

@@ -1,0 +1,128 @@
+{
+  "project_id": "presence-ia",
+  "project_name": "Présence IA",
+  "domains": [
+    {"domain": "presence-ia.online",  "role": "sending", "dns_status": "verified"},
+    {"domain": "presence-ia.info",    "role": "sending", "dns_status": "verified"},
+    {"domain": "presence-ia.cloud",   "role": "sending", "dns_status": "verified"},
+    {"domain": "presence-ia.site",    "role": "sending", "dns_status": "verified"},
+    {"domain": "presence-ia.website", "role": "sending", "dns_status": "verified"}
+  ],
+  "mailboxes": [
+    {"email": "contact@presence-ia.online",   "domain": "presence-ia.online",   "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "hello@presence-ia.online",     "domain": "presence-ia.online",   "display_name": "Équipe Présence", "daily_limit": 40, "hourly_limit": 8},
+    {"email": "bonjour@presence-ia.online",   "domain": "presence-ia.online",   "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "info@presence-ia.online",      "domain": "presence-ia.online",   "display_name": "Info Présence",   "daily_limit": 40, "hourly_limit": 8},
+    {"email": "equipe@presence-ia.online",    "domain": "presence-ia.online",   "display_name": "Équipe IA",      "daily_limit": 40, "hourly_limit": 8},
+    {"email": "contact@presence-ia.info",     "domain": "presence-ia.info",     "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "hello@presence-ia.info",       "domain": "presence-ia.info",     "display_name": "Équipe Présence", "daily_limit": 40, "hourly_limit": 8},
+    {"email": "bonjour@presence-ia.info",     "domain": "presence-ia.info",     "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "info@presence-ia.info",        "domain": "presence-ia.info",     "display_name": "Info Présence",   "daily_limit": 40, "hourly_limit": 8},
+    {"email": "equipe@presence-ia.info",      "domain": "presence-ia.info",     "display_name": "Équipe IA",      "daily_limit": 40, "hourly_limit": 8},
+    {"email": "contact@presence-ia.cloud",    "domain": "presence-ia.cloud",    "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "hello@presence-ia.cloud",      "domain": "presence-ia.cloud",    "display_name": "Équipe Présence", "daily_limit": 40, "hourly_limit": 8},
+    {"email": "bonjour@presence-ia.cloud",    "domain": "presence-ia.cloud",    "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "info@presence-ia.cloud",       "domain": "presence-ia.cloud",    "display_name": "Info Présence",   "daily_limit": 40, "hourly_limit": 8},
+    {"email": "equipe@presence-ia.cloud",     "domain": "presence-ia.cloud",    "display_name": "Équipe IA",      "daily_limit": 40, "hourly_limit": 8},
+    {"email": "contact@presence-ia.site",     "domain": "presence-ia.site",     "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "hello@presence-ia.site",       "domain": "presence-ia.site",     "display_name": "Équipe Présence", "daily_limit": 40, "hourly_limit": 8},
+    {"email": "bonjour@presence-ia.site",     "domain": "presence-ia.site",     "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "info@presence-ia.site",        "domain": "presence-ia.site",     "display_name": "Info Présence",   "daily_limit": 40, "hourly_limit": 8},
+    {"email": "equipe@presence-ia.site",      "domain": "presence-ia.site",     "display_name": "Équipe IA",      "daily_limit": 40, "hourly_limit": 8},
+    {"email": "contact@presence-ia.website",  "domain": "presence-ia.website",  "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "hello@presence-ia.website",    "domain": "presence-ia.website",  "display_name": "Équipe Présence", "daily_limit": 40, "hourly_limit": 8},
+    {"email": "bonjour@presence-ia.website",  "domain": "presence-ia.website",  "display_name": "Présence IA",    "daily_limit": 40, "hourly_limit": 8},
+    {"email": "info@presence-ia.website",     "domain": "presence-ia.website",  "display_name": "Info Présence",   "daily_limit": 40, "hourly_limit": 8},
+    {"email": "equipe@presence-ia.website",   "domain": "presence-ia.website",  "display_name": "Équipe IA",      "daily_limit": 40, "hourly_limit": 8}
+  ],
+  "warmup_strategy": {
+    "name": "Warmup Présence IA — 21j",
+    "max_daily_volume": 200,
+    "total_days": 21,
+    "auto_pause_on_issue": true,
+    "health_rules": {"max_bounce_rate": 0.03, "max_spam_rate": 0.005},
+    "ramp_schedule": [
+      {"day": 1,  "volume": 5},
+      {"day": 3,  "volume": 10},
+      {"day": 5,  "volume": 20},
+      {"day": 7,  "volume": 35},
+      {"day": 10, "volume": 60},
+      {"day": 14, "volume": 100},
+      {"day": 18, "volume": 150},
+      {"day": 21, "volume": 200}
+    ]
+  },
+  "rotation_strategy": {
+    "name": "Rotation Présence IA",
+    "algorithm": "round_robin",
+    "per_mailbox_daily_cap": 40,
+    "domain_rotation": true
+  },
+  "compliance_rules": [
+    {
+      "name": "Bounce rate critique",
+      "rule_type": "bounce_rate",
+      "scope": "mailbox",
+      "threshold": 0.08,
+      "window_hours": 24,
+      "action_on_trigger": "pause_mailbox"
+    },
+    {
+      "name": "Bounce rate campagne",
+      "rule_type": "bounce_rate",
+      "scope": "campaign",
+      "threshold": 0.05,
+      "window_hours": 24,
+      "action_on_trigger": "alert"
+    },
+    {
+      "name": "Volume journalier total",
+      "rule_type": "send_volume",
+      "scope": "campaign",
+      "threshold": 1000,
+      "window_hours": 24,
+      "action_on_trigger": "stop_campaign"
+    }
+  ],
+  "campaign": {
+    "name": "Campagne Outreach Brest — Wave 1",
+    "channels": ["email"],
+    "stop_on_reply": true,
+    "stop_on_meeting": true
+  },
+  "sequences": [
+    {
+      "name": "Séquence 3 emails — Prospection TPE/PME",
+      "steps": [
+        {
+          "step_number": 1,
+          "channel": "email",
+          "delay_days": 0,
+          "subject": "Votre présence en ligne en 2026 — On peut faire beaucoup mieux",
+          "body_html": "<p>Bonjour {{first_name}},</p><p>Je travaille avec des TPE/PME comme la vôtre dans le secteur de {{industry}} à Brest. J'ai regardé votre présence en ligne et j'ai quelques idées concrètes pour vous aider à attirer plus de clients.</p><p>Seriez-vous disponible 15 minutes cette semaine pour en discuter ?</p><p>Cordialement,<br>{{sender_name}}</p>",
+          "body_text": "Bonjour {{first_name}},\n\nJe travaille avec des TPE/PME comme la vôtre à Brest. J'ai quelques idées pour améliorer votre présence en ligne.\n\nDisponible 15 min cette semaine ?\n\nCordialement,\n{{sender_name}}"
+        },
+        {
+          "step_number": 2,
+          "channel": "email",
+          "delay_days": 3,
+          "subject": "Suite — Présence digitale {{company_name}}",
+          "body_html": "<p>Bonjour {{first_name}},</p><p>Je reviens vers vous suite à mon email de début de semaine.</p><p>J'ai préparé une analyse rapide de votre présence en ligne — je peux vous la partager gratuitement si ça vous intéresse.</p><p>{{calendly_link}}</p><p>Cordialement,<br>{{sender_name}}</p>",
+          "body_text": "Bonjour {{first_name}},\n\nSuite à mon email de l'autre jour — j'ai préparé une analyse de votre présence en ligne, gratuite.\n\nRDV ici : {{calendly_link}}\n\nCordialement,\n{{sender_name}}"
+        },
+        {
+          "step_number": 3,
+          "channel": "email",
+          "delay_days": 7,
+          "subject": "Dernière tentative — {{company_name}}",
+          "body_html": "<p>Bonjour {{first_name}},</p><p>C'est mon dernier message. Si le timing n'est pas bon, pas de problème — je ne vous recontacterai pas.</p><p>Si vous souhaitez quand même voir comment améliorer votre visibilité en ligne, mon agenda est ici : {{calendly_link}}</p><p>Bonne continuation,<br>{{sender_name}}</p>",
+          "body_text": "Bonjour {{first_name}},\n\nDernier message de ma part. Si intéressé : {{calendly_link}}\n\nBonne continuation,\n{{sender_name}}"
+        }
+      ]
+    }
+  ],
+  "sms_template": {
+    "name": "SMS relance RDV",
+    "body": "Bonjour {{first_name}}, c'est {{sender_name}} (Présence IA). Avez-vous pu voir mon email ? Je peux vous aider à améliorer votre visibilité en ligne. RDV rapide : {{calendly_link}}"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "project_id": "sublym",
+  "project_name": "Sublym",
+  "domains": [
+    {"domain": "sublym.com", "role": "sending", "dns_status": "pending"}
+  ],
+  "mailboxes": [
+    {"email": "contact@sublym.com",   "domain": "sublym.com", "display_name": "Sublym",       "daily_limit": 50, "hourly_limit": 10},
+    {"email": "hello@sublym.com",     "domain": "sublym.com", "display_name": "Équipe Sublym", "daily_limit": 50, "hourly_limit": 10},
+    {"email": "bonjour@sublym.com",   "domain": "sublym.com", "display_name": "Sublym",       "daily_limit": 50, "hourly_limit": 10}
+  ],
+  "warmup_strategy": {
+    "name": "Warmup Sublym — 14j",
+    "max_daily_volume": 150,
+    "total_days": 14,
+    "auto_pause_on_issue": true,
+    "health_rules": {"max_bounce_rate": 0.03, "max_spam_rate": 0.005},
+    "ramp_schedule": [
+      {"day": 1,  "volume": 5},
+      {"day": 3,  "volume": 15},
+      {"day": 5,  "volume": 30},
+      {"day": 7,  "volume": 60},
+      {"day": 10, "volume": 100},
+      {"day": 14, "volume": 150}
+    ]
+  },
+  "rotation_strategy": {
+    "name": "Rotation Sublym",
+    "algorithm": "round_robin",
+    "per_mailbox_daily_cap": 50,
+    "domain_rotation": false
+  },
+  "compliance_rules": [
+    {
+      "name": "Bounce rate critique",
+      "rule_type": "bounce_rate",
+      "scope": "mailbox",
+      "threshold": 0.08,
+      "window_hours": 24,
+      "action_on_trigger": "pause_mailbox"
+    },
+    {
+      "name": "Volume journalier total",
+      "rule_type": "send_volume",
+      "scope": "campaign",
+      "threshold": 500,
+      "window_hours": 24,
+      "action_on_trigger": "stop_campaign"
+    }
+  ],
+  "social_accounts": [
+    {
+      "platform": "instagram",
+      "account_name": "@sublym",
+      "credentials": {
+        "access_token": "${SUBLYM_INSTAGRAM_TOKEN}",
+        "ig_user_id": "${SUBLYM_INSTAGRAM_USER_ID}"
+      },
+      "daily_post_limit": 3
+    },
+    {
+      "platform": "pinterest",
+      "account_name": "Sublym",
+      "credentials": {
+        "access_token": "${SUBLYM_PINTEREST_TOKEN}",
+        "board_id": "${SUBLYM_PINTEREST_BOARD_ID}"
+      },
+      "daily_post_limit": 5
+    }
+  ],
+  "campaign": {
+    "name": "Campagne Notoriété Sublym — Q1 2026",
+    "channels": ["email", "instagram", "pinterest"],
+    "stop_on_reply": true,
+    "stop_on_meeting": false
+  }
+}

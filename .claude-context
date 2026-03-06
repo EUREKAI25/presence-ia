@@ -1,17 +1,21 @@
 {
   "project": "PRESENCE_IA",
-  "current_task": "TERMINÉ — Harmonisation CSS thème clair",
-  "last_update": "2026-02-20",
-  "next_step": "Déployer sur VPS + tester visuellement",
-  "status": "deployed",
+  "current_task": "MARKETING_MODULE EURKAI complet — email + SMS + social + CRM",
+  "last_update": "2026-03-06",
+  "next_step": "Déployer MARKETING_MODULE sur VPS + seed_loader presence_ia_seed.json + scorer 17 prospects Brest + configurer Calendly webhook",
+  "status": "marketing_module_ready",
   "completed": [
-    "98 tests passent",
-    "Conversion dark → light theme (homepage, landing, admin)",
-    "Couleurs unifiées: #fff/#f9fafb, borders #e5e7eb, text #1a1a2e",
-    "Box-shadows ajoutées pour profondeur visuelle",
-    "main.py: CSS homepage (nav, sections, boutons, footer)",
-    "content.py: CSS admin contenus (formulaires, FAQ, modal)",
-    "admin.py: CSS admin pages (dashboard, prospects, send queue)",
-    "Commit 0027143 + push GitHub ✅"
+    "Landing accordéon IA réel (3 requêtes × 3 modèles)",
+    "Landing H1 + insight + ia-explain + scarcity + pre-FAQ",
+    "FAQ simplifiée (4 Q&A sans jargon)",
+    "Calendly 30min → 20min partout",
+    "Home stats → phrases bénéfices",
+    "Fiche closers 3 offres (Domination 9k€ / Tout Inclus 3.5k€ / Kit 500€)",
+    "Page recrutement closers /recrutement",
+    "5 domaines Brevo authentifiés (presence-ia.online/info/cloud/site/website)",
+    "25 adresses email Brevo créées",
+    "DNS SPF/DKIM/DMARC propagés sur 5 domaines",
+    "OUTBOUND_EMAIL_MODULE EURKAI complet",
+    "MARKETING_MODULE EURKAI complet (email+SMS+social+CRM — 40 fichiers Python, 12 routes API, 4 tests, 2 seeds, seed_loader)"
   ]
 }
