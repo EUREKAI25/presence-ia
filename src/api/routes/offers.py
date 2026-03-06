@@ -70,10 +70,6 @@ def offers_page(request: Request, db: Session = Depends(get_db)):
     <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px">Stripe Price ID</label>
     <input id="stripe-{o.id}" value="{o.stripe_price_id or ''}" placeholder="price_..." style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px;border-radius:4px;font-size:13px">
   </div>
-  <div>
-    <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px">Profession cible</label>
-    <input id="profession-{o.id}" value="{o.profession or ''}" placeholder="couvreur (vide=générique)" style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px;border-radius:4px;font-size:13px">
-  </div>
   <div style="display:flex;align-items:flex-end;padding-bottom:2px">
     <label style="display:flex;align-items:center;gap:6px;color:#aaa;font-size:12px;cursor:pointer">
       <input id="active-{o.id}" type="checkbox" {'checked' if o.active else ''} style="width:auto"> Active
@@ -114,7 +110,6 @@ async function saveOffer(id, btn) {{
     name:           g('name').value,
     price:          parseFloat(g('price').value) || 0,
     stripe_price_id: g('stripe').value || null,
-    profession:     g('profession').value || null,
     active:         g('active').checked,
     features,
   }};
