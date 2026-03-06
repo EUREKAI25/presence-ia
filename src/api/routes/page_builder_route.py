@@ -23,8 +23,14 @@ import json
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from page_builder import ManifestPage, parse_manifest, render_page
-from page_builder.manifest.schema import ManifestSection, ManifestColumn, ManifestBlockConfig
+try:
+    from page_builder import ManifestPage, parse_manifest, render_page
+    from page_builder.manifest.schema import ManifestSection, ManifestColumn, ManifestBlockConfig
+    _PAGE_BUILDER_OK = True
+except ImportError:
+    _PAGE_BUILDER_OK = False
+    ManifestPage = parse_manifest = render_page = None
+    ManifestSection = ManifestColumn = ManifestBlockConfig = None
 
 from ...database import get_block, db_get_header, db_get_theme, db_get_page_layout
 
@@ -280,7 +286,7 @@ def build_manifest_from_db(
     page_type: str = "landing",
     city: Optional[str] = None,
     profession: Optional[str] = None,
-) -> ManifestPage:
+):
     """
     Construit un ManifestPage complet depuis la DB PRESENCE_IA.
 
@@ -290,6 +296,9 @@ def build_manifest_from_db(
     4. Hero bg_src depuis CityHeaderDB (si landing + city)
     5. Pricing depuis offers_module
     """
+    if not _PAGE_BUILDER_OK:
+        raise RuntimeError("page_builder module non installé — render_landing non disponible")
+
     # 1. Thème
     theme = db_get_theme(db)
 
