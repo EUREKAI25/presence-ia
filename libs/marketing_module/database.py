@@ -25,6 +25,95 @@ SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
 
 def init_db():
     Base.metadata.create_all(bind=_engine)
+    db = SessionLocal()
+    try:
+        _seed_default_sequence(db)
+    finally:
+        db.close()
+
+
+_PROJECT_ID = os.getenv("MKT_PROJECT_ID", "presence_ia")
+
+_DEFAULT_SEQUENCE_STEPS = [
+    {"step_order": 1, "delay_days": 0,  "channel": "email",
+     "subject_template": "Les IA recommandent vos concurrents a {city}",
+     "body_template": (
+         "Bonjour,\n\nNous avons verifie ce que voient vos prospects lorsqu'ils demandent a leur IA :\n\n"
+         "\"Quel {profession} recommandez-vous a {city} ?\"\n\nCertaines entreprises sont recommandees.\n\n"
+         "Vous pouvez voir ce que l'IA affiche ici :\n{landing_url}\n\nBonne journee,\nPresence IA")},
+    {"step_order": 2, "delay_days": 1,  "channel": "sms",
+     "subject_template": None,
+     "body_template": (
+         "Bonjour, nous avons analyse ce que les IA affichent pour un {profession} a {city}. "
+         "Voici la page : {landing_url} - Presence IA")},
+    {"step_order": 3, "delay_days": 3,  "channel": "email",
+     "subject_template": "Voici ce que voient vos prospects sur les IA",
+     "body_template": (
+         "Bonjour,\n\nQuand quelqu'un cherche un {profession} a {city} sur ChatGPT ou Gemini,\n"
+         "certaines entreprises sont proposees en priorite.\n\n"
+         "Votre entreprise n'apparait pas actuellement dans ces reponses.\n\n"
+         "Voici la page personnalisee :\n{landing_url}\n\n"
+         "Nous pouvons vous expliquer cela en 20 minutes si vous le souhaitez.")},
+    {"step_order": 4, "delay_days": 5,  "channel": "sms",
+     "subject_template": None,
+     "body_template": (
+         "Bonjour, petit rappel : la page montrant les resultats des IA pour {city} "
+         "est toujours disponible. {landing_url} - Presence IA")},
+    {"step_order": 5, "delay_days": 7,  "channel": "email",
+     "subject_template": "Votre analyse est toujours disponible",
+     "body_template": (
+         "Bonjour,\n\nNous avions prepare une page montrant ce que les IA affichent\n"
+         "lorsqu'un prospect cherche un {profession} a {city}.\n\n"
+         "La page est toujours accessible ici :\n{landing_url}\n\n"
+         "Si vous voulez comprendre pourquoi certaines entreprises sont citees\n"
+         "et comment y apparaitre, vous pouvez reserver un creneau.")},
+    {"step_order": 6, "delay_days": 14, "channel": "email",
+     "subject_template": "Dernier message concernant votre visibilite IA",
+     "body_template": (
+         "Bonjour,\n\nLes recommandations faites par les IA deviennent\n"
+         "un nouveau canal d'acquisition pour les entreprises locales.\n\n"
+         "Nous avons analyse ce qui apparait actuellement pour {city}.\n\n"
+         "Voici la page :\n{landing_url}\n\n"
+         "Si le sujet vous interesse, vous pouvez reserver un audit gratuit\n"
+         "pour voir comment ameliorer votre visibilite.")},
+]
+
+
+def _seed_default_sequence(db: Session):
+    """Cree la sequence de prospection par defaut si elle n'existe pas."""
+    existing = db.query(CampaignSequenceDB).filter_by(
+        project_id=_PROJECT_ID, name="Prospection couvreurs"
+    ).first()
+    if existing:
+        return
+
+    # Campagne par defaut (SQLite n'enforce pas les FK sans PRAGMA)
+    campaign = db.query(CampaignDB).filter_by(
+        project_id=_PROJECT_ID, name="Prospection par defaut"
+    ).first()
+    if not campaign:
+        campaign = CampaignDB(
+            project_id=_PROJECT_ID,
+            name="Prospection par defaut",
+            channels=["email", "sms"],
+            status="active",
+        )
+        db.add(campaign)
+        db.flush()
+
+    seq = CampaignSequenceDB(
+        project_id=_PROJECT_ID,
+        campaign_id=campaign.id,
+        name="Prospection couvreurs",
+        stop_on_reply=True,
+    )
+    db.add(seq)
+    db.flush()
+
+    for step_data in _DEFAULT_SEQUENCE_STEPS:
+        db.add(CampaignSequenceStepDB(sequence_id=seq.id, **step_data))
+
+    db.commit()
 
 
 def get_db():
