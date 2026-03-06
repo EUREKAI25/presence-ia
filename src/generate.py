@@ -96,12 +96,29 @@ td{{padding:9px;border-bottom:1px solid #eee}}.cited{{color:#2ecc71;font-weight:
 
 def email_generate(db: Session, p: ProspectDB) -> Dict:
     comps = _comps(p); c1 = comps[0] if comps else "vos concurrents"; c2 = comps[1] if len(comps)>1 else ""
-    l = landing_url(p); vid = p.video_url or "[VIDÉO À AJOUTER]"
-    subj = f"À {p.city}, ChatGPT recommande {c1}. Pas vous."
-    body = (f"Bonjour,\n\nJ'ai testé ce que répondent plusieurs IA lorsqu'un client cherche un "
-            f"{p.profession} à {p.city}.\n\nSur des tests répétés, {c1}"
-            f"{' (et parfois ' + c2 + ')' if c2 else ''} est régulièrement cité. "
-            f"Votre entreprise n'apparaît pas.\n\nVidéo (90s) : {vid}\nSynthèse + options : {l}\n\n— {SIGNATURE}")
+    l = landing_url(p); vid = p.video_url or "[VIDEO A AJOUTER]"
+    c2_part = f" (et parfois {c2})" if c2 else ""
+    # Lire le template depuis la DB si disponible
+    try:
+        from .database import db_get_template
+        tpl = db_get_template(db, "email_prospection")
+    except Exception:
+        tpl = None
+    if tpl and tpl.subject and tpl.body:
+        subj = (tpl.subject
+                .replace("{city}", p.city).replace("{profession}", p.profession)
+                .replace("{c1}", c1).replace("{c2}", c2))
+        body = (tpl.body
+                .replace("{name}", p.name or "").replace("{city}", p.city)
+                .replace("{profession}", p.profession).replace("{c1}", c1)
+                .replace("{c2}", c2).replace("{c2_part}", c2_part)
+                .replace("{video_url}", vid).replace("{landing_url}", l))
+    else:
+        subj = f"A {p.city}, ChatGPT recommande {c1}. Pas vous."
+        body = (f"Bonjour,\n\nJ'ai teste ce que repondent plusieurs IA lorsqu'un client cherche un "
+                f"{p.profession} a {p.city}.\n\nSur des tests repetes, {c1}"
+                f"{c2_part} est regulierement cite. "
+                f"Votre entreprise n'apparait pas.\n\nVideo (90s) : {vid}\nSynthese + options : {l}\n\n-- {SIGNATURE}")
     data = {"prospect_id": p.prospect_id, "name": p.name, "city": p.city,
             "subject": subj, "body": body, "landing_url": l,
             "video_url": vid, "c1": c1, "c2": c2}

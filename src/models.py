@@ -367,6 +367,19 @@ class V3LandingTextDB(Base):
     updated_at:     Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class MessageTemplateDB(Base):
+    """Templates email/SMS éditables depuis /admin/templates."""
+    __tablename__ = "message_templates"
+    slug        : Mapped[str]            = mapped_column(sa.String, primary_key=True)   # ex: "email_prospection"
+    name        : Mapped[str]            = mapped_column(sa.String, nullable=False)     # ex: "Email prospection"
+    channel     : Mapped[str]            = mapped_column(sa.String, nullable=False)     # "email" | "sms"
+    subject     : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)        # objet email
+    body        : Mapped[str]            = mapped_column(sa.Text, default="")           # texte brut
+    body_html   : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)        # HTML (séquences)
+    placeholders: Mapped[str]            = mapped_column(sa.Text, default="[]")         # JSON list[str]
+    updated_at  : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))

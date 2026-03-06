@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -51,6 +51,9 @@ def init_db():
             seed_cms_blocks(db)
     except Exception:
         pass
+    # Seed message templates
+    with SessionLocal() as db:
+        _seed_message_templates(db)
 
 
 def get_db():
@@ -396,3 +399,142 @@ def _seed_theme(db: Session):
             preset_json=json.dumps(_DEFAULT_THEME_PRESET, ensure_ascii=False),
         ))
         db.commit()
+
+
+# ── Message Templates ────────────────────────────────────────────────────────
+
+_DEFAULT_TEMPLATES = [
+    {
+        "slug": "email_prospection",
+        "name": "Email prospection (1er contact)",
+        "channel": "email",
+        "subject": "A {city}, ChatGPT recommande {c1}. Pas vous.",
+        "body": (
+            "Bonjour,\n\n"
+            "J'ai teste ce que repondent plusieurs IA lorsqu'un client cherche un {profession} a {city}.\n\n"
+            "Sur des tests repetes, {c1}{c2_part} est regulierement cite. "
+            "Votre entreprise n'apparait pas.\n\n"
+            "Video (90s) : {video_url}\n"
+            "Synthese + options : {landing_url}\n\n"
+            "-- Presence IA"
+        ),
+        "body_html": None,
+        "placeholders": json.dumps(["{name}", "{city}", "{profession}", "{c1}", "{c2}", "{c2_part}", "{video_url}", "{landing_url}"]),
+    },
+    {
+        "slug": "sms_prospection",
+        "name": "SMS prospection (1er contact)",
+        "channel": "sms",
+        "subject": None,
+        "body": (
+            "Les IA citent vos concurrents. Pas vous.\n"
+            "Reservez votre creneau pour comprendre pourquoi et inverser la tendance :\n"
+            "{calendly_url}"
+        ),
+        "body_html": None,
+        "placeholders": json.dumps(["{name}", "{city}", "{metier}", "{calendly_url}"]),
+    },
+    {
+        "slug": "email_sequence_j1",
+        "name": "Sequence email — J+1 (1er contact)",
+        "channel": "email",
+        "subject": "Votre presence en ligne en 2026 — On peut faire beaucoup mieux",
+        "body": (
+            "Bonjour {{first_name}},\n\n"
+            "Je travaille avec des TPE/PME comme la votre dans le secteur de {{industry}} a {{city}}. "
+            "J'ai regarde votre presence en ligne et j'ai quelques idees concretes pour vous aider a attirer plus de clients.\n\n"
+            "Seriez-vous disponible 15 minutes cette semaine pour en discuter ?\n\n"
+            "Cordialement,\n{{sender_name}}"
+        ),
+        "body_html": (
+            "<p>Bonjour {{first_name}},</p>"
+            "<p>Je travaille avec des TPE/PME comme la votre dans le secteur de {{industry}} a {{city}}. "
+            "J'ai regarde votre presence en ligne et j'ai quelques idees concretes pour vous aider a attirer plus de clients.</p>"
+            "<p>Seriez-vous disponible 15 minutes cette semaine pour en discuter ?</p>"
+            "<p>Cordialement,<br>{{sender_name}}</p>"
+        ),
+        "placeholders": json.dumps(["{{first_name}}", "{{company_name}}", "{{city}}", "{{industry}}", "{{sender_name}}"]),
+    },
+    {
+        "slug": "email_sequence_j3",
+        "name": "Sequence email — J+3 (relance)",
+        "channel": "email",
+        "subject": "Suite — Presence digitale {{company_name}}",
+        "body": (
+            "Bonjour {{first_name}},\n\n"
+            "Je reviens vers vous suite a mon email de debut de semaine.\n\n"
+            "J'ai prepare une analyse rapide de votre presence en ligne — je peux vous la partager gratuitement si ca vous interesse.\n\n"
+            "{{calendly_link}}\n\n"
+            "Cordialement,\n{{sender_name}}"
+        ),
+        "body_html": (
+            "<p>Bonjour {{first_name}},</p>"
+            "<p>Je reviens vers vous suite a mon email de debut de semaine.</p>"
+            "<p>J'ai prepare une analyse rapide de votre presence en ligne — je peux vous la partager gratuitement si ca vous interesse.</p>"
+            "<p>{{calendly_link}}</p>"
+            "<p>Cordialement,<br>{{sender_name}}</p>"
+        ),
+        "placeholders": json.dumps(["{{first_name}}", "{{company_name}}", "{{calendly_link}}", "{{sender_name}}"]),
+    },
+    {
+        "slug": "email_sequence_j7",
+        "name": "Sequence email — J+7 (dernier contact)",
+        "channel": "email",
+        "subject": "Derniere tentative — {{company_name}}",
+        "body": (
+            "Bonjour {{first_name}},\n\n"
+            "C'est mon dernier message. Si le timing n'est pas bon, pas de probleme — je ne vous recontacterai pas.\n\n"
+            "Si vous souhaitez quand meme voir comment ameliorer votre visibilite en ligne, mon agenda est ici : {{calendly_link}}\n\n"
+            "Bonne continuation,\n{{sender_name}}"
+        ),
+        "body_html": (
+            "<p>Bonjour {{first_name}},</p>"
+            "<p>C'est mon dernier message. Si le timing n'est pas bon, pas de probleme — je ne vous recontacterai pas.</p>"
+            "<p>Si vous souhaitez quand meme voir comment ameliorer votre visibilite en ligne, mon agenda est ici : {{calendly_link}}</p>"
+            "<p>Bonne continuation,<br>{{sender_name}}</p>"
+        ),
+        "placeholders": json.dumps(["{{first_name}}", "{{company_name}}", "{{calendly_link}}", "{{sender_name}}"]),
+    },
+    {
+        "slug": "sms_sequence",
+        "name": "SMS sequence (relance RDV)",
+        "channel": "sms",
+        "subject": None,
+        "body": (
+            "Bonjour {{first_name}}, c'est {{sender_name}} (Presence IA). "
+            "Avez-vous pu voir mon email ? Je peux vous aider a ameliorer votre visibilite en ligne. "
+            "RDV rapide : {{calendly_link}}"
+        ),
+        "body_html": None,
+        "placeholders": json.dumps(["{{first_name}}", "{{sender_name}}", "{{calendly_link}}"]),
+    },
+]
+
+
+def _seed_message_templates(db: Session):
+    """Insere les templates par defaut s'ils n'existent pas encore."""
+    for t in _DEFAULT_TEMPLATES:
+        existing = db.query(MessageTemplateDB).filter_by(slug=t["slug"]).first()
+        if not existing:
+            db.add(MessageTemplateDB(**t))
+    db.commit()
+
+
+def db_list_templates(db: Session) -> list:
+    return db.query(MessageTemplateDB).order_by(MessageTemplateDB.channel, MessageTemplateDB.slug).all()
+
+
+def db_get_template(db: Session, slug: str):
+    return db.query(MessageTemplateDB).filter_by(slug=slug).first()
+
+
+def db_update_template(db: Session, slug: str, updates: dict):
+    t = db.query(MessageTemplateDB).filter_by(slug=slug).first()
+    if not t:
+        return None
+    for k, v in updates.items():
+        if hasattr(t, k):
+            setattr(t, k, v)
+    db.commit()
+    db.refresh(t)
+    return t
