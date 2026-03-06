@@ -249,15 +249,23 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     _accordion_html = "\n".join(_acc_items)
 
     # ── FAQ (accordéon JS, un à la fois) ────────────────────────────────
-    faq_html = "".join(
-        f'<div class="faq-item">'
-        f'<button class="faq-q" onclick="toggleFaq(this)">{q}<span class="faq-icon">+</span></button>'
-        f'<div class="faq-a" hidden>{a}</div>'
-        f'</div>'
+    _faq_pairs = [
+        (L("faq", f"q{i}"), L("faq", f"a{i}"))
         for i in range(1, 8)
-        for q, a in [(L("faq", f"q{i}"), L("faq", f"a{i}"))]
-        if q
-    )
+        if L("faq", f"q{i}")
+    ]
+    faq_html = ""
+    for _fi, (_fq, _fa) in enumerate(_faq_pairs):
+        _open_faq = " open" if _fi == 0 else ""
+        _hidden_faq = "" if _fi == 0 else " hidden"
+        _icon_faq = "−" if _fi == 0 else "+"
+        faq_html += (
+            f'<div class="faq-item">'
+            f'<button class="faq-q{_open_faq}" onclick="toggleFaq(this)">{_fq}'
+            f'<span class="faq-icon">{_icon_faq}</span></button>'
+            f'<div class="faq-a"{_hidden_faq}>{_fa}</div>'
+            f'</div>'
+        )
 
     video_html = (
         f'<p class="video-link"><a href="{p.video_url}" target="_blank">Voir la demo video (90s)</a></p>'
@@ -289,10 +297,10 @@ a{{color:inherit;text-decoration:none}}
 .hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);
   color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
   padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
-.hero h1{{font-size:clamp(28px,5vw,54px);font-weight:800;color:#fff;max-width:760px;
-  margin:0 auto 36px;letter-spacing:-.8px;line-height:1.2;
+.hero h1{{font-size:clamp(20px,3.5vw,40px);font-weight:800;color:#fff;max-width:760px;
+  margin:0 auto 36px;letter-spacing:-.8px;line-height:1.25;
   text-shadow:0 2px 12px rgba(0,0,0,.5)}}
-.hero h1 em{{font-style:normal;font-size:1.2em;display:block;margin-top:4px}}
+.hero h1 em{{font-style:normal;font-size:1.35em;display:block;margin-top:24px;letter-spacing:-.5px}}
 .hero-cta{{display:inline-flex;align-items:center;gap:8px;
   background:#fff;color:var(--txt);font-weight:700;font-size:14px;
   padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);
@@ -305,7 +313,7 @@ section{{padding:80px 0}}
   color:var(--acc);margin-bottom:10px}}
 section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
   letter-spacing:-.4px;margin-bottom:12px;line-height:1.15}}
-.sect-sub{{color:var(--muted);font-size:15px;max-width:560px;margin-bottom:44px}}
+.sect-sub{{color:var(--muted);font-size:clamp(17px,2vw,20px);max-width:760px;margin-bottom:44px}}
 
 /* RÉSULTATS */
 .sect-results{{background:#fff}}
@@ -416,6 +424,7 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .stats-bar__inner{{max-width:820px;margin:0 auto;display:flex;justify-content:center;flex-wrap:wrap;gap:0}}
 .stats-bar .stat{{text-align:center;padding:0 44px;border-right:1px solid var(--border)}}
 .stats-bar .stat:last-child{{border-right:none}}
+.stats-bar .stat__icon{{font-size:30px;line-height:1;margin-bottom:8px;display:flex;justify-content:center}}
 .stats-bar .stat__val{{font-size:1.25rem;font-weight:800;color:var(--txt);letter-spacing:-.02em;line-height:1.2}}
 .stats-bar .stat__lbl{{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}}
 @media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:16px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
@@ -426,10 +435,10 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
 .acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;
   padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
-.acc-ts{{color:#94a3b8;font-size:11px;white-space:nowrap;font-weight:600;flex-shrink:0}}
-.acc-text{{font-style:italic;color:#f1f5f9;font-size:15px;font-weight:500;flex:1}}
-.acc-icon{{color:#64748b;font-size:20px;font-weight:300;flex-shrink:0;margin-left:auto;transition:color .15s}}
-.acc-item.open .acc-icon{{color:#60a5fa}}
+.acc-ts{{color:#94a3b8;font-size:13px;white-space:nowrap;font-weight:600;flex-shrink:0}}
+.acc-text{{font-style:italic;color:#f1f5f9;font-size:17px;font-weight:500;flex:1}}
+.acc-icon{{background:#334155;color:#94a3b8;font-size:15px;font-weight:800;flex-shrink:0;margin-left:auto;transition:all .15s;min-width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1}}
+.acc-item.open .acc-icon{{background:#2563eb;color:#fff}}
 .acc-body{{padding:0 16px 16px}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
 @media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
@@ -486,26 +495,36 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 <!-- STICKY NAV -->
 <nav class="sticky-nav">
   <a class="sn-logo" href="/">Présence<span>IA</span></a>
-  <a class="sn-cta" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit</a>
+  <a class="sn-cta" href="#book" onclick="event.preventDefault();document.getElementById('book').scrollIntoView({{behavior:'smooth'}})">Réserver mon audit gratuit</a>
 </nav>
 
 <!-- HERO -->
 <div class="hero">
   <div class="c">
-    <div class="hero-pill">Audit Visibilité IA &mdash; {p.name.upper()}</div>
+    <div class="hero-pill">Audit Visibilité IA &mdash; {p.name.upper()}*</div>
     <h1>À {p.city}, ChatGPT et Gemini recommandent des {p.profession}s.<em>Mais pas vous.</em></h1>
     <button class="hero-cta" onclick="document.getElementById('ia-demo').scrollIntoView({{behavior:'smooth'}})">
       Voir les résultats &darr;
     </button>
   </div>
+  <p style="position:absolute;bottom:88px;right:28px;font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.2px;z-index:2">*Analyse réalisée sur ChatGPT, Claude et Gemini</p>
 </div>
 
 <!-- STATS BAR -->
 <div class="stats-bar">
   <div class="stats-bar__inner">
-    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
-    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
-    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e8355a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg></div>
+      <div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e8355a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+      <div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e8355a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div>
+    </div>
   </div>
 </div>
 
@@ -526,7 +545,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+      <a class="btn-pitch" href="#book" onclick="event.preventDefault();document.getElementById('book').scrollIntoView({{behavior:'smooth'}})">Réserver mon audit gratuit &rarr;</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d&rsquo;entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -538,12 +557,33 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n&rsquo;apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu&rsquo;elles recommandent.</p>
-    <a class="btn-pitch" href="https://calendly.com/contact-presence-ia/20min" target="_blank">Réserver mon audit gratuit &rarr;</a>
+    <a class="btn-pitch" href="#book" onclick="event.preventDefault();document.getElementById('book').scrollIntoView({{behavior:'smooth'}})">Réserver mon audit gratuit &rarr;</a>
   </div>
 </section>
 
 <!-- FAQ -->
 {f'<section class="sect-faq"><div class="c"><div class="faq-wrap">{faq_html}</div></div></section>' if faq_html else ""}
+
+<!-- RÉSERVER -->
+<section class="sect-book" id="book" style="background:#fff;padding:80px 0">
+  <div class="c" style="text-align:center">
+    <p class="sect-label">Audit gratuit</p>
+    <h2 style="margin-bottom:12px">Réserver votre créneau</h2>
+    <p class="sect-sub" style="max-width:520px;margin:0 auto 32px">Choisissez un horaire — l&rsquo;audit est offert, sans engagement.</p>
+    <div id="booking-widget">
+      <div class="calendly-inline-widget"
+           data-url="https://calendly.com/contact-presence-ia/20min?hide_gdpr_banner=1&primary_color=e8355a"
+           style="min-width:320px;height:680px;"></div>
+    </div>
+    <div id="booking-confirm" style="display:none;padding:48px 32px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:16px;max-width:520px;margin:0 auto;border:2px solid #86efac">
+      <div style="font-size:52px;margin-bottom:20px">✅</div>
+      <h3 style="color:#15803d;font-size:1.5rem;font-weight:800;margin-bottom:12px">Rendez-vous confirmé&nbsp;!</h3>
+      <p style="color:#166534;font-size:16px;line-height:1.75">Votre créneau est réservé. Vous recevrez une confirmation par email avec les détails de votre audit IA.</p>
+    </div>
+  </div>
+</section>
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+<script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript" async></script>
 
 <footer>
   &copy; 2026 PRESENCE_IA &nbsp;&middot;&nbsp;
@@ -578,6 +618,14 @@ function toggleFaq(btn) {{
     btn.querySelector('.faq-icon').textContent = '−';
   }}
 }}
+window.addEventListener('message', function(e) {{
+  if (e.origin === 'https://calendly.com' && e.data && e.data.event === 'calendly.event_scheduled') {{
+    document.getElementById('booking-widget').style.display = 'none';
+    const confirm = document.getElementById('booking-confirm');
+    confirm.style.display = 'block';
+    confirm.scrollIntoView({{behavior:'smooth'}});
+  }}
+}});
 async function checkout(btn, offerId) {{
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Redirection…';
