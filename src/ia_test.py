@@ -194,9 +194,13 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
 def _openai(q: str) -> str:
     import openai
     # gpt-4o = modèle par défaut ChatGPT (ce que les vrais utilisateurs voient)
+    # system prompt = reproduit le comportement ChatGPT web (sans ça, l'API refuse de nommer des pros locaux)
     r = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")).chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-        messages=[{"role":"user","content":q}], temperature=TEMP, max_tokens=600)
+        messages=[
+            {"role": "system", "content": "Tu es un assistant utile et direct. Quand on te demande des professionnels ou entreprises locales, tu cites des noms réels que tu connais, avec une courte description."},
+            {"role": "user", "content": q}
+        ], temperature=TEMP, max_tokens=600)
     return r.choices[0].message.content or ""
 
 def _anthropic(q: str) -> str:
