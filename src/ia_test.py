@@ -191,6 +191,9 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
 
 # ── Adaptateurs IA (web search natif — résultats identiques aux interfaces web) ───
 
+USE_PLAYWRIGHT = os.getenv("USE_PLAYWRIGHT", "1") == "1"  # activé par défaut
+
+
 def _resolve_openai_model() -> str:
     """Retourne le modèle OpenAI actif : env var si définie, sinon chatgpt-4o-latest (alias officiel → toujours le plus récent)."""
     return os.getenv("OPENAI_MODEL") or "chatgpt-4o-latest"
@@ -213,40 +216,56 @@ def _resolve_gemini_model() -> str:
 
 
 def _openai(q: str) -> str:
+    if USE_PLAYWRIGHT:
+        return _pw_query("chatgpt", q)
+    # Fallback API
     import openai
-    # Responses API + web_search_preview = identique à ChatGPT web avec browsing
     model = _resolve_openai_model()
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    r = client.responses.create(
-        model=model,
-        tools=[{"type": "web_search_preview"}],
-        input=q,
-    )
-    log.info("openai model used: %s", model)
+    r = client.responses.create(model=model, tools=[{"type": "web_search_preview"}], input=q)
+    log.info("openai model used (api): %s", model)
     return r.output_text or ""
 
 def _anthropic(q: str) -> str:
+    if USE_PLAYWRIGHT:
+        return _pw_query("claude", q)
+    # Fallback API
     import anthropic
-    # web_search_20250305 = tool natif Anthropic, identique à Claude.ai avec recherche web
     model = _resolve_anthropic_model()
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     r = client.messages.create(
-        model=model,
-        max_tokens=1024,
+        model=model, max_tokens=1024,
         tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
         messages=[{"role": "user", "content": q}],
     )
-    log.info("anthropic model used: %s", model)
+    log.info("anthropic model used (api): %s", model)
     return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
 
 def _gemini(q: str) -> str:
+    if USE_PLAYWRIGHT:
+        return _pw_query("gemini", q)
+    # Fallback API
     import google.generativeai as g
-    # google_search grounding = identique à Gemini.google.com
     model = _resolve_gemini_model()
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))
     r = g.GenerativeModel(model).generate_content(q, tools=[{"google_search": {}}])
-    log.info("gemini model used: %s", model)
+    log.info("gemini model used (api): %s", model)
     return r.text or ""
+
+
+def _pw_query(platform: str, q: str) -> str:
+    """Lance Playwright sur le compte free en priorité, paid en fallback, API en dernier recours."""
+    from .playwright_scraper import scrape
+    for tier in ("free", "paid"):
+        res = scrape(platform, tier, q)
+        if res["ok"] and res["text"]:
+            log.info("[playwright] %s/%s → %d chars | model: %s", platform, tier, len(res["text"]), res["model"])
+            return res["text"]
+        if res["error"] and "Session manquante" not in res["error"]:
+            # Erreur inattendue (timeout, sélecteur cassé) → log alerte
+            log.error("[playwright] ALERTE %s/%s — sélecteur peut-être changé : %s", platform, tier, res["error"])
+    log.warning("[playwright] %s : toutes sessions échouées, pas de fallback API", platform)
+    return ""
 
 _CALLERS = {
     "openai":    (_openai,    "OPENAI_API_KEY"),
