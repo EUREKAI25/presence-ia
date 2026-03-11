@@ -242,9 +242,7 @@ def _anthropic(q: str) -> str:
     return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
 
 def _gemini(q: str) -> str:
-    if USE_PLAYWRIGHT:
-        return _pw_query("gemini", q)
-    # Fallback API
+    # Gemini → toujours via API google_search grounding (résultats identiques à Gemini.google.com)
     import google.generativeai as g
     model = _resolve_gemini_model()
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))

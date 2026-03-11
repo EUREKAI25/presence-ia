@@ -2,13 +2,15 @@
 Login automatique Playwright — renouvelle toutes les sessions sans intervention humaine.
 Lancé par cron toutes les 3 semaines ou via : python scripts/auto_login.py
 
+Architecture :
+  ChatGPT → Playwright (email/password OpenAI)
+  Claude  → Playwright via Google OAuth (même compte Google que Gemini)
+  Gemini  → API google_search grounding (pas de session, clé GEMINI_API_KEY)
+
 Credentials lus depuis .env :
   CHATGPT_FREE_EMAIL / CHATGPT_FREE_PASSWORD
   CHATGPT_PAID_EMAIL / CHATGPT_PAID_PASSWORD
-  CLAUDE_FREE_EMAIL  / CLAUDE_FREE_PASSWORD
-  CLAUDE_PAID_EMAIL  / CLAUDE_PAID_PASSWORD
-  GEMINI_FREE_EMAIL  / GEMINI_FREE_PASSWORD
-  GEMINI_PAID_EMAIL  / GEMINI_PAID_PASSWORD
+  GOOGLE_BOT_EMAIL   / GOOGLE_BOT_PASSWORD    ← utilisé pour Claude OAuth + Gemini
 """
 import asyncio
 import logging
@@ -72,15 +74,13 @@ async def login_claude(page, email: str, password: str):
 
 # ── Gemini (Google) ───────────────────────────────────────────────────
 
-async def login_gemini(page, email: str, password: str):
+async def login_google(page, email: str, password: str, continue_url: str):
     """
-    Google détecte les headless basiques → on utilise un user-agent réaliste
-    et on désactive les flags headless détectables.
-    Fonctionne avec des comptes Google sans 2FA (comptes dédiés).
+    Login Google générique (utilisé pour Claude OAuth).
+    Compte dédié SANS 2FA obligatoire.
     """
     await page.goto(
-        "https://accounts.google.com/signin/v2/identifier"
-        "?continue=https://gemini.google.com/",
+        f"https://accounts.google.com/signin/v2/identifier?continue={continue_url}",
         wait_until="domcontentloaded"
     )
     await page.wait_for_timeout(2000)
@@ -93,15 +93,31 @@ async def login_gemini(page, email: str, password: str):
     await page.click('#passwordNext button, button:has-text("Next")')
     await page.wait_for_timeout(5000)
 
-    # Accepter CGU si première connexion
-    try:
-        await page.click('button:has-text("Accept")', timeout=5000)
-        await page.wait_for_timeout(2000)
-    except Exception:
-        pass
+    # Accepter CGU / écrans intermédiaires Google
+    for selector in ['button:has-text("Accept")', 'button:has-text("Continue")', 'button:has-text("I agree")']:
+        try:
+            await page.click(selector, timeout=3000)
+            await page.wait_for_timeout(1500)
+        except Exception:
+            pass
 
-    await page.wait_for_url("**gemini.google.com/**", timeout=30000)
-    log.info("gemini — login OK")
+    log.info("google login OK (%s)", email)
+
+
+async def login_claude_google(page, email: str, password: str):
+    """Claude.ai — login via Google OAuth (pas de mot de passe Claude, magic link évité)."""
+    await page.goto("https://claude.ai/login", wait_until="domcontentloaded")
+    await page.wait_for_timeout(2000)
+
+    # Bouton "Continue with Google"
+    await page.click('button:has-text("Continue with Google"), a:has-text("Continue with Google")', timeout=10000)
+    await page.wait_for_timeout(2000)
+
+    # Flux Google standard
+    await login_google(page, email, password, continue_url="https://claude.ai/")
+
+    await page.wait_for_url("**claude.ai/**", timeout=20000)
+    log.info("claude — login Google OAuth OK")
 
 
 # ── Runner principal ──────────────────────────────────────────────────
@@ -115,19 +131,13 @@ PLATFORMS = {
         },
     },
     "claude": {
-        "login_fn": login_claude,
+        # Login via Google OAuth — même compte Google que Gemini, pas de magic link
+        "login_fn": login_claude_google,
         "tiers": {
-            "free": ("CLAUDE_FREE_EMAIL", "CLAUDE_FREE_PASSWORD"),
-            "paid": ("CLAUDE_PAID_EMAIL", "CLAUDE_PAID_PASSWORD"),
+            "free": ("GOOGLE_BOT_EMAIL", "GOOGLE_BOT_PASSWORD"),
         },
     },
-    "gemini": {
-        "login_fn": login_gemini,
-        "tiers": {
-            "free": ("GEMINI_FREE_EMAIL", "GEMINI_FREE_PASSWORD"),
-            "paid": ("GEMINI_PAID_EMAIL", "GEMINI_PAID_PASSWORD"),
-        },
-    },
+    # Gemini → API google_search grounding, pas de session Playwright nécessaire
 }
 
 
