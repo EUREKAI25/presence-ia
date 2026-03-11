@@ -45,9 +45,9 @@ def api_scan_auto(data: AutoScanInput, db: Session = Depends(get_db)):
     if not api_key:
         raise HTTPException(400, "GOOGLE_MAPS_API_KEY manquante — ajoutez-la dans votre .env")
 
-    from ...google_places import search_prospects
+    from ...google_places import search_prospects_enriched
     try:
-        raw, reasons = search_prospects(data.profession, data.city, api_key, data.max_prospects)
+        raw, reasons = search_prospects_enriched(data.profession, data.city, api_key, data.max_prospects)
     except ValueError as exc:
         raise HTTPException(502, str(exc))
     except Exception as exc:
@@ -62,7 +62,7 @@ def api_scan_auto(data: AutoScanInput, db: Session = Depends(get_db)):
             profession=data.profession, city=data.city, max_prospects=data.max_prospects))
 
     manual = [ProspectInput(name=p["name"], website=p["website"],
-                            phone=p["phone"], reviews_count=p["reviews_count"])
+                            phone=p.get("tel"), reviews_count=p["reviews_count"])
               for p in raw]
     scan_data = ProspectScanInput(city=data.city, profession=data.profession,
                                   max_prospects=data.max_prospects,
@@ -73,13 +73,37 @@ def api_scan_auto(data: AutoScanInput, db: Session = Depends(get_db)):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
+    # Enregistrer mobile, cms, email directement sur les ProspectDB créés
+    raw_by_website = {p["website"]: p for p in raw}
+    for prospect in ps:
+        enriched = raw_by_website.get(prospect.website or "")
+        if enriched:
+            if enriched.get("mobile"):
+                prospect.mobile = enriched["mobile"]
+            if enriched.get("cms"):
+                prospect.cms = enriched["cms"]
+            if enriched.get("email") and not prospect.email:
+                prospect.email = enriched["email"]
+    db.commit()
+
     return {
         "campaign_id": campaign.campaign_id,
         "created":     len(ps),
         "skipped":     len(reasons),
         "reasons":     reasons,
         "source":      "google_places",
-        "prospects":   [{"id": p.prospect_id, "name": p.name, "website": p.website} for p in ps],
+        "prospects":   [
+            {
+                "id":      p.prospect_id,
+                "name":    p.name,
+                "website": p.website,
+                "tel":     p.phone,
+                "mobile":  p.mobile,
+                "email":   p.email,
+                "cms":     p.cms,
+            }
+            for p in ps
+        ],
     }
 
 

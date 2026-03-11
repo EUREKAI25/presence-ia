@@ -24,6 +24,8 @@ def init_db():
     with ENGINE.connect() as conn:
         for tbl, col in [
             ("prospects", "email TEXT"),
+            ("prospects", "mobile TEXT"),
+            ("prospects", "cms TEXT"),
             ("prospects", "proof_image_url TEXT"),
             ("prospects", "city_image_url TEXT"),
             ("prospects", "paid INTEGER DEFAULT 0"),

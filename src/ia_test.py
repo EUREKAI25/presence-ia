@@ -191,7 +191,7 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
 
 # ── Adaptateurs IA (web search natif — résultats identiques aux interfaces web) ───
 
-USE_PLAYWRIGHT = os.getenv("USE_PLAYWRIGHT", "1") == "1"  # activé par défaut
+USE_PLAYWRIGHT = os.getenv("USE_PLAYWRIGHT", "0") == "1"  # désactivé — APIs web_search par défaut
 
 
 def _resolve_openai_model() -> str:
@@ -212,24 +212,18 @@ def _resolve_anthropic_model() -> str:
 
 def _resolve_gemini_model() -> str:
     """Retourne le modèle Gemini actif : env var si définie, sinon gemini-2.0-flash."""
-    return os.getenv("GEMINI_MODEL") or "gemini-2.0-flash"
+    return os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-preview-04-17"
 
 
-def _openai(q: str) -> str:
-    if USE_PLAYWRIGHT:
-        return _pw_query("chatgpt", q)
-    # Fallback API
+def _openai_api(q: str) -> str:
     import openai
     model = _resolve_openai_model()
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     r = client.responses.create(model=model, tools=[{"type": "web_search_preview"}], input=q)
-    log.info("openai model used (api): %s", model)
+    log.info("openai api: %s", model)
     return r.output_text or ""
 
-def _anthropic(q: str) -> str:
-    if USE_PLAYWRIGHT:
-        return _pw_query("claude", q)
-    # Fallback API
+def _anthropic_api(q: str) -> str:
     import anthropic
     model = _resolve_anthropic_model()
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -238,23 +232,34 @@ def _anthropic(q: str) -> str:
         tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
         messages=[{"role": "user", "content": q}],
     )
-    log.info("anthropic model used (api): %s", model)
+    log.info("anthropic api: %s", model)
     return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
 
-def _gemini(q: str) -> str:
-    if USE_PLAYWRIGHT:
-        return _pw_query("gemini", q)
-    # Fallback API
-    import google.generativeai as g
+def _gemini_api(q: str) -> str:
+    from google import genai
+    from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
     model = _resolve_gemini_model()
-    g.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    r = g.GenerativeModel(model).generate_content(q, tools=[{"google_search": {}}])
-    log.info("gemini model used (api): %s", model)
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    r = client.models.generate_content(
+        model=model,
+        contents=q,
+        config=GenerateContentConfig(tools=[Tool(google_search=GoogleSearch())]),
+    )
+    log.info("gemini api: %s", model)
     return r.text or ""
+
+def _openai(q: str) -> str:
+    return _pw_query("chatgpt", q) if USE_PLAYWRIGHT else _openai_api(q)
+
+def _anthropic(q: str) -> str:
+    return _pw_query("claude", q) if USE_PLAYWRIGHT else _anthropic_api(q)
+
+def _gemini(q: str) -> str:
+    return _pw_query("gemini", q) if USE_PLAYWRIGHT else _gemini_api(q)
 
 
 def _pw_query(platform: str, q: str) -> str:
-    """Lance Playwright sur le compte free en priorité, paid en fallback, API en dernier recours."""
+    """Lance Playwright (free→paid), fallback sur API web_search si Playwright échoue."""
     from .playwright_scraper import scrape
     for tier in ("free", "paid"):
         res = scrape(platform, tier, q)
@@ -262,9 +267,13 @@ def _pw_query(platform: str, q: str) -> str:
             log.info("[playwright] %s/%s → %d chars | model: %s", platform, tier, len(res["text"]), res["model"])
             return res["text"]
         if res["error"] and "Session manquante" not in res["error"]:
-            # Erreur inattendue (timeout, sélecteur cassé) → log alerte
-            log.error("[playwright] ALERTE %s/%s — sélecteur peut-être changé : %s", platform, tier, res["error"])
-    log.warning("[playwright] %s : toutes sessions échouées, pas de fallback API", platform)
+            log.error("[playwright] ALERTE %s/%s — %s", platform, tier, res["error"])
+
+    # Playwright échoué → fallback API web_search (même résultat, sans Cloudflare)
+    log.warning("[playwright] %s : sessions échouées → fallback API", platform)
+    api_fn = {"chatgpt": _openai_api, "claude": _anthropic_api, "gemini": _gemini_api}.get(platform)
+    if api_fn:
+        return api_fn(q)
     return ""
 
 _CALLERS = {

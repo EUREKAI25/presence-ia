@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 _TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 _DETAILS_URL     = "https://maps.googleapis.com/maps/api/place/details/json"
-_DETAIL_FIELDS   = "name,website,formatted_phone_number,user_ratings_total,rating"
+_DETAIL_FIELDS   = "name,website,formatted_phone_number,international_phone_number,user_ratings_total,rating"
 
 # Statuts Google qui signifient "pas de résultat" (pas une erreur)
 _EMPTY_STATUSES = {"ZERO_RESULTS"}
@@ -75,6 +75,25 @@ def _clean_name(name: str, city: str = "") -> str:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
+def _classify_phone(raw: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """
+    Retourne (tel_fixe, mobile) depuis un numéro brut Google Places.
+    Mobile = commence par 06 ou 07 (ou +336 / +337).
+    """
+    if not raw:
+        return None, None
+    digits = re.sub(r'\D', '', raw)
+    # Normalise +33X -> 0X
+    if digits.startswith("33") and len(digits) == 11:
+        digits = "0" + digits[2:]
+    if len(digits) != 10:
+        return raw, None  # garde brut si format inconnu
+    fmt = " ".join([digits[:2], digits[2:4], digits[4:6], digits[6:8], digits[8:]])
+    if digits[1] in ("6", "7"):
+        return None, fmt
+    return fmt, None
+
 
 def _domain(url: str) -> str:
     """Domaine normalisé pour déduplication (ex: 'dupont-toiture.fr')."""
@@ -175,13 +194,46 @@ def search_prospects(profession: str, city: str, api_key: str,
             continue
 
         seen_domains.add(d)
+
+        # Téléphone : priorité au numéro international (plus fiable pour classification)
+        raw_phone = (details.get("international_phone_number")
+                     or details.get("formatted_phone_number") or "")
+        tel, mobile = _classify_phone(raw_phone)
+
         prospects.append({
             "name":          name,
             "website":       website,
-            "phone":         details.get("formatted_phone_number"),
+            "tel":           tel,
+            "mobile":        mobile,
             "reviews_count": details.get("user_ratings_total")
                              or place.get("user_ratings_total"),
             "rating":        details.get("rating") or place.get("rating"),
         })
+
+    return prospects, reasons
+
+
+def search_prospects_enriched(profession: str, city: str, api_key: str,
+                               max_results: int = 30) -> Tuple[List[Dict], List[str]]:
+    """
+    Comme search_prospects mais enrichit chaque prospect avec :
+    - email et mobile extraits de la homepage
+    - CMS détecté
+
+    Retourne : list[{name, website, tel, mobile, email, cms, reviews_count, rating}]
+    """
+    from .enrich import enrich_website
+    from .cms_detector import detect_cms
+
+    prospects, reasons = search_prospects(profession, city, api_key, max_results)
+
+    for p in prospects:
+        url = p.get("website") or ""
+        web_data = enrich_website(url)
+        p["email"]  = web_data["email"]
+        # Mobile depuis le site en fallback si Places n'en a pas retourné
+        if not p.get("mobile") and web_data["mobile"]:
+            p["mobile"] = web_data["mobile"]
+        p["cms"] = detect_cms(url)
 
     return prospects, reasons

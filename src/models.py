@@ -76,6 +76,8 @@ class ProspectDB(Base):
     profession:          Mapped[str]            = mapped_column(sa.String, nullable=False)
     website:             Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     phone:               Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    mobile:              Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    cms:                 Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     reviews_count:       Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
     google_ads_active:   Mapped[Optional[bool]] = mapped_column(sa.Boolean, nullable=True)
     competitors_cited:   Mapped[str]            = mapped_column(sa.Text, default="[]")
