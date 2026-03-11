@@ -189,35 +189,38 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
     return result
 
 
-# ── Adaptateurs IA ────────────────────────────────────────────────────
+# ── Adaptateurs IA (web search natif — résultats identiques aux interfaces web) ───
 
 def _openai(q: str) -> str:
     import openai
-    # gpt-4o = modèle par défaut ChatGPT (ce que les vrais utilisateurs voient)
-    # system prompt = reproduit le comportement ChatGPT web (sans ça, l'API refuse de nommer des pros locaux)
-    r = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")).chat.completions.create(
+    # Responses API + web_search_preview = identique à ChatGPT web avec browsing
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    r = client.responses.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-        messages=[
-            {"role": "system", "content": "Tu es un assistant utile et direct. Quand on te demande des professionnels ou entreprises locales, tu cites des noms réels que tu connais, avec une courte description."},
-            {"role": "user", "content": q}
-        ], temperature=TEMP, max_tokens=600)
-    return r.choices[0].message.content or ""
+        tools=[{"type": "web_search_preview"}],
+        input=q,
+    )
+    return r.output_text or ""
 
 def _anthropic(q: str) -> str:
     import anthropic
-    # claude-sonnet-4-6 = modèle par défaut Claude.ai (ce que les vrais utilisateurs voient)
-    r = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")).messages.create(
+    # web_search_20250305 = tool natif Anthropic, identique à Claude.ai avec recherche web
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    r = client.messages.create(
         model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
-        max_tokens=600, temperature=TEMP,
-        messages=[{"role":"user","content":q}])
-    return r.content[0].text if r.content else ""
+        max_tokens=1024,
+        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+        messages=[{"role": "user", "content": q}],
+    )
+    # Concaténer tous les blocs texte de la réponse finale
+    return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
 
 def _gemini(q: str) -> str:
     import google.generativeai as g
+    # google_search grounding = identique à Gemini.google.com
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    # gemini-2.0-flash = modèle par défaut Gemini.google.com
-    r = g.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        generation_config={"temperature": TEMP, "max_output_tokens": 600}).generate_content(q)
+    model = g.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
+    r = model.generate_content(q, tools=[{"google_search": {}}])
     return r.text or ""
 
 _CALLERS = {
