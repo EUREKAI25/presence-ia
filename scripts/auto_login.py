@@ -31,27 +31,54 @@ log = logging.getLogger(__name__)
 # ── ChatGPT ───────────────────────────────────────────────────────────
 
 async def login_chatgpt(page, email: str, password: str):
-    await page.goto("https://chatgpt.com/auth/login", wait_until="domcontentloaded")
-    await page.wait_for_timeout(2000)
+    await page.goto("https://chatgpt.com/", wait_until="domcontentloaded")
+    await page.wait_for_timeout(3000)
 
-    # Bouton "Log in"
+    # Screenshot debug
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_1.png"))
+
+    # Bouton "Log in" sur la page d'accueil
+    for sel in ['button:has-text("Log in")', 'a:has-text("Log in")', '[data-testid="login-button"]']:
+        try:
+            await page.click(sel, timeout=5000)
+            await page.wait_for_timeout(2000)
+            break
+        except Exception:
+            continue
+
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_2.png"))
+
+    # Champ email (auth0 : input#username ou input[type=email])
+    for sel in ['input#username', 'input[name="username"]', 'input[type="email"]', 'input[autocomplete="email"]']:
+        try:
+            await page.fill(sel, email, timeout=10000)
+            break
+        except Exception:
+            continue
+
+    await page.click('button[type="submit"], button[name="action"], button:has-text("Continue")', timeout=10000)
+    await page.wait_for_timeout(2000)
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_3.png"))
+
+    # Champ password
+    for sel in ['input[type="password"]', 'input[name="password"]', 'input#password']:
+        try:
+            await page.fill(sel, password, timeout=10000)
+            break
+        except Exception:
+            continue
+
+    await page.click('button[type="submit"], button[name="action"], button:has-text("Continue")', timeout=10000)
+    await page.wait_for_timeout(5000)
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_4.png"))
+    log.info("chatgpt — post-login url: %s", page.url)
+
+    # Attendre la page principale (plusieurs URLs possibles)
     try:
-        await page.click('button:has-text("Log in")', timeout=8000)
-        await page.wait_for_timeout(1500)
+        await page.wait_for_url("https://chatgpt.com/**", timeout=20000)
     except Exception:
         pass
-
-    await page.fill('input[name="username"], input[type="email"]', email)
-    await page.click('button[type="submit"], button:has-text("Continue")')
-    await page.wait_for_timeout(1500)
-
-    await page.fill('input[name="password"], input[type="password"]', password)
-    await page.click('button[type="submit"], button:has-text("Continue")')
-    await page.wait_for_timeout(4000)
-
-    # Attendre la page principale
-    await page.wait_for_url("**/", timeout=20000)
-    log.info("chatgpt — login OK")
+    log.info("chatgpt — login OK, url finale: %s", page.url)
 
 
 # ── Claude ────────────────────────────────────────────────────────────
