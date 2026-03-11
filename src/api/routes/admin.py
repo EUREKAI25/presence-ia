@@ -9,30 +9,9 @@ from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl
 from ...models import ProspectStatus, ProspectDB
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin"])
-
-
-def _admin_nav(token: str, active: str = "") -> str:
-    tabs = [
-        ("contacts",   "👥 Contacts"),
-        ("offers",     "💶 Offres"),
-        ("analytics",  "📊 Analytics"),
-        ("evidence",   "📸 Preuves"),
-        ("headers",    "🖼 Headers"),
-        ("content",    "✏️ Contenus"),
-        ("send-queue", "📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "#f9fafb"};color:{"#fff" if t==active else "#374151"}">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
 
 
 def _check_token(request: Request):
@@ -69,7 +48,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         </tr>"""
 
     token = _admin_token()
-    nav = _admin_nav(token)
+    nav = admin_nav(token)
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>PRESENCE_IA — Admin</title>
 <style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e;margin:0}}

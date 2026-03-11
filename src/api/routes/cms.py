@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from ...database import get_db
+from ._nav import admin_nav
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["CMS"])
@@ -59,36 +60,6 @@ def _check_token(request: Request) -> str:
         raise HTTPException(403, "Accès refusé")
     return token
 
-
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts",   "👥 Contacts"),
-        ("offers",     "💶 Offres"),
-        ("analytics",  "📊 Analytics"),
-        ("evidence",   "📸 Preuves"),
-        ("headers",    "🖼 Headers"),
-        ("content",    "✏️ Contenus"),
-        ("cms",        "🧩 CMS"),
-        ("send-queue", "📤 Envoi"),
-        ("scan",       "🔍 Recherche"),
-        ("prospection","🎯 Prospection"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "#f9fafb"};color:{"#fff" if t==active else "#374151"}">{label}</a>'
-        for t, label in tabs
-    )
-    return (
-        f'<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;'
-        f'display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        f'<a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;'
-        f'padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>'
-        f'{links}</div>'
-    )
-
-
-# ── Schémas ────────────────────────────────────────────────────────────────────
 
 class CmsUpsertRequest(BaseModel):
     key: str
@@ -188,7 +159,7 @@ td{{border-bottom:1px solid #f3f4f6;vertical-align:top}}
 .toast{{position:fixed;bottom:24px;right:24px;background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;display:none;z-index:999}}
 </style>
 </head><body>
-{_nav("cms", token)}
+{admin_nav(token, "cms")}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
     <h1 style="font-size:18px;color:#1a1a2e">🧩 CMS Blocks ({len(all_blocks)} blocs)</h1>

@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_or_create_evidence, db_get_evidence, jl, jd
+from ._nav import admin_nav
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["Evidence"])
@@ -141,28 +142,6 @@ def get_latest_evidence(
 
 # ── Admin onglet ──────────────────────────────────────────────────────────────
 
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts",  "👥 Contacts"),
-        ("offers",    "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence",  "📸 Preuves"),
-        ("headers",   "🖼 Headers"),
-        ("content",   "✏️ Contenus"),
-        ("send-queue","📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
-
-
 @router.get("/admin/evidence", response_class=HTMLResponse)
 def evidence_admin_page(request: Request, db: Session = Depends(get_db)):
     from ...database import db_get_evidence as _get_ev
@@ -231,7 +210,7 @@ def evidence_admin_page(request: Request, db: Session = Depends(get_db)):
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 input,select{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 12px;border-radius:6px;font-size:13px}}</style>
 </head><body>
-{_nav("evidence", token)}
+{admin_nav(token, "evidence")}
 <div style="max-width:1200px;margin:0 auto;padding:24px">
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;gap:24px;flex-wrap:wrap">

@@ -42,6 +42,16 @@ def init_db():
             except Exception:
                 pass
         conn.commit()
+    # Corriger les URLs localhost stockées pour les headers (utiliser chemins relatifs)
+    with ENGINE.connect() as conn:
+        try:
+            conn.execute(text(
+                "UPDATE city_headers SET url = '/dist/headers/' || filename "
+                "WHERE url LIKE 'http://localhost%' OR url LIKE 'http://127.0.0.1%'"
+            ))
+            conn.commit()
+        except Exception:
+            pass
     # Seed requêtes IA par défaut (si table vide)
     with SessionLocal() as db:
         _seed_ia_query_templates(db)

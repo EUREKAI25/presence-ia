@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_list_content_blocks, set_block
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Content"])
 
@@ -15,137 +16,6 @@ def _check_token(request: Request):
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Accès refusé")
     return token
-
-
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts",   "👥 Contacts"),
-        ("offers",     "💶 Offres"),
-        ("analytics",  "📊 Analytics"),
-        ("evidence",   "📸 Preuves"),
-        ("headers",    "🖼 Headers"),
-        ("content",    "✏️ Contenus"),
-        ("send-queue", "📤 Envoi"),
-        ("scan",       "🔍 Recherche"),
-        ("prospection","🎯 Prospection"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "#f9fafb"};color:{"#fff" if t==active else "#374151"}">{label}</a>'
-        for t, label in tabs
-    )
-    return f'<div style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' \
-           f'<a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>' \
-           f'{links}</div>'
-
-
-# Labels des champs fixes (sauf FAQ qui est dynamique)
-_FIELD_LABELS = {
-    # HOME HERO
-    ("home","hero","title"):          "Titre principal",
-    ("home","hero","subtitle"):       "Sous-titre",
-    ("home","hero","cta_primary"):    "Bouton principal (texte)",
-    ("home","hero","cta_secondary"):  "Bouton secondaire (texte)",
-    # HOME PROOF STAT
-    ("home","proof_stat","stat_1_value"):  "Stat 1 — Valeur",
-    ("home","proof_stat","stat_1_label"):  "Stat 1 — Texte",
-    ("home","proof_stat","stat_2_value"):  "Stat 2 — Valeur",
-    ("home","proof_stat","stat_2_label"):  "Stat 2 — Texte",
-    ("home","proof_stat","stat_3_value"):  "Stat 3 — Valeur",
-    ("home","proof_stat","stat_3_label"):  "Stat 3 — Texte",
-    ("home","proof_stat","source_url_1"):   "Source 1 — URL",
-    ("home","proof_stat","source_label_1"): "Source 1 — Texte",
-    ("home","proof_stat","source_url_2"):   "Source 2 — URL",
-    ("home","proof_stat","source_label_2"): "Source 2 — Texte",
-    # HOME PROOF VISUAL
-    ("home","proof_visual","title"):    "Titre section",
-    ("home","proof_visual","subtitle"): "Sous-titre section",
-    ("home","proof_visual","step_1"):   "Étape 1",
-    ("home","proof_visual","step_2"):   "Étape 2",
-    ("home","proof_visual","step_3"):   "Étape 3",
-    ("home","proof_visual","step_4"):   "Étape 4",
-    # HOME CTA
-    ("home","cta","title"):     "Titre CTA final",
-    ("home","cta","subtitle"):  "Sous-titre CTA",
-    ("home","cta","btn_label"): "Texte bouton",
-    # LANDING HERO
-    ("landing","hero","title_tpl"):    "Template titre ({city}, {profession})",
-    ("landing","hero","subtitle_tpl"): "Template sous-titre ({n_queries}, {n_models}, {models})",
-    ("landing","hero","cta_label"):    "Texte bouton CTA",
-    # LANDING PROOF VISUAL
-    ("landing","proof_visual","mention"): "Mention tests (ex: 9 tests sur 3 jours)",
-    # LANDING PROOF STAT
-    ("landing","proof_stat","stat_1_value"):  "Stat 1 — Valeur",
-    ("landing","proof_stat","stat_1_label"):  "Stat 1 — Texte",
-    ("landing","proof_stat","stat_2_value"):  "Stat 2 — Valeur",
-    ("landing","proof_stat","stat_2_label"):  "Stat 2 — Texte",
-    ("landing","proof_stat","stat_3_value"):  "Stat 3 — Valeur",
-    ("landing","proof_stat","stat_3_label"):  "Stat 3 — Texte",
-    ("landing","proof_stat","source_url_1"):   "Source 1 — URL",
-    ("landing","proof_stat","source_label_1"): "Source 1 — Texte",
-    ("landing","proof_stat","source_url_2"):   "Source 2 — URL",
-    ("landing","proof_stat","source_label_2"): "Source 2 — Texte",
-    # LANDING PROBLEM
-    ("landing","problem","title"):    "Titre",
-    ("landing","problem","subtitle"): "Sous-titre / accroche",
-    # LANDING PROOF VISUAL
-    ("landing","proof_visual","title"):    "Titre section",
-    ("landing","proof_visual","subtitle"): "Sous-titre",
-    ("landing","proof_visual","step_1"):   "Étape 1",
-    ("landing","proof_visual","step_2"):   "Étape 2",
-    ("landing","proof_visual","step_3"):   "Étape 3",
-    ("landing","proof_visual","step_4"):   "Étape 4",
-    ("landing","proof_visual","mention"):  "Mention tests (ex: 9 tests sur 3 jours)",
-    # LANDING CTA
-    ("landing","cta","title"):     "Titre CTA final",
-    ("landing","cta","subtitle"):  "Sous-titre CTA",
-    ("landing","cta","btn_label"): "Texte bouton",
-    # HOME PROBLEM
-    ("home","problem","title"):    "Titre",
-    ("home","problem","subtitle"): "Sous-titre / accroche",
-}
-
-_SECTION_TITLES = {
-    "hero":         "🦸 HERO",
-    "proof_stat":   "📊 Preuves statistiques",
-    "problem":      "⚠️ Problème / Accroche",
-    "proof_visual": "👁 Comment ça marche",
-    "evidence":     "📸 Captures d'écran",
-    "pricing":      "💶 Tarifs",
-    "faq":          "❓ FAQ",
-    "cta":          "📣 CTA final",
-}
-
-# Catalogue complet des sections disponibles par page
-_SECTIONS_CATALOG = {
-    "home": [
-        {"key": "hero",         "label": "🦸 Hero"},
-        {"key": "proof_stat",   "label": "📊 Preuves statistiques"},
-        {"key": "problem",      "label": "⚠️ Problème / Accroche"},
-        {"key": "proof_visual", "label": "👁 Comment ça marche"},
-        {"key": "evidence",     "label": "📸 Captures d'écran"},
-        {"key": "pricing",      "label": "💶 Tarifs"},
-        {"key": "faq",          "label": "❓ FAQ"},
-        {"key": "cta",          "label": "📣 CTA final"},
-    ],
-    "landing": [
-        {"key": "hero",         "label": "🦸 Hero"},
-        {"key": "proof_stat",   "label": "📊 Preuves statistiques"},
-        {"key": "problem",      "label": "⚠️ Problème / Accroche"},
-        {"key": "proof_visual", "label": "👁 Comment ça marche"},
-        {"key": "evidence",     "label": "📸 Captures d'écran"},
-        {"key": "pricing",      "label": "💶 Tarifs"},
-        {"key": "faq",          "label": "❓ FAQ"},
-        {"key": "cta",          "label": "📣 CTA final"},
-    ],
-}
-
-_ROWS = {
-    ("landing","hero","title_tpl"): 2,
-    ("landing","hero","subtitle_tpl"): 2,
-    ("home","hero","title"): 3,
-}
 
 
 def _render_field(page_type, section_key, field_key, label, value, show_variants=True):
@@ -340,7 +210,7 @@ def content_admin_page(request: Request, db: Session = Depends(get_db),
 <title>Contenus — PRESENCE_IA Admin</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e}}</style>
 </head><body>
-{_nav("content", token)}
+{admin_nav(token, "content")}
 <div style="max-width:860px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
   <h1 style="color:#1a1a2e;font-size:18px">✏️ Contenus éditables</h1>

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ...database import get_db
 from ...models import ContactDB, ProspectDB
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Analytics"])
 
@@ -17,26 +18,6 @@ def _check_token(request: Request):
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Accès refusé")
     return token
-
-
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts", "👥 Contacts"),
-        ("offers", "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence", "📸 Preuves"),
-        ("send-queue", "📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
 
 
 def _stat_card(label: str, value: str, sub: str = "", color: str = "#e94560") -> str:
@@ -166,7 +147,7 @@ def analytics_page(request: Request, db: Session = Depends(get_db)):
 <title>Analytics — PRESENCE_IA Admin</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 h2{{color:#fff;font-size:15px;margin:0 0 16px}}</style></head><body>
-{_nav("analytics", token)}
+{admin_nav(token, "analytics")}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
 
 <h1 style="color:#fff;font-size:18px;margin-bottom:24px">📊 Analytics</h1>

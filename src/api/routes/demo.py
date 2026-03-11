@@ -12,6 +12,7 @@ from ...database import (
     db_get_evidence, db_list_runs, jl,
 )
 from ...generate import landing_url
+from ._nav import admin_nav
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "secret")
 router = APIRouter(tags=["Demo"])
@@ -20,17 +21,6 @@ router = APIRouter(tags=["Demo"])
 def _check_admin(token: str):
     if token != ADMIN_TOKEN:
         raise HTTPException(403, "Accès refusé")
-
-
-def _nav(token: str) -> str:
-    t = f"?token={token}"
-    return (
-        f'<nav style="background:#1a0a4e;padding:12px 24px;display:flex;gap:20px;align-items:center">'
-        f'<span style="color:#fff;font-weight:800;font-size:16px">⚡ PRESENCE_IA</span>'
-        f'<a href="/admin{t}" style="color:#aaa;font-size:13px;text-decoration:none">Dashboard</a>'
-        f'<a href="/admin/contacts{t}" style="color:#aaa;font-size:13px;text-decoration:none">Contacts</a>'
-        f'</nav>'
-    )
 
 
 def _prospect_rows(prospects, db, token: str) -> str:
@@ -90,7 +80,7 @@ def admin_demo(campaign_id: str, token: str = "", db: Session = Depends(get_db))
         ev_html = '<p style="color:#6b7280;font-size:13px">Aucune preuve disponible pour ce métier × ville.</p>'
 
     prospect_rows = _prospect_rows(prospects, db, token)
-    nav = _nav(token)
+    nav = admin_nav(token, "demo")
     prof_cap = campaign.profession.capitalize()
     city_cap = campaign.city.capitalize()
 

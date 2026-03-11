@@ -11,19 +11,23 @@ def admin_nav(token: str, active: str = "") -> str:
         ("PROSPECTION", [
             ("contacts",    "Contacts"),
             ("prospection", "Campagnes"),
+            ("scan",        "Scan IA"),
             ("send-queue",  "File d'envoi"),
             ("analytics",   "Analytics"),
+            ("scheduler",   "Planificateur"),
         ]),
         ("CONTENU", [
             ("templates",   "Messages"),
-            ("sequences",   "Sequences"),
+            ("sequences",   "Séquences"),
             ("content",     "Textes pages"),
+            ("cms",         "Blocs CMS"),
             ("offers",      "Offres"),
         ]),
         ("SITE", [
             ("evidence",    "Preuves"),
             ("headers",     "Headers"),
-            ("theme",       "Theme"),
+            ("theme",       "Thème"),
+            ("v3",          "Admin V3"),
         ]),
     ]
 

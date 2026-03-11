@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_header, db_upsert_header, db_delete_header, db_list_headers
+from ._nav import admin_nav
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["Headers"])
@@ -61,30 +62,6 @@ def _process_header(src: Path, dest: Path) -> bool:
         return False
 
 
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts",  "👥 Contacts"),
-        ("offers",    "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence",  "📸 Preuves"),
-        ("headers",   "🖼 Headers"),
-        ("content",   "✏️ Contenus"),
-        ("send-queue","📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
-
-
-# ── API publique ──────────────────────────────────────────────────────────────
-
 @router.get("/api/headers/{city}")
 def get_header(city: str, db: Session = Depends(get_db)):
     row = db_get_header(db, city)
@@ -121,7 +98,7 @@ def upload_header(
         dest.write_bytes(raw_bytes)
         log.warning("Header %s sauvegardé sans traitement Pillow", city_slug)
 
-    url = f"{_base_url()}/{HEADERS_SUBPATH}/{filename}"
+    url = f"/{HEADERS_SUBPATH}/{filename}"
     row = db_upsert_header(db, city_slug, filename, url)
     log.info("Header uploadé pour %s → %s", city_slug, dest)
     return {"city": row.city, "url": row.url, "filename": row.filename}
@@ -147,37 +124,26 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     headers = db_list_headers(db)
 
-    # Ville actuellement définie pour la landing
-    from ...database import get_block
-    current_landing_city = get_block(db, "landing", "config", "header_city", default="")
-
     cards = ""
     for h in headers:
-        is_landing = (h.city == current_landing_city)
-        badge = '<span style="background:#e94560;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:8px">Landing</span>' if is_landing else ""
-        use_btn_style = "background:#1a4a1a;color:#4ade80" if is_landing else "background:#0f0f1a;color:#aaa;border:1px solid #2a2a4e"
-        use_btn_label = "✅ Landing active" if is_landing else "🖼 Utiliser pour la landing"
-        cards += f"""<div style="background:#1a1a2e;border:1px solid {'#e94560' if is_landing else '#2a2a4e'};border-radius:8px;padding:16px;position:relative">
+        img_url = h.url if h.url.startswith("http") else h.url
+        cards += f"""<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <span style="color:#fff;font-weight:bold;font-size:14px">{h.city.title()}{badge}</span>
+    <span style="color:#fff;font-weight:bold;font-size:14px">{h.city.title()}</span>
     <button onclick="deleteHeader('{h.city}',this)"
       style="background:#4a1a1a;color:#e94560;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">
       🗑 Supprimer
     </button>
   </div>
-  <a href="{h.url}" target="_blank">
-    <img src="{h.url}" style="width:100%;border-radius:6px;max-height:160px;object-fit:cover" loading="lazy"
+  <a href="{img_url}" target="_blank">
+    <img src="{img_url}" style="width:100%;border-radius:6px;max-height:160px;object-fit:cover" loading="lazy"
          onerror="this.style.display='none'">
   </a>
-  <div style="font-size:10px;color:#555;margin-top:6px;word-break:break-all">{h.url}</div>
-  <div style="display:flex;gap:6px;margin-top:8px">
-    <button onclick="setLandingHeader('{h.city}',this)"
-      style="{use_btn_style};border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;flex:1">
-      {use_btn_label}
-    </button>
-    <button onclick="navigator.clipboard.writeText('{h.url}')"
+  <div style="font-size:10px;color:#555;margin-top:6px;word-break:break-all">{img_url}</div>
+  <div style="margin-top:8px">
+    <button onclick="navigator.clipboard.writeText('{img_url}')"
       style="background:#0f0f1a;color:#aaa;border:1px solid #2a2a4e;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">
-      📋
+      📋 Copier URL
     </button>
   </div>
 </div>"""
@@ -190,7 +156,7 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 input{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 12px;border-radius:6px;font-size:13px}}</style>
 </head><body>
-{_nav("headers", token)}
+{admin_nav(token, "headers")}
 <div style="max-width:960px;margin:0 auto;padding:24px">
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:24px;flex-wrap:wrap">
@@ -249,15 +215,6 @@ async function deleteHeader(city, btn) {{
   if (r.ok) location.reload();
   else {{ btn.disabled = false; btn.textContent = '❌ Erreur'; }}
 }}
-async function setLandingHeader(city, btn) {{
-  btn.disabled = true; btn.textContent = '…';
-  const r = await fetch('/admin/content/update?token=' + T, {{
-    method: 'POST',
-    headers: {{'Content-Type': 'application/json'}},
-    body: JSON.stringify({{page_type:'landing', section_key:'config', field_key:'header_city', value:city, profession:null, city:null}})
-  }});
-  if (r.ok) location.reload();
-  else {{ btn.disabled = false; btn.textContent = '❌ Erreur'; }}
-}}
+
 </script>
 </body></html>""")

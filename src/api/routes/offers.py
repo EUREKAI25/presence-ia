@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Offers"])
 
@@ -15,26 +16,6 @@ def _check_token(request: Request):
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Accès refusé")
     return token
-
-
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts",  "👥 Contacts"),
-        ("offers",    "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence",  "📸 Preuves"),
-        ("send-queue","📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
 
 
 @router.get("/admin/offers", response_class=HTMLResponse)
@@ -91,7 +72,7 @@ def offers_page(request: Request, db: Session = Depends(get_db)):
 <title>Offres — PRESENCE_IA Admin</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
 </head><body>
-{_nav("offers", token)}
+{admin_nav(token, "offers")}
 <div style="max-width:960px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
   <h1 style="color:#fff;font-size:18px">💶 Offres</h1>

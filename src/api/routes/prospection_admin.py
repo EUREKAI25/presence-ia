@@ -14,6 +14,7 @@ from ...database import (get_db, db_create_campaign, db_create_prospect, jd,
                           db_list_ia_query_templates, db_upsert_ia_query_template,
                           db_delete_ia_query_template)
 from ...models import (CampaignDB, ProspectDB, ProspectStatus, ProspectionTargetDB)
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Prospection"])
 
@@ -34,31 +35,6 @@ def _check_token(request: Request) -> str:
     if t != os.getenv("ADMIN_TOKEN", "changeme"):
         raise HTTPException(403, "Token invalide")
     return t
-
-
-def _nav(token: str, active: str = "prospection") -> str:
-    tabs = [
-        ("contacts",    "👥 Contacts"),
-        ("offers",      "💶 Offres"),
-        ("analytics",   "📊 Analytics"),
-        ("evidence",    "📸 Preuves"),
-        ("headers",     "🖼 Headers"),
-        ("content",     "✏️ Contenus"),
-        ("send-queue",  "📤 Envoi"),
-        ("scan",        "🔍 Test ponctuel"),
-        ("prospection", "🎯 Prospection"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return (f'<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;'
-            f'display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-            f'<a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;'
-            f'padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>'
-            f'{links}</div>')
 
 
 def _next_run(target: ProspectionTargetDB) -> str:
@@ -195,7 +171,7 @@ input:focus,select:focus,textarea:focus{{outline:none;border-color:#e94560}}
   margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #2a2a4e}}
 </style>
 </head><body>
-{_nav(token)}
+{admin_nav(token, "prospection")}
 <div class="wrap">
 <h1>🎯 Prospection automatique</h1>
 <p class="sub">Google Places → tests IA → suspects qualifiés. Le scheduler vérifie toutes les heures.</p>

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ...database import get_db, db_list_contacts, db_get_contact, db_create_contact, db_update_contact, db_delete_contact
 from ...models import ContactDB
+from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Contacts"])
 
@@ -18,27 +19,6 @@ def _check_token(request: Request):
     return token
 
 
-def _nav(active: str, token: str) -> str:
-    tabs = [
-        ("contacts", "👥 Contacts"),
-        ("offers", "💶 Offres"),
-        ("analytics", "📊 Analytics"),
-        ("evidence", "📸 Preuves"),
-        ("send-queue", "📤 Envoi"),
-    ]
-    links = "".join(
-        f'<a href="/admin/{t}?token={token}" style="padding:10px 18px;border-radius:6px;text-decoration:none;'
-        f'font-size:13px;font-weight:{"bold" if t==active else "normal"};'
-        f'background:{"#e94560" if t==active else "transparent"};color:#fff">{label}</a>'
-        for t, label in tabs
-    )
-    return f'''<div style="background:#0a0a15;border-bottom:1px solid #1a1a2e;padding:0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <a href="/admin?token={token}" style="color:#e94560;font-weight:bold;font-size:15px;padding:12px 16px 12px 0;text-decoration:none">⚡ PRESENCE_IA</a>
-  {links}
-</div>'''
-
-
-STATUS_COLORS = {"SUSPECT": "#888", "PROSPECT": "#e9a020", "CLIENT": "#2ecc71"}
 def _offer_labels(db: Session) -> dict:
     """Labels des offres lus depuis offers_module (pas hardcodés)."""
     from offers_module.database import db_list_offers
@@ -88,7 +68,7 @@ td{{padding:9px 10px;border-bottom:1px solid #1a1a2e;font-size:12px;vertical-ali
 tr:hover td{{background:#12122a}}.add-form{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin:20px}}
 input,select,textarea{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:7px 10px;border-radius:4px;font-size:12px}}
 label{{color:#aaa;font-size:11px;display:block;margin-bottom:3px}}</style></head><body>
-{_nav("contacts", token)}
+{admin_nav(token, "contacts")}
 <div style="padding:20px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
   <h1 style="color:#fff;font-size:18px">👥 Contacts ({len(contacts)})</h1>
