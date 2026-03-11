@@ -48,15 +48,18 @@ async def login_chatgpt(page, email: str, password: str):
 
     await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_2.png"))
 
-    # Champ email (auth0 : input#username ou input[type=email])
-    for sel in ['input#username', 'input[name="username"]', 'input[type="email"]', 'input[autocomplete="email"]']:
+    # Champ email — ChatGPT modal affiche un input placeholder "Adresse e-mail"
+    for sel in ['input[placeholder*="mail" i]', 'input[placeholder*="email" i]',
+                'input#username', 'input[name="username"]', 'input[type="email"]',
+                'input[autocomplete="email"]']:
         try:
-            await page.fill(sel, email, timeout=10000)
+            await page.fill(sel, email, timeout=8000)
+            log.info("chatgpt — email rempli avec sélecteur: %s", sel)
             break
         except Exception:
             continue
 
-    await page.click('button[type="submit"], button[name="action"], button:has-text("Continue")', timeout=10000)
+    await page.click('button:has-text("Continuer"), button:has-text("Continue"), button[type="submit"]', timeout=10000)
     await page.wait_for_timeout(2000)
     await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_3.png"))
 
@@ -68,7 +71,7 @@ async def login_chatgpt(page, email: str, password: str):
         except Exception:
             continue
 
-    await page.click('button[type="submit"], button[name="action"], button:has-text("Continue")', timeout=10000)
+    await page.click('button[type="submit"], button[name="action"], button:has-text("Continuer"), button:has-text("Continue")', timeout=10000)
     await page.wait_for_timeout(5000)
     await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_4.png"))
     log.info("chatgpt — post-login url: %s", page.url)
@@ -88,11 +91,11 @@ async def login_claude(page, email: str, password: str):
     await page.wait_for_timeout(2000)
 
     await page.fill('input[type="email"]', email)
-    await page.click('button[type="submit"], button:has-text("Continue")')
+    await page.click('button[type="submit"], button:has-text("Continuer"), button:has-text("Continue")')
     await page.wait_for_timeout(1500)
 
     await page.fill('input[type="password"]', password)
-    await page.click('button[type="submit"], button:has-text("Continue")')
+    await page.click('button[type="submit"], button:has-text("Continuer"), button:has-text("Continue")')
     await page.wait_for_timeout(4000)
 
     await page.wait_for_url("**claude.ai/**", timeout=20000)
@@ -121,7 +124,7 @@ async def login_google(page, email: str, password: str, continue_url: str):
     await page.wait_for_timeout(5000)
 
     # Accepter CGU / écrans intermédiaires Google
-    for selector in ['button:has-text("Accept")', 'button:has-text("Continue")', 'button:has-text("I agree")']:
+    for selector in ['button:has-text("Accept")', 'button:has-text("Continuer"), button:has-text("Continue")', 'button:has-text("I agree")']:
         try:
             await page.click(selector, timeout=3000)
             await page.wait_for_timeout(1500)
