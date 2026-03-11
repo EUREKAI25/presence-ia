@@ -193,21 +193,26 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
 
 def _openai(q: str) -> str:
     import openai
+    # gpt-4o = modèle par défaut ChatGPT (ce que les vrais utilisateurs voient)
     r = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")).chat.completions.create(
-        model="gpt-4o-mini", messages=[{"role":"user","content":q}], temperature=TEMP, max_tokens=600)
+        model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+        messages=[{"role":"user","content":q}], temperature=TEMP, max_tokens=600)
     return r.choices[0].message.content or ""
 
 def _anthropic(q: str) -> str:
     import anthropic
+    # claude-sonnet-4-6 = modèle par défaut Claude.ai (ce que les vrais utilisateurs voient)
     r = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")).messages.create(
-        model="claude-haiku-4-5-20251001", max_tokens=600, temperature=TEMP,
+        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+        max_tokens=600, temperature=TEMP,
         messages=[{"role":"user","content":q}])
     return r.content[0].text if r.content else ""
 
 def _gemini(q: str) -> str:
     import google.generativeai as g
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    r = g.GenerativeModel("gemini-2.0-flash",
+    # gemini-2.0-flash = modèle par défaut Gemini.google.com
+    r = g.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         generation_config={"temperature": TEMP, "max_output_tokens": 600}).generate_content(q)
     return r.text or ""
 
