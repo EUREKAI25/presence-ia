@@ -31,14 +31,12 @@ log = logging.getLogger(__name__)
 # ── ChatGPT ───────────────────────────────────────────────────────────
 
 async def login_chatgpt(page, email: str, password: str):
+    """Login ChatGPT via Google OAuth — évite le CAPTCHA Cloudflare du formulaire email/password."""
     await page.goto("https://chatgpt.com/", wait_until="domcontentloaded")
     await page.wait_for_timeout(3000)
 
-    # Screenshot debug
-    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_1.png"))
-
-    # Bouton "Log in" sur la page d'accueil
-    for sel in ['button:has-text("Log in")', 'a:has-text("Log in")', '[data-testid="login-button"]']:
+    # Ouvrir la modal de connexion
+    for sel in ['button:has-text("Se connecter")', 'button:has-text("Log in")', 'a:has-text("Log in")']:
         try:
             await page.click(sel, timeout=5000)
             await page.wait_for_timeout(2000)
@@ -46,42 +44,26 @@ async def login_chatgpt(page, email: str, password: str):
         except Exception:
             continue
 
-    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_2.png"))
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_login.png"))
 
-    # Champ email — ChatGPT modal affiche un input placeholder "Adresse e-mail"
-    for sel in ['input[placeholder*="mail" i]', 'input[placeholder*="email" i]',
-                'input#username', 'input[name="username"]', 'input[type="email"]',
-                'input[autocomplete="email"]']:
-        try:
-            await page.fill(sel, email, timeout=8000)
-            log.info("chatgpt — email rempli avec sélecteur: %s", sel)
-            break
-        except Exception:
-            continue
-
-    await page.click('button:has-text("Continuer"), button:has-text("Continue"), button[type="submit"]', timeout=10000)
+    # Cliquer "Continuer avec Google" — contourne Cloudflare
+    await page.click(
+        'button:has-text("Continuer avec Google"), button:has-text("Continue with Google")',
+        timeout=10000
+    )
     await page.wait_for_timeout(2000)
-    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_3.png"))
 
-    # Champ password
-    for sel in ['input[type="password"]', 'input[name="password"]', 'input#password']:
-        try:
-            await page.fill(sel, password, timeout=10000)
-            break
-        except Exception:
-            continue
+    # Flux Google standard (même fonction que Claude/Gemini)
+    await login_google(page, email, password, continue_url="https://chatgpt.com/")
 
-    await page.click('button[type="submit"], button[name="action"], button:has-text("Continuer"), button:has-text("Continue")', timeout=10000)
-    await page.wait_for_timeout(5000)
-    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_4.png"))
-    log.info("chatgpt — post-login url: %s", page.url)
-
-    # Attendre la page principale (plusieurs URLs possibles)
+    # Attendre la page principale ChatGPT
     try:
         await page.wait_for_url("https://chatgpt.com/**", timeout=20000)
     except Exception:
         pass
-    log.info("chatgpt — login OK, url finale: %s", page.url)
+
+    await page.screenshot(path=str(SESSIONS_DIR / "debug_chatgpt_done.png"))
+    log.info("chatgpt — login Google OAuth OK, url: %s", page.url)
 
 
 # ── Claude ────────────────────────────────────────────────────────────
@@ -156,8 +138,8 @@ PLATFORMS = {
     "chatgpt": {
         "login_fn": login_chatgpt,
         "tiers": {
-            "free": ("CHATGPT_FREE_EMAIL", "CHATGPT_FREE_PASSWORD"),
-            "paid": ("CHATGPT_PAID_EMAIL", "CHATGPT_PAID_PASSWORD"),
+            "free": ("GOOGLE_BOT_EMAIL", "GOOGLE_BOT_PASSWORD"),
+            "paid": ("CHATGPT_PAID_EMAIL", "CHATGPT_PAID_PASSWORD"),  # compte Plus si dispo
         },
     },
     "claude": {
