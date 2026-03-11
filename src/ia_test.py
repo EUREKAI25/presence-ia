@@ -191,36 +191,61 @@ def competitors_from(entities: List[Dict], name: str, website: Optional[str]) ->
 
 # ── Adaptateurs IA (web search natif — résultats identiques aux interfaces web) ───
 
+def _resolve_openai_model() -> str:
+    """Retourne le modèle OpenAI actif : env var si définie, sinon chatgpt-4o-latest (alias officiel → toujours le plus récent)."""
+    return os.getenv("OPENAI_MODEL") or "chatgpt-4o-latest"
+
+def _resolve_anthropic_model() -> str:
+    """Retourne le modèle Anthropic actif : env var si définie, sinon détecte le dernier claude-sonnet dispo."""
+    if os.getenv("ANTHROPIC_MODEL"):
+        return os.getenv("ANTHROPIC_MODEL")
+    try:
+        import anthropic
+        models = [m.id for m in anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")).models.list().data]
+        sonnet = sorted([m for m in models if "sonnet" in m], reverse=True)
+        return sonnet[0] if sonnet else "claude-sonnet-4-6"
+    except Exception:
+        return "claude-sonnet-4-6"
+
+def _resolve_gemini_model() -> str:
+    """Retourne le modèle Gemini actif : env var si définie, sinon gemini-2.0-flash."""
+    return os.getenv("GEMINI_MODEL") or "gemini-2.0-flash"
+
+
 def _openai(q: str) -> str:
     import openai
     # Responses API + web_search_preview = identique à ChatGPT web avec browsing
+    model = _resolve_openai_model()
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     r = client.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+        model=model,
         tools=[{"type": "web_search_preview"}],
         input=q,
     )
+    log.info("openai model used: %s", model)
     return r.output_text or ""
 
 def _anthropic(q: str) -> str:
     import anthropic
     # web_search_20250305 = tool natif Anthropic, identique à Claude.ai avec recherche web
+    model = _resolve_anthropic_model()
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     r = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+        model=model,
         max_tokens=1024,
         tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
         messages=[{"role": "user", "content": q}],
     )
-    # Concaténer tous les blocs texte de la réponse finale
+    log.info("anthropic model used: %s", model)
     return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
 
 def _gemini(q: str) -> str:
     import google.generativeai as g
     # google_search grounding = identique à Gemini.google.com
+    model = _resolve_gemini_model()
     g.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = g.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
-    r = model.generate_content(q, tools=[{"google_search": {}}])
+    r = g.GenerativeModel(model).generate_content(q, tools=[{"google_search": {}}])
+    log.info("gemini model used: %s", model)
     return r.text or ""
 
 _CALLERS = {

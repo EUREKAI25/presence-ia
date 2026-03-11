@@ -652,3 +652,6 @@ app.include_router(client_dashboard.router)
 app.include_router(livrables.router)
 app.include_router(templates.router)
 app.include_router(sequences.router)
+
+from .routes.active_models import router as active_models_router
+app.include_router(active_models_router)
