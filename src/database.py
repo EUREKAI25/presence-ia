@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -42,6 +42,9 @@ def init_db():
             except Exception:
                 pass
         conn.commit()
+    # Seed requêtes IA par défaut (si table vide)
+    with SessionLocal() as db:
+        _seed_ia_query_templates(db)
     # Seed content blocks + theme
     with SessionLocal() as db:
         _seed_content_blocks(db)
@@ -548,3 +551,66 @@ def db_update_template(db: Session, slug: str, updates: dict):
     db.commit()
     db.refresh(t)
     return t
+
+
+# ── Métier configs ────────────────────────────────────────────────────────────
+
+def db_list_metier_configs(db: Session) -> list:
+    return db.query(MetierConfigDB).order_by(MetierConfigDB.metier).all()
+
+def db_get_metier_config(db: Session, metier: str) -> Optional[MetierConfigDB]:
+    return db.query(MetierConfigDB).filter_by(metier=metier.lower().strip()).first()
+
+def db_upsert_metier_config(db: Session, metier: str, problematique: str, mission: str) -> MetierConfigDB:
+    row = db.query(MetierConfigDB).filter_by(metier=metier.lower().strip()).first()
+    if row:
+        row.problematique = problematique
+        row.mission = mission
+    else:
+        row = MetierConfigDB(metier=metier.lower().strip(), problematique=problematique, mission=mission)
+        db.add(row)
+    db.commit(); db.refresh(row)
+    return row
+
+def db_delete_metier_config(db: Session, metier: str) -> bool:
+    row = db.query(MetierConfigDB).filter_by(metier=metier.lower().strip()).first()
+    if not row: return False
+    db.delete(row); db.commit()
+    return True
+
+
+# ── IA Query Templates ────────────────────────────────────────────────────────
+
+_DEFAULT_IA_QUERIES = [
+    ("J'ai une {problematique} à {ville}, qui peut m'aider ?",              0),
+    ("Rénover ma toiture à {ville}, tu me conseilles quel {metier} ?",      1),
+    ("Meilleur {metier} à {ville}, avis et recommandations",                2),
+    ("Quel artisan pour {mission} à {ville} ?",                             3),
+    ("{metier} de confiance à {ville} — qui recommandes-tu ?",              4),
+]
+
+def _seed_ia_query_templates(db: Session):
+    if db.query(IAQueryTemplateDB).count() > 0:
+        return
+    for tpl, order in _DEFAULT_IA_QUERIES:
+        db.add(IAQueryTemplateDB(template=tpl, active=True, order=order))
+    db.commit()
+
+def db_list_ia_query_templates(db: Session) -> list:
+    return db.query(IAQueryTemplateDB).order_by(IAQueryTemplateDB.order).all()
+
+def db_upsert_ia_query_template(db: Session, tid: str, template: str, active: bool, order: int) -> IAQueryTemplateDB:
+    row = db.query(IAQueryTemplateDB).filter_by(id=tid).first()
+    if row:
+        row.template = template; row.active = active; row.order = order
+    else:
+        row = IAQueryTemplateDB(id=tid, template=template, active=active, order=order)
+        db.add(row)
+    db.commit(); db.refresh(row)
+    return row
+
+def db_delete_ia_query_template(db: Session, tid: str) -> bool:
+    row = db.query(IAQueryTemplateDB).filter_by(id=tid).first()
+    if not row: return False
+    db.delete(row); db.commit()
+    return True

@@ -275,6 +275,24 @@ class JobStatus(str, Enum):
     FAILED  = "FAILED"
 
 
+class MetierConfigDB(Base):
+    """Configuration par métier : problématique + mission (pour les placeholders des requêtes IA)."""
+    __tablename__ = "metier_configs"
+    metier:          Mapped[str]            = mapped_column(sa.String, primary_key=True)  # ex: "couvreur"
+    problematique:   Mapped[str]            = mapped_column(sa.String, default="")        # ex: "fuite de toiture"
+    mission:         Mapped[str]            = mapped_column(sa.String, default="")        # ex: "refaire ma toiture"
+    updated_at:      Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IAQueryTemplateDB(Base):
+    """Templates de requêtes IA éditables depuis l'admin."""
+    __tablename__ = "ia_query_templates"
+    id:       Mapped[str]  = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    template: Mapped[str]  = mapped_column(sa.Text, nullable=False)   # ex: "J'ai une {problematique} à {ville}, qui peut m'aider ?"
+    active:   Mapped[bool] = mapped_column(sa.Boolean, default=True)
+    order:    Mapped[int]  = mapped_column(sa.Integer, default=0)
+
+
 class ProspectionTargetDB(Base):
     """Ciblage de prospection automatique (ville × métier × fréquence)."""
     __tablename__ = "prospection_targets"

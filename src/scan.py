@@ -7,47 +7,55 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
-from .database import db_create_campaign, db_create_prospect, db_get_campaign, jd
+from .database import (db_create_campaign, db_create_prospect, db_get_campaign, jd,
+                        db_list_ia_query_templates, db_get_metier_config, SessionLocal)
 from .models import CampaignCreate, CampaignDB, ProspectDB, ProspectInput, ProspectScanInput, ProspectStatus
 
 
-# ── Requêtes imposées par profession ──────────────────────────────────
+# ── Requêtes IA — fallback statique si DB vide ────────────────────────
 
-_QUERIES: dict = {
-    "couvreur": [
-        "Quel est le meilleur couvreur à {city} ?",
-        "J'ai une fuite de toiture à {city}, tu peux me recommander un couvreur ?",
-        "Qui sont les couvreurs les mieux notés à {city} ?",
-        "Quelles entreprises de couverture ou de toiture sont connues à {city} ?",
-        "Donne-moi des noms de couvreurs ou d'entreprises de toiture à {city}",
-    ],
-    "plombier": [
-        "Quel est le meilleur plombier à {city} ?",
-        "J'ai une fuite d'eau à {city}, tu peux me recommander un plombier ?",
-        "Qui sont les plombiers les mieux notés à {city} ?",
-        "Quelles entreprises de plomberie sont connues à {city} ?",
-        "Donne-moi des noms de plombiers ou d'entreprises de plomberie à {city}",
-    ],
-    "restaurant": [
-        "Quel est le meilleur restaurant à {city} ?",
-        "Tu me conseilles quel restaurant à {city} ?",
-        "Quels sont les restaurants les mieux notés à {city} ?",
-        "Quels restaurants sont incontournables à {city} ?",
-        "Donne-moi des noms de restaurants à {city}",
-    ],
-    "default": [
-        "Quel est le meilleur {profession} à {city} ?",
-        "Tu peux me recommander un bon {profession} à {city} ?",
-        "Qui sont les meilleurs {profession}s à {city} ?",
-        "Quelles entreprises de {profession} sont connues à {city} ?",
-        "Donne-moi des noms de {profession}s ou d'entreprises à {city}",
-    ],
-}
+_FALLBACK_QUERIES = [
+    "J'ai une {problematique} à {ville}, qui peut m'aider ?",
+    "Rénover ma toiture à {ville}, tu me conseilles quel {metier} ?",
+    "Meilleur {metier} à {ville}, avis et recommandations",
+    "Quel artisan pour {mission} à {ville} ?",
+    "{metier} de confiance à {ville} — qui recommandes-tu ?",
+]
 
 
-def get_queries(profession: str, city: str) -> List[str]:
-    templates = _QUERIES.get(profession.lower().strip(), _QUERIES["default"])
-    return [t.format(profession=profession, city=city) for t in templates]
+def get_queries(profession: str, city: str, db: Session = None) -> List[str]:
+    """
+    Lit les templates actifs depuis la DB (éditables depuis l'admin).
+    Remplace {metier}, {ville}, {problematique}, {mission}.
+    Fallback statique si la DB est vide.
+    """
+    close = False
+    if db is None:
+        db = SessionLocal(); close = True
+
+    try:
+        rows = db_list_ia_query_templates(db)
+        templates = [r.template for r in rows if r.active] or _FALLBACK_QUERIES
+
+        cfg = db_get_metier_config(db, profession)
+        problematique = cfg.problematique if cfg else profession
+        mission       = cfg.mission       if cfg else profession
+    finally:
+        if close:
+            db.close()
+
+    result = []
+    for tpl in templates:
+        result.append(
+            tpl.replace("{metier}", profession)
+               .replace("{ville}", city)
+               .replace("{problematique}", problematique)
+               .replace("{mission}", mission)
+               # compatibilité anciens templates
+               .replace("{profession}", profession)
+               .replace("{city}", city)
+        )
+    return result
 
 
 # ── Campagne ──────────────────────────────────────────────────────────
