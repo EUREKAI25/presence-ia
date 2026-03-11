@@ -137,7 +137,13 @@ PLATFORMS = {
             "free": ("GOOGLE_BOT_EMAIL", "GOOGLE_BOT_PASSWORD"),
         },
     },
-    # Gemini → API google_search grounding, pas de session Playwright nécessaire
+    "gemini": {
+        # Même compte Google — login standard
+        "login_fn": lambda page, email, pw: login_google(page, email, pw, "https://gemini.google.com/"),
+        "tiers": {
+            "free": ("GOOGLE_BOT_EMAIL", "GOOGLE_BOT_PASSWORD"),
+        },
+    },
 }
 
 
