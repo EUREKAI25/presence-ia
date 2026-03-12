@@ -197,6 +197,14 @@ async function uploadHeader(btn) {{
   const status = document.getElementById('upload-status');
   if (!city) {{ status.textContent = '⚠️ Ville requise'; return; }}
   if (!fileInput.files.length) {{ status.textContent = '⚠️ Fichier requis'; return; }}
+  const file = fileInput.files[0];
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+  if (!allowed.includes(file.type)) {{
+    status.textContent = '❌ Format invalide — utilisez JPG, PNG ou WEBP uniquement'; return;
+  }}
+  if (file.size > 20 * 1024 * 1024) {{
+    status.textContent = '❌ Fichier trop lourd (' + (file.size/1024/1024).toFixed(1) + ' Mo) — max 20 Mo'; return;
+  }}
   btn.disabled = true; btn.textContent = '…';
   status.textContent = 'Upload en cours…';
   const form = new FormData();

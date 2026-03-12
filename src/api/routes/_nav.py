@@ -9,7 +9,7 @@ def admin_token() -> str:
 def admin_nav(token: str, active: str = "") -> str:
     sections = [
         ("PROSPECTION", [
-            ("contacts",    "Contacts"),
+            ("v3",          "Contacts"),
             ("prospection", "Campagnes"),
             ("scan",        "Scan IA"),
             ("send-queue",  "File d'envoi"),
@@ -27,7 +27,6 @@ def admin_nav(token: str, active: str = "") -> str:
             ("evidence",    "Preuves"),
             ("headers",     "Headers"),
             ("theme",       "Thème"),
-            ("v3",          "Admin V3"),
         ]),
     ]
 

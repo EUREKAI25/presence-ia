@@ -259,6 +259,11 @@ async function uploadEvidence(btn) {{
   const status     = document.getElementById('up-status');
   if (!profession || !city) {{ status.textContent = '⚠️ Profession et ville requises'; return; }}
   if (!files.length) {{ status.textContent = '⚠️ Sélectionner au moins un fichier'; return; }}
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+  for (const f of files) {{
+    if (!allowed.includes(f.type)) {{ status.textContent = '❌ ' + f.name + ' : format invalide (JPG/PNG/WEBP uniquement)'; return; }}
+    if (f.size > 20*1024*1024) {{ status.textContent = '❌ ' + f.name + ' trop lourd (' + (f.size/1024/1024).toFixed(1) + ' Mo) — max 20 Mo'; return; }}
+  }}
   btn.disabled = true; btn.textContent = '…';
   let done = 0, errors = 0;
   for (const file of files) {{

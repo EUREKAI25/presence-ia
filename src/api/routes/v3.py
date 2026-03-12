@@ -1656,6 +1656,9 @@ async function uploadImage() {{
   const file = document.getElementById('img-file').files[0];
   const status = document.getElementById('upload-status');
   if (!city || !file) {{ alert('Ville et fichier requis'); return; }}
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+  if (!allowed.includes(file.type)) {{ status.textContent = '❌ Format invalide — JPG, PNG ou WEBP uniquement'; return; }}
+  if (file.size > 50*1024*1024) {{ status.textContent = '❌ Fichier trop lourd (' + (file.size/1024/1024).toFixed(1) + ' Mo) — max 50 Mo avant compression'; return; }}
   status.textContent = "⏳ Compression de l&#39;image...";
   let blob;
   try {{ blob = await _compressImg(file); }}

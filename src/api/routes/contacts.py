@@ -29,6 +29,8 @@ def _offer_labels(db: Session) -> dict:
 @router.get("/admin/contacts", response_class=HTMLResponse)
 def contacts_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
+    # Les contacts sont gérés dans Admin V3 (source unique)
+    return RedirectResponse(f"/admin/v3?token={token}", status_code=302)
     contacts = db_list_contacts(db)
     offer_labels = _offer_labels(db)
 
