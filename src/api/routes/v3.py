@@ -475,11 +475,12 @@ def _render_landing(
         dt = p.ia_tested_at if isinstance(p.ia_tested_at, datetime) else datetime.fromisoformat(str(p.ia_tested_at))
         last_test_date = dt.strftime("%d/%m/%Y")
 
-    stats_html = f"""
-<div class="stats">
-  <div class="stat-item"><strong>3 IA</strong><span>testées<br>ChatGPT · Gemini · Claude</span></div>
-  <div class="stat-item"><strong>3×</strong><span>fois par semaine</span></div>
-  <div class="stat-item"><strong>3</strong><span>prompts différents<br>par test</span></div>
+    stats_html = """<div class="stats-bar">
+  <div class="stats-bar__inner">
+    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
+    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
+    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
+  </div>
 </div>"""
 
     def _ia_accordion_label(model: str, response: str, prospect_name: str, profession: str) -> str:
@@ -514,36 +515,45 @@ def _render_landing(
                 by_prompt[pr] = {"tested_at": r.get("tested_at"), "models": []}
             by_prompt[pr]["models"].append(r)
 
+        _DEMO_COLS = [
+            ("chatgpt", "ChatGPT", "(OpenAI)",    "#10a37f"),
+            ("claude",  "Claude",  "(Anthropic)", "#d97706"),
+            ("gemini",  "Gemini",  "(Google)",    "#4285f4"),
+        ]
         chat_html = ""
-        for prompt_text, group in by_prompt.items():
+        for _i, (prompt_text, group) in enumerate(by_prompt.items()):
             ts = ""
             ts_raw = group["tested_at"]
             if ts_raw:
-                try:
-                    ts = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m à %H:%M")
-                except Exception:
-                    ts = str(ts_raw)[:16]
-            prompt_header = (
-                f'<div class="chat-prompt">'
-                f'<span class="chat-ts">{ts}</span> : <em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em>'
-                f'</div>'
-            ) if ts else (
-                f'<div class="chat-prompt"><em>&laquo;&nbsp;{prompt_text}&nbsp;&raquo;</em></div>'
-            )
-            acc_items = ""
-            for r in group["models"]:
-                resp_html = (r.get("response", "") or "").replace("\n", "<br>")
-                label = _ia_accordion_label(r["model"], r.get("response", ""), p.name, p.profession)
-                acc_items += (
-                    f'<details class="chat-detail">'
-                    f'<summary>{label}</summary>'
-                    f'<div class="chat-detail-body">{resp_html}</div>'
-                    f'</details>'
+                try:    ts = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m/%Y à %Hh%M")
+                except Exception: ts = str(ts_raw)[:16]
+            model_map = {(r.get("model") or "").lower(): r for r in group["models"]}
+            cols = ""
+            for _key, _nm, _co, _color in _DEMO_COLS:
+                r = model_map.get(_key)
+                if r:
+                    lbl = _ia_accordion_label(_nm, r.get("response", ""), p.name, p.profession)
+                    items_html = f'<li>{name}</li>' if "vous cite ✓" in lbl else '<li class="ia-col__empty">Aucun concurrent cité</li>'
+                else:
+                    items_html = '<li class="ia-col__empty">Aucun concurrent cité</li>'
+                cols += (
+                    f'<div class="ia-col">'
+                    f'<div class="ia-col__brand" style="color:{_color}">{_nm} <span style="font-size:.78em;font-weight:400;color:#94a3b8">{_co}</span></div>'
+                    f'<ul class="ia-col__list">{items_html}</ul>'
+                    f'</div>'
                 )
+            _open = " open" if _i == 0 else ""
+            _icon = "−" if _i == 0 else "+"
+            _hidden = "" if _i == 0 else " hidden"
+            _ts_span = f'<span class="acc-ts">{ts}</span>' if ts else ""
             chat_html += (
-                f'<div class="chat-group">'
-                f'{prompt_header}'
-                f'<div class="chat-accordion">{acc_items}</div>'
+                f'<div class="acc-item{_open}">'
+                f'<button class="acc-q" onclick="toggleAcc(this)">'
+                f'{_ts_span}'
+                f'<span class="acc-text">« {prompt_text} »</span>'
+                f'<span class="acc-icon">{_icon}</span>'
+                f'</button>'
+                f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div></div>'
                 f'</div>'
             )
     else:
@@ -609,19 +619,14 @@ def _render_landing(
         f'Mais pas vous.'
     )
 
+    _bg_style = f"background-image:linear-gradient(to bottom,rgba(0,0,15,.78) 0%,rgba(0,0,15,.85) 100%),url('{city_image_url}')" if city_image_url else ""
     hero_html = (
-        f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
-        f'<div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,15,.78) 0%,rgba(0,0,15,.85) 100%)"></div>'
-        f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
-        f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
-        f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
-        f'<p style="color:rgba(255,255,255,.8);font-size:1rem;max-width:600px;margin:0 auto;line-height:1.75;">{sub_text}{_source_img}</p>'
+        f'<div class="hero" style="{_bg_style}">'
+        f'<div class="c">'
+        f'<div class="hero-pill">Audit Visibilité IA — {name}</div>'
+        f'<h1>À <em>{city_cap}</em>, les IA recommandent des {pro_plural}.<em>Mais pas vous.</em></h1>'
+        f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo\').scrollIntoView({{{{behavior:\'smooth\'}}}})">Voir les résultats ↓</button>'
         f'</div></div>'
-    ) if city_image_url else (
-        f'<div class="hero"><div class="hero-badge">Audit personnalisé</div>'
-        f'<h1>{h1_plain}</h1>'
-        f'<p style="margin-top:20px;font-size:1rem;color:#555;max-width:600px;margin-left:auto;margin-right:auto;line-height:1.75">{sub_text}{_source_plain}</p>'
-        f'</div>'
     )
 
     # ── CTA custom ────────────────────────────────────────────────────────
@@ -676,122 +681,157 @@ def _render_landing(
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Présence IA — Audit pour {name}</title><meta name="robots" content="noindex"><link rel="icon" href="/assets/favicon.png">
+<title>{name} — Audit Visibilité IA</title><meta name="robots" content="noindex"><link rel="icon" href="/assets/favicon.png">
 <style>
-*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--black:#0a0a0a;--white:#fff;--g1:#f5f5f5;--g2:#e8e8e8;--g3:#999;--blue:#2563eb;--blue-bg:#eff4ff}}
-body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--black);background:var(--white);line-height:1.6;-webkit-font-smoothing:antialiased}}
+:root{{--acc:#e8355a;--acc2:#ff7043;--green:#16a34a;--txt:#111827;--muted:#6b7280;--light:#f3f4f8;--border:#e5e7eb;--card:#ffffff;--shadow:0 4px 24px rgba(0,0,0,.08)}}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,'Segoe UI',Helvetica,sans-serif;background:#fff;color:var(--txt);line-height:1.65}}
 a{{color:inherit;text-decoration:none}}
-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
-.logo{{font-size:1rem;font-weight:700;letter-spacing:-.02em}}
-.nav-tag{{font-size:.75rem;color:rgba(255,255,255,.55);letter-spacing:.04em;text-transform:uppercase}}
-.hero{{max-width:820px;margin:0 auto;padding:96px 48px 72px;text-align:center}}
-.hero-badge{{display:inline-block;background:var(--blue-bg);color:var(--blue);font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px}}
-.hero h1{{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px}}
-.hero h1 em{{font-style:normal;color:var(--blue)}}.hero p{{font-size:1.1rem;color:#555;max-width:520px;margin:0 auto;line-height:1.7}}
-.stats{{background:var(--g1);border-top:1px solid var(--g2);border-bottom:1px solid var(--g2);padding:40px 48px;display:flex;justify-content:center;gap:64px;flex-wrap:wrap}}
-.stat-item{{text-align:center}}.stat-item strong{{display:block;font-size:2.4rem;font-weight:800;letter-spacing:-.04em;line-height:1;margin-bottom:6px}}
-.stat-item span{{font-size:.82rem;color:var(--g3);line-height:1.4}}
-.section{{max-width:780px;margin:0 auto;padding:72px 48px}}
-.section h2{{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.2}}
-.section>p{{color:#555;font-size:1.05rem;margin-bottom:32px}}
-.chat-box{{background:#fafafa;border:1px solid var(--g2);border-radius:12px;padding:24px 28px;margin:32px 0}}
-.chat-group{{margin:28px 0}}
-.chat-accordion{{margin-top:12px;border:1px solid var(--g2);border-radius:10px;overflow:hidden}}
-.chat-detail{{border-bottom:1px solid var(--g2)}}
-.chat-detail:last-child{{border-bottom:none}}
-.chat-detail summary{{padding:13px 18px;font-size:.9rem;font-weight:600;color:#dc2626;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;user-select:none}}
-.chat-detail summary::before{{content:"▶";font-size:1rem;color:#2563eb;transition:transform .2s;display:inline-block;flex-shrink:0}}
-.chat-detail[open] summary::before{{transform:rotate(90deg)}}
-.chat-detail summary::after{{content:"voir";margin-left:auto;font-size:.72rem;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.05em}}
-.chat-detail[open] summary::after{{content:"fermer"}}
-.chat-detail summary:hover{{background:#fafafa}}
-.chat-detail-body{{padding:14px 18px 16px;font-size:.88rem;color:#444;line-height:1.7;border-top:1px solid var(--g2);background:#fff}}
-.chat-meta{{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--g2)}}
-.chat-meta strong{{font-size:.9rem}}.chat-time{{font-size:.78rem;color:var(--g3);margin-left:auto}}
-.chat-label{{display:block;font-size:.72rem;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}}
-.chat-prompt{{margin-bottom:16px;font-size:.88rem;color:#555}}.chat-prompt em{{font-style:italic;color:#1a1a1a}}.chat-ts{{font-weight:600;color:#888}}
-.chat-response{{margin-bottom:8px}}
-.chat-text{{font-size:.95rem;color:var(--black);line-height:1.75;background:#fff;border:1px solid var(--g2);border-radius:8px;padding:14px 18px;margin-top:4px}}
-.audit-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:32px}}
-.audit-point{{display:flex;gap:16px;align-items:flex-start;padding:20px 24px;border:1px solid var(--g2);border-radius:10px;background:var(--white)}}
-.audit-num{{flex-shrink:0;width:28px;height:28px;background:var(--blue-bg);color:var(--blue);font-size:.72rem;font-weight:700;border-radius:6px;display:flex;align-items:center;justify-content:center}}
-.audit-point strong{{display:block;font-size:.95rem;font-weight:600;margin-bottom:4px}}.audit-point p{{font-size:.85rem;color:#666;line-height:1.5}}
-.cta-section{{background:var(--black);color:var(--white);padding:80px 48px;text-align:center}}
-.cta-section h2{{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:16px}}
-.cta-section p{{color:rgba(255,255,255,.55);font-size:1rem;margin-bottom:40px;max-width:460px;margin-left:auto;margin-right:auto}}
-.btn-cta{{display:inline-block;background:var(--white);color:var(--black);font-weight:700;font-size:1rem;padding:16px 44px;border-radius:8px;transition:opacity .15s}}
-.btn-cta:hover{{opacity:.88}}.btn-sub{{display:block;margin-top:16px;font-size:.78rem;color:rgba(255,255,255,.35);letter-spacing:.02em}}
-footer{{padding:28px 48px;text-align:center;font-size:.78rem;color:var(--g3);border-top:1px solid var(--g2)}}
-footer a{{color:var(--g3)}}
-@media(max-width:640px){{nav,.hero,.stats,.section,.cta-section,footer{{padding-left:24px;padding-right:24px}}.stats{{gap:36px}}.hero{{padding-top:64px;padding-bottom:48px}}}}
+.c{{max-width:920px;margin:0 auto;padding:0 28px}}
+.sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
+.sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none;display:flex;align-items:center}}
+.sn-cta{{background:#2563eb;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
+.sn-cta:hover{{background:#1d4ed8}}
+.hero{{min-height:72vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:80px 24px 64px;position:relative}}
+.hero::after{{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#fff);pointer-events:none}}
+.hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
+.hero h1{{font-size:clamp(28px,5vw,54px);font-weight:800;color:#fff;max-width:760px;margin:0 auto 36px;letter-spacing:-.8px;line-height:1.2;text-shadow:0 2px 12px rgba(0,0,0,.5)}}
+.hero h1 em{{font-style:normal;color:#93c5fd}}
+.hero h1 em:last-child{{font-style:normal;color:#fff;font-size:.85em;display:block;margin-top:8px}}
+.hero-cta{{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--txt);font-weight:700;font-size:14px;padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);cursor:pointer;border:none;transition:transform .2s,box-shadow .2s}}
+.hero-cta:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.3)}}
+section{{padding:80px 0}}
+.sect-label{{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}}
+section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);letter-spacing:-.4px;margin-bottom:12px;line-height:1.15}}
+.sect-sub{{color:var(--muted);font-size:15px;max-width:560px;margin-bottom:44px}}
+.stats-bar{{background:#fff;border-bottom:1px solid var(--border);padding:36px 24px}}
+.stats-bar__inner{{max-width:820px;margin:0 auto;display:flex;justify-content:center;flex-wrap:wrap;gap:0}}
+.stats-bar .stat{{text-align:center;padding:0 44px;border-right:1px solid var(--border)}}
+.stats-bar .stat:last-child{{border-right:none}}
+.stats-bar .stat__val{{font-size:1.25rem;font-weight:800;color:var(--txt);letter-spacing:-.02em;line-height:1.2}}
+.stats-bar .stat__lbl{{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}}
+@media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:16px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
+.sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
+.ia-accordion{{margin-bottom:28px}}
+.acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
+.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
+.acc-ts{{color:#94a3b8;font-size:11px;white-space:nowrap;font-weight:600;flex-shrink:0}}
+.acc-text{{font-style:italic;color:#f1f5f9;font-size:15px;font-weight:500;flex:1}}
+.acc-icon{{color:#64748b;font-size:20px;font-weight:300;flex-shrink:0;margin-left:auto;transition:color .15s}}
+.acc-item.open .acc-icon{{color:#60a5fa}}
+.acc-body{{padding:0 16px 16px}}
+.ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
+@media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
+.ia-col{{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}}
+.ia-col__brand{{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}}
+.ia-col__list{{list-style:none;padding:0}}
+.ia-col__list li{{font-size:13px;color:#374151;padding:6px 0;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px}}
+.ia-col__list li:last-child{{border-bottom:none}}
+.ia-col__list li::before{{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0}}
+.ia-col__empty{{font-size:12px;color:var(--muted);font-style:italic}}
+.ia-insight{{background:#fff;border:2px solid var(--border);border-radius:12px;padding:22px 26px;margin:28px 0 14px}}
+.ia-insight__title{{font-size:1.15rem;font-weight:800;color:var(--txt);margin-bottom:8px}}
+.ia-insight__text{{font-size:14px;color:var(--muted);line-height:1.65}}
+.ia-explain{{font-size:13.5px;color:#374151;background:#f0f9ff;border-left:3px solid #0ea5e9;padding:14px 20px;border-radius:0 8px 8px 0;margin-bottom:6px;line-height:1.65}}
+.ia-mention{{text-align:center;font-size:11.5px;color:var(--muted);margin:6px 0 28px;letter-spacing:.2px}}
+.ia-demo-cta{{text-align:center;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}}
+.ia-demo-cta__limit{{font-size:12px;color:var(--muted);margin-top:14px;font-style:italic}}
+.btn-pitch{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:700;font-size:15px;padding:16px 40px;border-radius:50px;text-decoration:none;box-shadow:0 4px 20px rgba(232,53,90,.35);transition:all .2s;cursor:pointer;border:none}}
+.btn-pitch:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(232,53,90,.45)}}
+.sect-pre-faq{{background:linear-gradient(135deg,#0d0820 0%,#0a1840 100%);padding:72px 24px}}
+.pre-faq-title{{font-size:clamp(22px,3.5vw,34px);font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-.3px;line-height:1.2}}
+.pre-faq-text{{font-size:15px;color:#94a3b8;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.7}}
+.sect-faq{{background:var(--light)}}
+.faq-wrap{{max-width:680px;margin-top:40px}}
+.faq-item{{background:#fff;border-radius:10px;margin-bottom:8px;border:1px solid var(--border);overflow:hidden}}
+.faq-q{{width:100%;text-align:left;padding:18px 20px;font-size:15px;font-weight:600;color:var(--txt);background:#fff;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;transition:background .1s}}
+.faq-q:hover{{background:#f8fafc}}
+.faq-q.open{{color:var(--acc)}}
+.faq-icon{{flex-shrink:0;font-size:20px;font-weight:300;color:var(--muted);line-height:1}}
+.faq-q.open .faq-icon{{color:var(--acc)}}
+.faq-a{{padding:0 20px 18px;color:var(--muted);font-size:14px;line-height:1.75}}
+footer{{background:#111827;padding:32px 24px;text-align:center;color:#6b7280;font-size:11px;letter-spacing:.3px}}
+footer a{{color:#9ca3af;text-decoration:underline}}
 </style></head><body>
 
-<nav>
-  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:40px;width:auto;display:block;filter:brightness(0) invert(1)"></div>
-  <div class="nav-tag">Audit — {name}</div>
+<nav class="sticky-nav">
+  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:36px;width:auto;display:block"></a>
+  <a class="sn-cta" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit</a>
 </nav>
 
 {hero_html}
 
 {stats_html}
 
-<div class="section">
-  <h2 style="margin-bottom:8px">Ce que voient vos futurs clients<br>quand ils interrogent une IA</h2>
-  <p>Réponses réelles obtenues lors des derniers tests sur les {pro_label}s de {city_cap}&nbsp;:</p>
-  {chat_html}
-  <div style="margin-top:32px;padding:28px 0">
-    <p style="font-size:1rem;line-height:1.75;margin-bottom:12px;color:var(--t)">
-      Ce n'est pas une question de réputation ou de classement sur Google Places.
-    </p>
-    <p style="font-size:1.15rem;font-weight:700;line-height:1.6;margin:24px 0;color:var(--t);display:flex;align-items:baseline;gap:10px">
-      <span style="color:#2563eb;flex-shrink:0">→</span>
-      Vous devez connaître et parler la langue que comprennent les IA.
-    </p>
-    <p style="font-size:1rem;line-height:1.75;margin-bottom:28px;color:var(--t)">
-      Nous analysons et optimisons votre positionnement dans les réponses générées par les IA.
-    </p>
-    <div style="text-align:center">
-      <a href="{CALENDLY_URL}" target="_blank" style="display:inline-block;background:#2563eb;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:.95rem">Réserver mon appel stratégique →</a>
+<section class="sect-ia-demo" id="ia-demo">
+  <div class="c">
+    <h2 style="font-size:clamp(28px,4vw,44px);margin-bottom:6px">En ce moment</h2>
+    <p class="sect-sub">Voici ce que voient vos prospects quand ils consultent leur IA pour trouver un {pro_label} à {city_cap}</p>
+    <div class="ia-accordion">
+      {chat_html}
+    </div>
+    <div class="ia-insight">
+      <h3 class="ia-insight__title">Votre entreprise n'apparaît dans aucune réponse.</h3>
+      <p class="ia-insight__text">Lorsque vos prospects demandent un {pro_label} à {city_cap} à leur IA, ce sont vos concurrents qui sont recommandés.</p>
+    </div>
+    <div class="ia-explain">
+      Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet.
+    </div>
+    <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
+    <div class="ia-demo-cta">
+      <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+      <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
   </div>
-</div>
+</section>
 
-<hr style="border:none;border-top:1px solid var(--g2);">
-
-{proof_section}
-
-<div style="background:var(--g1);padding:56px 48px;">
-  <div style="max-width:640px;margin:0 auto;">
-    <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:20px;">Ce que couvre cet appel :</h2>
-    <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px">
-      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Votre positionnement réel sur les 3 IA</li>
-      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Ce que font vos concurrents</li>
-      <li style="display:flex;align-items:baseline;gap:10px;font-size:1rem;color:var(--t)"><span style="color:#2563eb;font-weight:700">→</span> Comment inverser la tendance</li>
-    </ul>
+<section class="sect-pre-faq">
+  <div class="c" style="text-align:center">
+    <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n'apparaît pas.</h2>
+    <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu'elles recommandent.</p>
+    <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
   </div>
-</div>
+</section>
 
-<div class="cta-section">
-  <h2>{cta_title}</h2>
-  <p>{cta_sub}</p>
-  <a href="{CALENDLY_URL}" target="_blank" class="btn-cta">Je réserve mon créneau →</a>
-  <span class="btn-sub">Sans engagement · Résultats concrets</span>
-</div>
+<section class="sect-faq"><div class="c"><div class="faq-wrap">
+  <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Pourquoi les IA ne me recommandent-elles pas ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>La plupart des entreprises n'ont pas les informations qu'une IA attend pour les recommander : fiche Google incomplète, site peu structuré, pas assez de mentions en ligne. L'audit identifie précisément ce qui vous manque.</div></div>
+  <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Est-ce que je reçois un plan d'action ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Oui. En plus de l'analyse, vous recevez une liste d'actions concrètes classées par priorité. Chaque point est expliqué simplement — pas de jargon technique.</div></div>
+  <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Combien de temps pour voir des résultats ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Les premières améliorations sont généralement visibles en 4 à 8 semaines. Cela dépend des actions mises en place et de l'ancienneté de votre présence en ligne.</div></div>
+  <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">L'appel est-il payant ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Non. L'appel de 20 minutes et votre audit sont entièrement gratuits. Si vous souhaitez un accompagnement, nous vous proposerons une offre à l'issue de l'échange.</div></div>
+</div></div></section>
 
 <footer>
-  © 2026 Présence IA &nbsp;·&nbsp;
-  <a href="https://presence-ia.com/mentions-legales">Mentions légales</a> &nbsp;·&nbsp;
-  <a href="https://presence-ia.com/contact">Contact</a>
+  © 2026 PRESENCE_IA &nbsp;·&nbsp;
+  <a href="https://presence-ia.com/cgv" target="_blank">Conditions Générales de Vente</a>
 </footer>
 <script>
-document.addEventListener('toggle', function(e) {{
-  if (e.target.tagName === 'DETAILS' && e.target.classList.contains('chat-detail') && e.target.open) {{
-    document.querySelectorAll('details.chat-detail[open]').forEach(function(d) {{
-      if (d !== e.target) d.open = false;
-    }});
+function toggleAcc(btn) {{
+  const item = btn.closest('.acc-item');
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.acc-item').forEach(function(i) {{
+    i.classList.remove('open');
+    i.querySelector('.acc-body').hidden = true;
+    i.querySelector('.acc-icon').textContent = '+';
+  }});
+  if (!isOpen) {{
+    item.classList.add('open');
+    item.querySelector('.acc-body').hidden = false;
+    item.querySelector('.acc-icon').textContent = '−';
   }}
-}}, true);
+}}
+function toggleFaq(btn) {{
+  const isOpen = btn.classList.contains('open');
+  document.querySelectorAll('.faq-q').forEach(function(b) {{
+    b.classList.remove('open');
+    b.nextElementSibling.hidden = true;
+    b.querySelector('.faq-icon').textContent = '+';
+  }});
+  if (!isOpen) {{
+    btn.classList.add('open');
+    btn.nextElementSibling.hidden = false;
+    btn.querySelector('.faq-icon').textContent = '−';
+  }}
+}}
 </script>
 </body></html>"""
 
