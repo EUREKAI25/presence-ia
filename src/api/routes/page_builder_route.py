@@ -404,26 +404,23 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     ]
 
     # Steps
-    _steps_data = [
-        ("#2563eb", "rgba(37,99,235,.1)",
-         '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-         "Nous simulons les recherches que vos futurs clients peuvent faire dans les IA pour trouver leur couvreur à Rennes."),
-        ("#7c3aed", "rgba(124,58,237,.1)",
-         '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>',
-         "Nous analysons quelles entreprises sont recommandées par ces IA."),
-        ("#ea580c", "rgba(234,88,12,.1)",
-         '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3.87-7 13-7 13S5 12.87 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-         "Nous identifions les signaux qui expliquent ces recommandations : structure du site, informations publiques, présence locale."),
-        ("#16a34a", "rgba(22,163,74,.1)",
-         '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-         "Vous découvrez pourquoi votre entreprise n'apparaît pas aujourd'hui et les actions concrètes pour corriger la situation."),
+    _STEP_ICONS = [
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>',
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>',
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    ]
+    _steps_descs = [
+        "Nous simulons les recherches que vos futurs clients peuvent faire dans les IA pour trouver leur couvreur à Rennes.",
+        "Nous analysons quelles entreprises sont recommandées par ces IA.",
+        "Nous identifions les signaux qui expliquent ces recommandations : structure du site, informations publiques, présence locale.",
+        "Vous découvrez pourquoi votre entreprise n'apparaît pas aujourd'hui et les actions concrètes pour corriger la situation.",
     ]
     steps_html = ""
-    for i, (color, bg, icon, desc) in enumerate(_steps_data, 1):
+    for i, (icon, desc) in enumerate(zip(_STEP_ICONS, _steps_descs), 1):
         steps_html += (
-            f'<div class="step" style="--step-color:{color};--step-bg:{bg}">'
-            f'<div class="step__icon">{icon}</div>'
-            f'<div class="step__num">Étape {i}</div>'
+            f'<div class="step">'
+            f'<div class="step__header">{icon}<span class="step__num">Étape {i}</span></div>'
             f'<div class="step__desc">{desc}</div>'
             f'</div>'
         )
@@ -467,12 +464,10 @@ a{color:inherit}
 .section__title{text-align:center;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;margin-bottom:12px;letter-spacing:-.03em;color:var(--dark)}
 .section__sub{text-align:center;color:var(--m);margin-bottom:56px;font-size:1rem;max-width:560px;margin-left:auto;margin-right:auto}
 /* STEPS */
-.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
-.step{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 24px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
-.step:hover{transform:translateY(-5px);box-shadow:0 16px 40px rgba(0,0,0,.09)}
-.step::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--step-color,#2563eb)}
-.step__icon{width:48px;height:48px;border-radius:12px;background:var(--step-bg,rgba(37,99,235,.1));display:flex;align-items:center;justify-content:center;margin-bottom:14px}
-.step__num{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--step-color,#2563eb);margin-bottom:8px}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.step{background:#fff;border:1px solid #e2e8f0;border-radius:var(--r);padding:24px}
+.step__header{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:var(--dark)}
+.step__num{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dark)}
 .step__desc{font-size:.88rem;color:var(--m);line-height:1.65}
 /* CALL STEPS */
 .call-steps{list-style:none;padding:0;margin:40px auto 0;max-width:560px}
@@ -543,7 +538,6 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 <div class="section section--alt" id="how">
   <div class="container">
     <h2 class="section__title">Comment fonctionne l'audit de visibilité IA</h2>
-    <p class="section__sub">En 20 minutes :</p>
     <div class="steps-grid">{steps_html}</div>
   </div>
 </div>
@@ -551,6 +545,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 <div class="section" id="appel">
   <div class="container" style="max-width:640px">
     <h2 class="section__title">Comment se déroule l'appel</h2>
+    <p class="section__sub" style="margin-bottom:0">En 20 minutes :</p>
     <ol class="call-steps">
       {"".join(f'<li>{s}</li>' for s in _call_steps if s)}
     </ol>
