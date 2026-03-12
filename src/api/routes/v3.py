@@ -1170,6 +1170,7 @@ tr:hover{{background:#fafafa}}
         <button class="btn btn-primary btn-sm" onclick="bulkSendSelected('sms', false)" title="SMS aux prospects sélectionnés">💬 Sélection</button>
         <button class="btn btn-primary btn-sm" onclick="bulkSend('email', false)" title="Envoie à TOUS les prospects avec email (1 par minute)">✉ Tous</button>
         <button class="btn btn-primary btn-sm" onclick="bulkSend('sms', false)">💬 Tous</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSelected()" title="Supprimer les prospects sélectionnés">🗑 Supprimer sélection</button>
       </div>
     </div>
 
@@ -1710,6 +1711,23 @@ async function deleteProspect(tok, name) {{
     const row = document.getElementById('row-' + tok);
     if (row) row.remove();
   }} else {{ alert('Erreur suppression'); }}
+}}
+async function deleteSelected() {{
+  const selected = getSelected();
+  if (!selected.length) {{ alert('Sélectionnez au moins un prospect.'); return; }}
+  if (!confirm(`Supprimer ${{selected.length}} prospect(s) sélectionné(s) ? Cette action est irréversible.`)) return;
+  const prog = document.getElementById('bulk-progress');
+  prog.style.display = 'block';
+  prog.textContent = 'Suppression en cours…';
+  let done = 0, errors = 0;
+  await Promise.all(selected.map(async tok => {{
+    const r = await fetch(`/api/v3/prospect/${{tok}}?token=${{TOKEN}}`, {{method:'DELETE'}});
+    if (r.ok) {{ done++; const row = document.getElementById('row-' + tok); if (row) row.remove(); }}
+    else errors++;
+  }}));
+  prog.textContent = `✅ ${{done}} supprimé(s)${{errors ? ' — ' + errors + ' erreur(s)' : ''}}`;
+  document.getElementById('cb-all').checked = false;
+  setTimeout(() => {{ prog.style.display = 'none'; }}, 3000);
 }}
 </script>
 </body></html>""")
