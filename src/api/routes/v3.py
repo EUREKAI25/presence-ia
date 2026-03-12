@@ -749,7 +749,7 @@ def _render_landing(
 body{{font-family:-apple-system,'Segoe UI',Helvetica,sans-serif;background:#fff;color:var(--txt);line-height:1.65}}
 a{{color:inherit;text-decoration:none}}
 .c{{max-width:920px;margin:0 auto;padding:0 28px}}
-.sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
+.sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
 .sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none;display:flex;align-items:center}}
 .sn-cta{{background:#527FB3;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
 .sn-cta:hover{{background:#3d6a9a}}
@@ -819,7 +819,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 </style></head><body>
 
 <nav class="sticky-nav">
-  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
+  <a class="sn-logo" href="/"><img src="/assets/logo-white.svg" alt="Présence IA" style="height:44px;width:auto;display:block;filter:brightness(0) invert(1)"></a>
   <a class="sn-cta" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit</a>
 </nav>
 
