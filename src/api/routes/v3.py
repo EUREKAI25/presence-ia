@@ -611,7 +611,7 @@ def _render_landing(
 
     hero_html = (
         f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
-        f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.70) 50%,rgba(0,0,0,.58) 100%)"></div>'
+        f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.2) 100%)"></div>'
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
         f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
@@ -724,22 +724,11 @@ nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-bet
 .btn-cta:hover{{opacity:.88}}.btn-sub{{display:block;margin-top:16px;font-size:.78rem;color:rgba(255,255,255,.35);letter-spacing:.02em}}
 footer{{padding:28px 48px;text-align:center;font-size:.78rem;color:var(--g3);border-top:1px solid var(--g2)}}
 footer a{{color:var(--g3)}}
-@media(max-width:640px){{
-  nav{{padding:14px 20px}}
-  .hero{{padding:56px 20px 40px}}
-  .hero h1{{font-size:1.75rem;letter-spacing:-.02em}}
-  .stats{{gap:20px;padding:28px 20px}}
-  .stat-item strong{{font-size:1.8rem}}
-  .section{{padding:48px 20px}}
-  .audit-grid{{grid-template-columns:1fr}}
-  .cta-section{{padding:56px 20px}}
-  .cta-section h2{{font-size:1.7rem}}
-  footer{{padding:20px}}
-}}
+@media(max-width:640px){{nav,.hero,.stats,.section,.cta-section,footer{{padding-left:24px;padding-right:24px}}.stats{{gap:36px}}.hero{{padding-top:64px;padding-bottom:48px}}}}
 </style></head><body>
 
 <nav>
-  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:54px;width:auto;display:block"></div>
+  <div class="logo" style="display:flex;align-items:center;gap:9px"><svg width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="14" cy="14" r="3" fill="#2563eb"/><circle cx="14" cy="14" r="7" stroke="#2563eb" stroke-width="1.5" fill="none" opacity=".65"/><circle cx="14" cy="14" r="11" stroke="#2563eb" stroke-width="1" fill="none" opacity=".35"/></svg>Présence&nbsp;<span>IA</span></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 
