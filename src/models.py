@@ -356,6 +356,7 @@ class V3ProspectDB(Base):
     sent_method:   Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)  # email/sms/form
     contacted:     Mapped[bool]          = mapped_column(sa.Boolean, default=False)
     notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
+    cms:           Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
     created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
 
 

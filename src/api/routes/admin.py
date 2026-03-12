@@ -34,6 +34,13 @@ def _admin_token() -> str:
 @router.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     if (r := _check_token(request)) is not None: return r
+    token = _admin_token()
+    return RedirectResponse(f"/admin/analytics?token={token}", status_code=302)
+
+
+@router.get("/admin/campaigns", response_class=HTMLResponse)
+def admin_campaigns(request: Request, db: Session = Depends(get_db)):
+    if (r := _check_token(request)) is not None: return r
     campaigns = db_list_campaigns(db)
     rows = ""
     for c in campaigns:

@@ -728,7 +728,7 @@ footer a{{color:var(--g3)}}
 </style></head><body>
 
 <nav>
-  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:54px;width:auto;display:block"></div>
+  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:40px;width:auto;display:block"></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 

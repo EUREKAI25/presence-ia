@@ -230,7 +230,7 @@ input:focus,select:focus,textarea:focus{{outline:none;border-color:#e94560}}
   <div style="display:flex;gap:10px;margin-top:16px;align-items:flex-end">
     <div style="flex:1">
       <label class="f">Nouvelle requête</label>
-      <input type="text" id="new_query" placeholder="ex: Quel {metier} pour {mission} à {ville} ?">
+      <input type="text" id="new_query" placeholder="ex: Quel {{metier}} pour {{mission}} à {{ville}} ?">
     </div>
     <button class="btn-sm" style="margin-bottom:1px" onclick="addQuery()">+ Ajouter</button>
   </div>
