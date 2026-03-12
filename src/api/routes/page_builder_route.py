@@ -512,7 +512,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 <body>
 
 <nav class="nav">
-  <a class="nav__brand" href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/assets/logo.svg" alt="Présence IA" style="height:36px;display:block"></a>
+  <a class="nav__brand" href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;display:block"></a>
   <a class="nav__cta" href="#contact">Réserver mon audit gratuit</a>
 </nav>
 

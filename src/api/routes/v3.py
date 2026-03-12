@@ -819,7 +819,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 </style></head><body>
 
 <nav class="sticky-nav">
-  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:36px;width:auto;display:block"></a>
+  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
   <a class="sn-cta" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit</a>
 </nav>
 
