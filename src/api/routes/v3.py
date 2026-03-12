@@ -625,7 +625,7 @@ def _render_landing(
         f'<div class="c">'
         f'<div class="hero-pill">Audit Visibilité IA — {name}</div>'
         f'<h1>À <em>{city_cap}</em>, les IA recommandent des {pro_plural}.<em>Mais pas vous.</em></h1>'
-        f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo\').scrollIntoView({{{{behavior:\'smooth\'}}}})">Voir les résultats ↓</button>'
+        f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo-title\').scrollIntoView({{{{behavior:\'smooth\'}}}})">Voir les résultats ↓</button>'
         f'</div></div>'
     )
 
@@ -703,7 +703,7 @@ a{{color:inherit;text-decoration:none}}
 section{{padding:80px 0}}
 .sect-label{{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}}
 section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);letter-spacing:-.4px;margin-bottom:12px;line-height:1.15}}
-.sect-sub{{color:var(--muted);font-size:15px;max-width:560px;margin-bottom:44px}}
+.sect-sub{{color:var(--muted);font-size:18px;max-width:680px;margin-bottom:44px;line-height:1.5}}
 .stats-bar{{background:#fff;border-bottom:1px solid var(--border);padding:36px 24px}}
 .stats-bar__inner{{max-width:820px;margin:0 auto;display:flex;justify-content:center;flex-wrap:wrap;gap:0}}
 .stats-bar .stat{{text-align:center;padding:0 44px;border-right:1px solid var(--border)}}
@@ -715,7 +715,7 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .ia-accordion{{margin-bottom:28px}}
 .acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
 .acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
-.acc-ts{{color:#94a3b8;font-size:11px;white-space:nowrap;font-weight:600;flex-shrink:0}}
+.acc-ts{{color:#94a3b8;font-size:13px;white-space:nowrap;font-weight:600;flex-shrink:0}}
 .acc-text{{font-style:italic;color:#f1f5f9;font-size:15px;font-weight:500;flex:1}}
 .acc-icon{{color:#64748b;font-size:20px;font-weight:300;flex-shrink:0;margin-left:auto;transition:color .15s}}
 .acc-item.open .acc-icon{{color:#60a5fa}}
@@ -765,17 +765,18 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 
 <section class="sect-ia-demo" id="ia-demo">
   <div class="c">
-    <h2 style="font-size:clamp(28px,4vw,44px);margin-bottom:6px">En ce moment</h2>
-    <p class="sect-sub">Voici ce que voient vos prospects quand ils consultent leur IA pour trouver un {pro_label} à {city_cap}</p>
+    <p class="sect-sub" id="ia-demo-title">Voici ce que voient vos prospects en ce moment même quand ils consultent leur IA pour trouver un {pro_label} à {city_cap}</p>
     <div class="ia-accordion">
       {chat_html}
     </div>
     <div class="ia-insight">
       <h3 class="ia-insight__title">Votre entreprise n'apparaît dans aucune réponse.</h3>
       <p class="ia-insight__text">Lorsque vos prospects demandent un {pro_label} à {city_cap} à leur IA, ce sont vos concurrents qui sont recommandés.</p>
+      <p class="ia-insight__text" style="margin-top:10px">Une partie de la demande se dirige donc naturellement vers eux — sans que vous en ayez conscience.</p>
     </div>
     <div class="ia-explain">
-      Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet.
+      <p>Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet et c'est précisément ce que nous analysons lors de l'audit.</p>
+      <p style="margin-top:10px">Que savent les IA aujourd'hui de votre entreprise ? Pourquoi elles recommandent vos concurrents à votre place ?</p>
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
