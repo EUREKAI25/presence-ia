@@ -749,12 +749,12 @@ def _render_landing(
 body{{font-family:-apple-system,'Segoe UI',Helvetica,sans-serif;background:#fff;color:var(--txt);line-height:1.65}}
 a{{color:inherit;text-decoration:none}}
 .c{{max-width:920px;margin:0 auto;padding:0 28px}}
-.sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
+.sticky-nav{{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
 .sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none;display:flex;align-items:center}}
 .sn-cta{{background:#527FB3;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
 .sn-cta:hover{{background:#3d6a9a}}
 @media(max-width:640px){{.sn-cta{{font-size:11px;padding:6px 12px}}}}
-.hero{{min-height:72vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:80px 24px 64px;position:relative}}
+.hero{{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:120px 24px 64px;position:relative}}
 .hero::after{{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#fff);pointer-events:none}}
 .hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
 .hero h1{{font-size:clamp(22px,3.8vw,42px);font-weight:800;color:#fff;max-width:820px;margin:0 auto 36px;letter-spacing:-.8px;line-height:1.25;text-shadow:0 2px 12px rgba(0,0,0,.5)}}
