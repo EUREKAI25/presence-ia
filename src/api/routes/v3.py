@@ -477,9 +477,21 @@ def _render_landing(
 
     stats_html = """<div class="stats-bar">
   <div class="stats-bar__inner">
-    <div class="stat"><div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div></div>
-    <div class="stat"><div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div></div>
-    <div class="stat"><div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div></div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg></div>
+      <div class="stat__val" style="color:#f87171">Des clients perdus</div>
+      <div class="stat__lbl">sans même le savoir</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="stat__val" style="color:#a78bfa">Des concurrents</div>
+      <div class="stat__lbl">qui prennent votre place</div>
+    </div>
+    <div class="stat">
+      <div class="stat__icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="stat__val" style="color:#34d399">Un plan d'action</div>
+      <div class="stat__lbl">pour renverser la situation</div>
+    </div>
   </div>
 </div>"""
 
@@ -506,21 +518,33 @@ def _render_landing(
         return f"{model} ne vous cite pas"
 
     def _extract_competitors_from_response(response: str) -> list:
-        """Extrait les noms d'entreprises depuis une réponse IA (markdown)."""
+        """Extrait les noms d'entreprises depuis une réponse IA (markdown + texte Gemini)."""
         names: list = []
         seen: set = set()
-        # Markdown links: [Nom de l'entreprise](url)
+        # Markdown links: [Nom](url)
         for m in re.finditer(r'\[([^\]]{3,80})\]\(https?://', response):
             n = m.group(1).strip()
             if n and not n.startswith("http") and n.lower() not in seen:
                 names.append(n); seen.add(n.lower())
-        # Bold: **Nom**
+        # Bold: **Nom** ou **Nom :**
         for m in re.finditer(r'\*\*([^*]{3,80})\*\*', response):
             n = m.group(1).strip().rstrip(":")
             if n and n.lower() not in seen:
                 names.append(n); seen.add(n.lower())
-        # Numbered list "1. Nom — " or "1. **Nom**" already handled above
-        return names[:6]
+        # Gemini format: "   CompanyName : description" (2-4 espaces d'indentation)
+        for m in re.finditer(r'^\s{2,4}([A-Za-z\u00C0-\u024F][^\n:]{1,60}?)\s*:', response, re.MULTILINE):
+            n = m.group(1).strip()
+            words = n.split()
+            if 1 <= len(words) <= 6 and n.lower() not in seen and len(n) <= 60:
+                names.append(n); seen.add(n.lower())
+        # "incluent A, B et C." (liste en fin de réponse Gemini)
+        m_inc = re.search(r'incluent\s+(.+?)\.', response)
+        if m_inc:
+            for part in re.split(r',\s*|\s+et\s+', m_inc.group(1)):
+                n = part.strip()
+                if n and n.lower() not in seen:
+                    names.append(n); seen.add(n.lower())
+        return names[:7]
 
     # ── Chat groups (1 prompt → accordéon par IA) ─────────────────────────
     if ia_results_list:
@@ -579,6 +603,14 @@ def _render_landing(
             _icon = "−" if _i == 0 else "+"
             _hidden = "" if _i == 0 else " hidden"
             _ts_span = f'<span class="acc-ts">{ts}</span>' if ts else ""
+            _has_empty = 'ia-col__empty' in cols
+            _empty_notice = (
+                '<p class="ia-empty-notice">'
+                'Il arrive même que les intelligences artificielles ne sachent pas encore quelles entreprises recommander. '
+                'Cela signifie simplement que les signaux nécessaires ne sont pas encore suffisamment clairs — '
+                'et que le marché est encore largement ouvert !'
+                '</p>'
+            ) if _has_empty else ""
             chat_html += (
                 f'<div class="acc-item{_open}">'
                 f'<button class="acc-q" onclick="toggleAcc(this)">'
@@ -586,7 +618,7 @@ def _render_landing(
                 f'<span class="acc-text">« {prompt_text} »</span>'
                 f'<span class="acc-icon">{_icon}</span>'
                 f'</button>'
-                f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div></div>'
+                f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div>{_empty_notice}</div>'
                 f'</div>'
             )
     else:
@@ -657,8 +689,8 @@ def _render_landing(
         f'<div class="hero" style="{_bg_style}">'
         f'<div class="c">'
         f'<div class="hero-pill">Audit Visibilité IA — {name}</div>'
-        f'<h1>À <em>{city_cap}</em>, les IA recommandent des {pro_plural}.<em>Mais pas vous.</em></h1>'
-        f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo-title\').scrollIntoView({{{{behavior:\'smooth\'}}}})">Voir les résultats ↓</button>'
+        f'<h1>À <em>{city_cap}</em>, les IA recommandent des <em>{pro_plural}</em>.<em>Mais pas vous.</em></h1>'
+        f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo-title\').scrollIntoView({{behavior:\'smooth\'}})">Voir les résultats ↓</button>'
         f'</div></div>'
     )
 
@@ -737,13 +769,14 @@ section{{padding:80px 0}}
 .sect-label{{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}}
 section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);letter-spacing:-.4px;margin-bottom:12px;line-height:1.15}}
 .sect-sub{{color:var(--muted);font-size:18px;max-width:680px;margin-bottom:44px;line-height:1.5}}
-.stats-bar{{background:#fff;border-bottom:1px solid var(--border);padding:36px 24px}}
+.stats-bar{{background:#fff;border-bottom:1px solid var(--border);padding:40px 24px}}
 .stats-bar__inner{{max-width:820px;margin:0 auto;display:flex;justify-content:center;flex-wrap:wrap;gap:0}}
 .stats-bar .stat{{text-align:center;padding:0 44px;border-right:1px solid var(--border)}}
 .stats-bar .stat:last-child{{border-right:none}}
-.stats-bar .stat__val{{font-size:1.25rem;font-weight:800;color:var(--txt);letter-spacing:-.02em;line-height:1.2}}
+.stats-bar .stat__icon{{display:flex;justify-content:center;margin-bottom:10px}}
+.stats-bar .stat__val{{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;line-height:1.2}}
 .stats-bar .stat__lbl{{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}}
-@media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:16px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
+@media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:20px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
 .sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
 .ia-accordion{{margin-bottom:28px}}
 .acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
@@ -762,6 +795,7 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .ia-col__list li:last-child{{border-bottom:none}}
 .ia-col__list li::before{{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0}}
 .ia-col__empty{{font-size:12px;color:var(--muted);font-style:italic}}
+.ia-empty-notice{{font-size:13px;color:#94a3b8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 16px;margin-top:14px;line-height:1.6}}
 .ia-insight{{background:#fff;border:2px solid var(--border);border-radius:12px;padding:22px 26px;margin:28px 0 14px}}
 .ia-insight__title{{font-size:1.15rem;font-weight:800;color:var(--txt);margin-bottom:8px}}
 .ia-insight__text{{font-size:14px;color:var(--muted);line-height:1.65}}
@@ -798,7 +832,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 
 <section class="sect-ia-demo" id="ia-demo">
   <div class="c">
-    <p class="sect-sub" id="ia-demo-title">Voici ce que voient vos prospects en ce moment même quand ils consultent leur IA pour trouver un {pro_label} à {city_cap}</p>
+    <p class="sect-sub" id="ia-demo-title"><svg style="display:inline-block;vertical-align:middle;margin-right:8px;flex-shrink:0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e8355a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Voici ce que voient vos prospects en ce moment même quand ils consultent leur IA pour trouver un {pro_label} à {city_cap} :</p>
     <div class="ia-accordion">
       {chat_html}
     </div>
