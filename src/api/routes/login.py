@@ -52,7 +52,7 @@ def login_page(error: str = ""):
 <style>{_CSS}</style>
 </head><body>
 <div class="card">
-  <img src="/assets/logo.svg" alt="PRESENCE_IA" style="height:44px;width:auto;filter:brightness(0) invert(1);margin-bottom:4px">
+  <img src="/assets/logo.svg" alt="PRESENCE_IA" style="height:52px;width:auto;filter:brightness(0) invert(1);margin-bottom:4px">
   <p class="sub">Espace administration</p>
   <form method="POST" action="/admin/login">
     <label>Mot de passe</label>

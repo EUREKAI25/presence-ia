@@ -611,7 +611,7 @@ def _render_landing(
 
     hero_html = (
         f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
-        f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.2) 100%)"></div>'
+        f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.70) 50%,rgba(0,0,0,.58) 100%)"></div>'
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
         f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
@@ -739,7 +739,7 @@ footer a{{color:var(--g3)}}
 </style></head><body>
 
 <nav>
-  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:36px;width:auto;display:block"></div>
+  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:54px;width:auto;display:block"></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 
@@ -1018,6 +1018,8 @@ def admin_v3(
         links_html = f'<a href="{r.landing_url}" target="_blank" title="Landing page" style="{_btn_style()}">🔗</a>'
         if r.website:
             links_html += f' <a href="{r.website}" target="_blank" title="Site web" style="{_btn_style()}">🌐</a>'
+        if r.cms:
+            links_html += f'<br><span style="font-size:10px;background:#f0f4ff;border:1px solid #dbe4ff;border-radius:3px;padding:1px 5px;color:#4263eb;white-space:nowrap">{r.cms}</span>'
         table_rows += f"""<tr id="row-{r.token}" data-email="{'1' if r.email else '0'}" data-phone="{'1' if r.phone else '0'}" data-sent="{'1' if r.contacted else '0'}">
           <td><input type="checkbox" class="prospect-cb" value="{r.token}"></td>
           <td style="font-size:.85rem"><strong>{r.name}</strong></td>
@@ -1875,6 +1877,12 @@ def scrape_prospects(token: str = ""):
                 p.email        = p.email or result.get("email")
                 p.phone        = p.phone or result.get("phone")
                 p.contact_url  = result.get("contact_url")
+                try:
+                    from ..cms_detector import detect_cms
+                    cms = detect_cms(p.website)
+                    p.cms = cms if cms and cms != "unknown" else None
+                except Exception:
+                    pass
                 p.scrape_status = "done"
                 db.commit()
                 time.sleep(1)  # 1s entre chaque scrape

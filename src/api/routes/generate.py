@@ -521,7 +521,7 @@ footer{{background:#111827;padding:32px 24px;text-align:center;
 
 <!-- STICKY NAV -->
 <nav class="sticky-nav">
-  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:32px;width:auto;filter:brightness(0) invert(1);display:block"></a>
+  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;width:auto;filter:brightness(0) invert(1);display:block"></a>
   <a class="sn-cta" href="#book" onclick="event.preventDefault();document.getElementById('book').scrollIntoView({{behavior:'smooth'}})">Réserver mon audit gratuit</a>
 </nav>
 
