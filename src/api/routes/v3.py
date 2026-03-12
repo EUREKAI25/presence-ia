@@ -1018,7 +1018,7 @@ def admin_v3(
         links_html = f'<a href="{r.landing_url}" target="_blank" title="Landing page" style="{_btn_style()}">🔗</a>'
         if r.website:
             links_html += f' <a href="{r.website}" target="_blank" title="Site web" style="{_btn_style()}">🌐</a>'
-        table_rows += f"""<tr id="row-{r.token}">
+        table_rows += f"""<tr id="row-{r.token}" data-email="{'1' if r.email else '0'}" data-phone="{'1' if r.phone else '0'}" data-sent="{'1' if r.contacted else '0'}">
           <td><input type="checkbox" class="prospect-cb" value="{r.token}"></td>
           <td style="font-size:.85rem"><strong>{r.name}</strong></td>
           <td style="font-size:.82rem">{r.city}</td>
@@ -1115,10 +1115,10 @@ tr:hover{{background:#fafafa}}
   {accordion_html}
 
   <div class="stats-bar">
-    <div class="stat-chip"><strong>{total}</strong><span>Prospects total</span></div>
-    <div class="stat-chip"><strong style="color:#2563eb">{n_email} <span style="font-size:.8rem;font-weight:400">({pct_e}%)</span></strong><span>Avec email</span></div>
-    <div class="stat-chip"><strong style="color:#2563eb">{n_phone} <span style="font-size:.8rem;font-weight:400">({pct_p}%)</span></strong><span>Avec téléphone</span></div>
-    <div class="stat-chip"><strong style="color:#16a34a">{n_sent}</strong><span>Contactés</span></div>
+    <div class="stat-chip"><strong id="stat-total">{total}</strong><span>Prospects total</span></div>
+    <div class="stat-chip"><strong id="stat-email" style="color:#2563eb">{n_email} <span id="stat-email-pct" style="font-size:.8rem;font-weight:400">({pct_e}%)</span></strong><span>Avec email</span></div>
+    <div class="stat-chip"><strong id="stat-phone" style="color:#2563eb">{n_phone} <span id="stat-phone-pct" style="font-size:.8rem;font-weight:400">({pct_p}%)</span></strong><span>Avec téléphone</span></div>
+    <div class="stat-chip"><strong id="stat-sent" style="color:#16a34a">{n_sent}</strong><span>Contactés</span></div>
   </div>
 
   <div class="new-search-form">
@@ -1145,7 +1145,7 @@ tr:hover{{background:#fafafa}}
 
   <div class="card" style="padding:14px 20px">
     <div class="filters">
-      <span style="font-size:.82rem;font-weight:600;color:#444">{len(rows)} résultats</span>
+      <span id="results-count" style="font-size:.82rem;font-weight:600;color:#444">{len(rows)} résultats</span>
       <select onchange="applyFilter()" id="f-ville">
         <option value="">Toutes les villes</option>
         {city_options}
@@ -1177,7 +1177,7 @@ tr:hover{{background:#fafafa}}
     <div id="bulk-progress" style="display:none;padding:8px 0;font-size:.82rem;color:#2563eb"></div>
 
     <div style="overflow-x:auto">
-      <table>
+      <table id="prospects-table">
         <thead><tr>
           <th style="width:32px"><input type="checkbox" id="cb-all" onclick="toggleAll(this)" title="Sélectionner tout"></th>
           <th>Nom</th><th>Ville</th><th>Métier</th><th>Téléphone</th><th>Email</th>
@@ -1704,12 +1704,29 @@ async function deleteImage(imgId) {{
   location.reload();
 }}
 
+function refreshStats() {{
+  const rows = [...document.querySelectorAll('#prospects-table tbody tr')];
+  const total = rows.length;
+  const nEmail = rows.filter(r => r.dataset.email === '1').length;
+  const nPhone = rows.filter(r => r.dataset.phone === '1').length;
+  const nSent  = rows.filter(r => r.dataset.sent  === '1').length;
+  const pctE = total ? Math.round(nEmail / total * 100) : 0;
+  const pctP = total ? Math.round(nPhone / total * 100) : 0;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-email').childNodes[0].textContent = nEmail + ' ';
+  document.getElementById('stat-email-pct').textContent = '(' + pctE + '%)';
+  document.getElementById('stat-phone').childNodes[0].textContent = nPhone + ' ';
+  document.getElementById('stat-phone-pct').textContent = '(' + pctP + '%)';
+  document.getElementById('stat-sent').textContent = nSent;
+  document.getElementById('results-count').textContent = total + ' résultats';
+}}
 async function deleteProspect(tok, name) {{
   if (!confirm('Supprimer ' + name + ' ?')) return;
   const r = await fetch(`/api/v3/prospect/${{tok}}?token=${{TOKEN}}`, {{method:'DELETE'}});
   if (r.ok) {{
     const row = document.getElementById('row-' + tok);
     if (row) row.remove();
+    refreshStats();
   }} else {{ alert('Erreur suppression'); }}
 }}
 async function deleteSelected() {{
@@ -1725,6 +1742,7 @@ async function deleteSelected() {{
     if (r.ok) {{ done++; const row = document.getElementById('row-' + tok); if (row) row.remove(); }}
     else errors++;
   }}));
+  refreshStats();
   prog.textContent = `✅ ${{done}} supprimé(s)${{errors ? ' — ' + errors + ' erreur(s)' : ''}}`;
   document.getElementById('cb-all').checked = false;
   setTimeout(() => {{ prog.style.display = 'none'; }}, 3000);
