@@ -394,7 +394,7 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     hero_cta      = B("hero", "cta_primary",  "Réserver mon audit gratuit")
     cta_title     = B("cta", "title",    "Votre audit IA en 48h — 97€")
     cta_subtitle  = B("cta", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
-    cta_btn       = B("cta", "btn_label","Commander mon audit")
+    cta_btn       = B("cta", "btn_label","Réserver mon audit gratuit →")
 
     intro_profession = B("intro", "profession", "couvreur")
     intro_city       = B("intro", "city",       "Rennes")
