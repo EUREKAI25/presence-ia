@@ -14,11 +14,7 @@ from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Scan"])
 
-_MODELS = [
-    ("openai",    "ChatGPT (GPT-4o mini)"),
-    ("anthropic", "Anthropic (Claude Haiku)"),
-    ("gemini",    "Gemini (2.0 Flash)"),
-]
+_MODELS = ["openai", "anthropic", "gemini"]
 
 
 def _check_token(request: Request) -> str:
@@ -31,13 +27,6 @@ def _check_token(request: Request) -> str:
 @router.get("/admin/scan", response_class=HTMLResponse)
 def scan_page(request: Request):
     token = _check_token(request)
-
-    models_checks = "".join(
-        f'<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#ccc;font-size:14px;cursor:pointer">'
-        f'<input type="checkbox" name="models" value="{mid}" checked '
-        f'style="width:16px;height:16px;accent-color:#e94560"> {label}</label>'
-        for mid, label in _MODELS
-    )
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -97,11 +86,6 @@ textarea{{resize:vertical;min-height:120px}}
   </button>
 </div>
 
-<div class="card">
-  <h2>Moteurs IA</h2>
-  {models_checks}
-</div>
-
 <button class="btn" id="runBtn" onclick="runScan()">Lancer la recherche →</button>
 
 <div class="log" id="log"></div>
@@ -138,11 +122,10 @@ async function runScan() {{
   const prof    = document.getElementById('profession').value.trim();
   const name    = document.getElementById('name').value.trim() || `[TEST] ${{prof}} ${{city}}`;
   const qlines  = document.getElementById('queries').value.trim().split('\\n').filter(l => l.trim());
-  const models  = [...document.querySelectorAll('input[name=models]:checked')].map(c => c.value);
+  const models  = ['openai', 'anthropic', 'gemini'];
 
   if (!city || !prof)   {{ alert('Ville et métier obligatoires.'); return; }}
   if (!qlines.length)   {{ alert('Aucune requête.'); return; }}
-  if (!models.length)   {{ alert('Sélectionnez au moins un moteur.'); return; }}
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true; btn.textContent = 'Recherche en cours…';
@@ -232,34 +215,31 @@ async def run_scan(request: Request, db: Session = Depends(get_db)):
     from ...models import TestRunDB
     from datetime import datetime
 
-    runs_out = []
-    for model in models:
+    import asyncio
+
+    async def _run_model(model):
         if model not in _CALLERS:
-            continue
+            return None
         api_key_env = _CALLERS[model][1]
         if not os.getenv(api_key_env):
-            runs_out.append({"model": model, "mentioned": False,
-                             "mention_per_query": [], "competitors": [],
-                             "error": f"Clé {api_key_env} manquante"})
-            continue
-
+            return {"model": model, "mentioned": False,
+                    "mention_per_query": [], "competitors": [],
+                    "error": f"Clé {api_key_env} manquante"}
         caller, _ = _CALLERS[model]
         raw, ents, mq, comps, notes = [], [], [], [], []
         mentioned = False
-
+        loop = asyncio.get_event_loop()
         for qi, q in enumerate(queries):
-            ans = _safe_call(caller, q, model, qi, notes)
+            ans = await loop.run_in_executor(None, lambda caller=caller, q=q, m=model, i=qi: _safe_call(caller, q, m, i, notes))
             raw.append(ans)
             e = extract_entities(ans)
             ents.append([{"type": x["type"], "value": x["value"]} for x in e])
-            m = is_mentioned(ans, name)
-            mq.append(m)
-            if m: mentioned = True
+            m_flag = is_mentioned(ans, name)
+            mq.append(m_flag)
+            if m_flag: mentioned = True
             comps.extend(competitors_from(e, name, None))
-
         seen: set = set()
         uc = [c for c in comps if not (c.lower() in seen or seen.add(c.lower()))]
-
         run = TestRunDB(
             run_id=str(uuid.uuid4()),
             campaign_id=campaign.campaign_id,
@@ -275,12 +255,10 @@ async def run_scan(request: Request, db: Session = Depends(get_db)):
             notes="; ".join(notes) or None,
         )
         db_create_run(db, run)
-        runs_out.append({
-            "model": model,
-            "mentioned": mentioned,
-            "mention_per_query": mq,
-            "competitors": uc[:10],
-        })
+        return {"model": model, "mentioned": mentioned, "mention_per_query": mq, "competitors": uc[:10]}
+
+    results = await asyncio.gather(*[_run_model(m) for m in models])
+    runs_out = [r for r in results if r is not None]
 
     prospect.status = ProspectStatus.TESTED.value
     db.commit()

@@ -307,13 +307,16 @@ async function saveVideoUrl(pid) {{
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Send Queue — PRESENCE_IA</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
-h1{{color:#1a1a2e;margin-bottom:4px}}h2{{color:#6b7280;font-size:13px;margin:0 0 20px}}
+<style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e;margin:0}}
+h1{{color:#1a1a2e;margin-bottom:4px;font-size:18px}}h2{{color:#6b7280;font-size:13px;margin:0 0 20px}}
+.wrap{{padding:24px;max-width:1400px;margin:0 auto}}
 table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
 th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:11px}}
 td{{padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e;vertical-align:middle}}
 a{{color:#e94560}}code{{font-size:11px}}</style></head>
 <body>
+{admin_nav(token, "send-queue")}
+<div class="wrap">
 <h1>Send Queue</h1>
 <h2>{len(prospects)} prospects éligibles</h2>
 <table>
@@ -324,12 +327,8 @@ a{{color:#e94560}}code{{font-size:11px}}</style></head>
   </tr>
   {rows or '<tr><td colspan=10 style="text-align:center;color:#9ca3af;padding:20px">Aucun prospect éligible</td></tr>'}
 </table>
-<p style="margin-top:16px;color:#9ca3af;font-size:12px">
-  <a href="/admin?token={token}">← Dashboard</a> &nbsp;|&nbsp;
-  <a href="/admin/scheduler?token={token}">→ Scheduler</a>
-</p>
 {js}
-</body></html>""")
+</div></body></html>""")
 
 
 # ── Scheduler status ───────────────────────────────────────────────────────
@@ -337,6 +336,7 @@ a{{color:#e94560}}code{{font-size:11px}}</style></head>
 
 @router.get("/admin/scheduler", response_class=HTMLResponse)
 def admin_scheduler(request: Request):
+    token = request.query_params.get("token", "") or request.cookies.get("admin_token", "")
     _check_token(request)
     try:
         from ...scheduler import scheduler_status
@@ -349,12 +349,18 @@ def admin_scheduler(request: Request):
         for j in jobs
     )
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><title>Scheduler</title>
-<style>*{{box-sizing:border-box}}body{{font-family:monospace;background:#f9fafb;color:#1a1a2e;margin:0;padding:24px}}
-h1{{color:#1a1a2e}}table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
+<meta charset="UTF-8"><title>Scheduler — PRESENCE_IA</title>
+<style>*{{box-sizing:border-box}}body{{font-family:'Segoe UI',sans-serif;background:#f9fafb;color:#1a1a2e;margin:0}}
+.wrap{{padding:24px;max-width:960px;margin:0 auto}}
+h1{{color:#1a1a2e;font-size:18px;margin-bottom:4px}}
+p.sub{{color:#6b7280;font-size:13px;margin-bottom:20px}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e5e7eb}}
 th{{background:#f9fafb;color:#6b7280;padding:10px;text-align:left;font-size:12px}}
 td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560}}</style></head>
-<body><h1>Scheduler — Jobs actifs</h1>
+<body>
+{admin_nav(token, "scheduler")}
+<div class="wrap">
+<h1>Planificateur</h1>
+<p class="sub">Jobs APScheduler actifs — prospections automatiques et tâches récurrentes</p>
 <table><tr><th>ID</th><th>Prochain run</th><th>Trigger</th></tr>{rows}</table>
-<p style="margin-top:16px"><a href="/admin?token={request.query_params.get('token', _admin_token())}">← Retour</a></p>
-</body></html>""")
+</div></body></html>""")

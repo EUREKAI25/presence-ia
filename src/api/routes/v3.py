@@ -29,6 +29,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from pydantic import BaseModel
 
 from ...models import V3ProspectDB, V3CityImageDB, V3LandingTextDB, ContentBlockDB
+from ._nav import admin_nav
 from ...database import SessionLocal, get_block, set_block
 
 log = logging.getLogger(__name__)
@@ -1081,7 +1082,7 @@ tr:hover{{background:#fafafa}}
 .form-group label{{display:block;font-size:.75rem;color:#666;margin-bottom:4px;font-weight:500}}
 </style>
 </head><body>
-
+{admin_nav(api_token, "v3")}
 <div class="topbar">
   <h1 style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="14" cy="14" r="3" fill="white"/><circle cx="14" cy="14" r="7" stroke="white" stroke-width="1.5" fill="none" opacity=".65"/><circle cx="14" cy="14" r="11" stroke="white" stroke-width="1" fill="none" opacity=".35"/></svg>Présence&nbsp;<span style="color:#93c5fd">IA</span> · Admin V3</h1>
   <a href="/admin?token={api_token}">← Admin principal</a>
@@ -1378,10 +1379,10 @@ async function bulkSendSelected(method, isTest) {{
   let testEmail = null, testPhone = null;
   if (isTest) {{
     if (method === 'email') {{
-      testEmail = prompt('Email de test :');
+      testEmail = prompt('Email de test :', 'nathalie.brigitte@gmail.com');
       if (!testEmail) return;
     }} else {{
-      testPhone = prompt('Numéro de test :');
+      testPhone = prompt('Numéro de test :', '+393514459617');
       if (!testPhone) return;
     }}
   }} else {{
@@ -1582,10 +1583,10 @@ async function bulkSend(method, isTest) {{
   let testEmail = null, testPhone = null;
   if (isTest) {{
     if (method === 'email') {{
-      testEmail = prompt('Email de test (recevra tous les messages) :');
+      testEmail = prompt('Email de test (recevra tous les messages) :', 'nathalie.brigitte@gmail.com');
       if (!testEmail) return;
     }} else {{
-      testPhone = prompt('Numéro de test (recevra tous les SMS, format 06XXXXXXXX) :');
+      testPhone = prompt('Numéro de test (recevra tous les SMS) :', '+393514459617');
       if (!testPhone) return;
     }}
   }} else {{
