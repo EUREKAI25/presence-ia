@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from ...models import V3ProspectDB, V3CityImageDB, V3LandingTextDB, ContentBlockDB
 from ._nav import admin_nav
 from ...database import SessionLocal, get_block, set_block
+from . import v3_mkt_bridge as _mkt
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -222,11 +223,34 @@ def _scrape_site(url: str) -> dict:
 
 # ── Brevo sending ─────────────────────────────────────────────────────────────
 
-def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str) -> bool:
+def _body_to_html(plain: str, landing_url: str = "", delivery_id: str = "") -> str:
+    """Convertit le corps texte en HTML avec tracking pixel et lien cliquable."""
+    import html as _html
+    tracked_url = landing_url
+    if delivery_id and landing_url:
+        from urllib.parse import quote as _q
+        tracked_url = f"{BASE_URL}/l/track/click/{delivery_id}?url={_q(landing_url, safe='')}"
+    lines = _html.escape(plain).replace("\n", "<br>\n")
+    if delivery_id and landing_url:
+        escaped_orig = _html.escape(landing_url)
+        escaped_tracked = _html.escape(tracked_url)
+        lines = lines.replace(escaped_orig,
+                              f'<a href="{escaped_tracked}">{escaped_orig}</a>')
+    pixel = ""
+    if delivery_id:
+        pixel = (f'<img src="{BASE_URL}/l/track/open/{delivery_id}" '
+                 f'width="1" height="1" alt="" style="display:none">')
+    return (f'<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;color:#333">'
+            f'{lines}{pixel}</body></html>')
+
+
+def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str,
+                      delivery_id: str = "", landing_url: str = "") -> bool:
     api_key = os.getenv("BREVO_API_KEY", "")
     if not api_key:
         log.error("BREVO_API_KEY manquante")
         return False
+    html_body = _body_to_html(body, landing_url=landing_url, delivery_id=delivery_id)
     try:
         resp = http_req.post(
             "https://api.brevo.com/v3/smtp/email",
@@ -236,6 +260,7 @@ def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str) -> b
                 "to": [{"email": to_email, "name": to_name}],
                 "subject": subject,
                 "textContent": body,
+                "htmlContent": html_body,
             },
             timeout=10,
         )
@@ -991,6 +1016,29 @@ def logout_v3():
     resp = RedirectResponse("/login/v3", status_code=302)
     resp.delete_cookie(_ADMIN_COOKIE_KEY)
     return resp
+
+
+# ── Routes tracking email ─────────────────────────────────────────────────────
+
+@router.get("/l/track/open/{delivery_id}")
+def track_open(delivery_id: str):
+    """Pixel de tracking open — 1×1 GIF transparent."""
+    from fastapi.responses import Response
+    _mkt.record_open(delivery_id)
+    gif = (b"GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00"
+           b"!\xf9\x04\x00\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01"
+           b"\x00\x00\x02\x02D\x01\x00;")
+    return Response(content=gif, media_type="image/gif",
+                    headers={"Cache-Control": "no-store, no-cache"})
+
+
+@router.get("/l/track/click/{delivery_id}")
+def track_click(delivery_id: str, url: str = ""):
+    """Tracking clic → redirige vers l'URL d'origine."""
+    _mkt.record_click(delivery_id)
+    if url:
+        return RedirectResponse(url, status_code=302)
+    return RedirectResponse(BASE_URL, status_code=302)
 
 
 # ── Route publique ────────────────────────────────────────────────────────────
@@ -2152,7 +2200,11 @@ async def send_email_prospect(tok: str, request: Request):
         metier = p.profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
         subj  = subj_tpl.format(ville=p.city, metier=metier, metiers=metiers,
                                 city=p.city, profession=p.profession, name=p.name)
-        ok    = _send_brevo_email(p.email, p.name, subj, msg)
+        delivery_id = _mkt.create_delivery(p.token)
+        ok    = _send_brevo_email(p.email, p.name, subj, msg,
+                                  delivery_id=delivery_id or "",
+                                  landing_url=p.landing_url or "")
+        _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo API error")
         if ok:
             p.sent_at     = datetime.utcnow()
             p.sent_method = "email"
@@ -2227,11 +2279,17 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                 subj_real = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
                                             city=city, profession=profession, name=name)
                 subj   = f"[TEST] {subj_real}" if test_mode else subj_real
-                ok     = _send_brevo_email(dest, name, subj, msg) if dest else False
+                delivery_id = _mkt.create_delivery(tok) if not test_mode else None
+                ok     = _send_brevo_email(dest, name, subj, msg,
+                                           delivery_id=delivery_id or "",
+                                           landing_url=landing_url or "") if dest else False
+                _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo error")
             elif req.method == "sms":
                 dest   = req.test_phone if test_mode else phone
                 msg    = _contact_message_sms(name, city, profession, landing_url, sms_tpl)
+                delivery_id = _mkt.create_sms_delivery(tok) if not test_mode else None
                 ok     = _send_brevo_sms(dest, msg) if dest else False
+                _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo SMS error")
             else:
                 ok = False
 

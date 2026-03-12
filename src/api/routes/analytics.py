@@ -45,10 +45,35 @@ def _pct(num: int, denom: int) -> str:
     return f"{num/denom*100:.0f}%" if denom else "—"
 
 
+def _mkt_delivery_stats() -> dict:
+    """Lit les stats de livraison depuis marketing.db (graceful si absent)."""
+    empty = {"sent": 0, "opened": 0, "clicked": 0, "bounced": 0, "rdv": 0}
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import (
+            ProspectDeliveryDB, DeliveryStatus, MeetingDB,
+        )
+        with MktSession() as mdb:
+            deliveries = (mdb.query(ProspectDeliveryDB)
+                          .filter_by(project_id="presence-ia").all())
+            meetings   = (mdb.query(MeetingDB)
+                          .filter_by(project_id="presence-ia").all())
+            return {
+                "sent":    sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.sent),
+                "opened":  sum(1 for d in deliveries if d.opened_at),
+                "clicked": sum(1 for d in deliveries if d.clicked_at),
+                "bounced": sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.bounced),
+                "rdv":     len(meetings),
+            }
+    except Exception:
+        return empty
+
+
 @router.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     prospects = db.query(V3ProspectDB).all()
+    mkt = _mkt_delivery_stats()
 
     total      = len(prospects)
     with_email = sum(1 for p in prospects if p.email)
@@ -65,6 +90,18 @@ def analytics_page(request: Request, db: Session = Depends(get_db)):
         _card("Avec email", str(with_email), f"{rate_email} des scannés", "#6366f1"),
         _card("IA testés", str(ia_tested), f"{rate_ia} des scannés", "#e9a020"),
         _card("Landing envoyée", str(contacted), f"{rate_contact} des scannés", "#2ecc71"),
+    ])
+
+    # Funnel email tracking (depuis marketing.db)
+    open_rate  = _pct(mkt["opened"],  mkt["sent"])
+    click_rate = _pct(mkt["clicked"], mkt["sent"])
+    rdv_rate   = _pct(mkt["rdv"],     mkt["sent"])
+    funnel_mkt = "".join([
+        _card("Emails envoyés",  str(mkt["sent"]),    "livraisons marketing.db", "#527FB3"),
+        _card("Ouvertures",      str(mkt["opened"]),  f"{open_rate} des envoyés",  "#6366f1"),
+        _card("Clics landing",   str(mkt["clicked"]), f"{click_rate} des envoyés", "#e9a020"),
+        _card("RDV Calendly",    str(mkt["rdv"]),     f"{rdv_rate} des envoyés",   "#2ecc71"),
+        _card("Bounces",         str(mkt["bounced"]), "adresses invalides",         "#e94560"),
     ])
 
     # Par métier
@@ -119,6 +156,9 @@ h2{{color:#fff;font-size:15px;margin:0 0 16px}}
 
 <p class="section-label">Funnel prospects V3</p>
 <div class="grid-4">{funnel}</div>
+
+<p class="section-label" style="margin-top:8px">Tracking email (marketing module)</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:32px">{funnel_mkt}</div>
 
 <div class="grid-3">
   <div class="panel"><h2>🎯 Par métier</h2>{pro_bars}</div>
