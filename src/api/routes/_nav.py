@@ -85,7 +85,7 @@ def admin_nav(token: str, active: str = "") -> str:
         f'<a href="/admin?token={token}" '
         f'style="display:flex;align-items:center;justify-content:center;'
         f'padding:14px 12px;border-bottom:1px solid #e5e7eb;text-decoration:none;flex-shrink:0">'
-        f'<img src="/assets/logo.svg" alt="PRESENCE_IA" style="height:30px;width:auto"></a>'
+        f'<img src="/assets/logo.svg" alt="PRESENCE_IA" style="width:148px;height:auto"></a>'
         f'<div style="padding:10px 8px;flex:1">'
         f'{sections_html}'
         f'</div>'

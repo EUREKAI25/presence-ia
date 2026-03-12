@@ -48,10 +48,11 @@ def login_page(error: str = ""):
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connexion — PRESENCE_IA</title>
+<link rel="icon" href="/assets/favicon.png">
 <style>{_CSS}</style>
 </head><body>
 <div class="card">
-  <div class="logo">Présence<span>IA</span></div>
+  <img src="/assets/logo.svg" alt="PRESENCE_IA" style="height:44px;width:auto;filter:brightness(0) invert(1);margin-bottom:4px">
   <p class="sub">Espace administration</p>
   <form method="POST" action="/admin/login">
     <label>Mot de passe</label>
