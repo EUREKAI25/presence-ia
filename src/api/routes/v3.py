@@ -728,7 +728,7 @@ footer a{{color:var(--g3)}}
 </style></head><body>
 
 <nav>
-  <div class="logo" style="display:flex;align-items:center;gap:9px"><svg width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="14" cy="14" r="3" fill="#2563eb"/><circle cx="14" cy="14" r="7" stroke="#2563eb" stroke-width="1.5" fill="none" opacity=".65"/><circle cx="14" cy="14" r="11" stroke="#2563eb" stroke-width="1" fill="none" opacity=".35"/></svg>Présence&nbsp;<span>IA</span></div>
+  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:54px;width:auto;display:block"></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 
