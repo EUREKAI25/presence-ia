@@ -411,10 +411,10 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     ]
     _steps_descs = [
-        "Nous simulons les recherches que vos futurs clients peuvent faire dans les IA pour trouver leur couvreur à Rennes.",
-        "Nous analysons quelles entreprises sont recommandées par ces IA.",
-        "Nous identifions les signaux qui expliquent ces recommandations : structure du site, informations publiques, présence locale.",
-        "Vous découvrez pourquoi votre entreprise n'apparaît pas aujourd'hui et les actions concrètes pour corriger la situation.",
+        "Nous reproduisons les recherches que vos futurs clients font dans les IA pour trouver un couvreur à Rennes.",
+        "Nous voyons quelles entreprises sont réellement recommandées dans ces réponses.",
+        "Nous analysons pourquoi ces entreprises apparaissent… et pourquoi d'autres n'y figurent pas.",
+        "Vous découvrez concrètement comment apparaître dans ces recommandations.",
     ]
     steps_html = ""
     for i, (icon, desc) in enumerate(zip(_STEP_ICONS, _steps_descs), 1):
