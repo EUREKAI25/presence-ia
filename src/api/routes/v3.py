@@ -547,6 +547,7 @@ def _render_landing(
         return names[:7]
 
     # ── Chat groups (1 prompt → accordéon par IA) ─────────────────────────
+    _any_empty = False
     if ia_results_list:
         from collections import OrderedDict
         by_prompt = OrderedDict()
@@ -568,6 +569,7 @@ def _render_landing(
             ("gemini",  "Gemini",  "(Google)",    "#4285f4"),
         ]
         chat_html = ""
+        _any_empty = False
         for _i, (prompt_text, group) in enumerate(by_prompt.items()):
             ts = ""
             ts_raw = group["tested_at"]
@@ -603,14 +605,8 @@ def _render_landing(
             _icon = "−" if _i == 0 else "+"
             _hidden = "" if _i == 0 else " hidden"
             _ts_span = f'<span class="acc-ts">{ts}</span>' if ts else ""
-            _has_empty = 'ia-col__empty' in cols
-            _empty_notice = (
-                '<p class="ia-empty-notice">'
-                'Il arrive même que les intelligences artificielles ne sachent pas encore quelles entreprises recommander. '
-                'Cela signifie simplement que les signaux nécessaires ne sont pas encore suffisamment clairs — '
-                'et que le marché est encore largement ouvert !'
-                '</p>'
-            ) if _has_empty else ""
+            if 'ia-col__empty' in cols:
+                _any_empty = True
             chat_html += (
                 f'<div class="acc-item{_open}">'
                 f'<button class="acc-q" onclick="toggleAcc(this)">'
@@ -618,7 +614,7 @@ def _render_landing(
                 f'<span class="acc-text">« {prompt_text} »</span>'
                 f'<span class="acc-icon">{_icon}</span>'
                 f'</button>'
-                f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div>{_empty_notice}</div>'
+                f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div></div>'
                 f'</div>'
             )
     else:
@@ -832,7 +828,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 
 <section class="sect-ia-demo" id="ia-demo">
   <div class="c">
-    <p class="sect-sub" id="ia-demo-title"><svg style="display:inline-block;vertical-align:middle;margin-right:8px;flex-shrink:0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e8355a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Voici ce que voient vos prospects en ce moment même quand ils consultent leur IA pour trouver un {pro_label} à {city_cap} :</p>
+    <p class="sect-sub" id="ia-demo-title"><svg style="display:inline-block;vertical-align:middle;margin-right:8px;flex-shrink:0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Voici ce que voient vos prospects en ce moment même quand ils consultent leur IA pour trouver un {pro_label} à {city_cap} :</p>
     <div class="ia-accordion">
       {chat_html}
     </div>
@@ -840,6 +836,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
       <h3 class="ia-insight__title">Votre entreprise n'apparaît dans aucune réponse.</h3>
       <p class="ia-insight__text">Lorsque vos prospects demandent un {pro_label} à {city_cap} à leur IA, ce sont vos concurrents qui sont recommandés.</p>
       <p class="ia-insight__text" style="margin-top:10px">Une partie de la demande se dirige donc naturellement vers eux — sans que vous en ayez conscience.</p>
+      {'<p class="ia-insight__text" style="margin-top:10px">Il arrive même que les intelligences artificielles ne sachent pas encore quelles entreprises recommander. Cela signifie simplement que les signaux nécessaires ne sont pas encore suffisamment clairs — et que le marché est encore largement ouvert !</p>' if _any_empty else ''}
     </div>
     <div class="ia-explain">
       <p>Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet et c'est précisément ce que nous analysons lors de l'audit.</p>
@@ -867,6 +864,14 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Combien de temps pour voir des résultats ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Les premières améliorations sont généralement visibles en 4 à 8 semaines. Cela dépend des actions mises en place et de l'ancienneté de votre présence en ligne.</div></div>
   <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">L'appel est-il payant ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Non. L'appel de 20 minutes et votre audit sont entièrement gratuits. Si vous souhaitez un accompagnement, nous vous proposerons une offre à l'issue de l'échange.</div></div>
 </div></div></section>
+
+<section class="sect-pre-faq" style="padding:56px 24px">
+  <div class="c" style="text-align:center">
+    <h2 class="pre-faq-title">Prêt à découvrir votre visibilité réelle sur les IA ?</h2>
+    <p class="pre-faq-text">Réservez votre audit gratuit — un appel de 20 minutes suffit.</p>
+    <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+  </div>
+</section>
 
 <footer>
   © 2026 PRESENCE_IA &nbsp;·&nbsp;
