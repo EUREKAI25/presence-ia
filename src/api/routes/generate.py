@@ -499,6 +499,22 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .video-link a{{color:var(--muted);font-size:13px}}
 footer{{background:#111827;padding:32px 24px;text-align:center;
   color:#6b7280;font-size:11px;letter-spacing:.3px}}
+
+@media(max-width:640px){{
+  .sticky-nav{{padding:0 16px;height:52px}}
+  .sn-cta{{font-size:12px;padding:7px 14px;border-radius:7px}}
+  .c{{padding:0 16px}}
+  .hero{{padding:56px 16px 48px}}
+  .hero h1{{font-size:clamp(18px,6vw,28px)}}
+  .hero .hero-cta{{font-size:14px;padding:13px 28px}}
+  .ev-track{{grid-template-columns:1fr}}
+  .sect-pre-faq{{padding:48px 16px}}
+  .pitch-card{{padding:24px 20px}}
+  .plans{{flex-direction:column;align-items:center}}
+  .plan{{width:100%;max-width:380px}}
+  .sect-faq .faq-wrap{{margin-top:24px}}
+  footer{{padding:24px 16px}}
+}}
 </style>
 </head>
 <body>

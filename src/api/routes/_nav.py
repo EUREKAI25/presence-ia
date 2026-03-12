@@ -69,15 +69,36 @@ def admin_nav(token: str, active: str = "") -> str:
         )
 
     return (
-        # Layout : sidebar fixe 180px, contenu décalé
+        # Layout : sidebar fixe 180px desktop, drawer mobile
         f'<style>'
         f'body{{margin:0!important;padding-left:180px!important;box-sizing:border-box}}'
         f'.pres-sidebar details summary::-webkit-details-marker{{display:none}}'
-        f'@media(max-width:600px){{body{{padding-left:0!important}}.pres-sidebar{{display:none!important}}}}'
+        f'#pres-hamburger{{display:none}}'
+        f'#pres-overlay{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:998}}'
+        f'#pres-overlay.show{{display:block}}'
+        f'@media(max-width:640px){{'
+        f'body{{padding-left:0!important;padding-top:52px!important}}'
+        f'#pres-hamburger{{display:flex!important;position:fixed;top:8px;left:10px;z-index:1001;'
+        f'background:#fff;border:1px solid #e5e7eb;border-radius:6px;'
+        f'width:38px;height:38px;align-items:center;justify-content:center;'
+        f'font-size:20px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.1)}}'
+        f'.pres-sidebar{{transform:translateX(-190px);transition:transform .22s ease}}'
+        f'.pres-sidebar.open{{transform:translateX(0)}}'
+        f'}}'
         f'</style>'
         # Favicon injecté dynamiquement
         f'<script>(function(){{var l=document.createElement("link");l.rel="icon";'
         f'l.type="image/png";l.href="/assets/favicon.png";document.head.appendChild(l);}})();</script>'
+        # Hamburger (mobile)
+        f'<button id="pres-hamburger" aria-label="Menu" onclick="'
+        f'document.querySelector(\'.pres-sidebar\').classList.toggle(\'open\');'
+        f'document.getElementById(\'pres-overlay\').classList.toggle(\'show\')'
+        f'">☰</button>'
+        # Overlay (mobile)
+        f'<div id="pres-overlay" onclick="'
+        f'document.querySelector(\'.pres-sidebar\').classList.remove(\'open\');'
+        f'this.classList.remove(\'show\')'
+        f'"></div>'
         # Sidebar
         f'<nav class="pres-sidebar" style="position:fixed;top:0;left:0;width:180px;height:100vh;'
         f'background:#fff;border-right:1px solid #e5e7eb;overflow-y:auto;z-index:1000;'

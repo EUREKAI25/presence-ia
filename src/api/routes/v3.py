@@ -724,7 +724,18 @@ nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-bet
 .btn-cta:hover{{opacity:.88}}.btn-sub{{display:block;margin-top:16px;font-size:.78rem;color:rgba(255,255,255,.35);letter-spacing:.02em}}
 footer{{padding:28px 48px;text-align:center;font-size:.78rem;color:var(--g3);border-top:1px solid var(--g2)}}
 footer a{{color:var(--g3)}}
-@media(max-width:640px){{nav,.hero,.stats,.section,.cta-section,footer{{padding-left:24px;padding-right:24px}}.stats{{gap:36px}}.hero{{padding-top:64px;padding-bottom:48px}}}}
+@media(max-width:640px){{
+  nav{{padding:14px 20px}}
+  .hero{{padding:56px 20px 40px}}
+  .hero h1{{font-size:1.75rem;letter-spacing:-.02em}}
+  .stats{{gap:20px;padding:28px 20px}}
+  .stat-item strong{{font-size:1.8rem}}
+  .section{{padding:48px 20px}}
+  .audit-grid{{grid-template-columns:1fr}}
+  .cta-section{{padding:56px 20px}}
+  .cta-section h2{{font-size:1.7rem}}
+  footer{{padding:20px}}
+}}
 </style></head><body>
 
 <nav>
