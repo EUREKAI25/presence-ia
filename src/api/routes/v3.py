@@ -522,8 +522,7 @@ def _render_landing(
         "définir", "demander", "consulter", "choisir", "vérifier", "comparer",
         "contacter", "obtenir", "utiliser", "faire", "trouver", "chercher",
         "prendre", "privilégier", "éviter", "noter", "savoir", "pensez",
-        "entreprises", "couvreurs", "artisans", "professionnels", "sociétés",
-        "un ", "une ", "des ", "les ", "il ", "elle ", "vous ", "nous ",
+        "il ", "elle ", "vous ", "nous ",
     }
     _REJECT_CONTAINS = {
         "listés", "listées", "listée", "témoigne", "témoignage",
@@ -535,7 +534,7 @@ def _render_landing(
     def _is_company_name(n: str) -> bool:
         """Retourne False si n ressemble à du texte de conseil/plateforme."""
         nl = n.lower().strip()
-        if not nl or nl[0].isdigit():                          # commence par un chiffre
+        if not nl:
             return False
         for start in _REJECT_STARTS:
             if nl.startswith(start):
