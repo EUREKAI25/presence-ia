@@ -396,6 +396,9 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     cta_subtitle  = B("cta", "subtitle", "Rejoignez les professionnels qui savent où ils en sont sur les IA.")
     cta_btn       = B("cta", "btn_label","Commander mon audit")
 
+    intro_profession = B("intro", "profession", "couvreur")
+    intro_city       = B("intro", "city",       "Rennes")
+
     # Section "Comment se déroule l'appel"
     _call_steps = [
         B("call", "step1", "Nous vous montrons les résultats observés"),
@@ -539,6 +542,13 @@ footer a{color:#9ca3af;text-decoration:underline}
     <p class="section__eyebrow">// Notre méthode</p>
     <h2 class="section__title">Comment fonctionne l'audit de <span style="color:var(--blue)">visibilité IA</span></h2>
     <div class="steps-grid">{steps_html}</div>
+  </div>
+</div>
+
+<div class="section section--alt" id="intro-method">
+  <div class="container" style="max-width:680px;text-align:center">
+    <p style="font-size:1.05rem;color:var(--m);line-height:1.8;margin-bottom:20px">Les intelligences artificielles recommandent des entreprises lorsque vos éventuels clients cherchent un professionnel dans leur ville.</p>
+    <p style="font-size:1.05rem;color:var(--m);line-height:1.8">Notre méthode consiste à analyser ce que ces IA voient réellement aujourd'hui lorsqu'un prospect recherche un <strong>{intro_profession}</strong> à <strong>{intro_city}</strong> pour vous assurer d'être suggéré.</p>
   </div>
 </div>
 
