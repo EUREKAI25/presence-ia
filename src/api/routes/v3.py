@@ -611,7 +611,7 @@ def _render_landing(
 
     hero_html = (
         f'<div style="position:relative;background-image:url({city_image_url});background-size:cover;background-position:center;min-height:500px;display:flex;align-items:center;justify-content:center;">'
-        f'<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.2) 100%)"></div>'
+        f'<div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,15,.78) 0%,rgba(0,0,15,.85) 100%)"></div>'
         f'<div style="position:relative;z-index:1;text-align:center;padding:80px 48px;max-width:820px;">'
         f'<div style="display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px;">Audit personnalisé</div>'
         f'<h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px;">{h1_img}</h1>'
@@ -682,9 +682,9 @@ def _render_landing(
 :root{{--black:#0a0a0a;--white:#fff;--g1:#f5f5f5;--g2:#e8e8e8;--g3:#999;--blue:#2563eb;--blue-bg:#eff4ff}}
 body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--black);background:var(--white);line-height:1.6;-webkit-font-smoothing:antialiased}}
 a{{color:inherit;text-decoration:none}}
-nav{{padding:20px 48px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--g2);background:var(--white);position:relative;z-index:10}}
-.logo{{font-size:1rem;font-weight:700;letter-spacing:-.02em}}.logo span{{color:var(--blue)}}
-.nav-tag{{font-size:.75rem;color:var(--g3);letter-spacing:.04em;text-transform:uppercase}}
+nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
+.logo{{font-size:1rem;font-weight:700;letter-spacing:-.02em}}
+.nav-tag{{font-size:.75rem;color:rgba(255,255,255,.55);letter-spacing:.04em;text-transform:uppercase}}
 .hero{{max-width:820px;margin:0 auto;padding:96px 48px 72px;text-align:center}}
 .hero-badge{{display:inline-block;background:var(--blue-bg);color:var(--blue);font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:28px}}
 .hero h1{{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px}}
@@ -728,7 +728,7 @@ footer a{{color:var(--g3)}}
 </style></head><body>
 
 <nav>
-  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:40px;width:auto;display:block"></div>
+  <div class="logo"><img src="/assets/logo.svg" alt="Présence IA" style="height:40px;width:auto;display:block;filter:brightness(0) invert(1)"></div>
   <div class="nav-tag">Audit — {name}</div>
 </nav>
 
