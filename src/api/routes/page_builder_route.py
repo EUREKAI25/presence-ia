@@ -405,10 +405,10 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
 
     # Steps
     _STEP_ICONS = [
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>',
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>',
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>',
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     ]
     _steps_descs = [
         "Nous reproduisons les recherches que vos futurs clients font dans les IA pour trouver un couvreur à Rennes.",
@@ -420,7 +420,8 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
     for i, (icon, desc) in enumerate(zip(_STEP_ICONS, _steps_descs), 1):
         steps_html += (
             f'<div class="step">'
-            f'<div class="step__header">{icon}<span class="step__num">Étape {i}</span></div>'
+            f'<div class="step__circle">{icon}</div>'
+            f'<div class="step__num">0{i}</div>'
             f'<div class="step__desc">{desc}</div>'
             f'</div>'
         )
@@ -449,7 +450,8 @@ a{color:inherit}
 .btn-hero-arrow{font-size:1.1rem;transition:transform .15s}
 .btn-hero:hover .btn-hero-arrow{transform:translateX(3px)}
 /* STATS */
-.stats-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:44px 24px}
+.stats-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:40px 24px}
+.stat__big{font-size:2.2rem;font-weight:800;color:var(--blue);letter-spacing:-.04em;line-height:1;margin-bottom:6px}
 .stats-bar__grid{display:flex;justify-content:center;gap:0;flex-wrap:wrap;max-width:860px;margin:0 auto}
 .stat{text-align:center;padding:0 48px;border-right:1px solid #e2e8f0}
 .stat:last-child{border-right:none}
@@ -463,12 +465,14 @@ a{color:inherit}
 .section__eyebrow{text-align:center;font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:12px}
 .section__title{text-align:center;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;margin-bottom:12px;letter-spacing:-.03em;color:var(--dark)}
 .section__sub{text-align:center;color:var(--m);margin-bottom:56px;font-size:1rem;max-width:560px;margin-left:auto;margin-right:auto}
-/* STEPS */
-.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
-.step{background:#fff;border:1px solid #e2e8f0;border-radius:var(--r);padding:24px}
-.step__header{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:var(--dark)}
-.step__num{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dark)}
-.step__desc{font-size:.88rem;color:var(--m);line-height:1.65}
+/* STEPS — process flow */
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
+.steps-grid::before{content:"";position:absolute;top:27px;left:12.5%;right:12.5%;border-top:2px dashed #cbd5e1;pointer-events:none;z-index:0}
+.step{text-align:center;padding:0 16px}
+.step__circle{width:56px;height:56px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;position:relative;z-index:1;box-shadow:0 4px 16px rgba(37,99,235,.25)}
+.step__num{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+.step__desc{font-size:.85rem;color:var(--m);line-height:1.65}
+@media(max-width:640px){.steps-grid{grid-template-columns:1fr 1fr;gap:32px 8px}.steps-grid::before{display:none}}
 /* CALL STEPS */
 .call-steps{list-style:none;padding:0;margin:40px auto 0;max-width:560px}
 .call-steps li{display:flex;align-items:flex-start;gap:20px;padding:20px 0;border-bottom:1px solid #e2e8f0;font-size:1.05rem;color:var(--t);line-height:1.6}
@@ -521,30 +525,32 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 <div class="stats-bar">
   <div class="stats-bar__grid">
     <div class="stat">
-      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg></div>
-      <div class="stat__val">Des clients perdus</div><div class="stat__lbl">sans même le savoir</div>
+      <div class="stat__big">3</div>
+      <div class="stat__val">IA analysées</div><div class="stat__lbl">ChatGPT, Claude &amp; Gemini</div>
     </div>
     <div class="stat">
-      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4h-3"/><circle cx="15" cy="7" r="4"/><path d="M1 21v-2a4 4 0 0 1 4-4h3"/><circle cx="5" cy="7" r="3"/></svg></div>
-      <div class="stat__val">Des concurrents</div><div class="stat__lbl">qui prennent votre place</div>
+      <div class="stat__big">48h</div>
+      <div class="stat__val">Délai de livraison</div><div class="stat__lbl">résultats garantis</div>
     </div>
     <div class="stat">
-      <div class="stat__icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
-      <div class="stat__val">Un plan d'action</div><div class="stat__lbl">pour renverser la situation</div>
+      <div class="stat__big">100%</div>
+      <div class="stat__val">Sur mesure</div><div class="stat__lbl">adapté à votre secteur</div>
     </div>
   </div>
 </div>
 
 <div class="section section--alt" id="how">
   <div class="container">
-    <h2 class="section__title">Comment fonctionne l'audit de visibilité IA</h2>
+    <p class="section__eyebrow">// Notre méthode</p>
+    <h2 class="section__title">Comment fonctionne l'audit de <span style="color:var(--blue)">visibilité IA</span></h2>
     <div class="steps-grid">{steps_html}</div>
   </div>
 </div>
 
 <div class="section" id="appel">
   <div class="container" style="max-width:640px">
-    <h2 class="section__title">Comment se déroule l'appel</h2>
+    <p class="section__eyebrow">// En pratique</p>
+    <h2 class="section__title">Comment se déroule <span style="color:var(--blue)">l'appel</span></h2>
     <p class="section__sub" style="margin-bottom:0">En 20 minutes :</p>
     <ol class="call-steps">
       {"".join(f'<li>{s}</li>' for s in _call_steps if s)}
