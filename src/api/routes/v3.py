@@ -685,7 +685,7 @@ def _render_landing(
         f'<div class="hero" style="{_bg_style}">'
         f'<div class="c">'
         f'<div class="hero-pill">Audit Visibilité IA — {name}</div>'
-        f'<h1>À <em>{city_cap}</em>, les IA recommandent des <em>{pro_plural}</em>.<em>Mais pas vous.</em></h1>'
+        f'<h1>À <em>{city_cap}</em>,<br>les IA recommandent des <em>{pro_plural}</em>.<em>Mais pas vous.</em></h1>'
         f'<button class="hero-cta" onclick="document.getElementById(\'ia-demo-title\').scrollIntoView({{behavior:\'smooth\'}})">Voir les résultats ↓</button>'
         f'</div></div>'
     )
@@ -757,7 +757,7 @@ a{{color:inherit;text-decoration:none}}
 .hero{{min-height:72vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:80px 24px 64px;position:relative}}
 .hero::after{{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#fff);pointer-events:none}}
 .hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
-.hero h1{{font-size:clamp(28px,5vw,54px);font-weight:800;color:#fff;max-width:760px;margin:0 auto 36px;letter-spacing:-.8px;line-height:1.2;text-shadow:0 2px 12px rgba(0,0,0,.5)}}
+.hero h1{{font-size:clamp(22px,3.8vw,42px);font-weight:800;color:#fff;max-width:820px;margin:0 auto 36px;letter-spacing:-.8px;line-height:1.25;text-shadow:0 2px 12px rgba(0,0,0,.5)}}
 .hero h1 em{{font-style:normal;color:#93c5fd}}
 .hero h1 em:last-child{{font-style:normal;color:#fff;font-size:.85em;display:block;margin-top:8px}}
 .hero-cta{{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--txt);font-weight:700;font-size:14px;padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);cursor:pointer;border:none;transition:transform .2s,box-shadow .2s}}
