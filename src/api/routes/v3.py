@@ -517,6 +517,37 @@ def _render_landing(
         # L'IA cite d'autres entreprises mais pas le prospect
         return f"{model} ne vous cite pas"
 
+    # Mots/débuts qui indiquent que ce N'EST PAS un nom d'entreprise
+    _REJECT_STARTS = {
+        "définir", "demander", "consulter", "choisir", "vérifier", "comparer",
+        "contacter", "obtenir", "utiliser", "faire", "trouver", "chercher",
+        "prendre", "privilégier", "éviter", "noter", "savoir", "pensez",
+        "entreprises", "couvreurs", "artisans", "professionnels", "sociétés",
+        "un ", "une ", "des ", "les ", "il ", "elle ", "vous ", "nous ",
+    }
+    _REJECT_CONTAINS = {
+        "listés", "listées", "listée", "témoigne", "témoignage",
+        "trustup", "travaux.com", "houzz", "habitatpresto", "pages jaunes",
+        "besoins", "plusieurs devis", "avis clients", "clairement",
+        "annuaire", "recommandé par", "recommandée par",
+    }
+
+    def _is_company_name(n: str) -> bool:
+        """Retourne False si n ressemble à du texte de conseil/plateforme."""
+        nl = n.lower().strip()
+        if not nl or nl[0].isdigit():                          # commence par un chiffre
+            return False
+        for start in _REJECT_STARTS:
+            if nl.startswith(start):
+                return False
+        for kw in _REJECT_CONTAINS:
+            if kw in nl:
+                return False
+        # Trop de mots → phrase de conseil, pas un nom d'entreprise
+        if len(nl.split()) > 6:
+            return False
+        return True
+
     def _extract_competitors_from_response(response: str) -> list:
         """Extrait les noms d'entreprises depuis une réponse IA (markdown + texte Gemini)."""
         names: list = []
@@ -524,25 +555,24 @@ def _render_landing(
         # Markdown links: [Nom](url)
         for m in re.finditer(r'\[([^\]]{3,80})\]\(https?://', response):
             n = m.group(1).strip()
-            if n and not n.startswith("http") and n.lower() not in seen:
+            if n and not n.startswith("http") and n.lower() not in seen and _is_company_name(n):
                 names.append(n); seen.add(n.lower())
         # Bold: **Nom** ou **Nom :**
         for m in re.finditer(r'\*\*([^*]{3,80})\*\*', response):
             n = m.group(1).strip().rstrip(":")
-            if n and n.lower() not in seen:
+            if n and n.lower() not in seen and _is_company_name(n):
                 names.append(n); seen.add(n.lower())
         # Gemini format: "   CompanyName : description" (2-4 espaces d'indentation)
         for m in re.finditer(r'^\s{2,4}([A-Za-z\u00C0-\u024F][^\n:]{1,60}?)\s*:', response, re.MULTILINE):
             n = m.group(1).strip()
-            words = n.split()
-            if 1 <= len(words) <= 6 and n.lower() not in seen and len(n) <= 60:
+            if 1 <= len(n.split()) <= 6 and n.lower() not in seen and _is_company_name(n):
                 names.append(n); seen.add(n.lower())
         # "incluent A, B et C." (liste en fin de réponse Gemini)
         m_inc = re.search(r'incluent\s+(.+?)\.', response)
         if m_inc:
             for part in re.split(r',\s*|\s+et\s+', m_inc.group(1)):
                 n = part.strip()
-                if n and n.lower() not in seen:
+                if n and n.lower() not in seen and _is_company_name(n):
                     names.append(n); seen.add(n.lower())
         return names[:7]
 
