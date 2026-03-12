@@ -405,10 +405,10 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
 
     # Steps
     _steps_defaults = [
-        ("", "Nous simulons les questions que vos futurs clients posent aux IA."),
-        ("", "Nous analysons quelles entreprises sont recommandées."),
-        ("", "Nous vérifions si votre entreprise apparaît dans ces réponses."),
-        ("", "Vous recevez un audit clair et les actions pour corriger cela."),
+        ("", "Nous simulons les recherches que vos futurs clients peuvent faire dans les IA pour trouver leur couvreur à Rennes."),
+        ("", "Nous analysons quelles entreprises sont recommandées par ces IA."),
+        ("", "Nous identifions les signaux qui expliquent ces recommandations : structure du site, informations publiques, présence locale."),
+        ("", "Vous découvrez pourquoi votre entreprise n'apparaît pas aujourd'hui et les actions concrètes pour corriger la situation."),
     ]
     steps_html = ""
     for i, (title, desc) in enumerate(_steps_defaults, 1):
@@ -532,7 +532,7 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 
 <div class="section section--alt" id="how">
   <div class="container">
-    <h2 class="section__title">Comment fonctionne l'analyse</h2>
+    <h2 class="section__title">Comment fonctionne l'audit de visibilité IA</h2>
     <div class="steps-grid">{steps_html}</div>
   </div>
 </div>

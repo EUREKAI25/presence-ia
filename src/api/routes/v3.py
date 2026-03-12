@@ -465,7 +465,7 @@ def _render_landing(
     n_competitors = len([x for x in competitors if x])
     last_test_date = ""
     if ia_results_list:
-        ts_raw = ia_results_list[0].get("tested_at", "")
+        ts_raw = max((r.get("tested_at") or "" for r in ia_results_list), default="")
         if ts_raw:
             try:
                 last_test_date = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m/%Y")
@@ -505,6 +505,23 @@ def _render_landing(
         # L'IA cite d'autres entreprises mais pas le prospect
         return f"{model} ne vous cite pas"
 
+    def _extract_competitors_from_response(response: str) -> list:
+        """Extrait les noms d'entreprises depuis une réponse IA (markdown)."""
+        names: list = []
+        seen: set = set()
+        # Markdown links: [Nom de l'entreprise](url)
+        for m in re.finditer(r'\[([^\]]{3,80})\]\(https?://', response):
+            n = m.group(1).strip()
+            if n and not n.startswith("http") and n.lower() not in seen:
+                names.append(n); seen.add(n.lower())
+        # Bold: **Nom**
+        for m in re.finditer(r'\*\*([^*]{3,80})\*\*', response):
+            n = m.group(1).strip().rstrip(":")
+            if n and n.lower() not in seen:
+                names.append(n); seen.add(n.lower())
+        # Numbered list "1. Nom — " or "1. **Nom**" already handled above
+        return names[:6]
+
     # ── Chat groups (1 prompt → accordéon par IA) ─────────────────────────
     if ia_results_list:
         from collections import OrderedDict
@@ -513,6 +530,12 @@ def _render_landing(
             pr = r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?"
             if pr not in by_prompt:
                 by_prompt[pr] = {"tested_at": r.get("tested_at"), "models": []}
+            else:
+                # garder la date la plus récente
+                cur = by_prompt[pr]["tested_at"] or ""
+                new_ts = r.get("tested_at") or ""
+                if new_ts > cur:
+                    by_prompt[pr]["tested_at"] = new_ts
             by_prompt[pr]["models"].append(r)
 
         _DEMO_COLS = [
@@ -533,7 +556,17 @@ def _render_landing(
                 r = model_map.get(_key)
                 if r:
                     lbl = _ia_accordion_label(_nm, r.get("response", ""), p.name, p.profession)
-                    items_html = f'<li>{name}</li>' if "vous cite ✓" in lbl else '<li class="ia-col__empty">Aucun concurrent cité</li>'
+                    _resp = r.get("response", "")
+                    _competitors = _extract_competitors_from_response(_resp)
+                    if "vous cite ✓" in lbl:
+                        items_html = f'<li class="ia-col__cited">{name} ✓</li>'
+                        for _cn in _competitors:
+                            if _cn.lower() != name.lower():
+                                items_html += f'<li>{_cn}</li>'
+                    elif _competitors:
+                        items_html = "".join(f'<li>{_cn}</li>' for _cn in _competitors)
+                    else:
+                        items_html = '<li class="ia-col__empty">Aucun concurrent cité</li>'
                 else:
                     items_html = '<li class="ia-col__empty">Aucun concurrent cité</li>'
                 cols += (
