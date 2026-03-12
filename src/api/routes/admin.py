@@ -4,7 +4,7 @@ Interface HTML légère pour piloter le pipeline sans Swagger.
 """
 import os
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl
@@ -15,11 +15,13 @@ router = APIRouter(tags=["Admin"])
 
 
 def _check_token(request: Request):
+    """Retourne None si valide, RedirectResponse vers login si invalide."""
     token = (request.headers.get("X-Admin-Token")
              or request.query_params.get("token")
              or request.cookies.get("admin_token", ""))
     if token != os.getenv("ADMIN_TOKEN", "changeme"):
-        raise HTTPException(403, "Token admin invalide")
+        return RedirectResponse("/admin/login", status_code=302)
+    return None
 
 
 def _admin_token() -> str:
@@ -31,7 +33,7 @@ def _admin_token() -> str:
 
 @router.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
+    if (r := _check_token(request)) is not None: return r
     campaigns = db_list_campaigns(db)
     rows = ""
     for c in campaigns:
@@ -75,7 +77,7 @@ td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560
 
 @router.get("/admin/campaign/{cid}", response_class=HTMLResponse)
 def admin_campaign(cid: str, request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
+    if (r := _check_token(request)) is not None: return r
     c = db_get_campaign(db, cid)
     if not c:
         raise HTTPException(404, "Campagne introuvable")
@@ -120,7 +122,7 @@ td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560
 
 @router.get("/admin/prospect/{pid}", response_class=HTMLResponse)
 def admin_prospect(pid: str, request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
+    if (r := _check_token(request)) is not None: return r
     p = db_get_prospect(db, pid)
     if not p:
         raise HTTPException(404, "Prospect introuvable")
@@ -181,7 +183,7 @@ a{{color:#e94560}}</style></head>
 
 @router.get("/admin/send-queue", response_class=HTMLResponse)
 def admin_send_queue(request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
+    if (r := _check_token(request)) is not None: return r
     token = request.query_params.get("token", _admin_token())
 
     # Tous les prospects éligibles (SCORED, READY_ASSETS, READY_TO_SEND, SENT_MANUAL)
@@ -337,7 +339,7 @@ a{{color:#e94560}}code{{font-size:11px}}</style></head>
 @router.get("/admin/scheduler", response_class=HTMLResponse)
 def admin_scheduler(request: Request):
     token = request.query_params.get("token", "") or request.cookies.get("admin_token", "")
-    _check_token(request)
+    if (r := _check_token(request)) is not None: return r
     try:
         from ...scheduler import scheduler_status
         jobs = scheduler_status()
