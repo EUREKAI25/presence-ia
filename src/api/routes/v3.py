@@ -749,7 +749,7 @@ def _render_landing(
 body{{font-family:-apple-system,'Segoe UI',Helvetica,sans-serif;background:#fff;color:var(--txt);line-height:1.65}}
 a{{color:inherit;text-decoration:none}}
 .c{{max-width:920px;margin:0 auto;padding:0 28px}}
-.sticky-nav{{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
+.sticky-nav{{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
 .sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none;display:flex;align-items:center}}
 .sn-cta{{background:#527FB3;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
 .sn-cta:hover{{background:#3d6a9a}}
