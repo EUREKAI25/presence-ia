@@ -871,8 +871,8 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 </div>
 
 <footer>
-  © 2026 PRESENCE_IA &nbsp;·&nbsp;
-  <a href="https://presence-ia.com/cgv" target="_blank">Conditions Générales de Vente</a>
+  © 2026 Présence IA &nbsp;·&nbsp;
+  <a href="/mentions" target="_blank">Mentions légales</a>
 </footer>
 <script>
 function toggleAcc(btn) {{

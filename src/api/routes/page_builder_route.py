@@ -488,15 +488,9 @@ a{color:inherit}
 .btn-cta{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:18px 44px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(82,127,179,.4);position:relative;transition:all .15s}
 .btn-cta:hover{background:#3d6a9a;transform:translateY(-1px)}
 /* FOOTER */
-footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
-.footer__inner{max-width:1040px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:40px;padding-bottom:40px}
-.footer__col h4{color:#e2e8f0;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px}
-.footer__col a{display:block;color:#94a3b8;text-decoration:none;font-size:.85rem;margin-bottom:10px;transition:color .1s}
-.footer__col a:hover{color:#fff}
-.footer__logo{font-weight:800;font-size:1rem;color:#fff;margin-bottom:10px}
-.footer__tagline{font-size:.82rem;color:#64748b;line-height:1.5;max-width:220px}
-.footer__bottom{max-width:1040px;margin:0 auto;padding-top:24px;border-top:1px solid #334155;font-size:.78rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-@media(max-width:640px){.stat{padding:0 24px;border-right:none;border-bottom:1px solid #e2e8f0;padding-bottom:24px;margin-bottom:8px}.stat:last-child{border-bottom:none}.steps-grid{grid-template-columns:1fr}.footer__inner{flex-direction:column;gap:28px}}
+footer{background:#111827;padding:32px 24px;text-align:center;color:#6b7280;font-size:11px;letter-spacing:.3px}
+footer a{color:#9ca3af;text-decoration:underline}
+@media(max-width:640px){.stat{padding:0 24px;border-right:none;border-bottom:1px solid #e2e8f0;padding-bottom:24px;margin-bottom:8px}.stat:last-child{border-bottom:none}.steps-grid{grid-template-columns:1fr}}
 """
 
     return f"""<!DOCTYPE html>
@@ -566,26 +560,8 @@ footer{background:var(--slate);color:#94a3b8;padding:56px 24px 28px}
 </div>
 
 <footer>
-  <div class="footer__inner">
-    <div class="footer__col">
-      <h4>Service</h4>
-      <a href="#how">Comment ça marche</a>
-      <a href="#faq">FAQ</a>
-      <a href="#contact">Commander</a>
-    </div>
-    <div class="footer__col">
-      <h4>Légal</h4>
-      <a href="/cgv">CGV</a>
-      <a href="/mentions">Mentions légales</a>
-    </div>
-    <div class="footer__col">
-      <h4>Contact</h4>
-      <a href="mailto:contact@presence-ia.com">contact@presence-ia.com</a>
-    </div>
-  </div>
-  <div class="footer__bottom">
-    <p>© 2026 Présence IA — Tous droits réservés</p>
-  </div>
+  © 2026 Présence IA &nbsp;·&nbsp;
+  <a href="/mentions" target="_blank">Mentions légales</a>
 </footer>
 
 <script></script>
