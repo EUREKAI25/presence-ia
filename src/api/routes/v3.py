@@ -751,8 +751,9 @@ a{{color:inherit;text-decoration:none}}
 .c{{max-width:920px;margin:0 auto;padding:0 28px}}
 .sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}}
 .sn-logo{{color:#fff;font-weight:800;font-size:1rem;letter-spacing:-.02em;text-decoration:none;display:flex;align-items:center}}
-.sn-cta{{background:#2563eb;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
-.sn-cta:hover{{background:#1d4ed8}}
+.sn-cta{{background:#527FB3;color:#fff;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .15s;white-space:nowrap}}
+.sn-cta:hover{{background:#3d6a9a}}
+@media(max-width:640px){{.sn-cta{{font-size:11px;padding:6px 12px}}}}
 .hero{{min-height:72vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:80px 24px 64px;position:relative}}
 .hero::after{{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#fff);pointer-events:none}}
 .hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
@@ -865,13 +866,9 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">L'appel est-il payant ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Non. L'appel de 20 minutes et votre audit sont entièrement gratuits. Si vous souhaitez un accompagnement, nous vous proposerons une offre à l'issue de l'échange.</div></div>
 </div></div></section>
 
-<section class="sect-pre-faq" style="padding:56px 24px">
-  <div class="c" style="text-align:center">
-    <h2 class="pre-faq-title">Prêt à découvrir votre visibilité réelle sur les IA ?</h2>
-    <p class="pre-faq-text">Réservez votre audit gratuit — un appel de 20 minutes suffit.</p>
-    <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
-  </div>
-</section>
+<div style="text-align:center;padding:40px 24px 56px">
+  <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+</div>
 
 <footer>
   © 2026 PRESENCE_IA &nbsp;·&nbsp;
