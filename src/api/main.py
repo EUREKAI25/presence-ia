@@ -63,6 +63,15 @@ def startup():
     except Exception as e:
         log.warning("Scheduler non démarré : %s", e)
 
+    # Montage assets statiques (logo, favicon — suivis par git)
+    assets_dir = Path(__file__).parent.parent / "assets"
+    try:
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        log.info("Static assets monté sur /assets → %s", assets_dir)
+    except Exception as e:
+        log.warning("Impossible de monter /assets : %s", e)
+
     # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
     dist_root = Path(__file__).parent.parent.parent / "dist"
     for sub, route, name in [
