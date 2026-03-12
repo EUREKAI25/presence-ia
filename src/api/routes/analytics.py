@@ -1,13 +1,12 @@
-"""Admin — onglet ANALYTICS."""
-import json
+"""Admin — onglet ANALYTICS (données V3ProspectDB)."""
 import os
-from collections import Counter, defaultdict
+from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...models import ContactDB, ProspectDB
+from ...models import V3ProspectDB
 from ._nav import admin_nav
 
 router = APIRouter(tags=["Admin Analytics"])
@@ -20,167 +19,114 @@ def _check_token(request: Request):
     return token
 
 
-def _stat_card(label: str, value: str, sub: str = "", color: str = "#e94560") -> str:
-    return f"""<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;text-align:center">
-  <div style="font-size:2rem;font-weight:bold;color:{color}">{value}</div>
-  <div style="color:#fff;font-size:13px;margin-top:4px">{label}</div>
-  {f'<div style="color:#555;font-size:11px;margin-top:2px">{sub}</div>' if sub else ''}
-</div>"""
+def _card(label: str, value: str, sub: str = "", color: str = "#e94560") -> str:
+    return (
+        f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;text-align:center">'
+        f'<div style="font-size:2rem;font-weight:bold;color:{color}">{value}</div>'
+        f'<div style="color:#fff;font-size:13px;margin-top:4px">{label}</div>'
+        + (f'<div style="color:#666;font-size:11px;margin-top:2px">{sub}</div>' if sub else "")
+        + "</div>"
+    )
 
 
 def _bar(label: str, value: int, max_val: int, color: str = "#e94560") -> str:
     pct = int(value / max_val * 100) if max_val else 0
-    return f"""<div style="margin-bottom:10px">
-  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-    <span style="color:#ccc;font-size:12px">{label}</span>
-    <span style="color:{color};font-size:12px;font-weight:bold">{value}</span>
-  </div>
-  <div style="background:#1a1a2e;border-radius:4px;height:8px">
-    <div style="background:{color};width:{pct}%;height:8px;border-radius:4px"></div>
-  </div>
-</div>"""
+    return (
+        f'<div style="margin-bottom:10px">'
+        f'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
+        f'<span style="color:#ccc;font-size:12px">{label}</span>'
+        f'<span style="color:{color};font-size:12px;font-weight:bold">{value}</span></div>'
+        f'<div style="background:#0f0f1a;border-radius:4px;height:8px">'
+        f'<div style="background:{color};width:{pct}%;height:8px;border-radius:4px"></div></div></div>'
+    )
+
+
+def _pct(num: int, denom: int) -> str:
+    return f"{num/denom*100:.0f}%" if denom else "—"
 
 
 @router.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
-    contacts = db.query(ContactDB).all()
+    prospects = db.query(V3ProspectDB).all()
 
-    # KPIs pipeline IA (table prospects)
-    all_prospects = db.query(ProspectDB).all()
-    p_total     = len(all_prospects)
-    p_tested    = sum(1 for p in all_prospects if p.status in ("TESTED","EMAIL_OK","SCORED","READY_ASSETS","READY_TO_SEND","SENT"))
-    p_suspects  = sum(1 for p in all_prospects if p.status in ("EMAIL_OK","SCORED","READY_ASSETS","READY_TO_SEND"))
-    p_sent      = sum(1 for p in all_prospects if p.status == "SENT")
-    pipeline_cards = "".join([
-        _stat_card("Scannés", str(p_total), color="#4b5ea8"),
-        _stat_card("Testés", str(p_tested), color="#6366f1"),
-        _stat_card("Suspects qualifiés", str(p_suspects), color="#e9a020"),
-        _stat_card("Envoyés", str(p_sent), color="#2ecc71"),
+    total      = len(prospects)
+    with_email = sum(1 for p in prospects if p.email)
+    ia_tested  = sum(1 for p in prospects if p.ia_tested_at or p.ia_results)
+    contacted  = sum(1 for p in prospects if p.contacted)
+
+    # Taux de conversion du funnel
+    rate_email    = _pct(with_email, total)
+    rate_ia       = _pct(ia_tested, total)
+    rate_contact  = _pct(contacted, total)
+
+    funnel = "".join([
+        _card("Scannés", str(total), "total prospects Google Places", "#4b5ea8"),
+        _card("Avec email", str(with_email), f"{rate_email} des scannés", "#6366f1"),
+        _card("IA testés", str(ia_tested), f"{rate_ia} des scannés", "#e9a020"),
+        _card("Landing envoyée", str(contacted), f"{rate_contact} des scannés", "#2ecc71"),
     ])
 
-    # Charger les offres depuis offers_module (prix dynamiques depuis DB)
-    from offers_module.database import db_list_offers
-    offers = db_list_offers(db)
-    offer_prices = {o.name: o.price for o in offers}   # name → price
-    # Fallback : chercher par nom partiel pour les contacts avec offer_selected = clé legacy
-    def _resolve_price(offer_key: str) -> float:
-        if offer_key in offer_prices:
-            return offer_prices[offer_key]
-        key_lower = offer_key.lower()
-        for name, price in offer_prices.items():
-            if key_lower in name.lower() or name.lower() in key_lower:
-                return price
-        return 0.0
+    # Par métier
+    by_profession = Counter(p.profession for p in prospects if p.profession)
+    max_pro = max(by_profession.values(), default=1)
+    pro_bars = "".join(
+        _bar(pro, count, max_pro, "#6366f1")
+        for pro, count in sorted(by_profession.items(), key=lambda x: -x[1])[:15]
+    ) or '<p style="color:#555;font-size:12px">Aucune donnée</p>'
 
-    total       = len(contacts)
-    suspects    = sum(1 for c in contacts if c.status == "SUSPECT")
-    prospects   = sum(1 for c in contacts if c.status == "PROSPECT")
-    clients     = sum(1 for c in contacts if c.status == "CLIENT")
-    sent_count  = sum(1 for c in contacts if c.message_sent)
-    read_count  = sum(1 for c in contacts if c.message_read)
-    paid_count  = sum(1 for c in contacts if c.paid)
-
-    conv_rate   = f"{clients/total*100:.1f}%" if total else "—"
-    open_rate   = f"{read_count/sent_count*100:.1f}%" if sent_count else "—"
-
-    # Revenue — prix lus depuis la DB (plus hardcodés)
-    revenue_by_offer: dict = defaultdict(float)
-    clients_by_offer: dict = Counter()
-    for c in contacts:
-        if c.paid and c.offer_selected:
-            revenue_by_offer[c.offer_selected] += _resolve_price(c.offer_selected)
-            clients_by_offer[c.offer_selected] += 1
-    revenue_total = sum(revenue_by_offer.values())
-
-    # Avg acquisition cost
-    costs = [c.acquisition_cost for c in contacts if c.acquisition_cost]
-    avg_cost = f"{sum(costs)/len(costs):.2f}€" if costs else "—"
-
-    # Clients by city
-    city_counter: dict = Counter(c.city for c in contacts if c.paid and c.city)
-    max_city = max(city_counter.values(), default=1)
-
-    # Contacts by city (all)
-    all_city: dict = Counter(c.city for c in contacts if c.city)
-    max_all_city = max(all_city.values(), default=1)
-
-    # Build KPI cards
-    rev_display = f"{int(revenue_total)}€" if revenue_total == int(revenue_total) else f"{revenue_total:.2f}€"
-    kpis = "".join([
-        _stat_card("Total contacts", str(total)),
-        _stat_card("Suspects", str(suspects), color="#888"),
-        _stat_card("Prospects", str(prospects), color="#e9a020"),
-        _stat_card("Clients", str(clients), color="#2ecc71"),
-        _stat_card("Taux conversion", conv_rate, f"{paid_count} payés / {total} contacts"),
-        _stat_card("Taux ouverture", open_rate, f"{read_count} lus / {sent_count} envoyés"),
-        _stat_card("Revenu total", rev_display, sub="Prix depuis admin", color="#2ecc71"),
-        _stat_card("Coût acq. moyen", avg_cost),
-    ])
-
-    # Revenue by offer bars (offres actives depuis la DB)
-    rev_bars = ""
-    max_rev = max(revenue_by_offer.values(), default=1)
-    if offers:
-        for o in offers:
-            rev = revenue_by_offer.get(o.name, 0)
-            nb  = clients_by_offer.get(o.name, 0)
-            price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price:.2f}€"
-            rev_bars += _bar(f"{o.name} ({price_display} — {nb} clients)", int(rev), int(max_rev), "#e94560")
-    if not rev_bars:
-        rev_bars = '<p style="color:#555;font-size:12px">Aucune offre configurée — <a href="/api/admin/offers" style="color:#e94560">Créer des offres</a></p>'
-
-    # Clients by city bars
+    # Par ville
+    by_city = Counter(p.city for p in prospects if p.city)
+    max_city = max(by_city.values(), default=1)
     city_bars = "".join(
-        _bar(city, count, max_city, "#2ecc71")
-        for city, count in sorted(city_counter.items(), key=lambda x: -x[1])[:10]
-    ) or '<p style="color:#555;font-size:12px">Aucun client encore</p>'
+        _bar(city, count, max_city, "#e9a020")
+        for city, count in sorted(by_city.items(), key=lambda x: -x[1])[:15]
+    ) or '<p style="color:#555;font-size:12px">Aucune donnée</p>'
 
-    # All contacts by city
-    all_city_bars = "".join(
-        _bar(city, count, max_all_city, "#e9a020")
-        for city, count in sorted(all_city.items(), key=lambda x: -x[1])[:10]
-    ) or '<p style="color:#555;font-size:12px">Aucun contact encore</p>'
+    # Contactés par ville
+    contacted_city = Counter(p.city for p in prospects if p.contacted and p.city)
+    max_cc = max(contacted_city.values(), default=1)
+    cc_bars = "".join(
+        _bar(city, count, max_cc, "#2ecc71")
+        for city, count in sorted(contacted_city.items(), key=lambda x: -x[1])[:10]
+    ) or '<p style="color:#555;font-size:12px">Aucun envoi encore</p>'
+
+    # Méthode d'envoi
+    methods = Counter(p.sent_method for p in prospects if p.contacted and p.sent_method)
+    max_m = max(methods.values(), default=1)
+    method_bars = "".join(
+        _bar(m, n, max_m, "#e94560")
+        for m, n in sorted(methods.items(), key=lambda x: -x[1])
+    ) or '<p style="color:#555;font-size:12px">Aucun envoi encore</p>'
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Analytics — PRESENCE_IA Admin</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
-h2{{color:#fff;font-size:15px;margin:0 0 16px}}</style></head><body>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+h2{{color:#fff;font-size:15px;margin:0 0 16px}}
+.section-label{{color:#9ca3af;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 12px}}
+.grid-4{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:32px}}
+.grid-3{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}}
+.panel{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px}}
+@media(max-width:700px){{.grid-3{{grid-template-columns:1fr}}}}
+</style></head><body>
 {admin_nav(token, "analytics")}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
 
 <h1 style="color:#fff;font-size:18px;margin-bottom:24px">📊 Analytics</h1>
 
-<h3 style="color:#9ca3af;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Pipeline IA</h3>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:32px">
-{pipeline_cards}
-</div>
-<h3 style="color:#9ca3af;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">CRM</h3>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:32px">
-{kpis}
+<p class="section-label">Funnel prospects V3</p>
+<div class="grid-4">{funnel}</div>
+
+<div class="grid-3">
+  <div class="panel"><h2>🎯 Par métier</h2>{pro_bars}</div>
+  <div class="panel"><h2>🏙 Par ville (total)</h2>{city_bars}</div>
+  <div class="panel">
+    <div style="margin-bottom:24px"><h2>✉️ Landings envoyées / ville</h2>{cc_bars}</div>
+    <h2>📡 Canal d'envoi</h2>{method_bars}
+  </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px">
-
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px">
-<h2>💶 Revenu par offre</h2>
-{rev_bars}
-</div>
-
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px">
-<h2>🏙 Clients par ville</h2>
-{city_bars}
-</div>
-
-</div>
-
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin-bottom:32px">
-<h2>📍 Contacts par ville (tous statuts)</h2>
-<div style="columns:2;gap:24px">
-{all_city_bars}
-</div>
-</div>
-
-</div>
-</body></html>""")
+</div></body></html>""")
