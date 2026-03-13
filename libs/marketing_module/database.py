@@ -15,7 +15,7 @@ from .models import (
     CloserApplicationDB, CloserDB, CommissionDB, CommissionStatus, ComplianceRuleDB,
     ContactDB, DeliveryStatus, MeetingDB, MeetingStatus, ProspectDeliveryDB,
     ProspectJourneyDB, ReplyStatus, ReputationStatus, RotationStrategyDB,
-    SendingDomainDB, SendingMailboxDB, SocialAccountDB, SocialPostDB,
+    SendingDomainDB, SendingMailboxDB, SlotDB, SlotStatus, SocialAccountDB, SocialPostDB,
     SocialPostStatus, TaskDB, WarmupStrategyDB, WarmupStatus,
 )
 
@@ -48,6 +48,8 @@ def _migrate_existing_tables():
         ("meetings",            "commission_amount",    "REAL"),
         ("prospect_deliveries", "landing_visited_at",   "DATETIME"),
         ("prospect_deliveries", "calendly_clicked_at",  "DATETIME"),
+        ("slots",               "calendar_event_id",    "TEXT"),
+        ("slots",               "notes",                "TEXT"),
     ]
     with _engine.connect() as conn:
         for table, col, col_type in migrations:
@@ -718,6 +720,149 @@ def db_update_application(db: Session, app_id: str, updates: dict) -> Optional[C
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
+
+# ── Slot ───────────────────────────────────────────────────────────────────────
+
+def db_create_slot(db: Session, data: dict) -> SlotDB:
+    obj = SlotDB(**data)
+    db.add(obj); db.commit(); db.refresh(obj)
+    return obj
+
+def db_get_slot(db: Session, slot_id: str) -> Optional[SlotDB]:
+    return db.query(SlotDB).filter_by(id=slot_id).first()
+
+def db_list_slots(db: Session, project_id: str,
+                  from_dt: Optional[datetime] = None,
+                  to_dt: Optional[datetime] = None,
+                  status: Optional[str] = None) -> list[SlotDB]:
+    q = db.query(SlotDB).filter_by(project_id=project_id)
+    if from_dt:
+        q = q.filter(SlotDB.starts_at >= from_dt)
+    if to_dt:
+        q = q.filter(SlotDB.starts_at <= to_dt)
+    if status:
+        q = q.filter_by(status=status)
+    return q.order_by(SlotDB.starts_at.asc()).all()
+
+def db_update_slot(db: Session, slot_id: str, updates: dict) -> Optional[SlotDB]:
+    obj = db_get_slot(db, slot_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    obj.updated_at = datetime.utcnow()
+    db.commit(); db.refresh(obj)
+    return obj
+
+def db_claim_slot(db: Session, slot_id: str, closer_id: str) -> tuple[bool, str]:
+    """
+    Tente de revendiquer un créneau pour un closer.
+    Règles :
+      - Le créneau doit être 'booked' (prospect inscrit, pas encore pris)
+      - Le closer ne doit pas avoir un autre créneau à ±25 min (anti-consécutif)
+    Retourne (success, message).
+    """
+    slot = db_get_slot(db, slot_id)
+    if not slot:
+        return False, "Créneau introuvable."
+    if slot.status != SlotStatus.booked:
+        return False, "Ce créneau n'est plus disponible."
+
+    # Anti-consécutif : vérifie les créneaux déjà pris par ce closer
+    from datetime import timedelta
+    window = timedelta(minutes=25)
+    conflict = db.query(SlotDB).filter(
+        SlotDB.project_id == slot.project_id,
+        SlotDB.closer_id  == closer_id,
+        SlotDB.status     == SlotStatus.claimed,
+        SlotDB.starts_at  >= slot.starts_at - window,
+        SlotDB.starts_at  <= slot.starts_at + window,
+    ).first()
+    if conflict:
+        return False, "Vous avez déjà un créneau dans cette plage horaire (règle anti-consécutif)."
+
+    slot.closer_id  = closer_id
+    slot.status     = SlotStatus.claimed
+    slot.updated_at = datetime.utcnow()
+    db.commit(); db.refresh(slot)
+    return True, "Créneau réservé avec succès."
+
+def db_delete_slot(db: Session, slot_id: str) -> bool:
+    obj = db_get_slot(db, slot_id)
+    if not obj: return False
+    db.delete(obj); db.commit()
+    return True
+
+def db_sync_slot_from_meeting(db: Session, project_id: str, meeting: MeetingDB):
+    """
+    Crée ou met à jour un slot 'booked' quand un prospect réserve via Calendly.
+    Si un slot existe déjà avec calendar_event_id, on le met à jour.
+    """
+    if not meeting.scheduled_at:
+        return
+    existing = None
+    if meeting.calendly_event_id:
+        existing = db.query(SlotDB).filter_by(
+            project_id=project_id,
+            calendar_event_id=meeting.calendly_event_id,
+        ).first()
+    if existing:
+        existing.status     = SlotStatus.booked
+        existing.meeting_id = meeting.id
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+    else:
+        db_create_slot(db, {
+            "project_id":        project_id,
+            "starts_at":         meeting.scheduled_at,
+            "ends_at":           meeting.scheduled_at + timedelta(minutes=20),
+            "meeting_id":        meeting.id,
+            "status":            SlotStatus.booked,
+            "calendar_event_id": meeting.calendly_event_id,
+        })
+
+
+# ── Leaderboard ────────────────────────────────────────────────────────────────
+
+def db_monthly_leaderboard(db: Session, project_id: str) -> list[dict]:
+    """
+    Classement mensuel des closers par deals signés ce mois-ci.
+    Retourne une liste triée, avec le rang et le bonus éventuel.
+    """
+    from datetime import date
+    today = date.today()
+    month_start = datetime(today.year, today.month, 1)
+
+    closers = db.query(CloserDB).filter_by(project_id=project_id, is_active=True).all()
+    rows = []
+    for c in closers:
+        meetings = db.query(MeetingDB).filter(
+            MeetingDB.project_id == project_id,
+            MeetingDB.closer_id  == c.id,
+            MeetingDB.status     == MeetingStatus.completed,
+            MeetingDB.completed_at >= month_start,
+        ).all()
+        total_signed = len(meetings)
+        total_revenue = sum(m.deal_value or 0 for m in meetings)
+        total_commission = sum(
+            (m.deal_value or 0) * (m.commission_rate or c.commission_rate)
+            for m in meetings
+        )
+        rows.append({
+            "closer_id":      c.id,
+            "name":           c.name,
+            "signed":         total_signed,
+            "revenue":        total_revenue,
+            "commission":     total_commission,
+            "base_rate":      c.commission_rate,
+        })
+
+    rows.sort(key=lambda x: x["signed"], reverse=True)
+    for i, row in enumerate(rows):
+        row["rank"]  = i + 1
+        row["bonus"] = i < 2 and row["signed"] > 0  # top 2 avec au moins 1 deal
+        row["effective_rate"] = row["base_rate"] + (0.05 if row["bonus"] else 0)
+    return rows
+
 
 def db_closer_stats(db: Session, project_id: str, closer_id: str) -> dict:
     meetings    = db.list_meetings(project_id=project_id, closer_id=closer_id) if False else \

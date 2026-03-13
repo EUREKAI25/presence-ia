@@ -142,6 +142,13 @@ class TaskStatus(str, Enum):
     done       = "done"
     cancelled  = "cancelled"
 
+class SlotStatus(str, Enum):
+    available = "available"   # créneau libre, aucun prospect
+    booked    = "booked"      # prospect a réservé, aucun closer n'a pris
+    claimed   = "claimed"     # un closer a pris ce créneau
+    completed = "completed"   # RDV effectué
+    cancelled = "cancelled"   # annulé
+
 class JourneyStage(str, Enum):
     contacted        = "contacted"
     opened           = "opened"
@@ -513,6 +520,23 @@ class ProspectJourneyDB(Base):
     meta                = Column(JSON, default=dict)
     created_at          = Column(DateTime, default=_now)
     updated_at          = Column(DateTime, default=_now, onupdate=_now)
+
+
+class SlotDB(Base):
+    """Créneau de 20 min proposé aux closers."""
+    __tablename__ = "slots"
+    id                = Column(String, primary_key=True, default=_uid)
+    project_id        = Column(String, nullable=False, index=True)
+    starts_at         = Column(DateTime, nullable=False, index=True)
+    ends_at           = Column(DateTime, nullable=False)
+    closer_id         = Column(String, ForeignKey("closers.id"), nullable=True)
+    meeting_id        = Column(String, ForeignKey("meetings.id"), nullable=True)
+    status            = Column(String, default=SlotStatus.available)
+    calendar_event_id = Column(String, nullable=True)
+    notes             = Column(Text, nullable=True)
+    created_at        = Column(DateTime, default=_now)
+    updated_at        = Column(DateTime, default=_now, onupdate=_now)
+    closer            = relationship("CloserDB", foreign_keys=[closer_id])
 
 
 class CloserApplicationDB(Base):

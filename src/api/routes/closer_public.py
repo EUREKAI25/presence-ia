@@ -412,6 +412,188 @@ _DEMO_MEETINGS = [
 ]
 
 
+_DEMO_SLOTS = [
+    {"id": "slot-1", "starts": "2026-03-14 09:00", "ends": "2026-03-14 09:20", "status": "booked",
+     "prospect": "Jean-Marc Fabre", "city": "Lyon", "profession": "Plombier"},
+    {"id": "slot-2", "starts": "2026-03-14 09:20", "ends": "2026-03-14 09:40", "status": "claimed_other",
+     "closer": "Kévin R."},
+    {"id": "slot-3", "starts": "2026-03-14 10:00", "ends": "2026-03-14 10:20", "status": "booked",
+     "prospect": "Sophie Renard", "city": "Bordeaux", "profession": "Coiffeuse"},
+    {"id": "slot-4", "starts": "2026-03-14 10:20", "ends": "2026-03-14 10:40", "status": "available"},
+    {"id": "slot-5", "starts": "2026-03-14 11:00", "ends": "2026-03-14 11:20", "status": "claimed_me",
+     "prospect": "Henri Dumont", "city": "Paris", "profession": "Électricien"},
+    {"id": "slot-6", "starts": "2026-03-14 14:00", "ends": "2026-03-14 14:20", "status": "booked",
+     "prospect": "Martine Colas", "city": "Nice", "profession": "Esthéticienne"},
+    {"id": "slot-7", "starts": "2026-03-14 14:20", "ends": "2026-03-14 14:40", "status": "available"},
+    {"id": "slot-8", "starts": "2026-03-15 09:00", "ends": "2026-03-15 09:20", "status": "booked",
+     "prospect": "Pierre Lemaire", "city": "Marseille", "profession": "Carreleur"},
+    {"id": "slot-9", "starts": "2026-03-15 10:00", "ends": "2026-03-15 10:20", "status": "available"},
+]
+
+_DEMO_LEADERBOARD = [
+    {"rank": 1, "name": "Kévin R.",    "signed": 4, "commission": 357.84, "bonus": True,  "rate": 23},
+    {"rank": 2, "name": "Marie Martin","signed": 3, "commission": 268.38, "bonus": True,  "rate": 23},
+    {"rank": 3, "name": "David L.",    "signed": 1, "commission": 89.46,  "bonus": False, "rate": 18},
+]
+
+
+@router.get("/closer/demo/slots", response_class=HTMLResponse)
+def closer_demo_slots(request: Request):
+    """Page de sélection de créneaux — aperçu démo."""
+    leaderboard_rows = ""
+    for r in _DEMO_LEADERBOARD:
+        is_me = r["name"] == "Marie Martin"
+        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
+                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5% bonus</span>'
+                       ) if r["bonus"] else ""
+        leaderboard_rows += (
+            f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
+            f'border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};'
+            f'font-size:13px;font-weight:{"700" if is_me else "400"}">'
+            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
+            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
+            f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]} deals</td>'
+            f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
+            f'{r["commission"]:.0f}€ — {r["rate"]}%</td>'
+            f'</tr>'
+        )
+
+    # Grouper créneaux par jour
+    from datetime import datetime as _dt
+    days: dict = {}
+    for s in _DEMO_SLOTS:
+        day = _dt.strptime(s["starts"], "%Y-%m-%d %H:%M").strftime("%A %d/%m")
+        days.setdefault(day, []).append(s)
+
+    STATUS_INFO = {
+        "available":    ("#2ecc71", "Disponible", False),
+        "booked":       ("#8b5cf6", "Prospect inscrit", True),
+        "claimed_me":   ("#6366f1", "Pris par moi", False),
+        "claimed_other":("#374151", "Pris par un autre", False),
+    }
+
+    days_html = ""
+    for day, slots in days.items():
+        slots_html = ""
+        for s in slots:
+            color, label, can_claim = STATUS_INFO.get(s["status"], ("#555", s["status"], False))
+            starts_fmt = s["starts"].split(" ")[1]
+            ends_fmt   = s["ends"].split(" ")[1]
+            prospect_info = ""
+            if s.get("prospect"):
+                prospect_info = (
+                    f'<div style="color:#9ca3af;font-size:11px;margin-top:2px">'
+                    f'{s["prospect"]} · {s.get("city","")} · {s.get("profession","")}</div>'
+                )
+            elif s.get("closer"):
+                prospect_info = f'<div style="color:#555;font-size:11px;margin-top:2px">Closer : {s["closer"]}</div>'
+
+            claim_btn = (
+                f'<button onclick="claimSlot(\'{s["id"]}\')" '
+                f'style="margin-top:8px;padding:5px 12px;background:#8b5cf6;border:none;'
+                f'border-radius:4px;color:#fff;font-size:11px;font-weight:600;cursor:pointer">Prendre ce créneau</button>'
+            ) if can_claim else ""
+
+            slots_html += (
+                f'<div style="background:#1a1a2e;border:1px solid {color}40;border-radius:8px;'
+                f'padding:12px 16px;margin-bottom:8px">'
+                f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+                f'  <div>'
+                f'    <span style="color:#fff;font-weight:600;font-size:13px">{starts_fmt} – {ends_fmt}</span>'
+                f'    {prospect_info}'
+                f'    {claim_btn}'
+                f'  </div>'
+                f'  <span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
+                f'  padding:2px 7px;border-radius:10px;flex-shrink:0">{label}</span>'
+                f'</div>'
+                f'</div>'
+            )
+        days_html += (
+            f'<div style="margin-bottom:24px">'
+            f'<h3 style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;'
+            f'letter-spacing:.08em;margin-bottom:12px">{day}</h3>'
+            f'{slots_html}</div>'
+        )
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Créneaux disponibles — Aperçu</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
+</head><body>
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
+            display:flex;align-items:center;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+  </div>
+  <a href="/closer/demo" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
+</div>
+<div style="max-width:820px;margin:0 auto;padding:28px 20px">
+
+<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;
+  padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+  ⚠️ Aperçu admin — données fictives.
+</div>
+
+<!-- Légende -->
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+  <div style="display:flex;align-items:center;gap:6px">
+    <span style="width:10px;height:10px;background:#2ecc71;border-radius:50%;display:inline-block"></span>
+    <span style="color:#9ca3af;font-size:11px">Disponible</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <span style="width:10px;height:10px;background:#8b5cf6;border-radius:50%;display:inline-block"></span>
+    <span style="color:#9ca3af;font-size:11px">Prospect inscrit</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <span style="width:10px;height:10px;background:#6366f1;border-radius:50%;display:inline-block"></span>
+    <span style="color:#9ca3af;font-size:11px">Pris par moi</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <span style="width:10px;height:10px;background:#374151;border-radius:50%;display:inline-block"></span>
+    <span style="color:#9ca3af;font-size:11px">Pris par un autre</span>
+  </div>
+</div>
+
+<!-- Créneaux -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px">
+  <div>
+    <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Créneaux disponibles</h2>
+    {days_html}
+  </div>
+  <div>
+    <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Classement du mois</h2>
+    <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:12px">
+    <table style="width:100%;border-collapse:collapse">
+    <thead><tr>
+      <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;
+          letter-spacing:.08em;border-bottom:1px solid #2a2a4e"></th>
+      <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;
+          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Closer</th>
+      <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;
+          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Ce mois</th>
+      <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;
+          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Commissions</th>
+    </tr></thead>
+    <tbody>{leaderboard_rows}</tbody>
+    </table></div>
+    <p style="color:#555;font-size:11px;line-height:1.5">
+      Les 2 premiers closers du mois reçoivent un bonus de +5% sur toutes leurs commissions du mois.
+    </p>
+  </div>
+</div>
+
+</div>
+<script>
+function claimSlot(id){{
+  alert('Démo uniquement — sur la vraie page, ce créneau serait réservé à votre nom.\\n\\nRègle anti-consécutif : impossible de prendre deux créneaux d\\'affilée.');
+}}
+</script>
+</body></html>""")
+
+
 @router.get("/closer/demo", response_class=HTMLResponse)
 def closer_portal_demo(request: Request):
     """Portail closer — aperçu avec données de démonstration."""
@@ -547,7 +729,47 @@ def closer_portal_demo(request: Request):
     panel_script     = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
     panel_objections = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
 
-    TABS = [("rdv","Mes RDV"),("commissions","Commissions"),("offre","L'offre"),("script","Script"),("objections","Objections")]
+    # Leaderboard démo
+    leaderboard_rows_demo = ""
+    for r in _DEMO_LEADERBOARD:
+        is_me = r["name"] == "Marie Martin"
+        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
+                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
+                       ) if r["bonus"] else ""
+        leaderboard_rows_demo += (
+            f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
+            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
+            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
+            f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
+            f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
+            f'{r["commission"]:.0f}€ — {r["rate"]}%</td>'
+            f'</tr>'
+        )
+
+    panel_leaderboard_demo = f"""
+<div style="margin-bottom:16px">
+  <a href="/closer/demo/slots" style="display:inline-block;background:#8b5cf6;color:#fff;
+    text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
+    Choisir mes créneaux →</a>
+</div>
+<h3 style="color:#fff;font-size:14px;margin-bottom:16px">Classement ce mois-ci</h3>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:16px">
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e"></th>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Closer</th>
+  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Deals</th>
+  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Commissions</th>
+</tr></thead>
+<tbody>{leaderboard_rows_demo}</tbody>
+</table></div>
+<p style="color:#555;font-size:12px;line-height:1.5">
+  Les 2 premiers closers du mois reçoivent +5% de commission sur tous leurs deals du mois en cours.
+</p>"""
+
+    TABS = [("rdv","Mes RDV"),("commissions","Commissions"),("offre","L'offre"),("script","Script"),("objections","Objections"),("classement","Classement")]
 
     def _tab_btn(slug, label, active="rdv"):
         a = slug == active
@@ -559,7 +781,8 @@ def closer_portal_demo(request: Request):
     tabs_html = f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">{"".join(_tab_btn(s,l) for s,l in TABS)}</div>'
 
     panels = {"rdv": panel_rdv, "commissions": panel_commissions,
-              "offre": panel_offre, "script": panel_script, "objections": panel_objections}
+              "offre": panel_offre, "script": panel_script, "objections": panel_objections,
+              "classement": panel_leaderboard_demo}
     panels_js = {k: v.replace("`","\\`").replace("${","\\${") for k,v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
@@ -913,9 +1136,60 @@ def closer_portal(token: str, request: Request):
         for line in content.get("commission_info", "").split("\n") if line.strip()
     )
 
+    # ── Leaderboard réel ──────────────────────────────────────────────────────
+    leaderboard_rows_real = ""
+    my_rank = "—"
+    try:
+        from marketing_module.database import SessionLocal as MktSession2, db_monthly_leaderboard
+        with MktSession2() as mdb2:
+            lb = db_monthly_leaderboard(mdb2, PROJECT_ID)
+        for r in lb:
+            is_me = closer and r["closer_id"] == closer.id
+            if is_me:
+                my_rank = str(r["rank"])
+            bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
+                           'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
+                           ) if r["bonus"] else ""
+            leaderboard_rows_real += (
+                f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
+                f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
+                f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+                f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
+                f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
+                f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
+                f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
+                f'{r["commission"]:.0f}€ — {r["effective_rate"]*100:.0f}%</td>'
+                f'</tr>'
+            )
+    except Exception:
+        leaderboard_rows_real = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#555">Données non disponibles</td></tr>'
+
+    panel_leaderboard = f"""
+<div style="margin-bottom:16px">
+  <a href="/closer/{token}/slots" style="display:inline-block;background:#8b5cf6;color:#fff;
+    text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
+    Choisir mes créneaux →</a>
+  {'<span style="margin-left:12px;color:#a5b4fc;font-size:12px">Votre rang : #' + my_rank + '</span>' if my_rank != "—" else ""}
+</div>
+<h3 style="color:#fff;font-size:14px;margin-bottom:16px">Classement ce mois-ci</h3>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:16px">
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e"></th>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Closer</th>
+  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Deals</th>
+  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Commissions</th>
+</tr></thead>
+<tbody>{"".join(leaderboard_rows_real) if leaderboard_rows_real else '<tr><td colspan="4" style="padding:20px;text-align:center;color:#555">Aucun classement ce mois</td></tr>'}</tbody>
+</table></div>
+<p style="color:#555;font-size:12px;line-height:1.5">
+  Les 2 premiers closers du mois reçoivent +5% de commission sur tous leurs deals du mois en cours.
+</p>"""
+
     # ── Onglets ───────────────────────────────────────────────────────────────
     TABS = [("rdv", "Mes RDV"), ("commissions", "Commissions"),
-            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections")]
+            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections"),
+            ("classement", "Classement")]
 
     def _tab_btn(slug, label):
         active = slug == tab
@@ -992,6 +1266,7 @@ def closer_portal(token: str, request: Request):
         "offre":       panel_offre,
         "script":      panel_script,
         "objections":  panel_objections,
+        "classement":  panel_leaderboard,
     }
     panels_js = {k: v.replace("`", "\\`").replace("${", "\\${") for k, v in panels.items()}
 
@@ -1026,7 +1301,7 @@ tr:hover{{background:#111127}}
 
 <!-- Contenu de l'onglet actif -->
 <div id="tab-content">
-  {"".join(panels[tab] if k==tab else "" for k in panels)}
+  {panels.get(tab, panels["rdv"])}
 </div>
 
 </div>
@@ -1037,6 +1312,7 @@ const _panels = {{
   offre: `{panels_js["offre"]}`,
   script: `{panels_js["script"]}`,
   objections: `{panels_js["objections"]}`,
+  classement: `{panels_js["classement"]}`,
 }};
 function switchTab(slug) {{
   document.getElementById('tab-content').innerHTML = _panels[slug] || '';
@@ -1204,3 +1480,245 @@ body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 </div>
 
 </div></body></html>""")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page créneaux du closer
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/closer/{token}/slots", response_class=HTMLResponse)
+def closer_slots(token: str, request: Request):
+    """Page de sélection des créneaux disponibles pour un closer."""
+    closer = _get_closer_by_token(token)
+    if not closer:
+        return HTMLResponse("<p style='font-family:sans-serif;padding:40px;color:#666'>Lien invalide.</p>",
+                            status_code=404)
+
+    import datetime as _dt
+    now  = _dt.datetime.utcnow()
+    week = now + _dt.timedelta(days=14)
+
+    slots  = []
+    lb     = []
+    my_rank = "—"
+    try:
+        from marketing_module.database import (SessionLocal as MktSession,
+                                               db_list_slots, db_monthly_leaderboard)
+        from marketing_module.models import SlotStatus, MeetingDB
+        from ...database import SessionLocal
+        from ...models import V3ProspectDB
+
+        with MktSession() as mdb:
+            slots = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=week)
+            lb    = db_monthly_leaderboard(mdb, PROJECT_ID)
+
+            # Enrichir les slots avec les infos prospect
+            slot_data = []
+            for s in slots:
+                prospect_info = ""
+                if s.meeting_id:
+                    mtg = mdb.query(MeetingDB).filter_by(id=s.meeting_id).first()
+                    if mtg:
+                        with SessionLocal() as db:
+                            p = db.query(V3ProspectDB).filter_by(token=mtg.prospect_id).first()
+                        if p:
+                            prospect_info = f"{p.name} · {p.city} · {p.profession}"
+                slot_data.append({
+                    "id":            s.id,
+                    "starts_at":     s.starts_at,
+                    "ends_at":       s.ends_at,
+                    "status":        s.status,
+                    "closer_id":     s.closer_id,
+                    "prospect_info": prospect_info,
+                })
+    except Exception:
+        slot_data = []
+
+    for r in lb:
+        if r["closer_id"] == closer.id:
+            my_rank = str(r["rank"])
+            break
+
+    # Grouper par jour
+    days: dict = {}
+    for s in slot_data:
+        day = s["starts_at"].strftime("%A %d/%m")
+        days.setdefault(day, []).append(s)
+
+    STATUS_INFO = {
+        "available": ("#2ecc71", "Disponible", False),
+        "booked":    ("#8b5cf6", "Prospect inscrit — à prendre", True),
+        "claimed":   ("#6366f1", "Pris par moi", False),
+        "completed": ("#9ca3af", "Terminé", False),
+        "cancelled": ("#374151", "Annulé", False),
+    }
+
+    days_html = ""
+    for day, day_slots in days.items():
+        slots_html = ""
+        for s in day_slots:
+            # Si claimed par quelqu'un d'autre
+            if s["status"] == "claimed" and s["closer_id"] != closer.id:
+                color, label, can_claim = "#374151", "Pris", False
+            else:
+                color, label, can_claim = STATUS_INFO.get(s["status"], ("#555", s["status"], False))
+                if s["status"] == "claimed" and s["closer_id"] == closer.id:
+                    color, label = "#6366f1", "Pris par moi"
+
+            starts_fmt = s["starts_at"].strftime("%H:%M")
+            ends_fmt   = s["ends_at"].strftime("%H:%M")
+
+            prospect_div = (
+                f'<div style="color:#9ca3af;font-size:11px;margin-top:2px">{s["prospect_info"]}</div>'
+            ) if s["prospect_info"] else ""
+
+            claim_btn = (
+                f'<button onclick="claimSlot(\'{s["id"]}\')" '
+                f'style="margin-top:8px;padding:5px 12px;background:#8b5cf6;border:none;'
+                f'border-radius:4px;color:#fff;font-size:11px;font-weight:600;cursor:pointer">'
+                f'Prendre ce créneau</button>'
+            ) if can_claim else ""
+
+            slots_html += (
+                f'<div id="slot-{s["id"]}" style="background:#1a1a2e;border:1px solid {color}40;'
+                f'border-radius:8px;padding:12px 16px;margin-bottom:8px">'
+                f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+                f'  <div>'
+                f'    <span style="color:#fff;font-weight:600;font-size:13px">{starts_fmt} – {ends_fmt}</span>'
+                f'    {prospect_div}'
+                f'    {claim_btn}'
+                f'  </div>'
+                f'  <span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
+                f'  padding:2px 7px;border-radius:10px;flex-shrink:0">{label}</span>'
+                f'</div></div>'
+            )
+        days_html += (
+            f'<div style="margin-bottom:24px">'
+            f'<h3 style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;'
+            f'letter-spacing:.08em;margin-bottom:12px">{day}</h3>'
+            f'{slots_html or "<p style=\'color:#555;font-size:12px\'>Aucun créneau ce jour</p>"}'
+            f'</div>'
+        )
+
+    if not days_html:
+        days_html = '<p style="color:#555;font-size:13px;padding:20px 0">Aucun créneau disponible pour les 14 prochains jours.</p>'
+
+    # Leaderboard sidebar
+    lb_rows = ""
+    for r in lb:
+        is_me = r["closer_id"] == closer.id
+        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
+                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
+                       ) if r["bonus"] else ""
+        lb_rows += (
+            f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:8px 12px;font-size:12px;color:#9ca3af">'
+            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:#fff;font-weight:{"700" if is_me else "400"}">'
+            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:#2ecc71;text-align:right">{r["signed"]}</td>'
+            f'</tr>'
+        )
+    if not lb_rows:
+        lb_rows = '<tr><td colspan="3" style="padding:16px;text-align:center;color:#555">Aucune donnée</td></tr>'
+
+    name = closer.name
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Créneaux — {name}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+table{{width:100%;border-collapse:collapse}}
+#toast{{position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#0f0f1a;
+  padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
+  opacity:0;transition:opacity .3s;pointer-events:none}}
+</style></head><body>
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
+            display:flex;align-items:center;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="color:#fff;font-size:13px;font-weight:600">{name}</span>
+    <a href="/closer/{token}?tab=classement" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
+  </div>
+</div>
+
+<div style="max-width:900px;margin:0 auto;padding:28px 20px">
+
+<!-- Légende -->
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#2ecc71;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Disponible</span></div>
+  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#8b5cf6;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Prospect inscrit</span></div>
+  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#6366f1;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par moi</span></div>
+  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#374151;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par un autre</span></div>
+</div>
+<p style="color:#555;font-size:11px;margin-bottom:24px">
+  ⚠️ Vous ne pouvez pas prendre deux créneaux consécutifs (règle anti-consécutif : 25 min minimum entre vos créneaux).
+</p>
+
+<div style="display:grid;grid-template-columns:1fr minmax(240px,320px);gap:28px">
+<div>
+  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Créneaux — 14 prochains jours</h2>
+  {days_html}
+</div>
+<div>
+  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Classement du mois</h2>
+  {'<div style="background:#6366f120;border:1px solid #6366f140;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#a5b4fc">Votre rang : #' + my_rank + '</div>' if my_rank != "—" else ""}
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:12px">
+  <table style="border-collapse:collapse">
+  <tbody>{lb_rows}</tbody>
+  </table></div>
+  <p style="color:#555;font-size:11px;line-height:1.5">Les 2 premiers reçoivent +5% de commission ce mois.</p>
+</div>
+</div>
+
+</div>
+<div id="toast"></div>
+<script>
+function toast(m, err){{
+  const t=document.getElementById('toast');
+  t.textContent=m;t.style.background=err?'#e94560':'#2ecc71';
+  t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
+}}
+async function claimSlot(slotId){{
+  const btn=event.target;
+  btn.textContent='En cours…';btn.disabled=true;
+  const r=await fetch('/closer/{token}/slots/'+slotId+'/claim',{{method:'POST'}});
+  const d=await r.json();
+  if(d.ok){{
+    toast('Créneau réservé ✓');
+    // Mettre à jour le slot visuellement
+    const el=document.getElementById('slot-'+slotId);
+    if(el){{
+      el.style.borderColor='#6366f140';
+      el.querySelector('span[style*="border-radius:10px"]').textContent='Pris par moi';
+      btn.remove();
+    }}
+  }} else {{
+    btn.textContent='Prendre ce créneau';btn.disabled=false;
+    toast(d.error||'Erreur',true);
+  }}
+}}
+</script>
+</body></html>""")
+
+
+@router.post("/closer/{token}/slots/{slot_id}/claim")
+async def closer_claim_slot(token: str, slot_id: str):
+    """Un closer revendique un créneau."""
+    closer = _get_closer_by_token(token)
+    if not closer:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Lien invalide")
+
+    try:
+        from marketing_module.database import SessionLocal as MktSession, db_claim_slot
+        with MktSession() as mdb:
+            ok, message = db_claim_slot(mdb, slot_id, closer.id)
+        return JSONResponse({"ok": ok, "message": message, "error": None if ok else message})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)

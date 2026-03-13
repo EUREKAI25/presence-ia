@@ -1067,3 +1067,312 @@ async def save_closer_content_route(request: Request):
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin — Créneaux RDV
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _gcal_sync(project_id: str) -> tuple[int, str]:
+    """
+    Synchronise les créneaux depuis Google Calendar.
+    Crée un SlotDB de 20 min par event trouvé sur les 14 prochains jours.
+    Variables d'env requises :
+      GOOGLE_CALENDAR_ID           ex: nathalie@presence-ia.com
+      GOOGLE_SERVICE_ACCOUNT_JSON  chemin vers le fichier JSON du compte de service
+    Retourne (nb créneaux créés/mis à jour, message).
+    """
+    import datetime as _dt
+    cal_id  = os.getenv("GOOGLE_CALENDAR_ID", "")
+    sa_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    if not cal_id or not sa_file:
+        return 0, "Variables GOOGLE_CALENDAR_ID ou GOOGLE_SERVICE_ACCOUNT_JSON non configurées."
+
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        creds   = service_account.Credentials.from_service_account_file(
+            sa_file, scopes=["https://www.googleapis.com/auth/calendar.readonly"]
+        )
+        service = build("calendar", "v3", credentials=creds)
+
+        now       = _dt.datetime.utcnow()
+        time_min  = now.isoformat() + "Z"
+        time_max  = (now + _dt.timedelta(days=14)).isoformat() + "Z"
+
+        result = service.events().list(
+            calendarId=cal_id,
+            timeMin=time_min, timeMax=time_max,
+            singleEvents=True, orderBy="startTime",
+            maxResults=500,
+        ).execute()
+        events = result.get("items", [])
+    except Exception as e:
+        return 0, f"Erreur Google Calendar : {e}"
+
+    from marketing_module.database import SessionLocal as MktSession, db_create_slot, db_get_slot
+    from marketing_module.models import SlotDB, SlotStatus
+
+    created = 0
+    with MktSession() as mdb:
+        for ev in events:
+            start_raw = ev.get("start", {}).get("dateTime")
+            if not start_raw:
+                continue
+            try:
+                import datetime as _dt2
+                starts_at = _dt2.datetime.fromisoformat(start_raw.replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                continue
+
+            event_id = ev.get("id", "")
+
+            # Découper en tranches de 20 min si l'event est plus long
+            end_raw = ev.get("end", {}).get("dateTime", start_raw)
+            try:
+                ends_ev = _dt2.datetime.fromisoformat(end_raw.replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                ends_ev = starts_at + _dt2.timedelta(minutes=20)
+
+            slot_start = starts_at
+            slice_idx  = 0
+            while slot_start < ends_ev:
+                slot_end = slot_start + _dt2.timedelta(minutes=20)
+                slice_id = f"{event_id}-{slice_idx}"
+
+                existing = mdb.query(SlotDB).filter_by(
+                    project_id=project_id, calendar_event_id=slice_id
+                ).first()
+                if not existing:
+                    db_create_slot(mdb, {
+                        "project_id":        project_id,
+                        "starts_at":         slot_start,
+                        "ends_at":           slot_end,
+                        "status":            SlotStatus.available,
+                        "calendar_event_id": slice_id,
+                        "notes":             ev.get("summary", ""),
+                    })
+                    created += 1
+                slot_start = slot_end
+                slice_idx  += 1
+
+    return created, f"{created} créneau(x) importé(s) depuis Google Calendar."
+
+
+@router.get("/admin/crm/slots", response_class=HTMLResponse)
+def admin_slots(request: Request):
+    token = _check_token(request)
+    import datetime as _dt
+
+    from marketing_module.database import SessionLocal as MktSession, db_list_slots, db_list_closers
+    from marketing_module.models import SlotStatus
+
+    PROJECT_ID = "presence-ia"
+    now  = _dt.datetime.utcnow()
+    week = now + _dt.timedelta(days=14)
+
+    slots   = []
+    closers = {}
+    try:
+        with MktSession() as mdb:
+            slots   = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=week)
+            for c in db_list_closers(mdb, PROJECT_ID, active_only=False):
+                closers[c.id] = c.name
+    except Exception:
+        pass
+
+    STATUS_COLORS = {
+        "available": ("#2ecc71", "Disponible"),
+        "booked":    ("#8b5cf6", "Réservé"),
+        "claimed":   ("#6366f1", "Pris"),
+        "completed": ("#9ca3af", "Terminé"),
+        "cancelled": ("#e94560", "Annulé"),
+    }
+
+    rows = ""
+    for s in slots:
+        color, label = STATUS_COLORS.get(s.status, ("#555", s.status))
+        closer_name = closers.get(s.closer_id, "—") if s.closer_id else "—"
+        rows += (
+            f'<tr style="border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:8px 12px;color:#fff;font-size:12px">{s.starts_at.strftime("%d/%m %H:%M")}</td>'
+            f'<td style="padding:8px 12px;color:#9ca3af;font-size:12px">{s.ends_at.strftime("%H:%M")}</td>'
+            f'<td style="padding:8px 12px"><span style="background:{color}20;color:{color};'
+            f'font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px">{label}</span></td>'
+            f'<td style="padding:8px 12px;color:#9ca3af;font-size:12px">{closer_name}</td>'
+            f'<td style="padding:8px 12px;color:#555;font-size:11px">{s.notes or ""}</td>'
+            f'<td style="padding:8px 12px">'
+            f'<button onclick="deleteSlot(\'{s.id}\')" '
+            f'style="background:#e9456020;color:#e94560;border:none;padding:3px 8px;'
+            f'border-radius:4px;font-size:10px;cursor:pointer">Suppr.</button></td>'
+            f'</tr>'
+        )
+
+    if not rows:
+        rows = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Aucun créneau sur les 14 prochains jours</td></tr>'
+
+    gcal_configured = bool(os.getenv("GOOGLE_CALENDAR_ID") and os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
+    gcal_badge = (
+        f'<span style="background:#2ecc7120;color:#2ecc71;font-size:10px;padding:2px 7px;border-radius:10px">Google Calendar configuré</span>'
+        if gcal_configured else
+        f'<span style="background:#e9456020;color:#e94560;font-size:10px;padding:2px 7px;border-radius:10px">Google Calendar non configuré (GOOGLE_CALENDAR_ID + GOOGLE_SERVICE_ACCOUNT_JSON requis)</span>'
+    )
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Créneaux RDV — Admin</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+table{{width:100%;border-collapse:collapse}}
+tr:hover{{background:#111127}}
+input{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:4px;padding:6px 10px;
+       color:#e8e8f0;font-size:12px;outline:none}}
+input:focus{{border-color:#6366f1}}
+</style></head><body>
+{admin_nav(token, "crm/slots")}
+<div style="max-width:900px;margin:0 auto;padding:24px">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+  <h1 style="color:#fff;font-size:18px">Créneaux RDV</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="syncGcal()" style="background:#1a1a2e;border:1px solid #2a2a4e;
+      color:#9ca3af;padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer">
+      ↻ Sync Google Calendar
+    </button>
+    <button onclick="showAddForm()" style="background:#6366f1;border:none;
+      color:#fff;padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer">
+      + Ajouter manuellement
+    </button>
+  </div>
+</div>
+<p style="color:#555;font-size:12px;margin-bottom:8px">14 prochains jours — {len(slots)} créneau(x)</p>
+<div style="margin-bottom:20px">{gcal_badge}</div>
+
+<!-- Formulaire ajout manuel -->
+<div id="add-form" style="display:none;background:#1a1a2e;border:1px solid #2a2a4e;
+  border-radius:8px;padding:16px;margin-bottom:20px">
+  <p style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Nouveau créneau</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div>
+      <label style="color:#6b7280;font-size:10px;display:block;margin-bottom:4px">Date/Heure début</label>
+      <input type="datetime-local" id="new-starts" style="width:180px">
+    </div>
+    <div>
+      <label style="color:#6b7280;font-size:10px;display:block;margin-bottom:4px">Note (optionnel)</label>
+      <input type="text" id="new-notes" placeholder="ex: Créneau dispo" style="width:200px">
+    </div>
+    <button onclick="addSlot()" style="background:#6366f1;border:none;color:#fff;
+      padding:7px 16px;border-radius:6px;font-size:12px;cursor:pointer">Créer</button>
+    <button onclick="document.getElementById('add-form').style.display='none'"
+      style="background:#1a1a2e;border:1px solid #2a2a4e;color:#9ca3af;padding:7px 12px;
+      border-radius:6px;font-size:12px;cursor:pointer">Annuler</button>
+  </div>
+</div>
+
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<table>
+<thead><tr>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Début</th>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Fin</th>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Statut</th>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Closer</th>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Note</th>
+  <th style="padding:8px 12px;border-bottom:1px solid #2a2a4e"></th>
+</tr></thead>
+<tbody id="slots-body">{rows}</tbody>
+</table>
+</div>
+
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#0f0f1a;
+  padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;opacity:0;
+  transition:opacity .3s;pointer-events:none"></div>
+
+</div>
+<script>
+function toast(m,err){{
+  const t=document.getElementById('toast');
+  t.textContent=m;t.style.background=err?'#e94560':'#2ecc71';
+  t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
+}}
+function showAddForm(){{document.getElementById('add-form').style.display='block'}}
+
+async function addSlot(){{
+  const starts=document.getElementById('new-starts').value;
+  const notes=document.getElementById('new-notes').value;
+  if(!starts){{toast('Indiquez une date',true);return}}
+  const r=await fetch('/admin/crm/slots?token={token}',{{
+    method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{starts_at:starts,notes:notes}})
+  }});
+  const d=await r.json();
+  if(d.ok){{toast('Créneau créé ✓');setTimeout(()=>location.reload(),800)}}
+  else toast('Erreur : '+(d.error||'?'),true);
+}}
+
+async function deleteSlot(id){{
+  if(!confirm('Supprimer ce créneau ?'))return;
+  const r=await fetch('/admin/crm/slots/'+id+'?token={token}',{{method:'DELETE'}});
+  const d=await r.json();
+  if(d.ok){{toast('Supprimé ✓');setTimeout(()=>location.reload(),600)}}
+  else toast('Erreur',true);
+}}
+
+async function syncGcal(){{
+  const btn=event.target;btn.textContent='Sync en cours…';btn.disabled=true;
+  const r=await fetch('/admin/crm/slots/sync?token={token}',{{method:'POST'}});
+  const d=await r.json();
+  btn.textContent='↻ Sync Google Calendar';btn.disabled=false;
+  toast(d.message||(d.ok?'Sync OK':'Erreur'),!d.ok);
+  if(d.ok&&d.created>0)setTimeout(()=>location.reload(),1200);
+}}
+</script>
+</body></html>""")
+
+
+@router.post("/admin/crm/slots", response_class=JSONResponse)
+async def admin_create_slot(request: Request):
+    token = _check_token(request)
+    import datetime as _dt
+    try:
+        data = await request.json()
+        starts_raw = data.get("starts_at", "")
+        notes = data.get("notes", "") or None
+
+        starts_at = _dt.datetime.fromisoformat(starts_raw)
+        ends_at   = starts_at + _dt.timedelta(minutes=20)
+
+        from marketing_module.database import SessionLocal as MktSession, db_create_slot
+        from marketing_module.models import SlotStatus
+        with MktSession() as mdb:
+            slot = db_create_slot(mdb, {
+                "project_id": "presence-ia",
+                "starts_at":  starts_at,
+                "ends_at":    ends_at,
+                "status":     SlotStatus.available,
+                "notes":      notes,
+            })
+        return JSONResponse({"ok": True, "id": slot.id})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+@router.delete("/admin/crm/slots/{slot_id}", response_class=JSONResponse)
+def admin_delete_slot(slot_id: str, request: Request):
+    _check_token(request)
+    try:
+        from marketing_module.database import SessionLocal as MktSession, db_delete_slot
+        with MktSession() as mdb:
+            ok = db_delete_slot(mdb, slot_id)
+        return JSONResponse({"ok": ok})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
+@router.post("/admin/crm/slots/sync", response_class=JSONResponse)
+def admin_sync_gcal(request: Request):
+    _check_token(request)
+    created, message = _gcal_sync("presence-ia")
+    return JSONResponse({"ok": True, "created": created, "message": message})
