@@ -138,38 +138,40 @@ textarea{resize:vertical;min-height:120px}
     <div class="row">
       <div class="field">
         <label>Prénom *</label>
-        <input type="text" name="first_name" required placeholder="Marie">
+        <input type="text" name="first_name" required placeholder="Prénom">
       </div>
       <div class="field">
         <label>Nom *</label>
-        <input type="text" name="last_name" required placeholder="Dupont">
+        <input type="text" name="last_name" required placeholder="Nom">
       </div>
     </div>
 
     <div class="field">
       <label>Email *</label>
-      <input type="email" name="email" required placeholder="vous@exemple.com">
+      <input type="email" name="email" required placeholder="votre@email.com">
     </div>
 
     <div class="field">
       <label>Téléphone</label>
-      <input type="tel" name="phone" placeholder="+33 6 12 34 56 78">
+      <input type="tel" name="phone" placeholder="Numéro de téléphone">
     </div>
 
     <div class="row">
       <div class="field">
-        <label>Ville</label>
-        <input type="text" name="city" placeholder="Paris">
+        <label>Date de naissance *</label>
+        <input type="date" name="date_of_birth" required>
       </div>
       <div class="field">
-        <label>Pays</label>
-        <input type="text" name="country" value="FR" placeholder="FR">
+        <label>Ville</label>
+        <input type="text" name="city" placeholder="Ville">
       </div>
     </div>
 
-    <div class="field">
-      <label>LinkedIn (optionnel)</label>
-      <input type="url" name="linkedin_url" placeholder="https://linkedin.com/in/...">
+    <div class="row">
+      <div class="field">
+        <label>Pays</label>
+        <input type="text" name="country" placeholder="FR">
+      </div>
     </div>
 
     <div class="section-title">Votre présentation</div>
@@ -179,25 +181,51 @@ textarea{resize:vertical;min-height:120px}
       <textarea name="message" required placeholder="Présentez-vous, votre expérience en vente/closing, pourquoi ce programme vous intéresse..."></textarea>
     </div>
 
-    <div class="field">
-      <label>Lien vidéo de présentation (YouTube, Loom, Drive…)</label>
-      <input type="url" name="video_url" placeholder="https://loom.com/share/...">
+    <div class="field" id="field-video">
+      <label>Lien vidéo de présentation (YouTube, Loom, Drive…) <span id="media-req" style="color:#e94560">*</span></label>
+      <input type="url" name="video_url" id="video_url" placeholder="https://loom.com/share/...">
       <p class="hint">2-3 minutes max. Présentez-vous et expliquez votre motivation.</p>
     </div>
 
     <div class="field">
-      <label>Message audio (optionnel)</label>
-      <input type="file" name="audio_file" accept="audio/*" style="padding:8px">
-      <p class="hint">Fichier audio .mp3 ou .m4a — 5 Mo max</p>
+      <label>Message audio <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(ou à la place de la vidéo)</span></label>
+      <input type="file" name="audio_file" id="audio_file" accept="audio/*" style="padding:8px">
+      <p class="hint">Fichier .mp3 ou .m4a — 5 Mo max</p>
     </div>
+
+    <p id="media-error" style="color:#e94560;font-size:12px;margin-bottom:12px;display:none">
+      Merci de fournir au moins une vidéo ou un message audio.
+    </p>
 
     <button type="submit" class="btn">Envoyer ma candidature →</button>
   </form>
 </div>
 
 <script>
-document.getElementById('form').addEventListener('submit', async function(e) {
+const form = document.getElementById('form');
+const videoInput = document.getElementById('video_url');
+const audioInput = document.getElementById('audio_file');
+
+function updateMediaReq() {
+  const hasVideo = videoInput.value.trim().length > 0;
+  const hasAudio = audioInput.files && audioInput.files.length > 0;
+  const req = document.getElementById('media-req');
+  if (req) req.style.display = (hasVideo || hasAudio) ? 'none' : 'inline';
+}
+videoInput.addEventListener('input', updateMediaReq);
+audioInput.addEventListener('change', updateMediaReq);
+
+form.addEventListener('submit', async function(e) {
   e.preventDefault();
+  const hasVideo = videoInput.value.trim().length > 0;
+  const hasAudio = audioInput.files && audioInput.files.length > 0;
+  const errEl = document.getElementById('media-error');
+  if (!hasVideo && !hasAudio) {
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
   const btn = this.querySelector('.btn');
   btn.textContent = 'Envoi en cours...';
   btn.disabled = true;
@@ -244,18 +272,35 @@ async def closer_recruit_submit(request: Request):
                 (out_dir / fn).write_bytes(content)
                 audio_url = f"/dist/closer-audio/{fn}"
 
+        video_url = form.get("video_url", "").strip() or None
+        if not video_url and not audio_url:
+            return JSONResponse(
+                {"ok": False, "error": "Merci de fournir au moins une vidéo ou un message audio."},
+                status_code=400,
+            )
+
+        # Date de naissance
+        from datetime import date as _date
+        dob_raw = form.get("date_of_birth", "").strip()
+        date_of_birth = None
+        if dob_raw:
+            try:
+                date_of_birth = _date.fromisoformat(dob_raw)
+            except ValueError:
+                pass
+
         data = {
-            "project_id":   PROJECT_ID,
-            "first_name":   form.get("first_name", "").strip() or None,
-            "last_name":    form.get("last_name", "").strip() or None,
-            "email":        form.get("email", "").strip() or None,
-            "phone":        form.get("phone", "").strip() or None,
-            "city":         form.get("city", "").strip() or None,
-            "country":      form.get("country", "FR").strip() or "FR",
-            "linkedin_url": form.get("linkedin_url", "").strip() or None,
-            "message":      form.get("message", "").strip() or None,
-            "video_url":    form.get("video_url", "").strip() or None,
-            "audio_url":    audio_url,
+            "project_id":    PROJECT_ID,
+            "first_name":    form.get("first_name", "").strip() or None,
+            "last_name":     form.get("last_name", "").strip() or None,
+            "email":         form.get("email", "").strip() or None,
+            "phone":         form.get("phone", "").strip() or None,
+            "city":          form.get("city", "").strip() or None,
+            "country":       form.get("country", "FR").strip() or "FR",
+            "message":       form.get("message", "").strip() or None,
+            "video_url":     video_url,
+            "audio_url":     audio_url,
+            "date_of_birth": date_of_birth,
         }
 
         from marketing_module.database import SessionLocal as MktSession, db_create_application
