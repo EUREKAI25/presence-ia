@@ -652,6 +652,7 @@ app.include_router(evidence_routes.router)
 app.include_router(cms.router)
 app.include_router(theme_admin_router)
 app.include_router(v3.router)
+app.include_router(closer_public.router) # AVANT generate/{profession} catch-all
 app.include_router(closing_pack.router)  # AVANT generate/{profession} catch-all
 app.include_router(generate.router)      # catch-all /{profession} — DOIT ÊTRE EN DERNIER
 app.include_router(retest.router)
@@ -662,7 +663,6 @@ app.include_router(templates.router)
 app.include_router(sequences.router)
 app.include_router(mkt.router)
 app.include_router(crm_admin.router)
-app.include_router(closer_public.router)
 
 from .routes.active_models import router as active_models_router
 app.include_router(active_models_router)

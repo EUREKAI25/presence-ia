@@ -31,66 +31,145 @@ def _mkt():
 @router.get("/closer/", response_class=HTMLResponse)
 @router.get("/closer", response_class=HTMLResponse)
 def closer_presentation():
-    """Page de présentation du programme closer (contenu à remplir)."""
+    """Page de présentation du programme closer."""
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Programme Closer — Présence IA</title>
+<title>Devenez Closer — Présence IA</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;min-height:100vh}
-.hero{text-align:center;padding:80px 20px 60px;max-width:800px;margin:0 auto}
-h1{font-size:clamp(2rem,5vw,3rem);color:#fff;margin-bottom:16px;line-height:1.2}
-.sub{color:#9ca3af;font-size:1.1rem;margin-bottom:40px;line-height:1.6}
-.btn{display:inline-block;background:#6366f1;color:#fff;padding:14px 40px;
-     border-radius:8px;text-decoration:none;font-weight:700;font-size:1rem}
-.section{max-width:900px;margin:0 auto;padding:60px 20px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:32px}
-.card{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:24px}
-.card h3{color:#fff;margin-bottom:8px}
-.card p{color:#9ca3af;font-size:0.9rem;line-height:1.5}
-.badge{display:inline-block;background:#6366f120;color:#6366f1;padding:4px 12px;
-       border-radius:20px;font-size:0.85rem;font-weight:600;margin-bottom:20px}
+a{text-decoration:none}
+.btn-primary{display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  color:#fff;padding:15px 44px;border-radius:50px;font-weight:700;font-size:1rem;
+  box-shadow:0 4px 24px #6366f140;transition:transform .15s,box-shadow .15s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px #6366f160}
+.btn-sec{display:inline-block;background:transparent;color:#9ca3af;padding:14px 32px;
+  border-radius:50px;font-weight:600;font-size:.95rem;border:1px solid #2a2a4e;transition:border-color .15s,color .15s}
+.btn-sec:hover{border-color:#6366f1;color:#fff}
 </style>
 </head><body>
 
-<div class="hero">
-  <span class="badge">Opportunité — Closer Présence IA</span>
-  <h1>Devenez Closer<br>Présence IA</h1>
-  <p class="sub">
-    Rejoignez notre équipe de commerciaux indépendants et accompagnez<br>
-    les artisans et PME locales dans leur visibilité sur les IA.
-  </p>
-  <a href="/closer/recruit" class="btn">Postuler maintenant →</a>
-</div>
+<!-- HEADER -->
+<header style="position:sticky;top:0;z-index:100;background:#0f0f1aee;
+  backdrop-filter:blur(12px);border-bottom:1px solid #1a1a2e;padding:0 24px">
+  <div style="max-width:1000px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:32px">
+    <a href="/closer/recruit" class="btn-primary" style="padding:10px 28px;font-size:.9rem">Postuler →</a>
+  </div>
+</header>
 
-<div class="section">
-  <h2 style="color:#fff;text-align:center;margin-bottom:8px">Ce que vous ferez</h2>
-  <p style="color:#9ca3af;text-align:center;margin-bottom:32px">
-    Les rendez-vous sont déjà pris. Votre rôle : convaincre et closer.
-  </p>
-  <div class="cards">
-    <div class="card">
-      <h3>RDV qualifiés fournis</h3>
-      <p>Nous gérons la prospection et la prise de RDV. Vous arrivez avec un prospect chaud prêt à signer.</p>
+<!-- HERO -->
+<section style="padding:80px 20px 60px;text-align:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 0%,#6366f118,transparent);pointer-events:none"></div>
+  <div style="max-width:760px;margin:0 auto;position:relative">
+    <span style="display:inline-block;background:#6366f115;border:1px solid #6366f130;
+      color:#a5b4fc;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+      padding:6px 16px;border-radius:20px;margin-bottom:24px">Opportunité de revenus · 100% télétravail</span>
+    <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
+      font-weight:800;letter-spacing:-.02em">
+      Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
+      -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
+    </h1>
+    <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
+      Les rendez-vous sont déjà pris et qualifiés.<br>
+      Votre seul job : closer. On s'occupe de tout le reste.
+    </p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="/closer/recruit" class="btn-primary">Je postule maintenant →</a>
+      <a href="#comment" class="btn-sec">Comment ça marche</a>
     </div>
-    <div class="card">
-      <h3>Commission attractive</h3>
-      <p>18% sur chaque deal + 5% de bonus sur les deals dépassant l'objectif mensuel.</p>
-    </div>
-    <div class="card">
-      <h3>Scripts &amp; objections</h3>
-      <p>Formation complète fournie : script de vente, réponses aux objections, accès aux outils.</p>
-    </div>
-    <div class="card">
-      <h3>100% télétravail</h3>
-      <p>Les calls se font en visio. Travaillez depuis n'importe où, aux heures qui vous conviennent.</p>
+    <!-- Chiffres -->
+    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-top:52px">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:#a78bfa">18%</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:#2ecc71">~89€</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:#f59e0b">100%</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">à distance</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:#527FB3">0</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">prospection de votre côté</div>
+      </div>
     </div>
   </div>
-</div>
+</section>
 
-<div style="text-align:center;padding:60px 20px">
-  <a href="/closer/recruit" class="btn">Je postule →</a>
-</div>
+<!-- COMMENT ÇA MARCHE -->
+<section id="comment" style="padding:72px 20px;max-width:900px;margin:0 auto">
+  <h2 style="color:#fff;font-size:1.8rem;font-weight:700;text-align:center;margin-bottom:8px">Comment ça marche</h2>
+  <p style="color:#9ca3af;text-align:center;margin-bottom:48px">3 étapes, pas de surprise</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px">
+    <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px;position:relative">
+      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">1</div>
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">On vous envoie un RDV</h3>
+      <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
+        Nous gérons la prospection, les emails, les relances. Vous recevez un RDV avec un prospect qui a déjà montré son intérêt.
+      </p>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
+      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">2</div>
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous closez</h3>
+      <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
+        Vous avez le script, les réponses aux objections, la fiche prospect. Vous faites le call et signez le deal.
+      </p>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
+      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">3</div>
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous êtes payé</h3>
+      <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
+        18% du deal viré le 10 du mois suivant. Pas de plafond. Plus vous signez, plus vous gagnez.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- CE QU'ON FOURNIT -->
+<section style="padding:0 20px 72px;max-width:900px;margin:0 auto">
+  <h2 style="color:#fff;font-size:1.8rem;font-weight:700;text-align:center;margin-bottom:48px">Ce qu'on vous fournit</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+    <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:1.3rem">📋</span>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Script de vente</div>
+      <div style="color:#555;font-size:.85rem">Mot pour mot, testé et validé</div></div>
+    </div>
+    <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:1.3rem">💬</span>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Réponses aux objections</div>
+      <div style="color:#555;font-size:.85rem">Pour chaque blocage courant</div></div>
+    </div>
+    <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:1.3rem">📅</span>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">RDV qualifiés</div>
+      <div style="color:#555;font-size:.85rem">Prospects chauds, déjà sensibilisés</div></div>
+    </div>
+    <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:1.3rem">📊</span>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Portail de suivi</div>
+      <div style="color:#555;font-size:.85rem">Vos RDV, stats et commissions en temps réel</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section style="padding:0 20px 80px">
+  <div style="max-width:620px;margin:0 auto;background:linear-gradient(135deg,#1a1a2e,#16162a);
+    border:1px solid #2a2a4e;border-radius:20px;padding:48px 40px;text-align:center">
+    <h2 style="color:#fff;font-size:1.6rem;font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
+    <p style="color:#9ca3af;margin-bottom:32px;line-height:1.6">
+      Candidature en 2 minutes. Réponse sous 48h.
+    </p>
+    <a href="/closer/recruit" class="btn-primary">Envoyer ma candidature →</a>
+  </div>
+</section>
 
 </body></html>""")
 
@@ -126,9 +205,14 @@ textarea{resize:vertical;min-height:120px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 </style>
 </head><body>
-<div class="wrap">
-  <a href="/closer" style="color:#527FB3;font-size:12px;text-decoration:none">← Programme closer</a>
-  <h1 style="margin-top:16px">Candidature Closer</h1>
+<header style="background:#0f0f1a;border-bottom:1px solid #1a1a2e;padding:0 24px;margin-bottom:0">
+  <div style="max-width:680px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:28px">
+    <a href="/closer" style="color:#9ca3af;font-size:12px">← Programme closer</a>
+  </div>
+</header>
+<div class="wrap" style="padding-top:36px">
+  <h1>Candidature Closer</h1>
   <p class="sub">Remplissez ce formulaire. Nous vous répondrons sous 48h.</p>
 
   <form id="form" method="post" action="/closer/recruit" enctype="multipart/form-data">
