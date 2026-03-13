@@ -1,5 +1,7 @@
 """Admin — onglet CRM : pipeline prospects → RDV → deal + gestion closers."""
 import os
+import json
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -558,7 +560,10 @@ tr:hover{{background:#111127}}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
   <h1 style="color:#fff;font-size:18px">Closers</h1>
-  <a href="/admin/crm?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← CRM</a>
+  <div style="display:flex;gap:16px;align-items:center">
+    <a href="/admin/crm/closer-messages?token={token}" style="color:#6366f1;font-size:12px;text-decoration:none">Messages recrutement →</a>
+    <a href="/admin/crm?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← CRM</a>
+  </div>
 </div>
 
 <h2 style="color:#9ca3af;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Closers actifs</h2>
@@ -683,6 +688,270 @@ async def save_application_notes(app_id: str, request: Request):
         from marketing_module.database import SessionLocal as MktSession, db_update_application
         with MktSession() as mdb:
             db_update_application(mdb, app_id, {"admin_notes": data.get("notes", "")})
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Messages de recrutement closers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_MESSAGES_FILE = Path(__file__).parent.parent.parent.parent / "data" / "closer_messages.json"
+
+_DEFAULT_MESSAGES = {
+    "linkedin_dm": (
+        "Bonjour [Prénom],\n\n"
+        "Je développe un réseau de closers indépendants pour Présence IA — "
+        "on aide les artisans et PME locales à apparaître sur ChatGPT et les IA.\n\n"
+        "Les RDV sont fournis, qualifiés, chauds. Votre rôle : closer.\n"
+        "Commission : 18% par deal + bonus.\n\n"
+        "Ça vous intéresse d'en savoir plus ? Je vous envoie le détail."
+    ),
+    "instagram_dm": (
+        "Hello [Prénom] 👋\n\n"
+        "Je recrute des closers pour un projet IA en pleine croissance.\n"
+        "RDV fournis + formation complète. Commission attractive.\n\n"
+        "Dispo pour en discuter ?"
+    ),
+    "facebook_dm": (
+        "Bonjour [Prénom],\n\n"
+        "Je développe une équipe de commerciaux indépendants dans le secteur de l'IA locale.\n"
+        "Vous travaillez à distance, les prospects sont déjà qualifiés.\n\n"
+        "Intéressé(e) par une opportunité en closing ?\n"
+        "Plus d'infos ici : https://presence-ia.com/closer"
+    ),
+    "email_subject": "Opportunité closing — IA locale (RDV fournis)",
+    "email_body": (
+        "Bonjour [Prénom],\n\n"
+        "Je me permets de vous contacter car votre profil correspond à ce que je recherche "
+        "pour développer mon équipe commerciale.\n\n"
+        "Je dirige Présence IA, une solution qui permet aux artisans et PME locales "
+        "d'apparaître sur ChatGPT, Google AI et les assistants vocaux.\n\n"
+        "Je recrute des closers indépendants :\n"
+        "- RDV qualifiés fournis (vous n'avez pas à prospecter)\n"
+        "- Formation script + objections incluse\n"
+        "- Commission 18% par deal signé\n"
+        "- 100% télétravail\n\n"
+        "Si vous êtes intéressé(e), vous pouvez candidater directement ici :\n"
+        "https://presence-ia.com/closer/recruit\n\n"
+        "Cordialement,"
+    ),
+    "notes": "",
+}
+
+
+def _load_closer_messages() -> dict:
+    try:
+        if _MESSAGES_FILE.exists():
+            return json.loads(_MESSAGES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return dict(_DEFAULT_MESSAGES)
+
+
+def _save_closer_messages(data: dict):
+    _MESSAGES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _MESSAGES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@router.get("/admin/crm/closer-messages", response_class=HTMLResponse)
+def closer_messages_page(request: Request):
+    """Éditeur des messages de recrutement closers + liens publics."""
+    token = _check_token(request)
+    msgs = _load_closer_messages()
+
+    # Closers actifs pour les liens individuels
+    closer_links = ""
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import CloserDB
+        with MktSession() as mdb:
+            closers = mdb.query(CloserDB).filter_by(
+                project_id="presence-ia", is_active=True
+            ).all()
+        if closers:
+            rows = "".join(
+                f'<tr style="border-bottom:1px solid #2a2a4e">'
+                f'<td style="padding:8px 12px;color:#e8e8f0;font-size:12px">{c.name}</td>'
+                f'<td style="padding:8px 12px">'
+                f'<a href="/closer/{getattr(c,"token",c.id) or c.id}" target="_blank" '
+                f'style="color:#527FB3;font-size:11px;font-family:monospace">'
+                f'presence-ia.com/closer/{getattr(c,"token",c.id) or c.id}</a></td>'
+                f'<td style="padding:8px 12px">'
+                f'<button onclick="copyText(\'presence-ia.com/closer/{getattr(c,"token",c.id) or c.id}\')" '
+                f'style="padding:3px 10px;background:#1a1a2e;border:1px solid #2a2a4e;'
+                f'border-radius:4px;color:#9ca3af;font-size:10px;cursor:pointer">Copier</button>'
+                f'</td></tr>'
+                for c in closers
+            )
+            closer_links = f"""
+<h2 style="color:#9ca3af;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin:28px 0 10px">
+Portails individuels closers</h2>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;
+             letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Closer</th>
+  <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;
+             letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Lien portail</th>
+  <th style="border-bottom:1px solid #2a2a4e"></th>
+</tr></thead>
+<tbody>{rows}</tbody>
+</table></div>"""
+    except Exception:
+        pass
+
+    def _field(key, label, placeholder="", rows=6):
+        val = msgs.get(key, "").replace("&", "&amp;").replace("<", "&lt;").replace('"', "&quot;")
+        tag = "input" if rows == 1 else "textarea"
+        if rows == 1:
+            return (
+                f'<div class="field"><label for="{key}">{label}</label>'
+                f'<input id="{key}" name="{key}" value="{val}" placeholder="{placeholder}"></div>'
+            )
+        return (
+            f'<div class="field"><label for="{key}">{label}</label>'
+            f'<div style="position:relative">'
+            f'<textarea id="{key}" name="{key}" rows="{rows}" placeholder="{placeholder}">{val}</textarea>'
+            f'<button type="button" onclick="copyField(\'{key}\')" '
+            f'style="position:absolute;top:8px;right:8px;padding:3px 10px;'
+            f'background:#0f0f1a;border:1px solid #2a2a4e;border-radius:4px;'
+            f'color:#9ca3af;font-size:10px;cursor:pointer">Copier</button>'
+            f'</div></div>'
+        )
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Messages recrutement — Closers</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+.wrap{{max-width:860px;margin:0 auto;padding:24px}}
+h1{{color:#fff;font-size:18px}}
+.field{{margin-bottom:20px}}
+label{{display:block;color:#9ca3af;font-size:11px;font-weight:600;
+       letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}}
+textarea,input{{width:100%;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;
+  padding:10px 12px;color:#e8e8f0;font-size:13px;font-family:inherit;
+  resize:vertical;outline:none;line-height:1.6}}
+textarea:focus,input:focus{{border-color:#6366f1}}
+.save-btn{{padding:10px 24px;background:#6366f1;border:none;border-radius:6px;
+           color:#fff;font-size:13px;font-weight:600;cursor:pointer}}
+.save-btn:hover{{background:#5254cc}}
+.link-card{{display:flex;align-items:center;justify-content:space-between;
+            background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;
+            padding:12px 16px;margin-bottom:8px}}
+.link-url{{color:#527FB3;font-size:12px;font-family:monospace;text-decoration:none}}
+.copy-btn{{padding:4px 12px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:4px;
+           color:#9ca3af;font-size:11px;cursor:pointer}}
+.section-sep{{height:1px;background:#2a2a4e;margin:28px 0}}
+.toast{{position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#0f0f1a;
+        padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
+        opacity:0;transition:opacity .3s;pointer-events:none}}
+.toast.show{{opacity:1}}
+</style></head><body>
+{admin_nav(token, "crm/closer-messages")}
+<div class="wrap">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+  <h1>Messages recrutement closers</h1>
+  <a href="/admin/crm/closers?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Closers</a>
+</div>
+
+<!-- ── Liens publics ───────────────────────────────── -->
+<h2 style="color:#9ca3af;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">
+Pages publiques</h2>
+
+<div class="link-card">
+  <div>
+    <div style="color:#e8e8f0;font-size:12px;font-weight:600;margin-bottom:2px">Page de présentation</div>
+    <a href="/closer/" target="_blank" class="link-url">presence-ia.com/closer/</a>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="/closer/" target="_blank"
+       style="padding:4px 12px;background:#6366f120;border:1px solid #6366f140;border-radius:4px;
+              color:#6366f1;font-size:11px;text-decoration:none">Voir ↗</a>
+    <button class="copy-btn" onclick="copyText('https://presence-ia.com/closer/')">Copier lien</button>
+  </div>
+</div>
+
+<div class="link-card">
+  <div>
+    <div style="color:#e8e8f0;font-size:12px;font-weight:600;margin-bottom:2px">Formulaire de candidature</div>
+    <a href="/closer/recruit" target="_blank" class="link-url">presence-ia.com/closer/recruit</a>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="/closer/recruit" target="_blank"
+       style="padding:4px 12px;background:#6366f120;border:1px solid #6366f140;border-radius:4px;
+              color:#6366f1;font-size:11px;text-decoration:none">Voir ↗</a>
+    <button class="copy-btn" onclick="copyText('https://presence-ia.com/closer/recruit')">Copier lien</button>
+  </div>
+</div>
+
+{closer_links}
+
+<div class="section-sep"></div>
+
+<!-- ── Éditeur messages ───────────────────────────── -->
+<h2 style="color:#9ca3af;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px">
+Mes messages de recrutement</h2>
+
+<form id="msg-form">
+  {_field("linkedin_dm",    "LinkedIn — Message direct", rows=8)}
+  {_field("instagram_dm",   "Instagram — Message direct", rows=5)}
+  {_field("facebook_dm",    "Facebook — DM / post groupe", rows=6)}
+  {_field("email_subject",  "Email — Objet", rows=1)}
+  {_field("email_body",     "Email — Corps", rows=10)}
+  {_field("notes",          "Notes internes (mémo perso, non envoyé)", rows=4)}
+
+  <button type="button" class="save-btn" onclick="saveMessages()">Sauvegarder</button>
+</form>
+
+</div>
+<div class="toast" id="toast">Sauvegardé ✓</div>
+
+<script>
+function copyText(txt) {{
+  navigator.clipboard.writeText(txt).then(() => showToast('Lien copié ✓'));
+}}
+function copyField(id) {{
+  const v = document.getElementById(id).value;
+  navigator.clipboard.writeText(v).then(() => showToast('Copié ✓'));
+}}
+function showToast(msg) {{
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}}
+async function saveMessages() {{
+  const fields = ['linkedin_dm','instagram_dm','facebook_dm','email_subject','email_body','notes'];
+  const data = {{}};
+  fields.forEach(f => {{ data[f] = document.getElementById(f).value; }});
+  const r = await fetch('/admin/crm/closer-messages?token={token}', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(data)
+  }});
+  if (r.ok) showToast('Sauvegardé ✓');
+  else showToast('Erreur !');
+}}
+</script>
+</body></html>"""
+    )
+
+
+@router.post("/admin/crm/closer-messages")
+async def save_closer_messages(request: Request):
+    """Sauvegarde les messages de recrutement."""
+    _check_token(request)
+    data = await request.json()
+    allowed = {"linkedin_dm", "instagram_dm", "facebook_dm",
+                "email_subject", "email_body", "notes"}
+    cleaned = {k: v for k, v in data.items() if k in allowed}
+    try:
+        _save_closer_messages(cleaned)
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
