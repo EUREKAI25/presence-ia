@@ -75,9 +75,10 @@ def startup():
     # Montage fichiers statiques (créé si absent, silencieux si permission refusée)
     dist_root = Path(__file__).parent.parent.parent / "dist"
     for sub, route, name in [
-        ("uploads", "/dist/uploads", "uploads"),
-        ("evidence", "/dist/evidence", "evidence"),
-        ("headers",  "/dist/headers",  "headers"),
+        ("uploads",        "/dist/uploads",        "uploads"),
+        ("evidence",       "/dist/evidence",       "evidence"),
+        ("headers",        "/dist/headers",        "headers"),
+        ("closer-audio",   "/dist/closer-audio",   "closer-audio"),
     ]:
         d = dist_root / sub
         try:
@@ -624,7 +625,7 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public
 from .routes.theme_admin import router as theme_admin_router
 from offers_module import router as offers_router
 
@@ -660,6 +661,8 @@ app.include_router(livrables.router)
 app.include_router(templates.router)
 app.include_router(sequences.router)
 app.include_router(mkt.router)
+app.include_router(crm_admin.router)
+app.include_router(closer_public.router)
 
 from .routes.active_models import router as active_models_router
 app.include_router(active_models_router)

@@ -142,6 +142,21 @@ class TaskStatus(str, Enum):
     done       = "done"
     cancelled  = "cancelled"
 
+class JourneyStage(str, Enum):
+    contacted        = "contacted"
+    opened           = "opened"
+    landing_visited  = "landing_visited"
+    calendly_clicked = "calendly_clicked"
+    rdv              = "rdv"
+    closed           = "closed"
+
+class ApplicationStage(str, Enum):
+    contacted = "contacted"
+    applied   = "applied"
+    reviewing = "reviewing"
+    validated = "validated"
+    rejected  = "rejected"
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ORM — EMAIL INFRASTRUCTURE
@@ -301,6 +316,8 @@ class ProspectDeliveryDB(Base):
     bounce_type         = Column(String, default=BounceType.none)
     opened_at           = Column(DateTime, nullable=True)
     clicked_at          = Column(DateTime, nullable=True)
+    landing_visited_at  = Column(DateTime, nullable=True)
+    calendly_clicked_at = Column(DateTime, nullable=True)
     provider_message_id = Column(String, nullable=True)
     error_message       = Column(Text, nullable=True)
     meta                = Column(JSON, default=dict)
@@ -371,14 +388,38 @@ class SocialPostDB(Base):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ORM — CRM (Closers, Meetings, Commissions, Tasks)
+# ORM — CRM (Contacts, Closers, Meetings, Commissions, Tasks, Journey)
 # ══════════════════════════════════════════════════════════════════════════════
+
+class ContactDB(Base):
+    """Registre central de contacts — partagé entre tous les projets."""
+    __tablename__ = "contacts"
+    id           = Column(String, primary_key=True, default=_uid)
+    project_id   = Column(String, nullable=False, index=True)
+    first_name   = Column(String, nullable=True)
+    last_name    = Column(String, nullable=True)
+    email        = Column(String, nullable=True, index=True)
+    phone        = Column(String, nullable=True)
+    city         = Column(String, nullable=True)
+    country      = Column(String, nullable=True, default="FR")
+    comment      = Column(Text, nullable=True)
+    meta         = Column(JSON, default=dict)
+    created_at   = Column(DateTime, default=_now)
+    updated_at   = Column(DateTime, default=_now, onupdate=_now)
+    closer       = relationship("CloserDB", back_populates="contact", uselist=False)
+    applications = relationship("CloserApplicationDB", back_populates="contact")
+
 
 class CloserDB(Base):
     __tablename__ = "closers"
     id              = Column(String, primary_key=True, default=_uid)
     project_id      = Column(String, nullable=False, index=True)
+    contact_id      = Column(String, ForeignKey("contacts.id"), nullable=True)
+    token           = Column(String, nullable=True, unique=True, default=_uid)
     name            = Column(String, nullable=False)
+    first_name      = Column(String, nullable=True)
+    last_name       = Column(String, nullable=True)
+    date_of_birth   = Column(String, nullable=True)     # ISO date string
     email           = Column(String, nullable=True)
     phone           = Column(String, nullable=True)
     commission_rate = Column(Float, default=0.18)       # 18%
@@ -387,6 +428,7 @@ class CloserDB(Base):
     meta            = Column(JSON, default=dict)
     created_at      = Column(DateTime, default=_now)
     updated_at      = Column(DateTime, default=_now, onupdate=_now)
+    contact         = relationship("ContactDB", back_populates="closer")
     meetings        = relationship("MeetingDB", back_populates="closer")
     commissions     = relationship("CommissionDB", back_populates="closer")
     tasks           = relationship("TaskDB", back_populates="closer")
@@ -394,23 +436,27 @@ class CloserDB(Base):
 
 class MeetingDB(Base):
     __tablename__ = "meetings"
-    id                 = Column(String, primary_key=True, default=_uid)
-    project_id         = Column(String, nullable=False, index=True)
-    prospect_id        = Column(String, nullable=False)     # ID externe
-    closer_id          = Column(String, ForeignKey("closers.id"), nullable=True)
-    campaign_id        = Column(String, ForeignKey("campaigns.id"), nullable=True)
-    scheduled_at       = Column(DateTime, nullable=True)
-    completed_at       = Column(DateTime, nullable=True)
-    status             = Column(String, default=MeetingStatus.scheduled)
-    calendly_event_id  = Column(String, nullable=True)
-    calendly_event_uri = Column(String, nullable=True)
-    deal_value         = Column(Float, nullable=True)       # montant deal si conclu
-    notes              = Column(Text, nullable=True)
-    meta               = Column(JSON, default=dict)
-    created_at         = Column(DateTime, default=_now)
-    updated_at         = Column(DateTime, default=_now, onupdate=_now)
-    closer             = relationship("CloserDB", back_populates="meetings")
-    commissions        = relationship("CommissionDB", back_populates="meeting")
+    id                   = Column(String, primary_key=True, default=_uid)
+    project_id           = Column(String, nullable=False, index=True)
+    prospect_id          = Column(String, nullable=False)     # ID externe
+    closer_id            = Column(String, ForeignKey("closers.id"), nullable=True)
+    campaign_id          = Column(String, ForeignKey("campaigns.id"), nullable=True)
+    rescheduled_from_id  = Column(String, nullable=True)      # auto-ref (SQLite: pas FK)
+    scheduled_at         = Column(DateTime, nullable=True)
+    completed_at         = Column(DateTime, nullable=True)
+    status               = Column(String, default=MeetingStatus.scheduled)
+    outcome              = Column(Text, nullable=True)        # résumé du call
+    commission_rate      = Column(Float, nullable=True)       # override closer.commission_rate
+    commission_amount    = Column(Float, nullable=True)       # montant calculé à la clôture
+    calendly_event_id    = Column(String, nullable=True)
+    calendly_event_uri   = Column(String, nullable=True)
+    deal_value           = Column(Float, nullable=True)       # montant deal si conclu
+    notes                = Column(Text, nullable=True)
+    meta                 = Column(JSON, default=dict)
+    created_at           = Column(DateTime, default=_now)
+    updated_at           = Column(DateTime, default=_now, onupdate=_now)
+    closer               = relationship("CloserDB", back_populates="meetings")
+    commissions          = relationship("CommissionDB", back_populates="meeting")
 
 
 class CommissionDB(Base):
@@ -446,6 +492,55 @@ class TaskDB(Base):
     created_at  = Column(DateTime, default=_now)
     updated_at  = Column(DateTime, default=_now, onupdate=_now)
     closer      = relationship("CloserDB", back_populates="tasks")
+
+
+class ProspectJourneyDB(Base):
+    """Agrège l'état funnel d'un prospect (une ligne par prospect par projet)."""
+    __tablename__ = "prospect_journeys"
+    id                  = Column(String, primary_key=True, default=_uid)
+    project_id          = Column(String, nullable=False, index=True)
+    prospect_id         = Column(String, nullable=False, index=True)
+    stage               = Column(String, default=JourneyStage.contacted)
+    score               = Column(Integer, default=0)
+    contacted_at        = Column(DateTime, nullable=True)
+    opened_at           = Column(DateTime, nullable=True)
+    landing_visited_at  = Column(DateTime, nullable=True)
+    calendly_clicked_at = Column(DateTime, nullable=True)
+    rdv_at              = Column(DateTime, nullable=True)
+    closed_at           = Column(DateTime, nullable=True)
+    stopped_reason      = Column(String, nullable=True)
+    next_action_at      = Column(DateTime, nullable=True)
+    meta                = Column(JSON, default=dict)
+    created_at          = Column(DateTime, default=_now)
+    updated_at          = Column(DateTime, default=_now, onupdate=_now)
+
+
+class CloserApplicationDB(Base):
+    """Candidature closer — recrutement via formulaire public."""
+    __tablename__ = "closer_applications"
+    id           = Column(String, primary_key=True, default=_uid)
+    project_id   = Column(String, nullable=False, index=True)
+    contact_id   = Column(String, ForeignKey("contacts.id"), nullable=True)
+    token        = Column(String, nullable=False, unique=True, default=_uid)
+    stage        = Column(String, default=ApplicationStage.applied)
+    first_name   = Column(String, nullable=True)
+    last_name    = Column(String, nullable=True)
+    email        = Column(String, nullable=True, index=True)
+    phone        = Column(String, nullable=True)
+    city         = Column(String, nullable=True)
+    country      = Column(String, nullable=True, default="FR")
+    linkedin_url = Column(String, nullable=True)
+    message      = Column(Text, nullable=True)
+    video_url    = Column(String, nullable=True)   # URL Loom/YouTube
+    audio_url    = Column(String, nullable=True)   # URL fichier audio uploadé
+    applied_at   = Column(DateTime, nullable=True, default=_now)
+    reviewed_at  = Column(DateTime, nullable=True)
+    validated_at = Column(DateTime, nullable=True)
+    admin_notes  = Column(Text, nullable=True)
+    meta         = Column(JSON, default=dict)
+    created_at   = Column(DateTime, default=_now)
+    updated_at   = Column(DateTime, default=_now, onupdate=_now)
+    contact      = relationship("ContactDB", back_populates="applications")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -615,9 +710,31 @@ class SocialPostCreate(BaseModel):
 
 
 # — CRM
+class ContactCreate(BaseModel):
+    project_id: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    country: str = "FR"
+    comment: Optional[str] = None
+    meta: dict = {}
+
+class ContactOut(BaseModel):
+    id: str; project_id: str
+    first_name: Optional[str]; last_name: Optional[str]
+    email: Optional[str]; phone: Optional[str]
+    city: Optional[str]; country: Optional[str]; created_at: datetime
+    class Config: from_attributes = True
+
 class CloserCreate(BaseModel):
     project_id: str
     name: str
+    contact_id: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     commission_rate: float = 0.18
@@ -626,6 +743,7 @@ class CloserCreate(BaseModel):
 
 class CloserOut(BaseModel):
     id: str; project_id: str; name: str; email: Optional[str]
+    token: Optional[str]
     commission_rate: float; bonus_rate: float; is_active: bool; created_at: datetime
     class Config: from_attributes = True
 
@@ -634,8 +752,12 @@ class MeetingCreate(BaseModel):
     prospect_id: str
     closer_id: Optional[str] = None
     campaign_id: Optional[str] = None
+    rescheduled_from_id: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     deal_value: Optional[float] = None
+    outcome: Optional[str] = None
+    commission_rate: Optional[float] = None
+    commission_amount: Optional[float] = None
     calendly_event_id: Optional[str] = None
     calendly_event_uri: Optional[str] = None
     notes: Optional[str] = None
@@ -644,8 +766,32 @@ class MeetingCreate(BaseModel):
 class MeetingOut(BaseModel):
     id: str; project_id: str; prospect_id: str
     closer_id: Optional[str]; campaign_id: Optional[str]
+    rescheduled_from_id: Optional[str]
     scheduled_at: Optional[datetime]; status: str
-    deal_value: Optional[float]; created_at: datetime
+    deal_value: Optional[float]; outcome: Optional[str]
+    commission_rate: Optional[float]; commission_amount: Optional[float]
+    created_at: datetime
+    class Config: from_attributes = True
+
+class CloserApplicationCreate(BaseModel):
+    project_id: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    country: str = "FR"
+    linkedin_url: Optional[str] = None
+    message: Optional[str] = None
+    video_url: Optional[str] = None
+    audio_url: Optional[str] = None
+    meta: dict = {}
+
+class CloserApplicationOut(BaseModel):
+    id: str; project_id: str; token: str; stage: str
+    first_name: Optional[str]; last_name: Optional[str]
+    email: Optional[str]; city: Optional[str]
+    applied_at: Optional[datetime]; created_at: datetime
     class Config: from_attributes = True
 
 class CommissionCreate(BaseModel):

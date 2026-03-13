@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     Base, BounceType, CampaignDB, CampaignSequenceDB, CampaignSequenceStepDB,
-    CloserDB, CommissionDB, CommissionStatus, ComplianceRuleDB, DeliveryStatus,
-    MeetingDB, MeetingStatus, ProspectDeliveryDB, ReplyStatus, ReputationStatus,
-    RotationStrategyDB, SendingDomainDB, SendingMailboxDB, SocialAccountDB,
-    SocialPostDB, SocialPostStatus, TaskDB, WarmupStrategyDB, WarmupStatus,
+    CloserApplicationDB, CloserDB, CommissionDB, CommissionStatus, ComplianceRuleDB,
+    ContactDB, DeliveryStatus, MeetingDB, MeetingStatus, ProspectDeliveryDB,
+    ProspectJourneyDB, ReplyStatus, ReputationStatus, RotationStrategyDB,
+    SendingDomainDB, SendingMailboxDB, SocialAccountDB, SocialPostDB,
+    SocialPostStatus, TaskDB, WarmupStrategyDB, WarmupStatus,
 )
 
 _DB_PATH = os.getenv("MKT_DB_PATH", "marketing.db")
@@ -25,11 +26,38 @@ SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
 
 def init_db():
     Base.metadata.create_all(bind=_engine)
+    _migrate_existing_tables()
     db = SessionLocal()
     try:
         _seed_default_sequence(db)
     finally:
         db.close()
+
+
+def _migrate_existing_tables():
+    """Ajoute les colonnes manquantes sur les tables existantes (SQLite ALTER TABLE)."""
+    migrations = [
+        ("closers",             "contact_id",           "TEXT"),
+        ("closers",             "token",                "TEXT"),
+        ("closers",             "first_name",           "TEXT"),
+        ("closers",             "last_name",            "TEXT"),
+        ("closers",             "date_of_birth",        "TEXT"),
+        ("meetings",            "rescheduled_from_id",  "TEXT"),
+        ("meetings",            "outcome",              "TEXT"),
+        ("meetings",            "commission_rate",      "REAL"),
+        ("meetings",            "commission_amount",    "REAL"),
+        ("prospect_deliveries", "landing_visited_at",   "DATETIME"),
+        ("prospect_deliveries", "calendly_clicked_at",  "DATETIME"),
+    ]
+    with _engine.connect() as conn:
+        for table, col, col_type in migrations:
+            try:
+                conn.execute(__import__("sqlalchemy").text(
+                    f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"
+                ))
+                conn.commit()
+            except Exception:
+                pass  # colonne déjà existante
 
 
 _PROJECT_ID = os.getenv("MKT_PROJECT_ID", "presence_ia")
@@ -607,6 +635,89 @@ def db_mailbox_stats(db: Session, mailbox_id: str, window_hours: int = 24) -> di
         "bounce_rate":  round(bounced / total, 4) if total else 0,
         "failure_rate": round(failed  / total, 4) if total else 0,
     }
+
+# ── Contact ────────────────────────────────────────────────────────────────────
+
+def db_create_contact(db: Session, data: dict) -> ContactDB:
+    obj = ContactDB(**data)
+    db.add(obj); db.commit(); db.refresh(obj)
+    return obj
+
+def db_get_contact(db: Session, contact_id: str) -> Optional[ContactDB]:
+    return db.query(ContactDB).filter_by(id=contact_id).first()
+
+def db_get_contact_by_email(db: Session, project_id: str, email: str) -> Optional[ContactDB]:
+    return db.query(ContactDB).filter_by(project_id=project_id, email=email).first()
+
+def db_list_contacts(db: Session, project_id: str) -> list[ContactDB]:
+    return db.query(ContactDB).filter_by(project_id=project_id).order_by(ContactDB.created_at.desc()).all()
+
+def db_update_contact(db: Session, contact_id: str, updates: dict) -> Optional[ContactDB]:
+    obj = db_get_contact(db, contact_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    obj.updated_at = datetime.utcnow()
+    db.commit(); db.refresh(obj)
+    return obj
+
+
+# ── ProspectJourney ────────────────────────────────────────────────────────────
+
+def db_get_journey(db: Session, project_id: str, prospect_id: str) -> Optional[ProspectJourneyDB]:
+    return db.query(ProspectJourneyDB).filter_by(
+        project_id=project_id, prospect_id=prospect_id
+    ).first()
+
+def db_upsert_journey(db: Session, project_id: str, prospect_id: str, updates: dict) -> ProspectJourneyDB:
+    obj = db_get_journey(db, project_id, prospect_id)
+    if not obj:
+        obj = ProspectJourneyDB(project_id=project_id, prospect_id=prospect_id)
+        db.add(obj)
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    obj.updated_at = datetime.utcnow()
+    db.commit(); db.refresh(obj)
+    return obj
+
+def db_list_journeys(db: Session, project_id: str, stage: Optional[str] = None) -> list[ProspectJourneyDB]:
+    q = db.query(ProspectJourneyDB).filter_by(project_id=project_id)
+    if stage:
+        q = q.filter_by(stage=stage)
+    return q.order_by(ProspectJourneyDB.updated_at.desc()).all()
+
+
+# ── CloserApplication ──────────────────────────────────────────────────────────
+
+def db_create_application(db: Session, data: dict) -> CloserApplicationDB:
+    obj = CloserApplicationDB(**data)
+    db.add(obj); db.commit(); db.refresh(obj)
+    return obj
+
+def db_get_application(db: Session, app_id: str) -> Optional[CloserApplicationDB]:
+    return db.query(CloserApplicationDB).filter_by(id=app_id).first()
+
+def db_get_application_by_token(db: Session, token: str) -> Optional[CloserApplicationDB]:
+    return db.query(CloserApplicationDB).filter_by(token=token).first()
+
+def db_list_applications(db: Session, project_id: str,
+                          stage: Optional[str] = None) -> list[CloserApplicationDB]:
+    q = db.query(CloserApplicationDB).filter_by(project_id=project_id)
+    if stage:
+        q = q.filter_by(stage=stage)
+    return q.order_by(CloserApplicationDB.created_at.desc()).all()
+
+def db_update_application(db: Session, app_id: str, updates: dict) -> Optional[CloserApplicationDB]:
+    obj = db_get_application(db, app_id)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    obj.updated_at = datetime.utcnow()
+    db.commit(); db.refresh(obj)
+    return obj
+
+
+# ── Stats ──────────────────────────────────────────────────────────────────────
 
 def db_closer_stats(db: Session, project_id: str, closer_id: str) -> dict:
     meetings    = db.list_meetings(project_id=project_id, closer_id=closer_id) if False else \
