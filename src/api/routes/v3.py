@@ -2322,6 +2322,92 @@ def bulk_status(token: str = ""):
     return _bulk_status
 
 
+# ── Webhook Brevo (bounces / unsubscribes) ─────────────────────────────────────
+
+@router.post("/api/v3/webhooks/brevo")
+async def brevo_webhook(request: Request):
+    """
+    Reçoit les événements Brevo (hardBounce, softBounce, blocked, unsubscribed).
+    Met à jour ProspectDeliveryDB + marque le prospect V3 si bounce hard.
+    """
+    try:
+        events = await request.json()
+        if isinstance(events, dict):
+            events = [events]
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid JSON"}, status_code=400)
+
+    from datetime import datetime
+    processed = 0
+    for ev in events:
+        event_type  = ev.get("event", "")
+        email       = ev.get("email", "")
+        msg_id      = ev.get("message-id", "") or ev.get("messageId", "")
+
+        if not email:
+            continue
+
+        # Chercher la livraison par message-id ou par email (dernière livraison)
+        try:
+            from marketing_module.database import (
+                SessionLocal as MktSession, db_update_delivery,
+            )
+            from marketing_module.models import (
+                ProspectDeliveryDB, DeliveryStatus, BounceType,
+            )
+            with MktSession() as mdb:
+                delivery = None
+                if msg_id:
+                    delivery = (mdb.query(ProspectDeliveryDB)
+                                .filter_by(provider_message_id=msg_id).first())
+                if not delivery:
+                    # Fallback : chercher par prospect_id (token = email lookup)
+                    with SessionLocal() as db:
+                        p = db.query(V3ProspectDB).filter_by(email=email).first()
+                    if p:
+                        delivery = (mdb.query(ProspectDeliveryDB)
+                                    .filter_by(project_id="presence-ia",
+                                               prospect_id=p.token)
+                                    .order_by(ProspectDeliveryDB.created_at.desc())
+                                    .first())
+
+                if delivery:
+                    if event_type in ("hardBounce", "blocked"):
+                        db_update_delivery(mdb, delivery.id, {
+                            "delivery_status": DeliveryStatus.bounced,
+                            "bounce_type":     BounceType.hard,
+                            "error_message":   event_type,
+                        })
+                    elif event_type == "softBounce":
+                        db_update_delivery(mdb, delivery.id, {
+                            "delivery_status": DeliveryStatus.bounced,
+                            "bounce_type":     BounceType.soft,
+                        })
+                    elif event_type == "unsubscribed":
+                        db_update_delivery(mdb, delivery.id, {
+                            "reply_status": "negative",
+                        })
+        except Exception as e:
+            log.warning("brevo_webhook delivery update: %s", e)
+
+        # Bounce hard → marquer le prospect V3 (évite les re-envois)
+        if event_type in ("hardBounce", "blocked") and email:
+            try:
+                with SessionLocal() as db:
+                    p = db.query(V3ProspectDB).filter_by(email=email).first()
+                    if p and not p.contacted:
+                        p.sent_method = "bounce"
+                        p.contacted   = True
+                        db.commit()
+            except Exception as e:
+                log.warning("brevo_webhook V3 update: %s", e)
+
+        processed += 1
+        log.info("Brevo webhook: %s → %s", event_type, email)
+
+    return JSONResponse({"ok": True, "processed": processed})
+
+
 @router.get("/api/v3/ia-test-debug")
 def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couvreur"):
     """Test IA unique pour diagnostiquer les modèles — retourne les erreurs détaillées."""

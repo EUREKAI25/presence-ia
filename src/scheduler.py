@@ -40,6 +40,15 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
+    # Job 3 : polling Calendly — toutes les 10 min
+    _scheduler.add_job(
+        _job_calendly_poll,
+        trigger=IntervalTrigger(minutes=10),
+        id="calendly_poll",
+        replace_existing=True,
+        misfire_grace_time=120,
+    )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
@@ -88,6 +97,123 @@ def _job_monthly_retest():
             db.close()
     except Exception as e:
         log.error("_job_monthly_retest : %s", e)
+
+
+def _job_calendly_poll():
+    """
+    Polling Calendly (plan gratuit — pas de webhooks).
+    Toutes les 10 min : cherche les nouveaux RDV depuis le dernier poll,
+    les enregistre dans MeetingDB, marque la séquence email comme stoppée.
+    """
+    try:
+        import os, requests as _req
+        from datetime import datetime, timezone, timedelta
+        from .database import SessionLocal
+        from .models import V3ProspectDB
+
+        token = os.getenv("CALENDLY_TOKEN", "")
+        if not token:
+            return
+
+        org = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Fenêtre : depuis 15 min en arrière (chevauchement léger pour ne rien rater)
+        since = (datetime.now(timezone.utc) - timedelta(minutes=15)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        resp = _req.get(
+            "https://api.calendly.com/scheduled_events",
+            params={"organization": org, "status": "active",
+                    "min_start_time": since, "count": 100},
+            headers=headers, timeout=10,
+        )
+        if resp.status_code != 200:
+            log.warning("Calendly poll HTTP %s", resp.status_code)
+            return
+
+        events = resp.json().get("collection", [])
+        if not events:
+            return
+
+        log.info("Calendly poll : %d event(s) récents", len(events))
+
+        try:
+            from marketing_module.database import SessionLocal as MktSession
+            from marketing_module.models import MeetingDB, MeetingStatus, ReplyStatus
+            from marketing_module.database import db_create_meeting, db_update_delivery
+        except Exception as e:
+            log.warning("marketing_module non dispo pour Calendly poll: %s", e)
+            return
+
+        with SessionLocal() as db, MktSession() as mdb:
+            for ev in events:
+                event_uuid = ev.get("uri", "").split("/")[-1]
+                calendly_event_id = event_uuid
+
+                # Éviter les doublons
+                existing = mdb.query(MeetingDB).filter_by(
+                    calendly_event_id=calendly_event_id
+                ).first()
+                if existing:
+                    continue
+
+                # Récupérer l'email de l'invité
+                inv_resp = _req.get(
+                    f"https://api.calendly.com/scheduled_events/{event_uuid}/invitees",
+                    params={"count": 1}, headers=headers, timeout=10,
+                )
+                if inv_resp.status_code != 200:
+                    continue
+                invitees = inv_resp.json().get("collection", [])
+                if not invitees:
+                    continue
+                invitee_email = invitees[0].get("email", "")
+                if not invitee_email:
+                    continue
+
+                # Chercher le prospect V3 par email
+                prospect = db.query(V3ProspectDB).filter_by(email=invitee_email).first()
+                prospect_id = prospect.token if prospect else invitee_email
+
+                # Parser la date de RDV
+                try:
+                    scheduled_at = datetime.fromisoformat(
+                        ev["start_time"].replace("Z", "+00:00")
+                    )
+                except Exception:
+                    scheduled_at = None
+
+                # Créer le meeting dans CRM
+                db_create_meeting(mdb, {
+                    "project_id":        "presence-ia",
+                    "prospect_id":       prospect_id,
+                    "campaign_id":       None,
+                    "scheduled_at":      scheduled_at,
+                    "status":            MeetingStatus.scheduled,
+                    "calendly_event_id": calendly_event_id,
+                    "calendly_event_uri": ev.get("uri", ""),
+                    "notes":             invitees[0].get("name", ""),
+                })
+
+                # Stopper la séquence email : marquer la dernière livraison comme "replied"
+                from marketing_module.models import ProspectDeliveryDB
+                last_delivery = (
+                    mdb.query(ProspectDeliveryDB)
+                    .filter_by(project_id="presence-ia", prospect_id=prospect_id)
+                    .order_by(ProspectDeliveryDB.created_at.desc())
+                    .first()
+                )
+                if last_delivery:
+                    db_update_delivery(mdb, last_delivery.id, {
+                        "reply_status": ReplyStatus.positive
+                    })
+
+                log.info("Calendly RDV enregistré — %s (%s)", invitee_email, event_uuid[:8])
+
+    except Exception as e:
+        log.error("_job_calendly_poll : %s", e)
 
 
 def _job_run_due_targets():
