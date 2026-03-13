@@ -171,8 +171,8 @@ def _youtube_embed(url: str) -> str:
 # ── Scraping ──────────────────────────────────────────────────────────────────
 
 def _scrape_site(url: str) -> dict:
-    """Scrape homepage + page contact pour email, téléphone, URL contact."""
-    result = {"email": None, "phone": None, "contact_url": None}
+    """Scrape homepage + page contact pour email, téléphone, URL contact, CMS."""
+    result = {"email": None, "phone": None, "contact_url": None, "cms": None}
     if not url:
         return result
 
@@ -201,6 +201,18 @@ def _scrape_site(url: str) -> dict:
         text = resp.text
         email, phone = _extract_from_text(text)
         contact_link = _find_contact_link(text, url)
+
+        # Détecter le CMS depuis le HTML + headers déjà téléchargés (pas de requête supplémentaire)
+        try:
+            from ..cms_detector import _COMPILED as _CMS_COMPILED
+            resp_headers_str = " ".join(f"{k}: {v}" for k, v in resp.headers.items())
+            haystack = text[:60_000] + " " + resp_headers_str
+            for _cms_name, _cms_patterns in _CMS_COMPILED:
+                if any(p.search(haystack) for p in _cms_patterns):
+                    result["cms"] = _cms_name
+                    break
+        except Exception:
+            pass
 
         # Si page contact trouvée, scraper aussi
         if contact_link and contact_link != url:
@@ -1992,13 +2004,8 @@ def generate_v3(req: GenerateRequest, token: str = ""):
     with SessionLocal() as db:
         for t in req.targets:
             try:
-                # Compte les prospects existants pour cette paire
-                n_existing = db.query(V3ProspectDB).filter_by(
-                    city=t.city, profession=t.profession
-                ).count()
-                # Fetch assez de résultats Google pour trouver t.max_results NOUVEAUX
-                raw_max = min(t.max_results + n_existing + 10, 60)
-                prospects, _ = search_prospects(t.profession, t.city, api_key, max_results=raw_max)
+                # Toujours fetch le max (60) pour avoir assez de candidats après filtrage
+                prospects, _ = search_prospects(t.profession, t.city, api_key, max_results=60)
             except Exception as e:
                 log.error("Google Places (%s %s): %s", t.profession, t.city, e)
                 continue
@@ -2014,10 +2021,27 @@ def generate_v3(req: GenerateRequest, token: str = ""):
                 existing = db.get(V3ProspectDB, tok)
                 ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) if ia_data.get("results") else None
                 if not existing:
+                    # Scrape inline : email + CMS depuis le site
+                    phone   = p.get("phone")
+                    website = p.get("website")
+                    scraped = _scrape_site(website) if website else {}
+                    email       = scraped.get("email")
+                    scrape_phone = scraped.get("phone")
+                    contact_url = scraped.get("contact_url")
+                    cms         = scraped.get("cms")
+                    phone = phone or scrape_phone  # compléter avec tél du site si Google n'en avait pas
+
+                    # Filtrage : seulement les leads qu'on peut contacter
+                    if not phone and not email:
+                        log.debug("Prospect écarté (pas de contact) : %s", p["name"])
+                        continue
+
                     new_count += 1
                     db.add(V3ProspectDB(
                         token=tok, name=p["name"], city=t.city, profession=t.profession,
-                        phone=p.get("phone"), website=p.get("website"),
+                        phone=phone, website=website,
+                        email=email, contact_url=contact_url, cms=cms,
+                        scrape_status="done",
                         reviews_count=p.get("reviews_count"), rating=p.get("rating"),
                         landing_url=landing_url,
                         competitors=json.dumps(competitors, ensure_ascii=False),
@@ -2034,17 +2058,22 @@ def generate_v3(req: GenerateRequest, token: str = ""):
                         existing.ia_model     = ia_data.get("model")
                         existing.ia_tested_at = ia_data.get("tested_at")
                         existing.ia_results   = ia_results_json
+                    phone   = existing.phone or p.get("phone")
+                    email   = existing.email
+                    cms     = existing.cms
                 db.commit()
                 results.append({
                     "nom": p["name"], "ville": t.city, "metier": t.profession,
-                    "telephone": p.get("phone",""), "site": p.get("website",""),
+                    "telephone": phone or "", "email": email or "",
+                    "cms": cms or "",
+                    "site": p.get("website",""),
                     "avis_google": p.get("reviews_count",""), "note": p.get("rating",""),
                     "landing_url": landing_url,
                     "concurrents": " | ".join(competitors),
                     "message_contact": _contact_message(p["name"], t.city, t.profession, landing_url),
                 })
     buf = io.StringIO()
-    fields = ["nom","ville","metier","telephone","site","avis_google","note","landing_url","concurrents","message_contact"]
+    fields = ["nom","ville","metier","telephone","email","cms","site","avis_google","note","landing_url","concurrents","message_contact"]
     w = csv.DictWriter(buf, fieldnames=fields); w.writeheader(); w.writerows(results)
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
