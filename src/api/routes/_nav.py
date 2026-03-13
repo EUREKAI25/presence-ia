@@ -56,13 +56,13 @@ def admin_nav(token: str, active: str = "") -> str:
         )
 
     sections_html = ""
-    for sec_label, tabs in sections:
-        # Ouvrir l'accordéon si la page active est dans cette section
+    for i, (sec_label, tabs) in enumerate(sections):
+        # Ouvrir uniquement la section contenant la page active — toutes les autres fermées
         is_open = any(slug == active for slug, _ in tabs)
         open_attr = " open" if is_open else ""
         links = "".join(_link(slug, label) for slug, label in tabs)
         sections_html += (
-            f'<details{open_attr} style="margin-bottom:2px">'
+            f'<details{open_attr} class="pres-acc" style="margin-bottom:2px">'
             f'<summary style="cursor:pointer;padding:8px 10px;font-size:10px;font-weight:700;'
             f'color:#9ca3af;letter-spacing:.08em;list-style:none;display:flex;align-items:center;'
             f'justify-content:space-between;border-radius:4px;user-select:none;'
@@ -117,4 +117,22 @@ def admin_nav(token: str, active: str = "") -> str:
         f'{sections_html}'
         f'</div>'
         f'</nav>'
+        # Accordéon exclusif : un seul ouvert à la fois
+        f'<script>'
+        f'(function(){{'
+        f'  function initAcc(){{'
+        f'    document.querySelectorAll(".pres-acc summary").forEach(function(s){{'
+        f'      s.addEventListener("click",function(e){{'
+        f'        var me=s.closest("details");'
+        f'        if(me.hasAttribute("open")) return;'  # va se fermer, laisser faire
+        f'        document.querySelectorAll(".pres-acc[open]").forEach(function(d){{'
+        f'          if(d!==me) d.removeAttribute("open");'
+        f'        }});'
+        f'      }});'
+        f'    }});'
+        f'  }}'
+        f'  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initAcc);'
+        f'  else initAcc();'
+        f'}})();'
+        f'</script>'
     )
