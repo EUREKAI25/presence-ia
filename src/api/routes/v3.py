@@ -2423,6 +2423,92 @@ async def brevo_webhook(request: Request):
     return JSONResponse({"ok": True, "processed": processed})
 
 
+@router.post("/api/v3/webhooks/twilio/inbound")
+async def twilio_inbound_sms(request: Request):
+    """
+    Webhook Twilio — réception SMS entrant d'un prospect.
+    À configurer dans la console Twilio : Messaging → Phone Number → Webhook URL
+      → POST https://presence-ia.com/api/v3/webhooks/twilio/inbound
+
+    Twilio envoie un form body avec : From, Body, MessageSid, etc.
+    """
+    try:
+        form = await request.form()
+        from_phone = form.get("From", "").strip()
+        body_text  = form.get("Body", "").strip()
+        msg_sid    = form.get("MessageSid", "")
+
+        if not from_phone:
+            return JSONResponse({"ok": False, "error": "no From"})
+
+        log.info("Twilio inbound SMS de %s : %s", from_phone, body_text[:60])
+
+        # Normaliser le numéro pour comparaison (+33 vs 06...)
+        def _normalize(n: str) -> str:
+            n = n.strip().replace(" ", "").replace("-", "").replace(".", "")
+            if n.startswith("0033"): n = "+" + n[2:]
+            if n.startswith("33") and not n.startswith("+"): n = "+" + n
+            return n
+
+        from_normalized = _normalize(from_phone)
+
+        # Chercher le prospect par téléphone
+        with SessionLocal() as db:
+            prospects = db.query(V3ProspectDB).filter(
+                V3ProspectDB.phone.isnot(None)
+            ).all()
+            prospect = None
+            for p in prospects:
+                if _normalize(p.phone or "") == from_normalized:
+                    prospect = p
+                    break
+
+        if not prospect:
+            log.info("Twilio inbound : numéro %s inconnu", from_phone)
+            # Twilio attend une réponse TwiML (même vide)
+            return HTMLResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+                                 media_type="text/xml")
+
+        log.info("Twilio inbound : réponse SMS de %s (%s)", prospect.name, from_phone)
+
+        # Mise à jour CRM
+        try:
+            from marketing_module.database import SessionLocal as MktSession, db_update_delivery
+            from marketing_module.models import ProspectDeliveryDB, ReplyStatus
+            with MktSession() as mdb:
+                delivery = (
+                    mdb.query(ProspectDeliveryDB)
+                    .filter_by(project_id="presence-ia", prospect_id=prospect.token)
+                    .order_by(ProspectDeliveryDB.created_at.desc())
+                    .first()
+                )
+                if delivery and delivery.reply_status == ReplyStatus.none:
+                    db_update_delivery(mdb, delivery.id, {"reply_status": ReplyStatus.positive})
+        except Exception as e:
+            log.warning("twilio_inbound CRM update: %s", e)
+
+        # Alerte admin
+        try:
+            from ...scheduler import _send_reply_alert
+            _send_reply_alert(
+                prospect_name=prospect.name or from_phone,
+                prospect_email=prospect.phone or from_phone,
+                snippet=body_text,
+                channel="sms",
+            )
+        except Exception as e:
+            log.warning("twilio_inbound alert: %s", e)
+
+        # Réponse TwiML vide (Twilio l'exige)
+        return HTMLResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+                             media_type="text/xml")
+
+    except Exception as e:
+        log.error("twilio_inbound_sms : %s", e)
+        return HTMLResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+                             media_type="text/xml")
+
+
 @router.get("/api/v3/ia-test-debug")
 def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couvreur"):
     """Test IA unique pour diagnostiquer les modèles — retourne les erreurs détaillées."""

@@ -49,6 +49,15 @@ def start_scheduler():
         misfire_grace_time=120,
     )
 
+    # Job 4 : polling IMAP réponses — toutes les 5 min
+    _scheduler.add_job(
+        _job_imap_reply_poll,
+        trigger=IntervalTrigger(minutes=5),
+        id="imap_reply_poll",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
@@ -214,6 +223,201 @@ def _job_calendly_poll():
 
     except Exception as e:
         log.error("_job_calendly_poll : %s", e)
+
+
+def _send_reply_alert(prospect_name: str, prospect_email: str, snippet: str, channel: str = "email"):
+    """
+    Envoie une alerte email à l'admin quand un prospect répond.
+    Utilise directement l'API Brevo (pas de dépendance circulaire).
+    Requiert : BREVO_API_KEY, ADMIN_EMAIL (ou ADMIN_ALERT_EMAIL) dans l'env.
+    """
+    try:
+        import os, requests as _req
+        key = os.getenv("BREVO_API_KEY", "")
+        admin_email = os.getenv("ADMIN_ALERT_EMAIL") or os.getenv("ADMIN_EMAIL", "contact@presence-ia.com")
+        if not key:
+            log.warning("BREVO_API_KEY absent — alerte non envoyée pour %s", prospect_name)
+            return
+
+        channel_label = "email" if channel == "email" else "SMS"
+        subject = f"🔔 Réponse {channel_label} — {prospect_name}"
+        body = (
+            f"<strong>{prospect_name}</strong> ({prospect_email}) a répondu à votre {channel_label}.<br><br>"
+            f"<blockquote style='border-left:3px solid #6366f1;padding:8px 16px;color:#555'>"
+            f"{snippet[:500]}"
+            f"</blockquote><br>"
+            f"<a href='https://presence-ia.com/admin/crm?token={os.getenv(\"ADMIN_TOKEN\",\"changeme\")}' "
+            f"style='background:#6366f1;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none'>"
+            f"Voir dans le CRM →</a>"
+        )
+
+        _req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": key, "Content-Type": "application/json"},
+            json={
+                "sender":  {"name": "Présence IA", "email": "contact@presence-ia.com"},
+                "to":      [{"email": admin_email}],
+                "subject": subject,
+                "htmlContent": body,
+            },
+            timeout=8,
+        )
+        log.info("Alerte réponse envoyée à %s pour %s", admin_email, prospect_name)
+    except Exception as e:
+        log.warning("_send_reply_alert : %s", e)
+
+
+def _job_imap_reply_poll():
+    """
+    Polling IMAP toutes les 5 min — détecte les réponses des prospects.
+
+    Variables d'env requises :
+      IMAP_HOST     ex: imap.gmail.com
+      IMAP_PORT     ex: 993
+      IMAP_USER     ex: contact@presence-ia.com
+      IMAP_PASSWORD mot de passe ou app password
+      IMAP_FOLDER   dossier à surveiller (défaut: INBOX)
+
+    Logique :
+      1. Cherche les emails UNSEEN dans INBOX
+      2. Pour chaque email, extrait l'adresse "From"
+      3. Cherche le prospect dans V3ProspectDB par email
+      4. Si trouvé : marque reply_status=positive dans ProspectDeliveryDB
+      5. Envoie alerte email à l'admin
+      6. Marque l'email comme SEEN pour ne pas le retraiter
+    """
+    import os, imaplib, email as _email
+    from email.header import decode_header
+
+    host  = os.getenv("IMAP_HOST", "")
+    port  = int(os.getenv("IMAP_PORT", "993"))
+    user  = os.getenv("IMAP_USER", "")
+    pwd   = os.getenv("IMAP_PASSWORD", "")
+    folder = os.getenv("IMAP_FOLDER", "INBOX")
+
+    if not (host and user and pwd):
+        return  # non configuré → silencieux
+
+    try:
+        conn = imaplib.IMAP4_SSL(host, port)
+        conn.login(user, pwd)
+        conn.select(folder)
+
+        # Chercher emails non lus
+        _, data = conn.search(None, "UNSEEN")
+        if not data or not data[0]:
+            conn.logout()
+            return
+
+        uids = data[0].split()
+        if not uids:
+            conn.logout()
+            return
+
+        log.info("IMAP poll : %d email(s) non lus", len(uids))
+
+        from .database import SessionLocal
+        from .models import V3ProspectDB
+
+        try:
+            from marketing_module.database import SessionLocal as MktSession, db_update_delivery
+            from marketing_module.models import ProspectDeliveryDB, ReplyStatus
+            _mkt_available = True
+        except Exception:
+            _mkt_available = False
+
+        for uid in uids:
+            try:
+                _, msg_data = conn.fetch(uid, "(RFC822)")
+                raw = msg_data[0][1]
+                msg = _email.message_from_bytes(raw)
+
+                # Extraire l'adresse From
+                from_raw = msg.get("From", "")
+                # Décoder si encodé
+                parts = decode_header(from_raw)
+                from_decoded = ""
+                for part, enc in parts:
+                    if isinstance(part, bytes):
+                        from_decoded += part.decode(enc or "utf-8", errors="replace")
+                    else:
+                        from_decoded += part
+                # Extraire email entre < >
+                import re
+                m = re.search(r"<([^>]+)>", from_decoded)
+                from_email = m.group(1).lower() if m else from_decoded.strip().lower()
+
+                if not from_email or "@" not in from_email:
+                    # Marquer comme lu quand même pour éviter boucle
+                    conn.store(uid, "+FLAGS", "\\Seen")
+                    continue
+
+                # Chercher prospect par email
+                with SessionLocal() as db:
+                    prospect = db.query(V3ProspectDB).filter(
+                        V3ProspectDB.email == from_email
+                    ).first()
+
+                if not prospect:
+                    # Pas un prospect connu — laisser non lu, ne pas alerter
+                    log.debug("IMAP : email de %s — pas un prospect connu", from_email)
+                    continue
+
+                # Extraire snippet du corps
+                snippet = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            try:
+                                snippet = part.get_payload(decode=True).decode("utf-8", errors="replace")[:300]
+                            except Exception:
+                                pass
+                            break
+                else:
+                    try:
+                        snippet = msg.get_payload(decode=True).decode("utf-8", errors="replace")[:300]
+                    except Exception:
+                        pass
+
+                log.info("IMAP : réponse détectée de %s (%s)", prospect.name, from_email)
+
+                # Mise à jour CRM
+                if _mkt_available:
+                    try:
+                        with MktSession() as mdb:
+                            delivery = (
+                                mdb.query(ProspectDeliveryDB)
+                                .filter_by(project_id="presence-ia", prospect_id=prospect.token)
+                                .order_by(ProspectDeliveryDB.created_at.desc())
+                                .first()
+                            )
+                            if delivery and delivery.reply_status == ReplyStatus.none:
+                                db_update_delivery(mdb, delivery.id, {
+                                    "reply_status": ReplyStatus.positive
+                                })
+                    except Exception as e:
+                        log.warning("IMAP CRM update : %s", e)
+
+                # Alerte admin
+                _send_reply_alert(
+                    prospect_name=prospect.name or from_email,
+                    prospect_email=from_email,
+                    snippet=snippet,
+                    channel="email",
+                )
+
+                # Marquer comme lu pour ne pas retraiter
+                conn.store(uid, "+FLAGS", "\\Seen")
+
+            except Exception as e:
+                log.error("IMAP traitement email uid=%s : %s", uid, e)
+
+        conn.logout()
+
+    except imaplib.IMAP4.error as e:
+        log.error("IMAP connexion : %s", e)
+    except Exception as e:
+        log.error("_job_imap_reply_poll : %s", e)
 
 
 def _job_run_due_targets():

@@ -1,8 +1,126 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — MARKETING_MODULE EURKAI complet (email + SMS + social + CRM)
+**Statut** : 🟢 actif — CRM Kanban + Closer recruitment + reply tracking
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-03-06 (session 2)
+**Dernière MAJ** : 2026-03-13
+
+---
+
+## 🔌 SESSION 2026-03-13 — CRM, CLOSER, GTM, REPLY TRACKING
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `libs/marketing_module/models.py` | ContactDB, CloserApplicationDB, ProspectJourneyDB, MeetingDB enrichi (rescheduled_from_id, outcome, commission_rate/amount), ProspectDeliveryDB (landing_visited_at, calendly_clicked_at), CloserDB enrichi (token, contact_id, dob), enums JourneyStage + ApplicationStage | ✅ |
+| `libs/marketing_module/database.py` | _migrate_existing_tables() ALTER TABLE idempotent + CRUD Contact, Journey, Application | ✅ |
+| `src/api/routes/crm_admin.py` | **NOUVEAU** — /admin/crm vue Table + Kanban drag&drop 6 colonnes, /admin/crm/closers, /admin/crm/application/{id} validation 1 clic | ✅ |
+| `src/api/routes/closer_public.py` | **NOUVEAU** — /closer/ présentation, /closer/recruit formulaire (vidéo+audio+message), /closer/{token} portail closer, /closer/{token}/meeting/{id} fiche RDV | ✅ |
+| `src/api/routes/_nav.py` | Section CRM ajoutée dans sidebar admin | ✅ |
+| `src/api/main.py` | Routers crm_admin + closer_public + mount closer-audio static | ✅ |
+| `src/api/routes/_gtm.py` | **NOUVEAU** — helper gtm_head(), gtm_body(), gtm_push() — activé via GTM_ID env var | ✅ |
+| `src/api/routes/v3_mkt_bridge.py` | record_landing_visit(), record_calendly_click() | ✅ |
+| `src/api/routes/v3.py` | GTM dans landing /l/{token}, /l/track/calendly/{token} redirect trackée, tous les liens Calendly instrumentés, webhook Twilio inbound SMS | ✅ |
+| `src/api/routes/page_builder_route.py` | GTM dans render_home | ✅ |
+| `src/scheduler.py` | _job_imap_reply_poll() toutes les 5 min + _send_reply_alert() via Brevo | ✅ |
+
+### Variables d'env à configurer sur le VPS
+
+```bash
+# GTM
+GTM_ID=GTM-XXXXXXX
+
+# IMAP reply tracking (contact@presence-ia.com ou autre boîte)
+IMAP_HOST=imap.gmail.com          # ou imap.ionos.de, mail.ionos.fr etc.
+IMAP_PORT=993
+IMAP_USER=contact@presence-ia.com
+IMAP_PASSWORD=xxxx
+IMAP_FOLDER=INBOX
+
+# Alerte réponse (email admin à alerter)
+ADMIN_ALERT_EMAIL=ton@email.com
+
+# Twilio inbound SMS
+# Configurer dans console Twilio : Messaging → Phone Number → Webhook
+# POST https://presence-ia.com/api/v3/webhooks/twilio/inbound
+```
+
+### URLs nouvelles en prod
+
+| URL | Description |
+|-----|-------------|
+| `/admin/crm` | CRM pipeline (table + kanban) |
+| `/admin/crm/closers` | Gestion closers + candidatures |
+| `/closer/` | Page présentation programme closer |
+| `/closer/recruit` | Formulaire candidature |
+| `/closer/{token}` | Portail closer |
+| `/l/track/calendly/{token}` | Tracking clic Calendly |
+| `POST /api/v3/webhooks/twilio/inbound` | Webhook SMS entrant |
+
+### Commits déployés
+- `f4caaac` — CRM Kanban + Closer + marketing_module enrichi
+- `0a10f17` — GTM + tracking landing_visited_at + calendly_clicked_at
+- *(reply tracking — en cours)*
+
+### À faire / en attente
+
+- [ ] Configurer `IMAP_*` + `ADMIN_ALERT_EMAIL` sur VPS
+- [ ] Configurer webhook Twilio inbound dans console Twilio
+- [ ] Créer container GTM-XXXXXXX + ajouter GTM_ID sur VPS
+- [ ] Configurer GTM : triggers landing_visit, calendly_click, cta_click
+- [ ] Remplir contenu `/closer/` (script de vente, objections)
+- [ ] Long terme : Brevo Inbound Parsing (MX record replies.presence-ia.fr → temps réel)
+
+---
+
+## 🔌 SESSION 2026-03-12 — RESTAURATION LANDING PAGE + FIX ADMIN
+
+### Réalisé
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/api/main.py` | Routeur admin/login déplacé AVANT generate (catch-all `/{profession}`) — fix `/admin` returning 404 | ✅ |
+| `src/api/routes/admin.py` | `_check_token` redirige vers `/admin/login` (302) au lieu de 403 | ✅ |
+| `src/api/routes/v3.py` | Logo SVG ajouté dans la nav (`/assets/logo.svg`, height:54px) | ✅ |
+| `src/api/routes/generate.py` | **Restauration état référence** : overlay hero `.78/.85`, "Aucun concurrent cité", marques IA texte seul (sans icônes SVG), suppression `_AI_LOGOS` dict | ✅ |
+
+### Commits déployés
+- `484a61f` — fix admin router ordering + redirect
+- `b3a6f40` — revert v3 landing
+- `59cb265` — v3 logo SVG nav
+- `79f8be3` — fix generate: marques texte seul, suppression SVG logos IA
+
+### Référence utilisée
+`/Users/nathalie/Dropbox/____BIG_BOFF___/_INPUTS/TOIT'URIEN — Audit Visibilite IA (1).html`
+(sauvegardé depuis `https://presence-ia.com/couvreur?t=6b84ba4b258f4eaabdf7b3e4`)
+
+---
+
+## 🔌 SESSION 2026-03-11 — ENRICHISSEMENT PROSPECTS (url, nom, cms, tel, mobile, email)
+
+### Réalisé
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/cms_detector.py` | Nouveau — détecte CMS depuis HTML/headers (wp, wix, squarespace, webflow, shopify, jimdo, prestashop, joomla, drupal, typo3) | ✅ |
+| `src/enrich.py` | Ajout `enrich_website()` (email + mobile en 1 requête) + `_classify_phone()` | ✅ |
+| `src/google_places.py` | `_classify_phone()` intégrée, `international_phone_number` dans Details, nouvelle `search_prospects_enriched()` | ✅ |
+| `src/models.py` | Colonnes `mobile TEXT` + `cms TEXT` ajoutées à ProspectDB | ✅ |
+| `src/database.py` | Migration auto `prospects.mobile` + `prospects.cms` | ✅ |
+| `src/api/routes/campaign.py` | Route `/prospect-scan/auto` utilise `search_prospects_enriched`, retourne 6 champs | ✅ |
+
+### Réponse retournée par `/api/prospect-scan/auto`
+```json
+{
+  "id": "...", "name": "Dupont Toiture", "website": "https://dupont-toiture.fr",
+  "tel": "02 99 12 34 56", "mobile": "06 12 34 56 78",
+  "email": "contact@dupont-toiture.fr", "cms": "wordpress"
+}
+```
+
+### Prochaines étapes
+- [ ] Déployer sur VPS + tester avec vraie campagne
+- [ ] Résoudre blocage Cloudflare pour tests IA (solution extension Chrome)
+
+---
 
 ## 🔌 SESSION 2026-03-06 (session 2) — MARKETING_MODULE EURKAI COMPLET
 
