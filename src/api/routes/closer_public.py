@@ -446,12 +446,13 @@ def closer_demo_slots(request: Request):
         bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
                        'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5% bonus</span>'
                        ) if r["bonus"] else ""
+        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
         leaderboard_rows += (
             f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
             f'border-bottom:1px solid #1a1a2e">'
             f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};'
             f'font-size:13px;font-weight:{"700" if is_me else "400"}">'
-            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'{rank_icon}</td>'
             f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
             f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
             f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]} deals</td>'
@@ -736,10 +737,11 @@ def closer_portal_demo(request: Request):
         bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
                        'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
                        ) if r["bonus"] else ""
+        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
         leaderboard_rows_demo += (
             f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
             f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
-            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'{rank_icon}</td>'
             f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
             f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
             f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
@@ -1150,10 +1152,11 @@ def closer_portal(token: str, request: Request):
             bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
                            'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
                            ) if r["bonus"] else ""
+            rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
             leaderboard_rows_real += (
                 f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
                 f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
-                f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+                f'{rank_icon}</td>'
                 f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
                 f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
                 f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
@@ -1610,10 +1613,11 @@ def closer_slots(token: str, request: Request):
         bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
                        'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
                        ) if r["bonus"] else ""
+        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
         lb_rows += (
             f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
             f'<td style="padding:8px 12px;font-size:12px;color:#9ca3af">'
-            f'{"🥇" if r["rank"]==1 else "🥈" if r["rank"]==2 else f"#{r[\"rank\"]}"}</td>'
+            f'{rank_icon}</td>'
             f'<td style="padding:8px 12px;font-size:12px;color:#fff;font-weight:{"700" if is_me else "400"}">'
             f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
             f'<td style="padding:8px 12px;font-size:12px;color:#2ecc71;text-align:right">{r["signed"]}</td>'
