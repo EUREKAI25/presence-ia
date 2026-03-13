@@ -794,7 +794,11 @@ def _render_landing(
                 f'<hr style="border:none;border-top:1px solid var(--g2);">'
             )
 
+    from ._gtm import gtm_head, gtm_body, gtm_push
+    _calendly_tracked = f"/l/track/calendly/{p.token}"
+
     return f"""<!DOCTYPE html><html lang="fr"><head>
+{gtm_head()}
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{name} — Audit Visibilité IA</title><meta name="robots" content="noindex"><link rel="icon" href="/assets/favicon.png">
 <style>
@@ -871,10 +875,12 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 footer{{background:#111827;padding:32px 24px;text-align:center;color:#6b7280;font-size:11px;letter-spacing:.3px}}
 footer a{{color:#9ca3af;text-decoration:underline}}
 </style></head><body>
+{gtm_body()}
+{gtm_push("landing_visit", page_type="prospect_landing", city=p.city, profession=p.profession)}
 
 <nav class="sticky-nav">
   <a class="sn-logo" href="/"><img src="/assets/logo-white.svg" alt="Présence IA" style="height:44px;width:auto;display:block;filter:brightness(0) invert(1)"></a>
-  <a class="sn-cta" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit</a>
+  <a class="sn-cta" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit</a>
 </nav>
 
 {hero_html}
@@ -899,7 +905,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+      <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -909,7 +915,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n'apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu'elles recommandent.</p>
-    <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+    <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
   </div>
 </section>
 
@@ -921,7 +927,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 </div></div></section>
 
 <div style="text-align:center;padding:40px 24px 56px">
-  <a class="btn-pitch" href="{CALENDLY_URL}" target="_blank">Réserver mon audit gratuit →</a>
+  <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
 </div>
 
 <footer>
@@ -1043,9 +1049,18 @@ def track_click(delivery_id: str, url: str = ""):
 
 # ── Route publique ────────────────────────────────────────────────────────────
 
+@router.get("/l/track/calendly/{token}")
+def track_calendly(token: str):
+    """Tracking clic Calendly + redirect."""
+    _mkt.record_calendly_click(token)
+    return RedirectResponse(CALENDLY_URL, status_code=302)
+
+
 @router.get("/l/{token}", response_class=HTMLResponse)
 def landing_v3(token: str):
     from ...models import CityEvidenceDB
+    # Tracking landing visit (silencieux)
+    _mkt.record_landing_visit(token)
     with SessionLocal() as db:
         p = db.get(V3ProspectDB, token)
         if not p:

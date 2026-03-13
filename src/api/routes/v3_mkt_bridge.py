@@ -175,6 +175,53 @@ def record_click(delivery_id: str):
         db.close()
 
 
+def record_landing_visit(prospect_token: str):
+    """Enregistre la visite de la landing personnalisée."""
+    db = _mkt_db()
+    if not db:
+        return
+    try:
+        from marketing_module.database import db_update_delivery
+        from marketing_module.models import ProspectDeliveryDB
+        from datetime import datetime
+        # Met à jour la livraison la plus récente du prospect
+        delivery = (
+            db.query(ProspectDeliveryDB)
+            .filter_by(project_id=PROJECT_ID, prospect_id=prospect_token)
+            .order_by(ProspectDeliveryDB.created_at.desc())
+            .first()
+        )
+        if delivery and not delivery.landing_visited_at:
+            db_update_delivery(db, delivery.id, {"landing_visited_at": datetime.utcnow()})
+    except Exception as e:
+        log.warning("record_landing_visit: %s", e)
+    finally:
+        db.close()
+
+
+def record_calendly_click(prospect_token: str):
+    """Enregistre un clic sur le bouton Calendly."""
+    db = _mkt_db()
+    if not db:
+        return
+    try:
+        from marketing_module.database import db_update_delivery
+        from marketing_module.models import ProspectDeliveryDB
+        from datetime import datetime
+        delivery = (
+            db.query(ProspectDeliveryDB)
+            .filter_by(project_id=PROJECT_ID, prospect_id=prospect_token)
+            .order_by(ProspectDeliveryDB.created_at.desc())
+            .first()
+        )
+        if delivery and not delivery.calendly_clicked_at:
+            db_update_delivery(db, delivery.id, {"calendly_clicked_at": datetime.utcnow()})
+    except Exception as e:
+        log.warning("record_calendly_click: %s", e)
+    finally:
+        db.close()
+
+
 def invalidate_cache():
     """Force le rechargement des IDs (utile après seed_loader)."""
     _cache.clear()

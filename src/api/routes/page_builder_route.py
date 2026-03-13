@@ -496,9 +496,12 @@ footer a{color:#9ca3af;text-decoration:underline}
 @media(max-width:640px){.stat{padding:0 24px;border-right:none;border-bottom:1px solid #e2e8f0;padding-bottom:24px;margin-bottom:8px}.stat:last-child{border-bottom:none}.steps-grid{grid-template-columns:1fr}}
 """
 
+    from ._gtm import gtm_head, gtm_body, gtm_push
+
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
+{gtm_head()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Présence IA — Audit de visibilité sur ChatGPT, Gemini et Claude</title>
@@ -507,6 +510,8 @@ footer a{color:#9ca3af;text-decoration:underline}
   <style>{css}</style>
 </head>
 <body>
+{gtm_body()}
+{gtm_push("page_view", page_type="home")}
 
 <nav class="nav">
   <a class="nav__brand" href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;display:block"></a>
