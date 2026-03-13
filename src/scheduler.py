@@ -151,7 +151,8 @@ def _job_calendly_poll():
         try:
             from marketing_module.database import SessionLocal as MktSession
             from marketing_module.models import MeetingDB, MeetingStatus, ReplyStatus
-            from marketing_module.database import db_create_meeting, db_update_delivery
+            from marketing_module.database import (db_create_meeting, db_update_delivery,
+                                                    db_sync_slot_from_meeting)
         except Exception as e:
             log.warning("marketing_module non dispo pour Calendly poll: %s", e)
             return
@@ -166,6 +167,8 @@ def _job_calendly_poll():
                     calendly_event_id=calendly_event_id
                 ).first()
                 if existing:
+                    # Synchroniser quand même le slot si le meeting existe déjà
+                    db_sync_slot_from_meeting(mdb, "presence-ia", existing)
                     continue
 
                 # Récupérer l'email de l'invité
@@ -195,7 +198,7 @@ def _job_calendly_poll():
                     scheduled_at = None
 
                 # Créer le meeting dans CRM
-                db_create_meeting(mdb, {
+                new_meeting = db_create_meeting(mdb, {
                     "project_id":        "presence-ia",
                     "prospect_id":       prospect_id,
                     "campaign_id":       None,
@@ -205,6 +208,10 @@ def _job_calendly_poll():
                     "calendly_event_uri": ev.get("uri", ""),
                     "notes":             invitees[0].get("name", ""),
                 })
+
+                # Créer un slot 'booked' dans l'agenda des closers
+                if new_meeting:
+                    db_sync_slot_from_meeting(mdb, "presence-ia", new_meeting)
 
                 # Stopper la séquence email : marquer la dernière livraison comme "replied"
                 from marketing_module.models import ProspectDeliveryDB
