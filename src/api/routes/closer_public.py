@@ -456,8 +456,6 @@ def closer_demo_slots(request: Request):
             f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
             f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
             f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]} deals</td>'
-            f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
-            f'{r["commission"]:.0f}€ — {r["rate"]}%</td>'
             f'</tr>'
         )
 
@@ -574,14 +572,12 @@ def closer_demo_slots(request: Request):
       <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;
           letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Closer</th>
       <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;
-          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Ce mois</th>
-      <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;
-          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Commissions</th>
+          letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Deals ce mois</th>
     </tr></thead>
     <tbody>{leaderboard_rows}</tbody>
     </table></div>
     <p style="color:#555;font-size:11px;line-height:1.5">
-      Les 2 premiers closers du mois reçoivent un bonus de +5% sur toutes leurs commissions du mois.
+      Les 2 premiers du mois reçoivent +5% de commission.
     </p>
   </div>
 </div>
@@ -589,7 +585,7 @@ def closer_demo_slots(request: Request):
 </div>
 <script>
 function claimSlot(id){{
-  alert('Démo uniquement — sur la vraie page, ce créneau serait réservé à votre nom.\\n\\nRègle anti-consécutif : impossible de prendre deux créneaux d\\'affilée.');
+  alert('Démo uniquement — sur la vraie page, ce créneau serait réservé à votre nom.');
 }}
 </script>
 </body></html>""")
@@ -737,41 +733,16 @@ def closer_portal_demo(request: Request):
         bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
                        'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
                        ) if r["bonus"] else ""
-        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
-        leaderboard_rows_demo += (
-            f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
-            f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
-            f'{rank_icon}</td>'
-            f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
-            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
-            f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
-            f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
-            f'{r["commission"]:.0f}€ — {r["rate"]}%</td>'
-            f'</tr>'
-        )
+    # panel_rdv avec bouton Agenda
+    panel_rdv = (
+        f'<div style="margin-bottom:20px">'
+        f'<a href="/closer/demo/slots" style="display:inline-block;background:#8b5cf6;'
+        f'color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">'
+        f'📅 Agenda — voir les créneaux disponibles →</a>'
+        f'</div>'
+    ) + panel_rdv
 
-    panel_leaderboard_demo = f"""
-<div style="margin-bottom:16px">
-  <a href="/closer/demo/slots" style="display:inline-block;background:#8b5cf6;color:#fff;
-    text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
-    Choisir mes créneaux →</a>
-</div>
-<h3 style="color:#fff;font-size:14px;margin-bottom:16px">Classement ce mois-ci</h3>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:16px">
-<table style="width:100%;border-collapse:collapse">
-<thead><tr>
-  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e"></th>
-  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Closer</th>
-  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Deals</th>
-  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Commissions</th>
-</tr></thead>
-<tbody>{leaderboard_rows_demo}</tbody>
-</table></div>
-<p style="color:#555;font-size:12px;line-height:1.5">
-  Les 2 premiers closers du mois reçoivent +5% de commission sur tous leurs deals du mois en cours.
-</p>"""
-
-    TABS = [("rdv","Mes RDV"),("commissions","Commissions"),("offre","L'offre"),("script","Script"),("objections","Objections"),("classement","Classement")]
+    TABS = [("rdv","Mes RDV"),("commissions","Commissions"),("offre","L'offre"),("script","Script"),("objections","Objections")]
 
     def _tab_btn(slug, label, active="rdv"):
         a = slug == active
@@ -783,8 +754,7 @@ def closer_portal_demo(request: Request):
     tabs_html = f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">{"".join(_tab_btn(s,l) for s,l in TABS)}</div>'
 
     panels = {"rdv": panel_rdv, "commissions": panel_commissions,
-              "offre": panel_offre, "script": panel_script, "objections": panel_objections,
-              "classement": panel_leaderboard_demo}
+              "offre": panel_offre, "script": panel_script, "objections": panel_objections}
     panels_js = {k: v.replace("`","\\`").replace("${","\\${") for k,v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
@@ -1160,39 +1130,14 @@ def closer_portal(token: str, request: Request):
                 f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
                 f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
                 f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]}</td>'
-                f'<td style="padding:10px 14px;color:#9ca3af;font-size:12px;text-align:right">'
-                f'{r["commission"]:.0f}€ — {r["effective_rate"]*100:.0f}%</td>'
                 f'</tr>'
             )
     except Exception:
-        leaderboard_rows_real = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#555">Données non disponibles</td></tr>'
-
-    panel_leaderboard = f"""
-<div style="margin-bottom:16px">
-  <a href="/closer/{token}/slots" style="display:inline-block;background:#8b5cf6;color:#fff;
-    text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
-    Choisir mes créneaux →</a>
-  {'<span style="margin-left:12px;color:#a5b4fc;font-size:12px">Votre rang : #' + my_rank + '</span>' if my_rank != "—" else ""}
-</div>
-<h3 style="color:#fff;font-size:14px;margin-bottom:16px">Classement ce mois-ci</h3>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:16px">
-<table style="width:100%;border-collapse:collapse">
-<thead><tr>
-  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e"></th>
-  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Closer</th>
-  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Deals</th>
-  <th style="padding:8px 14px;text-align:right;color:#555;font-size:10px;border-bottom:1px solid #2a2a4e">Commissions</th>
-</tr></thead>
-<tbody>{"".join(leaderboard_rows_real) if leaderboard_rows_real else '<tr><td colspan="4" style="padding:20px;text-align:center;color:#555">Aucun classement ce mois</td></tr>'}</tbody>
-</table></div>
-<p style="color:#555;font-size:12px;line-height:1.5">
-  Les 2 premiers closers du mois reçoivent +5% de commission sur tous leurs deals du mois en cours.
-</p>"""
+        leaderboard_rows_real = '<tr><td colspan="3" style="padding:20px;text-align:center;color:#555">Données non disponibles</td></tr>'
 
     # ── Onglets ───────────────────────────────────────────────────────────────
     TABS = [("rdv", "Mes RDV"), ("commissions", "Commissions"),
-            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections"),
-            ("classement", "Classement")]
+            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections")]
 
     def _tab_btn(slug, label):
         active = slug == tab
@@ -1217,6 +1162,11 @@ def closer_portal(token: str, request: Request):
         )
 
     panel_rdv = f"""
+<div style="margin-bottom:20px">
+  <a href="/closer/{token}/slots" style="display:inline-block;background:#8b5cf6;
+    color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">
+    📅 Agenda — voir les créneaux disponibles →</a>
+</div>
 <h3 style="color:#fff;font-size:14px;margin-bottom:16px">RDV à venir ({len(meetings_upcoming)})</h3>
 {upcoming_html}
 <h3 style="color:#9ca3af;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Historique</h3>
@@ -1269,7 +1219,6 @@ def closer_portal(token: str, request: Request):
         "offre":       panel_offre,
         "script":      panel_script,
         "objections":  panel_objections,
-        "classement":  panel_leaderboard,
     }
     panels_js = {k: v.replace("`", "\\`").replace("${", "\\${") for k, v in panels.items()}
 
@@ -1315,7 +1264,6 @@ const _panels = {{
   offre: `{panels_js["offre"]}`,
   script: `{panels_js["script"]}`,
   objections: `{panels_js["objections"]}`,
-  classement: `{panels_js["classement"]}`,
 }};
 function switchTab(slug) {{
   document.getElementById('tab-content').innerHTML = _panels[slug] || '';
@@ -1660,9 +1608,6 @@ table{{width:100%;border-collapse:collapse}}
   <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#6366f1;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par moi</span></div>
   <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#374151;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par un autre</span></div>
 </div>
-<p style="color:#555;font-size:11px;margin-bottom:24px">
-  ⚠️ Vous ne pouvez pas prendre deux créneaux consécutifs (règle anti-consécutif : 25 min minimum entre vos créneaux).
-</p>
 
 <div style="display:grid;grid-template-columns:1fr minmax(240px,320px);gap:28px">
 <div>

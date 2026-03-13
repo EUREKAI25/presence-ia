@@ -755,35 +755,37 @@ def db_update_slot(db: Session, slot_id: str, updates: dict) -> Optional[SlotDB]
 
 def db_claim_slot(db: Session, slot_id: str, closer_id: str) -> tuple[bool, str]:
     """
-    Tente de revendiquer un créneau pour un closer.
-    Règles :
-      - Le créneau doit être 'booked' (prospect inscrit, pas encore pris)
-      - Le closer ne doit pas avoir un autre créneau à ±25 min (anti-consécutif)
+    Revendique un créneau pour un closer.
+    - Le créneau doit être 'booked' (prospect inscrit, pas encore pris).
+    - Après la prise, le créneau suivant (+20 min) est automatiquement
+      bloqué comme buffer (s'il est libre = "available", pas s'il a un prospect).
     Retourne (success, message).
     """
+    from datetime import timedelta
     slot = db_get_slot(db, slot_id)
     if not slot:
         return False, "Créneau introuvable."
     if slot.status != SlotStatus.booked:
         return False, "Ce créneau n'est plus disponible."
 
-    # Anti-consécutif : vérifie les créneaux déjà pris par ce closer
-    from datetime import timedelta
-    window = timedelta(minutes=25)
-    conflict = db.query(SlotDB).filter(
-        SlotDB.project_id == slot.project_id,
-        SlotDB.closer_id  == closer_id,
-        SlotDB.status     == SlotStatus.claimed,
-        SlotDB.starts_at  >= slot.starts_at - window,
-        SlotDB.starts_at  <= slot.starts_at + window,
-    ).first()
-    if conflict:
-        return False, "Vous avez déjà un créneau dans cette plage horaire (règle anti-consécutif)."
-
     slot.closer_id  = closer_id
     slot.status     = SlotStatus.claimed
     slot.updated_at = datetime.utcnow()
-    db.commit(); db.refresh(slot)
+    db.commit()
+
+    # Buffer automatique : bloquer le créneau suivant s'il est libre
+    next_slot = db.query(SlotDB).filter(
+        SlotDB.project_id == slot.project_id,
+        SlotDB.starts_at  == slot.ends_at,
+        SlotDB.status     == SlotStatus.available,   # ne pas bloquer un créneau avec prospect
+    ).first()
+    if next_slot:
+        next_slot.status     = SlotStatus.blocked
+        next_slot.closer_id  = closer_id
+        next_slot.updated_at = datetime.utcnow()
+        db.commit()
+
+    db.refresh(slot)
     return True, "Créneau réservé avec succès."
 
 def db_delete_slot(db: Session, slot_id: str) -> bool:

@@ -146,6 +146,7 @@ class SlotStatus(str, Enum):
     available = "available"   # créneau libre, aucun prospect
     booked    = "booked"      # prospect a réservé, aucun closer n'a pris
     claimed   = "claimed"     # un closer a pris ce créneau
+    blocked   = "blocked"     # buffer automatique après un créneau pris
     completed = "completed"   # RDV effectué
     cancelled = "cancelled"   # annulé
 
