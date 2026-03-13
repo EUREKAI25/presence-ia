@@ -282,20 +282,50 @@ def _get_closer_by_token(token: str):
         return None
 
 
+def _load_portal_content() -> dict:
+    """Charge le contenu éditable du portail (script, offre, objections, etc.)."""
+    from pathlib import Path as _P
+    import json as _j
+    f = _P(__file__).parent.parent.parent.parent / "data" / "closer_content.json"
+    try:
+        if f.exists():
+            return _j.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {
+        "offer_title": "Présence IA — Visibilité locale sur les IA",
+        "offer_price": "497 €/an",
+        "offer_pitch": "Aide les artisans et PME locales à apparaître sur ChatGPT et les IA.",
+        "pitch_script": "Script non encore configuré — rendez-vous dans l'admin → Contenu portail.",
+        "objections": "Objections non encore configurées.",
+        "rdv_guide": "Guide RDV non encore configuré.",
+        "commission_info": "18% par deal signé.",
+    }
+
+
 @router.get("/closer/{token}", response_class=HTMLResponse)
 def closer_portal(token: str, request: Request):
-    """Portail closer — liste de ses RDV + stats."""
+    """Portail closer — RDV, stats, commissions, ressources."""
     preview = request.query_params.get("preview")
+    tab     = request.query_params.get("tab", "rdv")
 
     closer = _get_closer_by_token(token)
     if not closer and not preview:
         return HTMLResponse("<p style='font-family:sans-serif;padding:40px;color:#666'>Lien invalide.</p>",
                             status_code=404)
 
-    name = getattr(closer, "name", "Closer") if closer else "Aperçu"
+    name         = getattr(closer, "name", "Closer") if closer else "Aperçu"
+    commission_rate = getattr(closer, "commission_rate", 0.18) if closer else 0.18
+    content      = _load_portal_content()
 
-    meetings = []
-    stats = {"total": 0, "completed": 0, "no_show": 0, "scheduled": 0, "earned": 0.0}
+    # ── Données RDV ──────────────────────────────────────────────────────────
+    meetings_upcoming = []
+    meetings_past     = []
+    stats = {"total": 0, "completed": 0, "no_show": 0, "scheduled": 0,
+             "earned": 0.0, "pending": 0.0}
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+
     try:
         from marketing_module.database import SessionLocal as MktSession
         from marketing_module.models import MeetingDB, MeetingStatus
@@ -306,48 +336,197 @@ def closer_portal(token: str, request: Request):
             q = mdb.query(MeetingDB).filter_by(project_id=PROJECT_ID)
             if closer:
                 q = q.filter_by(closer_id=closer.id)
-            mtgs = q.order_by(MeetingDB.scheduled_at.desc()).limit(50).all()
+            mtgs = q.order_by(MeetingDB.scheduled_at.asc()).limit(100).all()
 
             with SessionLocal() as db:
                 for m in mtgs:
                     prospect = db.query(V3ProspectDB).filter_by(token=m.prospect_id).first()
-                    meetings.append({
-                        "id": m.id,
-                        "name": prospect.name if prospect else m.prospect_id[:12],
-                        "city": prospect.city if prospect else "—",
-                        "profession": prospect.profession if prospect else "—",
-                        "scheduled_at": m.scheduled_at.strftime("%d/%m/%y %H:%M") if m.scheduled_at else "—",
-                        "status": m.status,
-                        "deal_value": m.deal_value,
-                        "notes": m.notes or "",
-                    })
+                    entry = {
+                        "id":           m.id,
+                        "name":         prospect.name if prospect else "—",
+                        "city":         prospect.city if prospect else "—",
+                        "profession":   prospect.profession if prospect else "—",
+                        "phone":        prospect.phone if prospect else "",
+                        "scheduled_at": m.scheduled_at,
+                        "scheduled_str": m.scheduled_at.strftime("%d/%m/%y %H:%M") if m.scheduled_at else "—",
+                        "status":       m.status,
+                        "deal_value":   m.deal_value,
+                        "notes":        m.notes or "",
+                        "outcome":      getattr(m, "outcome", "") or "",
+                    }
                     stats["total"] += 1
                     if m.status == MeetingStatus.completed:
                         stats["completed"] += 1
                         if m.deal_value:
-                            rate = getattr(closer, "commission_rate", 0.18) if closer else 0.18
-                            stats["earned"] += m.deal_value * rate
+                            stats["earned"] += m.deal_value * commission_rate
                     elif m.status == MeetingStatus.no_show:
                         stats["no_show"] += 1
                     elif m.status == MeetingStatus.scheduled:
                         stats["scheduled"] += 1
+                        if m.deal_value:
+                            stats["pending"] += m.deal_value * commission_rate
+                    # Séparer à venir / passé
+                    if m.status == MeetingStatus.scheduled and m.scheduled_at and m.scheduled_at.replace(tzinfo=timezone.utc) >= now:
+                        meetings_upcoming.append(entry)
+                    else:
+                        meetings_past.append(entry)
     except Exception:
         pass
 
+    meetings_past.sort(key=lambda x: x["scheduled_at"] or datetime.min, reverse=True)
     conv_rate = f"{stats['completed']/stats['total']*100:.0f}%" if stats["total"] else "—"
 
-    mtg_rows = "".join(
+    # ── Stats bar ─────────────────────────────────────────────────────────────
+    stats_html = "".join(
+        f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;'
+        f'padding:14px 16px;text-align:center">'
+        f'<div style="font-size:1.6rem;font-weight:700;color:{c}">{v}</div>'
+        f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{l}</div>'
+        f'</div>'
+        for v, l, c in [
+            (stats["scheduled"],          "RDV à venir",      "#6366f1"),
+            (stats["completed"],          "Signés",           "#2ecc71"),
+            (stats["no_show"],            "No-show",          "#e94560"),
+            (conv_rate,                   "Taux conversion",  "#e9a020"),
+            (f'{stats["earned"]:.0f}€',   "Gagné",            "#527FB3"),
+            (f'{stats["pending"]:.0f}€',  "En attente",       "#9ca3af"),
+        ]
+    )
+
+    # ── RDV à venir ──────────────────────────────────────────────────────────
+    def _upcoming_card(m):
+        phone_btn = (
+            f'<a href="tel:{m["phone"]}" style="display:inline-block;margin-top:8px;'
+            f'padding:5px 12px;background:#6366f120;border:1px solid #6366f140;'
+            f'border-radius:4px;color:#6366f1;font-size:11px;text-decoration:none">📞 Appeler</a>'
+        ) if m["phone"] else ""
+        return (
+            f'<div style="background:#1a1a2e;border:1px solid #6366f140;border-radius:10px;'
+            f'padding:16px;margin-bottom:12px">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+            f'  <div>'
+            f'    <div style="color:#fff;font-size:14px;font-weight:600">{m["name"]}</div>'
+            f'    <div style="color:#6b7280;font-size:11px;margin-top:2px">{m["city"]} · {m["profession"]}</div>'
+            f'    {phone_btn}'
+            f'  </div>'
+            f'  <div style="text-align:right">'
+            f'    <div style="color:#6366f1;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
+            f'    <a href="/closer/{token}/meeting/{m["id"]}" '
+            f'    style="display:inline-block;margin-top:6px;color:#527FB3;font-size:11px;text-decoration:none">'
+            f'    Fiche RDV →</a>'
+            f'  </div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    upcoming_html = (
+        "".join(_upcoming_card(m) for m in meetings_upcoming)
+        or '<p style="color:#555;font-size:13px;padding:20px 0">Aucun RDV à venir</p>'
+    )
+
+    # ── Historique ────────────────────────────────────────────────────────────
+    past_rows = "".join(
         f'<tr style="border-bottom:1px solid #1a1a2e;cursor:pointer" '
         f'onclick="window.location=\'/closer/{token}/meeting/{m["id"]}\'">'
-        f'<td style="padding:12px 16px;color:#fff;font-size:13px">'
-        f'{m["name"]}<div style="color:#6b7280;font-size:11px">{m["city"]} · {m["profession"]}</div></td>'
-        f'<td style="padding:12px 16px;color:#9ca3af;font-size:12px">{m["scheduled_at"]}</td>'
-        f'<td style="padding:12px 16px">{_meeting_badge(m["status"])}</td>'
-        f'<td style="padding:12px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:12px">'
+        f'<td style="padding:10px 16px;color:#fff;font-size:12px">'
+        f'{m["name"]}<div style="color:#6b7280;font-size:10px">{m["city"]}</div></td>'
+        f'<td style="padding:10px 16px;color:#9ca3af;font-size:11px">{m["scheduled_str"]}</td>'
+        f'<td style="padding:10px 16px">{_meeting_badge(m["status"])}</td>'
+        f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:12px">'
         f'{"{}€".format(int(m["deal_value"])) if m["deal_value"] else "—"}</td>'
+        f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:11px">'
+        f'{"{}€".format(int(m["deal_value"]*commission_rate)) if m["deal_value"] else "—"}</td>'
         f'</tr>'
-        for m in meetings
-    ) or '<tr><td colspan="4" style="padding:40px;text-align:center;color:#555">Aucun RDV pour le moment</td></tr>'
+        for m in meetings_past
+    ) or '<tr><td colspan="5" style="padding:30px;text-align:center;color:#555">Aucun historique</td></tr>'
+
+    # ── Commissions ───────────────────────────────────────────────────────────
+    comm_info_html = "".join(
+        f'<p style="margin-bottom:8px">{line}</p>'
+        for line in content.get("commission_info", "").split("\n") if line.strip()
+    )
+
+    # ── Onglets ───────────────────────────────────────────────────────────────
+    TABS = [("rdv", "Mes RDV"), ("commissions", "Commissions"),
+            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections")]
+
+    def _tab_btn(slug, label):
+        active = slug == tab
+        return (
+            f'<button onclick="switchTab(\'{slug}\')" id="tab-{slug}" '
+            f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;'
+            f'font-weight:{"700" if active else "400"};'
+            f'background:{"#6366f1" if active else "#1a1a2e"};'
+            f'color:{"#fff" if active else "#9ca3af"};'
+            f'border:1px solid {"#6366f1" if active else "#2a2a4e"}">'
+            f'{label}</button>'
+        )
+
+    tabs_html = f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">{"".join(_tab_btn(s,l) for s,l in TABS)}</div>'
+
+    def _pre(text):
+        """Rendu texte brut en HTML lisible."""
+        return "<br>".join(
+            f'<span style="color:{"#6366f1" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
+            if ln.strip() else '<span style="display:block;height:8px"></span>'
+            for ln in (text or "").split("\n")
+        )
+
+    panel_rdv = f"""
+<h3 style="color:#fff;font-size:14px;margin-bottom:16px">RDV à venir ({len(meetings_upcoming)})</h3>
+{upcoming_html}
+<h3 style="color:#9ca3af;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Historique</h3>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 16px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Prospect</th>
+  <th style="padding:8px 16px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Date</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Statut</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Deal</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Commission</th>
+</tr></thead>
+<tbody>{past_rows}</tbody></table></div>"""
+
+    panel_commissions = f"""
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{stats["earned"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Gagné (tous temps)</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#6366f1">{stats["pending"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">En attente (RDV à venir)</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#e9a020">{commission_rate*100:.0f}%</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Taux de commission</div>
+  </div>
+</div>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
+<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Détail</p>
+<div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html}</div>
+</div>"""
+
+    def _resource_block(title, text, color="#6366f1"):
+        return (
+            f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px">'
+            f'<p style="color:{color};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">{title}</p>'
+            f'<div style="color:#ccc;font-size:13px;line-height:1.8">{_pre(text)}</div>'
+            f'</div>'
+        )
+
+    panel_offre       = _resource_block(content.get("offer_title","L'offre") + f' — {content.get("offer_price","")}', content.get("offer_pitch",""), "#2ecc71")
+    panel_script      = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
+    panel_objections  = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
+
+    panels = {
+        "rdv":         panel_rdv,
+        "commissions": panel_commissions,
+        "offre":       panel_offre,
+        "script":      panel_script,
+        "objections":  panel_objections,
+    }
+    panels_js = {k: v.replace("`", "\\`").replace("${", "\\${") for k, v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -356,45 +535,55 @@ def closer_portal(token: str, request: Request):
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 table{{width:100%;border-collapse:collapse}}
-th{{padding:10px 16px;text-align:left;color:#9ca3af;font-size:10px;font-weight:600;
-   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e}}
 tr:hover{{background:#111127}}
 </style></head><body>
 
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:16px 24px;
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
             display:flex;align-items:center;justify-content:space-between">
-  <div style="display:flex;align-items:center;gap:12px">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:28px">
-    <span style="color:#9ca3af;font-size:12px">Portail Closer</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:26px">
+    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
   </div>
-  <span style="color:#fff;font-weight:600">{name}</span>
+  <span style="color:#fff;font-weight:600;font-size:14px">{name}</span>
 </div>
 
-<div style="max-width:900px;margin:0 auto;padding:32px 20px">
+<div style="max-width:920px;margin:0 auto;padding:28px 20px">
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:32px">
-  {"".join(
-    f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">'
-    f'<div style="font-size:1.8rem;font-weight:700;color:{c}">{v}</div>'
-    f'<div style="color:#9ca3af;font-size:11px;margin-top:4px">{l}</div></div>'
-    for v, l, c in [
-        (stats["scheduled"],  "RDV à venir",    "#6366f1"),
-        (stats["completed"],  "Signés",          "#2ecc71"),
-        (stats["no_show"],    "No-show",         "#e94560"),
-        (conv_rate,           "Taux conversion", "#e9a020"),
-        (f'{stats["earned"]:.0f}€', "Commissions", "#527FB3"),
-    ]
-  )}
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:28px">
+{stats_html}
 </div>
 
-<h2 style="color:#fff;font-size:16px;margin-bottom:16px">Mes rendez-vous</h2>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
-<table><thead><tr>
-  <th>Prospect</th><th>Date</th><th>Statut</th><th>Deal</th>
-</tr></thead>
-<tbody>{mtg_rows}</tbody></table></div>
+<!-- Tabs -->
+{tabs_html}
 
-</div></body></html>""")
+<!-- Contenu de l'onglet actif -->
+<div id="tab-content">
+  {"".join(panels[tab] if k==tab else "" for k in panels)}
+</div>
+
+</div>
+<script>
+const _panels = {{
+  rdv: `{panels_js["rdv"]}`,
+  commissions: `{panels_js["commissions"]}`,
+  offre: `{panels_js["offre"]}`,
+  script: `{panels_js["script"]}`,
+  objections: `{panels_js["objections"]}`,
+}};
+function switchTab(slug) {{
+  document.getElementById('tab-content').innerHTML = _panels[slug] || '';
+  document.querySelectorAll('[id^="tab-"]').forEach(b => {{
+    const active = b.id === 'tab-' + slug;
+    b.style.background  = active ? '#6366f1' : '#1a1a2e';
+    b.style.color       = active ? '#fff'    : '#9ca3af';
+    b.style.fontWeight  = active ? '700'     : '400';
+    b.style.borderColor = active ? '#6366f1' : '#2a2a4e';
+  }});
+  history.replaceState(null,'',location.pathname + '?tab=' + slug);
+}}
+</script>
+</body></html>""")
 
 
 def _meeting_badge(status: str) -> str:
@@ -438,6 +627,8 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     if not meeting:
         return HTMLResponse("<p style='padding:40px;color:#666'>RDV introuvable.</p>", status_code=404)
 
+    content = _load_portal_content()
+
     def _fmt(dt):
         return dt.strftime("%d/%m/%y %H:%M") if dt else "—"
 
@@ -445,62 +636,104 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     city  = prospect.city if prospect else "—"
     prof  = prospect.profession if prospect else "—"
     email = prospect.email if prospect else "—"
+    phone = prospect.phone if prospect else ""
 
-    # Historique livraisons (timeline comportementale)
+    # Timeline comportementale
     timeline = ""
     try:
         for d in deliveries:
             items = []
-            if d.sent_at:    items.append(f'<li style="color:#6366f1">Envoyé {_fmt(d.sent_at)}</li>')
-            if d.opened_at:  items.append(f'<li style="color:#f59e0b">Ouvert {_fmt(d.opened_at)}</li>')
-            if d.clicked_at: items.append(f'<li style="color:#2ecc71">Clic landing {_fmt(d.clicked_at)}</li>')
+            if d.sent_at:    items.append(f'<li>📧 Envoyé {_fmt(d.sent_at)}</li>')
+            if d.opened_at:  items.append(f'<li style="color:#f59e0b">👁 Ouvert {_fmt(d.opened_at)}</li>')
+            if d.clicked_at: items.append(f'<li style="color:#2ecc71">🖱 Clic landing {_fmt(d.clicked_at)}</li>')
+            lv = getattr(d, "landing_visited_at", None)
+            if lv:           items.append(f'<li style="color:#2ecc71">🌐 Landing visitée {_fmt(lv)}</li>')
+            cc = getattr(d, "calendly_clicked_at", None)
+            if cc:           items.append(f'<li style="color:#6366f1">📅 Calendly cliqué {_fmt(cc)}</li>')
             timeline += "".join(items)
     except Exception:
         pass
 
+    # Guide RDV
+    rdv_guide_lines = "".join(
+        f'<div style="padding:6px 0;border-bottom:1px solid #1a1a2e;color:{"#6366f1" if ln.startswith(("AVANT","PENDANT","FIN","1.","2.","3.","4.","5.","6.","7.","8.","9.")) else "#ccc"};font-size:12px;line-height:1.5">{ln}</div>'
+        if ln.strip() else '<div style="height:6px"></div>'
+        for ln in content.get("rdv_guide", "").split("\n")
+    )
+
+    phone_btn = (
+        f'<a href="tel:{phone}" style="display:inline-block;margin-top:6px;padding:6px 14px;'
+        f'background:#6366f120;border:1px solid #6366f140;border-radius:4px;'
+        f'color:#6366f1;font-size:12px;text-decoration:none">📞 Appeler {phone}</a>'
+    ) if phone else ""
+
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><title>Fiche RDV — {name}</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiche RDV — {name}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px}}
+.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}
 </style></head><body>
 
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:16px 24px">
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
+            display:flex;align-items:center;justify-content:space-between">
   <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+  <a href="/closer/{closer_token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
 </div>
 
-<div style="max-width:700px;margin:0 auto;padding:32px 20px">
-<a href="/closer/{closer_token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
+<div style="max-width:780px;margin:0 auto;padding:28px 20px">
 
-<h1 style="color:#fff;font-size:22px;margin:16px 0 4px">{name}</h1>
-<p style="color:#9ca3af">{city} · {prof}</p>
-<p style="color:#555;font-size:12px;margin-top:4px">{email}</p>
+<!-- En-tête prospect -->
+<div style="margin-bottom:20px">
+  <h1 style="color:#fff;font-size:20px;margin-bottom:4px">{name}</h1>
+  <p style="color:#9ca3af;font-size:13px">{city} · {prof}</p>
+  <p style="color:#555;font-size:12px;margin-top:2px">{email}</p>
+  {phone_btn}
+</div>
 
-<div style="margin:24px 0;padding:16px;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;
-            display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center">
+<!-- Bloc RDV -->
+<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;text-align:center">
   <div>
-    <div style="color:#f59e0b;font-size:1.1rem;font-weight:700">{_fmt(meeting.scheduled_at)}</div>
+    <div style="color:#f59e0b;font-size:1.2rem;font-weight:700">{_fmt(meeting.scheduled_at)}</div>
     <div style="color:#9ca3af;font-size:11px;margin-top:4px">Date RDV</div>
   </div>
   <div>
-    <div>{_meeting_badge(meeting.status)}</div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:8px">Statut</div>
+    {_meeting_badge(meeting.status)}
+    <div style="color:#9ca3af;font-size:11px;margin-top:6px">Statut</div>
   </div>
   <div>
-    <div style="color:#2ecc71;font-size:1.1rem;font-weight:700">
+    <div style="color:#2ecc71;font-size:1.2rem;font-weight:700">
       {"{}€".format(int(meeting.deal_value)) if meeting.deal_value else "—"}
     </div>
     <div style="color:#9ca3af;font-size:11px;margin-top:4px">Deal</div>
   </div>
 </div>
 
-{'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:20px"><p style="color:#9ca3af;font-size:10px;text-transform:uppercase;margin-bottom:8px">Notes</p><p style="color:#ccc;line-height:1.5">' + (meeting.notes or "Aucune note") + '</p></div>'}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
-<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;margin-bottom:12px">Historique du prospect</p>
-<ul style="list-style:none;display:flex;flex-direction:column;gap:4px;font-size:12px">
-{timeline or '<li style="color:#555">Aucun historique disponible</li>'}
-</ul>
+<!-- Historique prospect -->
+<div class="card">
+  <p class="sec">Comportement du prospect</p>
+  <ul style="list-style:none;display:flex;flex-direction:column;gap:3px;font-size:12px">
+    {timeline or '<li style="color:#555">Aucun historique</li>'}
+  </ul>
+</div>
+
+<!-- Notes -->
+<div class="card">
+  <p class="sec">Notes</p>
+  <p style="color:#ccc;font-size:13px;line-height:1.5">{meeting.notes or "Aucune note"}</p>
+  {f'<p style="color:#9ca3af;font-size:12px;margin-top:8px">{meeting.outcome}</p>' if getattr(meeting,"outcome","") else ""}
+</div>
+
+</div>
+
+<!-- Guide RDV -->
+<div class="card">
+  <p class="sec">Fiche RDV — Aide-mémoire</p>
+  <div>{rdv_guide_lines or '<p style="color:#555;font-size:12px">Guide non configuré — rendez-vous dans l\'admin → Contenu portail</p>'}</div>
 </div>
 
 </div></body></html>""")

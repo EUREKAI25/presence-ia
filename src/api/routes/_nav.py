@@ -24,6 +24,7 @@ def admin_nav(token: str, active: str = "") -> str:
             ("crm",                  "Pipeline CRM"),
             ("crm/closers",          "Closers"),
             ("crm/closer-messages",  "Messages recrutement"),
+            ("crm/closer-content",   "Contenu portail"),
         ]),
         ("CONTENU", [
             ("templates",   "Messages"),
