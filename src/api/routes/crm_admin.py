@@ -558,11 +558,43 @@ tr:hover{{background:#111127}}
 </style></head><body>
 {admin_nav(token, "crm")}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
   <h1 style="color:#fff;font-size:18px">Closers</h1>
   <div style="display:flex;gap:16px;align-items:center">
     <a href="/admin/crm/closer-messages?token={token}" style="color:#6366f1;font-size:12px;text-decoration:none">Messages recrutement →</a>
     <a href="/admin/crm?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← CRM</a>
+  </div>
+</div>
+
+<!-- Aperçu pages publiques -->
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px;margin-bottom:24px">
+  <p style="color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Aperçu pages closer</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="/closer/" target="_blank"
+       style="padding:7px 14px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;
+              color:#9ca3af;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+      🌐 Page de présentation
+    </a>
+    <a href="/closer/recruit" target="_blank"
+       style="padding:7px 14px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;
+              color:#9ca3af;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+      📝 Formulaire candidature
+    </a>
+    <a href="/closer/demo" target="_blank"
+       style="padding:7px 14px;background:#6366f115;border:1px solid #6366f140;border-radius:6px;
+              color:#a5b4fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+      👤 Portail closer — aperçu
+    </a>
+    <a href="/closer/demo/meeting/demo-1" target="_blank"
+       style="padding:7px 14px;background:#6366f115;border:1px solid #6366f140;border-radius:6px;
+              color:#a5b4fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+      📋 Fiche RDV — aperçu
+    </a>
+    <a href="/closer/demo/meeting/demo-3" target="_blank"
+       style="padding:7px 14px;background:#2ecc7115;border:1px solid #2ecc7140;border-radius:6px;
+              color:#2ecc71;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+      ✅ Fiche RDV signé — aperçu
+    </a>
   </div>
 </div>
 

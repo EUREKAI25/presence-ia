@@ -336,6 +336,344 @@ form.addEventListener('submit', async function(e) {
 </body></html>""")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Pages démo (aperçu admin sans données réelles)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DEMO_MEETINGS = [
+    {
+        "id":           "demo-1",
+        "name":         "Jean-Marc Fabre",
+        "city":         "Lyon",
+        "profession":   "Plombier",
+        "phone":        "06 12 34 56 78",
+        "scheduled_str": "Demain 14h00",
+        "status":       "scheduled",
+        "deal_value":   None,
+        "notes":        "A vu la landing 2 fois, a cliqué sur Calendly. Très intéressé par la visibilité IA.",
+        "outcome":      "",
+        "timeline":     [
+            ("📧", "Envoyé", "08/03 09:14", "#6b7280"),
+            ("👁", "Ouvert", "08/03 11:32", "#f59e0b"),
+            ("🌐", "Landing visitée", "08/03 11:34", "#2ecc71"),
+            ("📅", "Calendly cliqué", "08/03 11:37", "#6366f1"),
+        ],
+    },
+    {
+        "id":           "demo-2",
+        "name":         "Sophie Renard",
+        "city":         "Bordeaux",
+        "profession":   "Coiffeuse",
+        "phone":        "07 98 76 54 32",
+        "scheduled_str": "15/03 10h30",
+        "status":       "scheduled",
+        "deal_value":   None,
+        "notes":        "Déjà contactée par un concurrent. Sensible au prix.",
+        "outcome":      "",
+        "timeline":     [
+            ("📧", "Envoyé", "07/03 14:20", "#6b7280"),
+            ("👁", "Ouvert", "09/03 08:55", "#f59e0b"),
+        ],
+    },
+    {
+        "id":           "demo-3",
+        "name":         "Marc Delorme",
+        "city":         "Nantes",
+        "profession":   "Électricien",
+        "phone":        "06 55 44 33 22",
+        "scheduled_str": "05/03 16h00",
+        "status":       "completed",
+        "deal_value":   497,
+        "notes":        "Très motivé, a signé rapidement.",
+        "outcome":      "Signé sans objection majeure. Client très chaud.",
+        "timeline":     [
+            ("📧", "Envoyé", "01/03 10:00", "#6b7280"),
+            ("👁", "Ouvert", "01/03 12:15", "#f59e0b"),
+            ("🌐", "Landing visitée", "01/03 12:18", "#2ecc71"),
+            ("📅", "Calendly cliqué", "02/03 09:30", "#6366f1"),
+        ],
+    },
+    {
+        "id":           "demo-4",
+        "name":         "Patricia Morin",
+        "city":         "Toulouse",
+        "profession":   "Esthéticienne",
+        "phone":        "",
+        "scheduled_str": "02/03 11h00",
+        "status":       "no_show",
+        "deal_value":   None,
+        "notes":        "N'a pas décroché. SMS envoyé.",
+        "outcome":      "",
+        "timeline":     [
+            ("📧", "Envoyé", "28/02 09:00", "#6b7280"),
+            ("👁", "Ouvert", "28/02 18:40", "#f59e0b"),
+        ],
+    },
+]
+
+
+@router.get("/closer/demo", response_class=HTMLResponse)
+def closer_portal_demo(request: Request):
+    """Portail closer — aperçu avec données de démonstration."""
+    content  = _load_portal_content()
+    commission_rate = 0.18
+    name = "Marie Martin"
+
+    stats = {
+        "scheduled": 2, "completed": 1, "no_show": 1,
+        "earned": 497 * commission_rate, "pending": 0.0,
+    }
+    conv_rate = "33%"
+
+    stats_html = "".join(
+        f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;'
+        f'padding:14px 16px;text-align:center">'
+        f'<div style="font-size:1.6rem;font-weight:700;color:{c}">{v}</div>'
+        f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{l}</div>'
+        f'</div>'
+        for v, l, c in [
+            (stats["scheduled"],          "RDV à venir",      "#6366f1"),
+            (stats["completed"],          "Signés",           "#2ecc71"),
+            (stats["no_show"],            "No-show",          "#e94560"),
+            (conv_rate,                   "Taux conversion",  "#e9a020"),
+            (f'{stats["earned"]:.0f}€',   "Gagné",            "#527FB3"),
+            (f'{stats["pending"]:.0f}€',  "En attente",       "#9ca3af"),
+        ]
+    )
+
+    upcoming = [m for m in _DEMO_MEETINGS if m["status"] == "scheduled"]
+    past     = [m for m in _DEMO_MEETINGS if m["status"] != "scheduled"]
+
+    def _upcoming_card(m):
+        phone_btn = (
+            f'<a href="tel:{m["phone"]}" style="display:inline-block;margin-top:8px;'
+            f'padding:5px 12px;background:#6366f120;border:1px solid #6366f140;'
+            f'border-radius:4px;color:#6366f1;font-size:11px;text-decoration:none">📞 Appeler</a>'
+        ) if m["phone"] else ""
+        return (
+            f'<div style="background:#1a1a2e;border:1px solid #6366f140;border-radius:10px;padding:16px;margin-bottom:12px">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+            f'  <div>'
+            f'    <div style="color:#fff;font-size:14px;font-weight:600">{m["name"]}</div>'
+            f'    <div style="color:#6b7280;font-size:11px;margin-top:2px">{m["city"]} · {m["profession"]}</div>'
+            f'    {phone_btn}'
+            f'  </div>'
+            f'  <div style="text-align:right">'
+            f'    <div style="color:#6366f1;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
+            f'    <a href="/closer/demo/meeting/{m["id"]}" '
+            f'    style="display:inline-block;margin-top:6px;color:#527FB3;font-size:11px;text-decoration:none">'
+            f'    Fiche RDV →</a>'
+            f'  </div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    upcoming_html = "".join(_upcoming_card(m) for m in upcoming)
+
+    past_rows = "".join(
+        f'<tr style="border-bottom:1px solid #1a1a2e;cursor:pointer" '
+        f'onclick="window.location=\'/closer/demo/meeting/{m["id"]}\'">'
+        f'<td style="padding:10px 16px;color:#fff;font-size:12px">'
+        f'{m["name"]}<div style="color:#6b7280;font-size:10px">{m["city"]}</div></td>'
+        f'<td style="padding:10px 16px;color:#9ca3af;font-size:11px">{m["scheduled_str"]}</td>'
+        f'<td style="padding:10px 16px">{_meeting_badge(m["status"])}</td>'
+        f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:12px">'
+        f'{"{}€".format(int(m["deal_value"])) if m["deal_value"] else "—"}</td>'
+        f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:11px">'
+        f'{"{}€".format(int(m["deal_value"]*commission_rate)) if m["deal_value"] else "—"}</td>'
+        f'</tr>'
+        for m in past
+    )
+
+    comm_info_html = "".join(
+        f'<p style="margin-bottom:8px">{ln}</p>'
+        for ln in content.get("commission_info", "").split("\n") if ln.strip()
+    )
+
+    def _pre(text):
+        return "<br>".join(
+            f'<span style="color:{"#6366f1" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
+            if ln.strip() else '<span style="display:block;height:8px"></span>'
+            for ln in (text or "").split("\n")
+        )
+
+    panel_rdv = f"""
+<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+  ⚠️ Aperçu admin — données fictives. La vraie page s'affiche sur <code>/closer/{{token}}</code>
+</div>
+<h3 style="color:#fff;font-size:14px;margin-bottom:16px">RDV à venir ({len(upcoming)})</h3>
+{upcoming_html}
+<h3 style="color:#9ca3af;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Historique</h3>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 16px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Prospect</th>
+  <th style="padding:8px 16px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e">Date</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Statut</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Deal</th>
+  <th style="padding:8px 16px;border-bottom:1px solid #2a2a4e;color:#555;font-size:10px">Commission</th>
+</tr></thead>
+<tbody>{past_rows}</tbody></table></div>"""
+
+    panel_commissions = f"""
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{stats["earned"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Gagné (tous temps)</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#6366f1">{stats["pending"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">En attente</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#e9a020">{commission_rate*100:.0f}%</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Taux de commission</div>
+  </div>
+</div>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
+<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Détail</p>
+<div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html}</div>
+</div>"""
+
+    def _resource_block(title, text, color="#6366f1"):
+        return (
+            f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">'
+            f'<p style="color:{color};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">{title}</p>'
+            f'<div style="color:#ccc;font-size:13px;line-height:1.8">{_pre(text)}</div>'
+            f'</div>'
+        )
+
+    panel_offre      = _resource_block(content.get("offer_title","L'offre") + f' — {content.get("offer_price","")}', content.get("offer_pitch",""), "#2ecc71")
+    panel_script     = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
+    panel_objections = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
+
+    TABS = [("rdv","Mes RDV"),("commissions","Commissions"),("offre","L'offre"),("script","Script"),("objections","Objections")]
+
+    def _tab_btn(slug, label, active="rdv"):
+        a = slug == active
+        return (f'<button onclick="switchTab(\'{slug}\')" id="tab-{slug}" '
+                f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;'
+                f'font-weight:{"700" if a else "400"};background:{"#6366f1" if a else "#1a1a2e"};'
+                f'color:{"#fff" if a else "#9ca3af"};border:1px solid {"#6366f1" if a else "#2a2a4e"}">{label}</button>')
+
+    tabs_html = f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">{"".join(_tab_btn(s,l) for s,l in TABS)}</div>'
+
+    panels = {"rdv": panel_rdv, "commissions": panel_commissions,
+              "offre": panel_offre, "script": panel_script, "objections": panel_objections}
+    panels_js = {k: v.replace("`","\\`").replace("${","\\${") for k,v in panels.items()}
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portail Closer — Aperçu</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}table{{width:100%;border-collapse:collapse}}tr:hover{{background:#111127}}</style>
+</head><body>
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:26px">
+    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+  </div>
+  <span style="color:#fff;font-weight:600;font-size:14px">{name}</span>
+</div>
+<div style="max-width:920px;margin:0 auto;padding:28px 20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:28px">{stats_html}</div>
+{tabs_html}
+<div id="tab-content">{panel_rdv}</div>
+</div>
+<script>
+const _panels={{{",".join(f'"{k}":`{v}`' for k,v in panels_js.items())}}};
+function switchTab(slug){{
+  document.getElementById('tab-content').innerHTML=_panels[slug]||'';
+  document.querySelectorAll('[id^="tab-"]').forEach(b=>{{
+    const a=b.id==='tab-'+slug;
+    b.style.background=a?'#6366f1':'#1a1a2e';b.style.color=a?'#fff':'#9ca3af';
+    b.style.fontWeight=a?'700':'400';b.style.borderColor=a?'#6366f1':'#2a2a4e';
+  }});
+}}
+</script>
+</body></html>""")
+
+
+@router.get("/closer/demo/meeting/{demo_id}", response_class=HTMLResponse)
+def closer_meeting_demo(demo_id: str, request: Request):
+    """Fiche RDV — aperçu avec données de démonstration."""
+    content  = _load_portal_content()
+    meeting  = next((m for m in _DEMO_MEETINGS if m["id"] == demo_id), _DEMO_MEETINGS[0])
+
+    rdv_guide_lines = "".join(
+        f'<div style="padding:6px 0;border-bottom:1px solid #1a1a2e;color:{"#6366f1" if ln.startswith(("AVANT","PENDANT","FIN","1.","2.","3.","4.","5.","6.","7.","8.","9.")) else "#ccc"};font-size:12px;line-height:1.5">{ln}</div>'
+        if ln.strip() else '<div style="height:6px"></div>'
+        for ln in content.get("rdv_guide", "").split("\n")
+    )
+
+    timeline_html = "".join(
+        f'<li style="color:{color};font-size:12px">{icon} {label} — {date}</li>'
+        for icon, label, date, color in meeting["timeline"]
+    )
+
+    phone_btn = (
+        f'<a href="tel:{meeting["phone"]}" style="display:inline-block;margin-top:6px;padding:6px 14px;'
+        f'background:#6366f120;border:1px solid #6366f140;border-radius:4px;'
+        f'color:#6366f1;font-size:12px;text-decoration:none">📞 {meeting["phone"]}</a>'
+    ) if meeting["phone"] else ""
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiche RDV — {meeting["name"]}</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px}}.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}</style>
+</head><body>
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
+  <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+  <a href="/closer/demo" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
+</div>
+<div style="max-width:780px;margin:0 auto;padding:28px 20px">
+
+<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+  ⚠️ Aperçu admin — données fictives
+</div>
+
+<div style="margin-bottom:20px">
+  <h1 style="color:#fff;font-size:20px;margin-bottom:4px">{meeting["name"]}</h1>
+  <p style="color:#9ca3af;font-size:13px">{meeting["city"]} · {meeting["profession"]}</p>
+  {phone_btn}
+</div>
+
+<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;text-align:center">
+  <div>
+    <div style="color:#f59e0b;font-size:1.2rem;font-weight:700">{meeting["scheduled_str"]}</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Date RDV</div>
+  </div>
+  <div>
+    {_meeting_badge(meeting["status"])}
+    <div style="color:#9ca3af;font-size:11px;margin-top:6px">Statut</div>
+  </div>
+  <div>
+    <div style="color:{"#2ecc71" if meeting["deal_value"] else "#555"};font-size:1.2rem;font-weight:700">
+      {"{}€".format(int(meeting["deal_value"])) if meeting["deal_value"] else "—"}
+    </div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Deal</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div class="card">
+  <p class="sec">Comportement du prospect</p>
+  <ul style="list-style:none;display:flex;flex-direction:column;gap:4px">{timeline_html}</ul>
+</div>
+<div class="card">
+  <p class="sec">Notes</p>
+  <p style="color:#ccc;font-size:13px;line-height:1.5">{meeting["notes"] or "Aucune note"}</p>
+  {f'<p style="color:#9ca3af;font-size:12px;margin-top:8px">{meeting["outcome"]}</p>' if meeting["outcome"] else ""}
+</div>
+</div>
+
+<div class="card">
+  <p class="sec">Fiche RDV — Aide-mémoire</p>
+  <div>{rdv_guide_lines or "<p style='color:#555;font-size:12px'>Guide non configuré — Admin → Contenu portail</p>"}</div>
+</div>
+
+</div></body></html>""")
+
+
 @router.post("/closer/recruit")
 async def closer_recruit_submit(request: Request):
     """Traite la soumission de candidature."""
