@@ -401,6 +401,38 @@ class MessageTemplateDB(Base):
     updated_at  : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ProfessionDB(Base):
+    """Référentiel métiers — source pour SIRENE + scoring prospection."""
+    __tablename__ = "professions"
+    id               : Mapped[str]            = mapped_column(sa.String, primary_key=True)          # slug "plombier"
+    label            : Mapped[str]            = mapped_column(sa.String, nullable=False)            # "Plombier"
+    label_pluriel    : Mapped[str]            = mapped_column(sa.String, nullable=False)            # "Plombiers"
+    categorie        : Mapped[str]            = mapped_column(sa.String, nullable=False)            # "Bâtiment"
+    codes_naf        : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # JSON ["4322A"]
+    termes_recherche : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # JSON ["plombier","plomberie"]
+    score_visibilite : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10
+    score_conseil_ia : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10
+    score_concurrence: Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10 (SIRENE, renseigné plus tard)
+    valeur_client    : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # € nouveau client
+    notes_ia         : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # raisonnement IA
+    problematique    : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)             # ex: "fuite de toiture"
+    mission          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)             # ex: "refaire ma toiture"
+    actif            : Mapped[bool]           = mapped_column(sa.Boolean, default=True)
+    created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    updated_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ScoringConfigDB(Base):
+    """Pondération du score global de prospection (configurable admin)."""
+    __tablename__ = "scoring_config"
+    id             : Mapped[str]   = mapped_column(sa.String, primary_key=True, default="default")
+    w_visibilite   : Mapped[float] = mapped_column(sa.Float, default=0.40)
+    w_conseil_ia   : Mapped[float] = mapped_column(sa.Float, default=0.30)
+    w_concurrence  : Mapped[float] = mapped_column(sa.Float, default=0.15)
+    w_valeur       : Mapped[float] = mapped_column(sa.Float, default=0.15)
+    updated_at     : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))

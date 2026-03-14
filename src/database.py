@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -69,6 +69,9 @@ def init_db():
     # Seed message templates
     with SessionLocal() as db:
         _seed_message_templates(db)
+    # Seed scoring config par défaut
+    with SessionLocal() as db:
+        _seed_scoring_config(db)
 
 
 def get_db():
@@ -624,3 +627,81 @@ def db_delete_ia_query_template(db: Session, tid: str) -> bool:
     if not row: return False
     db.delete(row); db.commit()
     return True
+
+
+# ── ProfessionDB ───────────────────────────────────────────────────────────────
+
+def db_list_professions(db: Session, actif_only: bool = False) -> list:
+    q = db.query(ProfessionDB)
+    if actif_only:
+        q = q.filter_by(actif=True)
+    return q.order_by(ProfessionDB.categorie, ProfessionDB.label).all()
+
+def db_get_profession(db: Session, pid: str) -> Optional[ProfessionDB]:
+    return db.query(ProfessionDB).filter_by(id=pid).first()
+
+def db_upsert_profession(db: Session, data: dict) -> ProfessionDB:
+    from datetime import datetime as _dt
+    obj = db.query(ProfessionDB).filter_by(id=data["id"]).first()
+    if obj:
+        for k, v in data.items():
+            setattr(obj, k, v)
+        obj.updated_at = _dt.utcnow()
+    else:
+        obj = ProfessionDB(**data)
+        db.add(obj)
+    db.commit(); db.refresh(obj)
+    return obj
+
+def db_update_profession(db: Session, pid: str, updates: dict) -> Optional[ProfessionDB]:
+    from datetime import datetime as _dt
+    obj = db_get_profession(db, pid)
+    if not obj: return None
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    obj.updated_at = _dt.utcnow()
+    db.commit(); db.refresh(obj)
+    return obj
+
+
+# ── ScoringConfigDB ────────────────────────────────────────────────────────────
+
+def _seed_scoring_config(db: Session):
+    if not db.query(ScoringConfigDB).filter_by(id="default").first():
+        db.add(ScoringConfigDB(id="default"))
+        db.commit()
+
+def db_get_scoring_config(db: Session) -> ScoringConfigDB:
+    cfg = db.query(ScoringConfigDB).filter_by(id="default").first()
+    if not cfg:
+        cfg = ScoringConfigDB(id="default")
+        db.add(cfg); db.commit(); db.refresh(cfg)
+    return cfg
+
+def db_update_scoring_config(db: Session, updates: dict) -> ScoringConfigDB:
+    from datetime import datetime as _dt
+    cfg = db_get_scoring_config(db)
+    for k, v in updates.items():
+        setattr(cfg, k, v)
+    cfg.updated_at = _dt.utcnow()
+    db.commit(); db.refresh(cfg)
+    return cfg
+
+def db_score_global(profession: ProfessionDB, cfg: ScoringConfigDB) -> float:
+    """Calcule le score global pondéré (0-10)."""
+    s = 0.0
+    total_w = 0.0
+    pairs = [
+        (profession.score_visibilite, cfg.w_visibilite),
+        (profession.score_conseil_ia, cfg.w_conseil_ia),
+        (profession.score_concurrence, cfg.w_concurrence),
+    ]
+    if profession.valeur_client:
+        # Normalise valeur_client sur 10 (10 000€ = 10/10)
+        vc_score = min(profession.valeur_client / 1000, 10)
+        pairs.append((vc_score, cfg.w_valeur))
+    for score, weight in pairs:
+        if score is not None:
+            s += score * weight
+            total_w += weight
+    return round(s / total_w, 1) if total_w else 0.0
