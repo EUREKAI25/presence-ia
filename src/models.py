@@ -401,6 +401,23 @@ class MessageTemplateDB(Base):
     updated_at  : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SireneSuspectDB(Base):
+    """Établissements bruts issus de SIRENE — vivier de prospection."""
+    __tablename__ = "sirene_suspects"
+    id               : Mapped[str]            = mapped_column(sa.String, primary_key=True)   # SIRET (14 chiffres)
+    raison_sociale   : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    profession_id    : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True, index=True)   # FK professions.id
+    ville            : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True, index=True)
+    code_postal      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    departement      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    code_naf         : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    actif            : Mapped[bool]           = mapped_column(sa.Boolean, default=True)       # établissement ouvert
+    enrichi_at       : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True) # date Google lookup
+    contactable      : Mapped[bool]           = mapped_column(sa.Boolean, default=False)      # email ou tél trouvé
+    created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    updated_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ProfessionDB(Base):
     """Référentiel métiers — source pour SIRENE + scoring prospection."""
     __tablename__ = "professions"

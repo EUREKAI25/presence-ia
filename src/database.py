@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -686,6 +686,152 @@ def db_update_scoring_config(db: Session, updates: dict) -> ScoringConfigDB:
     cfg.updated_at = _dt.utcnow()
     db.commit(); db.refresh(cfg)
     return cfg
+
+# ── SireneSuspectDB ───────────────────────────────────────────────────────────
+
+def db_sirene_count(db: Session, profession_id: str = None, ville: str = None,
+                    date_from=None, date_to=None) -> int:
+    q = db.query(SireneSuspectDB)
+    if profession_id: q = q.filter_by(profession_id=profession_id)
+    if ville:         q = q.filter_by(ville=ville)
+    if date_from:     q = q.filter(SireneSuspectDB.created_at >= date_from)
+    if date_to:       q = q.filter(SireneSuspectDB.created_at <= date_to)
+    return q.count()
+
+def db_sirene_upsert(db: Session, data: dict) -> SireneSuspectDB:
+    from datetime import datetime as _dt
+    obj = db.query(SireneSuspectDB).filter_by(id=data["id"]).first()
+    if obj:
+        for k, v in data.items(): setattr(obj, k, v)
+        obj.updated_at = _dt.utcnow()
+    else:
+        obj = SireneSuspectDB(**data); db.add(obj)
+    db.commit(); db.refresh(obj)
+    return obj
+
+
+# ── Dashboard stats ────────────────────────────────────────────────────────────
+
+def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
+    """
+    Calcule tous les KPIs du dashboard pour une période donnée.
+    Retourne un dict avec les valeurs absolues + taux.
+    """
+    from sqlalchemy import or_, and_, func
+    from .models import V3ProspectDB
+
+    # ── Suspects SIRENE ──
+    suspects = db.query(SireneSuspectDB).filter(
+        SireneSuspectDB.created_at.between(date_from, date_to)
+    ).count()
+    suspects_total = db.query(SireneSuspectDB).count()
+
+    # ── Enrichis (Google lookup fait) ──
+    enrichis = db.query(SireneSuspectDB).filter(
+        SireneSuspectDB.enrichi_at.between(date_from, date_to)
+    ).count()
+
+    # ── Contactables V3 (email ou tél) créés sur la période ──
+    contactables = db.query(V3ProspectDB).filter(
+        V3ProspectDB.created_at.between(date_from, date_to),
+        or_(V3ProspectDB.email.isnot(None), V3ProspectDB.phone.isnot(None))
+    ).count()
+    contactables_total = db.query(V3ProspectDB).filter(
+        or_(V3ProspectDB.email.isnot(None), V3ProspectDB.phone.isnot(None))
+    ).count()
+
+    # ── Contactés (envoi réalisé sur la période) ──
+    contactes = db.query(V3ProspectDB).filter(
+        V3ProspectDB.sent_at.between(date_from, date_to),
+        V3ProspectDB.contacted == True
+    ).count()
+
+    # ── Breakdown métier × ville (contactables période) ──
+    breakdown_rows = (
+        db.query(V3ProspectDB.profession, V3ProspectDB.city,
+                 func.count(V3ProspectDB.token).label("n_contactables"),
+                 func.sum(V3ProspectDB.contacted.cast(db.bind.dialect.name == 'sqlite' and 'INTEGER' or 'INTEGER')).label("n_contactes"))
+        .filter(
+            V3ProspectDB.created_at.between(date_from, date_to),
+            or_(V3ProspectDB.email.isnot(None), V3ProspectDB.phone.isnot(None))
+        )
+        .group_by(V3ProspectDB.profession, V3ProspectDB.city)
+        .order_by(func.count(V3ProspectDB.token).desc())
+        .limit(20)
+        .all()
+    )
+
+    # ── Stats marketing (marketing_module) ──
+    mkt = _db_mkt_stats_period(date_from, date_to)
+
+    return {
+        "suspects":          suspects,
+        "suspects_total":    suspects_total,
+        "enrichis":          enrichis,
+        "contactables":      contactables,
+        "contactables_total": contactables_total,
+        "contactes":         contactes,
+        "envoyes":           mkt["sent"],
+        "ouvertures":        mkt["opened"],
+        "clics":             mkt["clicked"],
+        "bounces":           mkt["bounced"],
+        "reponses":          mkt["replied"],
+        "rdv":               mkt["rdv"],
+        "deals":             mkt["deals"],
+        "closers_actifs":    mkt["closers_actifs"],
+        "top_closers":       mkt["top_closers"],
+        "breakdown":         [{"profession": r.profession, "ville": r.city,
+                               "contactables": r.n_contactables,
+                               "contactes": int(r.n_contactes or 0)} for r in breakdown_rows],
+    }
+
+
+def _db_mkt_stats_period(date_from, date_to) -> dict:
+    """Lit les stats marketing pour une période depuis marketing_module."""
+    empty = {"sent":0,"opened":0,"clicked":0,"bounced":0,"replied":0,
+             "rdv":0,"deals":0,"closers_actifs":0,"top_closers":[]}
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import (
+            ProspectDeliveryDB, DeliveryStatus, MeetingDB, MeetingStatus,
+            CloserDB, ReplyStatus
+        )
+        with MktSession() as mdb:
+            deliveries = mdb.query(ProspectDeliveryDB).filter(
+                ProspectDeliveryDB.project_id == "presence-ia",
+                ProspectDeliveryDB.created_at.between(date_from, date_to)
+            ).all()
+            meetings = mdb.query(MeetingDB).filter(
+                MeetingDB.project_id == "presence-ia",
+                MeetingDB.scheduled_at.between(date_from, date_to)
+            ).all()
+            closers = mdb.query(CloserDB).filter_by(
+                project_id="presence-ia", is_active=True
+            ).all()
+
+            # Top closers par deals signés sur la période
+            from marketing_module.models import MeetingStatus
+            top = []
+            for c in closers:
+                n = sum(1 for m in meetings
+                        if m.closer_id == c.id and m.status == MeetingStatus.completed)
+                top.append({"name": c.name, "deals": n})
+            top.sort(key=lambda x: -x["deals"])
+
+            return {
+                "sent":          sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.sent),
+                "opened":        sum(1 for d in deliveries if d.opened_at),
+                "clicked":       sum(1 for d in deliveries if d.clicked_at),
+                "bounced":       sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.bounced),
+                "replied":       sum(1 for d in deliveries if d.reply_status == ReplyStatus.positive),
+                "rdv":           len(meetings),
+                "deals":         sum(1 for m in meetings if m.status == MeetingStatus.completed),
+                "closers_actifs": len(closers),
+                "top_closers":   top[:3],
+            }
+    except Exception:
+        return empty
+
 
 def db_score_global(profession: ProfessionDB, cfg: ScoringConfigDB) -> float:
     """Calcule le score global pondéré (0-10)."""
