@@ -46,14 +46,20 @@ Retourne UNIQUEMENT un tableau JSON valide de 200 objets, sans texte avant ni ap
 """
 
 
-def _call_api(client, prompt_suffix: str, batch_label: str) -> list:
-    """Appelle Claude pour un lot de 100 professions. Retourne la liste parsée."""
-    import anthropic
-    prompt = PROMPT.replace("200 professions", "100 professions") + f"\n\n{prompt_suffix}"
-    print(f"⏳ Appel Claude API — {batch_label}...")
+BATCHES = [
+    ("Bâtiment",      "Concentre-toi sur : Bâtiment (artisans du bâtiment, travaux, rénovation). 50 professions."),
+    ("Santé/Beauté",  "Concentre-toi sur : Santé, Beauté, Animal, Bien-être. 50 professions. PAS de Bâtiment."),
+    ("Services/Auto", "Concentre-toi sur : Auto, Services aux particuliers, Événementiel, Autre. 50 professions. PAS de Bâtiment, Santé, Beauté."),
+    ("Pro/Immo",      "Concentre-toi sur : Immobilier, Juridique, High-tech, Services B2B locaux. 50 professions. PAS de catégories précédentes."),
+]
+
+
+def _call_api(client, batch_label: str, instructions: str) -> list:
+    prompt = PROMPT.replace("200 professions", "50 professions") + f"\n\nINSTRUCTIONS SPÉCIFIQUES : {instructions}"
+    print(f"⏳ Lot {batch_label}...")
     response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=32000,
+        model="claude-sonnet-4-6",
+        max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
     text = response.content[0].text.strip()
@@ -83,25 +89,17 @@ def main():
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Lot 1 : Bâtiment, Santé, Beauté, Auto (professions à forte dépendance terrain)
-    batch1 = _call_api(client,
-        "Concentre-toi sur ces catégories pour ce lot : Bâtiment, Santé, Beauté, Auto, Animal.",
-        "lot 1/2 (Bâtiment / Santé / Beauté / Auto / Animal)")
-
-    # Lot 2 : Services, Immobilier, Juridique, High-tech, Événementiel, Autre
-    batch2 = _call_api(client,
-        "Concentre-toi sur ces catégories pour ce lot : Services, Immobilier, Juridique, High-tech, Événementiel, Autre. "
-        "N'inclus PAS de professions déjà couvertes par : Bâtiment, Santé, Beauté, Auto, Animal.",
-        "lot 2/2 (Services / Immo / Juridique / High-tech / Événementiel)")
-
-    # Dédupliquer par id
-    seen = set()
-    professions = []
-    for p in batch1 + batch2:
-        pid = p.get("id", "").strip()
-        if pid and pid not in seen:
-            seen.add(pid)
-            professions.append(p)
+    seen, professions = set(), []
+    for label, instructions in BATCHES:
+        try:
+            batch = _call_api(client, label, instructions)
+            for p in batch:
+                pid = p.get("id", "").strip()
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    professions.append(p)
+        except Exception as e:
+            print(f"⚠️ Lot {label} échoué : {e}")
 
     print(f"✅ {len(professions)} professions uniques générées")
 
