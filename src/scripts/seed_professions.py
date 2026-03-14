@@ -87,16 +87,27 @@ def _call_and_insert(client, db, batch_label: str, instructions: str, force: boo
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=8000,
+        max_tokens=12000,
         messages=[{"role": "user", "content": prompt}],
     )
     text = response.content[0].text.strip()
-    print(f"✓ [{batch_label}] Réponse reçue ({len(text)} chars) — parsing JSON...", flush=True)
+    stop_reason = response.stop_reason
+    print(f"✓ [{batch_label}] Réponse reçue ({len(text)} chars, stop={stop_reason}) — parsing JSON...", flush=True)
 
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
+
+    # Si la réponse a été tronquée (stop_reason=max_tokens), réparer le JSON
+    if stop_reason == "max_tokens":
+        print(f"⚠️ [{batch_label}] Réponse tronquée — tentative de réparation JSON...", flush=True)
+        # Couper au dernier objet complet (avant le dernier '}')
+        last_brace = text.rfind("},")
+        if last_brace > 0:
+            text = text[:last_brace + 1] + "\n]"
+        elif text.rstrip().endswith("}"):
+            text = text + "\n]"
 
     professions = json.loads(text)
     print(f"✓ [{batch_label}] {len(professions)} professions parsées — insertion en DB...", flush=True)
@@ -153,50 +164,6 @@ def main():
         db.close()
 
     print(f"\n🎉 Terminé — {total} professions insérées au total", flush=True)
-
-    if dry_run:
-        print(json.dumps(professions[:3], ensure_ascii=False, indent=2))
-        print(f"... (dry-run, {len(professions)} total)")
-        return
-
-    from src.database import SessionLocal
-    from src.database import db_upsert_profession
-
-    with SessionLocal() as db:
-        inserted = updated = skipped = 0
-        for p in professions:
-            pid = p.get("id", "").strip()
-            if not pid:
-                skipped += 1
-                continue
-
-            from src.database import db_get_profession
-            existing = db_get_profession(db, pid)
-
-            if existing and not force:
-                skipped += 1
-                continue
-
-            data = {
-                "id":               pid,
-                "label":            p.get("label", pid),
-                "label_pluriel":    p.get("label_pluriel", p.get("label", pid) + "s"),
-                "categorie":        p.get("categorie", "Autre"),
-                "codes_naf":        json.dumps(p.get("codes_naf", []), ensure_ascii=False),
-                "termes_recherche": json.dumps(p.get("termes_recherche", [pid]), ensure_ascii=False),
-                "score_visibilite": p.get("score_visibilite"),
-                "score_conseil_ia": p.get("score_conseil_ia"),
-                "valeur_client":    p.get("valeur_client"),
-                "notes_ia":         p.get("notes_ia"),
-                "actif":            True,
-            }
-            db_upsert_profession(db, data)
-            if existing:
-                updated += 1
-            else:
-                inserted += 1
-
-        print(f"✅ DB : {inserted} insérées, {updated} mises à jour, {skipped} ignorées")
 
 
 if __name__ == "__main__":
