@@ -54,22 +54,66 @@ BATCHES = [
 ]
 
 
-def _call_api(client, batch_label: str, instructions: str) -> list:
+def _insert_profession(db, p: dict, force: bool) -> str:
+    """Insère ou met à jour une profession. Retourne 'inserted'/'updated'/'skipped'."""
+    from src.database import db_get_profession, db_upsert_profession
+    pid = p.get("id", "").strip()
+    if not pid:
+        return "skipped"
+    existing = db_get_profession(db, pid)
+    if existing and not force:
+        return "skipped"
+    data = {
+        "id":               pid,
+        "label":            p.get("label", pid),
+        "label_pluriel":    p.get("label_pluriel", p.get("label", pid) + "s"),
+        "categorie":        p.get("categorie", "Autre"),
+        "codes_naf":        json.dumps(p.get("codes_naf", []), ensure_ascii=False),
+        "termes_recherche": json.dumps(p.get("termes_recherche", [pid]), ensure_ascii=False),
+        "score_visibilite": p.get("score_visibilite"),
+        "score_conseil_ia": p.get("score_conseil_ia"),
+        "valeur_client":    p.get("valeur_client"),
+        "notes_ia":         p.get("notes_ia"),
+        "actif":            True,
+    }
+    db_upsert_profession(db, data)
+    return "updated" if existing else "inserted"
+
+
+def _call_and_insert(client, db, batch_label: str, instructions: str, force: bool, seen: set) -> int:
+    """Appelle Claude, parse le JSON, insère chaque profession immédiatement."""
     prompt = PROMPT.replace("200 professions", "50 professions") + f"\n\nINSTRUCTIONS SPÉCIFIQUES : {instructions}"
-    print(f"⏳ Lot {batch_label}...")
+    print(f"⏳ [{batch_label}] Appel API...", flush=True)
+
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
     text = response.content[0].text.strip()
+    print(f"✓ [{batch_label}] Réponse reçue ({len(text)} chars) — parsing JSON...", flush=True)
+
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
-    result = json.loads(text)
-    print(f"  → {len(result)} professions")
-    return result
+
+    professions = json.loads(text)
+    print(f"✓ [{batch_label}] {len(professions)} professions parsées — insertion en DB...", flush=True)
+
+    inserted = 0
+    for p in professions:
+        pid = p.get("id", "").strip()
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        status = _insert_profession(db, p, force)
+        if status in ("inserted", "updated"):
+            inserted += 1
+            print(f"  + {p.get('label','?')} ({p.get('categorie','?')}) score={p.get('score_visibilite','?')}", flush=True)
+
+    print(f"✅ [{batch_label}] {inserted} insérées en DB", flush=True)
+    return inserted
 
 
 def main():
@@ -87,21 +131,28 @@ def main():
         print("❌ anthropic non installé : pip install anthropic")
         sys.exit(1)
 
+    if dry_run:
+        print("Mode dry-run — pas d'insertion DB")
+
     client = anthropic.Anthropic(api_key=api_key)
 
-    seen, professions = set(), []
-    for label, instructions in BATCHES:
-        try:
-            batch = _call_api(client, label, instructions)
-            for p in batch:
-                pid = p.get("id", "").strip()
-                if pid and pid not in seen:
-                    seen.add(pid)
-                    professions.append(p)
-        except Exception as e:
-            print(f"⚠️ Lot {label} échoué : {e}")
+    from src.database import SessionLocal
+    db = SessionLocal()
+    seen = set()
+    total = 0
 
-    print(f"✅ {len(professions)} professions uniques générées")
+    try:
+        for label, instructions in BATCHES:
+            try:
+                n = _call_and_insert(client, db, label, instructions, force, seen)
+                total += n
+                print(f"📊 Total en DB : {total}", flush=True)
+            except Exception as e:
+                print(f"⚠️ Lot {label} échoué : {e}", flush=True)
+    finally:
+        db.close()
+
+    print(f"\n🎉 Terminé — {total} professions insérées au total", flush=True)
 
     if dry_run:
         print(json.dumps(professions[:3], ensure_ascii=False, indent=2))
