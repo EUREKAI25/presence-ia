@@ -53,7 +53,7 @@ def _call_api(client, prompt_suffix: str, batch_label: str) -> list:
     print(f"⏳ Appel Claude API — {batch_label}...")
     response = client.messages.create(
         model="claude-opus-4-6",
-        max_tokens=16000,
+        max_tokens=32000,
         messages=[{"role": "user", "content": prompt}],
     )
     text = response.content[0].text.strip()
