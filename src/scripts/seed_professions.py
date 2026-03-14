@@ -46,6 +46,26 @@ Retourne UNIQUEMENT un tableau JSON valide de 200 objets, sans texte avant ni ap
 """
 
 
+def _call_api(client, prompt_suffix: str, batch_label: str) -> list:
+    """Appelle Claude pour un lot de 100 professions. Retourne la liste parsée."""
+    import anthropic
+    prompt = PROMPT.replace("200 professions", "100 professions") + f"\n\n{prompt_suffix}"
+    print(f"⏳ Appel Claude API — {batch_label}...")
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=16000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = response.content[0].text.strip()
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+    result = json.loads(text)
+    print(f"  → {len(result)} professions")
+    return result
+
+
 def main():
     dry_run = "--dry-run" in sys.argv
     force   = "--force"   in sys.argv
@@ -61,29 +81,29 @@ def main():
         print("❌ anthropic non installé : pip install anthropic")
         sys.exit(1)
 
-    print("⏳ Appel Claude API — génération des 200 professions...")
     client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=16000,
-        messages=[{"role": "user", "content": PROMPT}],
-    )
 
-    text = response.content[0].text.strip()
-    # Extraire le JSON si entouré de backticks
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
+    # Lot 1 : Bâtiment, Santé, Beauté, Auto (professions à forte dépendance terrain)
+    batch1 = _call_api(client,
+        "Concentre-toi sur ces catégories pour ce lot : Bâtiment, Santé, Beauté, Auto, Animal.",
+        "lot 1/2 (Bâtiment / Santé / Beauté / Auto / Animal)")
 
-    try:
-        professions = json.loads(text)
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON invalide : {e}")
-        print(text[:500])
-        sys.exit(1)
+    # Lot 2 : Services, Immobilier, Juridique, High-tech, Événementiel, Autre
+    batch2 = _call_api(client,
+        "Concentre-toi sur ces catégories pour ce lot : Services, Immobilier, Juridique, High-tech, Événementiel, Autre. "
+        "N'inclus PAS de professions déjà couvertes par : Bâtiment, Santé, Beauté, Auto, Animal.",
+        "lot 2/2 (Services / Immo / Juridique / High-tech / Événementiel)")
 
-    print(f"✅ {len(professions)} professions générées")
+    # Dédupliquer par id
+    seen = set()
+    professions = []
+    for p in batch1 + batch2:
+        pid = p.get("id", "").strip()
+        if pid and pid not in seen:
+            seen.add(pid)
+            professions.append(p)
+
+    print(f"✅ {len(professions)} professions uniques générées")
 
     if dry_run:
         print(json.dumps(professions[:3], ensure_ascii=False, indent=2))
