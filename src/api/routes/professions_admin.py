@@ -198,7 +198,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
           <th onclick="sortTable('vis')" title="Dépendance à la recherche en ligne immédiate (Google, Maps)">Dép. recherche <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('conseil')" title="Dépendance au conseil IA / comparaison avant achat (ChatGPT, avis...)">Dép. conseil IA <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('valeur')">Valeur client <span class="sort-arrow">↕</span></th>
-          <th onclick="sortTable('score')">Score ▼ <span class="sort-arrow">↕</span></th>
+          <th id="th-score" onclick="sortTable('score')">Score ▼ <span class="sort-arrow">↕</span></th>
           <th>NAF</th>
           <th>Termes</th>
           <th onclick="sortTable('actif')">Statut <span class="sort-arrow">↕</span></th>
@@ -425,7 +425,7 @@ async function openQualify() {{
 
 // Serveur déjà trié par score desc — on indique juste la flèche sans re-trier
 (function() {{
-  const th = document.querySelector('th[onclick="sortTable(\'score\')"]');
+  const th = document.getElementById('th-score');
   if(th) {{ const a = th.querySelector('.sort-arrow'); if(a) a.textContent = '\u2193'; th.classList.add('sorted'); }}
 }})();
 </script>
