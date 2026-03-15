@@ -423,8 +423,11 @@ async function openQualify() {{
   }}, 4000);
 }}
 
-// Tri par défaut : score desc
-sortTable('score');
+// Serveur déjà trié par score desc — on indique juste la flèche sans re-trier
+(function() {{
+  const th = document.querySelector('th[onclick="sortTable(\'score\')"]');
+  if(th) {{ const a = th.querySelector('.sort-arrow'); if(a) a.textContent = '\u2193'; th.classList.add('sorted'); }}
+}})();
 </script>
 </body></html>""")
 
