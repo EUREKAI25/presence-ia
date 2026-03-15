@@ -441,8 +441,15 @@ def _job_run_due_targets():
         log.error("_job_run_due_targets : %s", e)
 
 
+_SIRENE_STATE: dict = {"running": False, "done": True}
+
+def _sirene_qualify_state() -> dict:
+    return dict(_SIRENE_STATE)
+
 def run_sirene_qualify(max_per_naf: int = 200):
     """Qualification SIRENE one-shot — lancé à la demande depuis l'admin."""
+    global _SIRENE_STATE
+    _SIRENE_STATE = {"running": True, "done": False}
     try:
         from .database import SessionLocal
         from .sirene import qualify_all_active
@@ -456,3 +463,5 @@ def run_sirene_qualify(max_per_naf: int = 200):
             db.close()
     except Exception as e:
         log.error("[SIRENE] Erreur qualification : %s", e)
+    finally:
+        _SIRENE_STATE = {"running": False, "done": True}

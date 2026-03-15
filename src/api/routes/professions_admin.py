@@ -245,10 +245,15 @@ tr:hover{{background:#fafafa;cursor:pointer}}
       <li>Recenser les établissements par ville</li>
       <li>Stocker les suspects dans la base</li>
     </ol>
-    <div id="qualify-actifs-info" style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin-bottom:16px;color:#166534"></div>
+    <div id="qualify-actifs-info" style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin-bottom:12px;color:#166534"></div>
+    <div id="qualify-progress" style="display:none;margin-bottom:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e40af">
+      <div style="font-weight:600;margin-bottom:4px">⏳ Qualification en cours...</div>
+      <div>Suspects récupérés : <strong id="qualify-count">0</strong></div>
+      <div style="margin-top:6px;font-size:11px;color:#6b7280">La page se met à jour automatiquement · <a href="#" onclick="location.reload()" style="color:#3b82f6">Actualiser maintenant</a></div>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-sm btn-green" id="qualify-confirm-btn" onclick="launchQualify()">Confirmer et lancer</button>
-      <button class="btn btn-sm btn-gray" onclick="document.getElementById('qualify-modal').classList.remove('show')">Annuler</button>
+      <button class="btn btn-sm btn-gray" id="qualify-cancel-btn" onclick="document.getElementById('qualify-modal').classList.remove('show');stopPolling()">Fermer</button>
       <span id="qualify-msg" style="font-size:12px;color:#16a34a;align-self:center"></span>
     </div>
   </div>
@@ -393,20 +398,39 @@ function openQualify() {{
   document.getElementById('qualify-confirm-btn').disabled = nb === 0;
   document.getElementById('qualify-modal').classList.add('show');
 }}
+let _pollInterval = null;
+function stopPolling() {{ if(_pollInterval) {{ clearInterval(_pollInterval); _pollInterval = null; }} }}
+
 async function launchQualify() {{
-  document.getElementById('qualify-msg').textContent = '⏳ Lancement...';
   document.getElementById('qualify-confirm-btn').disabled = true;
+  document.getElementById('qualify-confirm-btn').style.display = 'none';
+  document.getElementById('qualify-progress').style.display = 'block';
   const r = await fetch(`/admin/professions/qualify?token=${{TOKEN}}`, {{
     method:'POST', headers:{{'Content-Type':'application/json'}}, body: '{{}}'
   }});
-  const d = await r.json();
-  if(r.ok) {{
-    document.getElementById('qualify-msg').style.color = '#16a34a';
-    document.getElementById('qualify-msg').textContent = d.message || '✓ Lancé';
-  }} else {{
+  if(!r.ok) {{
+    const d = await r.json().catch(()=>({{}}));
     document.getElementById('qualify-msg').style.color = '#dc2626';
     document.getElementById('qualify-msg').textContent = d.detail || 'Erreur';
+    document.getElementById('qualify-progress').style.display = 'none';
+    document.getElementById('qualify-confirm-btn').style.display = '';
+    document.getElementById('qualify-confirm-btn').disabled = false;
+    return;
   }}
+  // Polling toutes les 4s
+  _pollInterval = setInterval(async () => {{
+    try {{
+      const pr = await fetch(`/admin/professions/qualify-status?token=${{TOKEN}}`);
+      const pd = await pr.json();
+      document.getElementById('qualify-count').textContent = (pd.total || 0).toLocaleString('fr-FR');
+      if(pd.done) {{
+        stopPolling();
+        document.getElementById('qualify-progress').innerHTML =
+          `<div style="color:#16a34a;font-weight:600">✓ Qualification terminée — ${{(pd.total||0).toLocaleString('fr-FR')}} suspects</div>
+           <div style="font-size:11px;margin-top:4px"><a href="#" onclick="location.reload()" style="color:#3b82f6">Actualiser la page</a></div>`;
+      }}
+    }} catch(e) {{}}
+  }}, 4000);
 }}
 document.getElementById('qualify-modal').addEventListener('click', function(e) {{
   if(e.target===this) this.classList.remove('show');
@@ -427,6 +451,16 @@ async def update_scoring(token: str = "", request: Request = None):
     with SessionLocal() as db:
         db_update_scoring_config(db, updates)
     return JSONResponse({"ok": True})
+
+
+@router.get("/admin/professions/qualify-status")
+def qualify_status(token: str = ""):
+    _require_admin(token)
+    from ...scheduler import _sirene_qualify_state
+    state = _sirene_qualify_state()
+    with SessionLocal() as db:
+        total = db_sirene_count(db)
+    return JSONResponse({"total": total, "done": state.get("done", True), "running": state.get("running", False)})
 
 
 @router.post("/admin/professions/qualify")
