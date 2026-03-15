@@ -11,7 +11,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...database import (SessionLocal, db_list_professions, db_update_profession,
-                         db_get_scoring_config, db_update_scoring_config, db_score_global)
+                         db_get_scoring_config, db_update_scoring_config, db_score_global,
+                         db_sirene_count)
 from ._nav import admin_nav, admin_token
 
 log    = logging.getLogger(__name__)
@@ -59,6 +60,10 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
     profs_scored = [(p, db_score_global(p, cfg)) for p in profs]
     profs_scored.sort(key=lambda x: x[1], reverse=True)
 
+    # Comptages SIRENE par profession (une seule requête par profession)
+    with SessionLocal() as db2:
+        sirene_counts = {p.id: db_sirene_count(db2, profession_id=p.id) for p, _ in profs_scored}
+
     nb_actifs = sum(1 for p, _ in profs_scored if p.actif)
 
     cat_opts = "".join(
@@ -83,6 +88,9 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
         vc     = f"{p.valeur_client:,}€".replace(",", " ") if p.valeur_client else "—"
         sg_color = "#16a34a" if sg >= 7 else ("#d97706" if sg >= 4 else "#dc2626")
         actif_int = 1 if p.actif else 0
+        nb_sirene = sirene_counts.get(p.id, 0)
+        sirene_cell = (f'<span style="font-size:12px;font-weight:600;color:#1d4ed8">{nb_sirene:,}</span>'
+                       if nb_sirene else '<span style="font-size:11px;color:#d1d5db">—</span>')
 
         rows_html += f"""
         <tr data-id="{p.id}" data-actif="{actif_int}"
@@ -100,6 +108,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{naf}</td>
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{termes}</td>
           <td style="padding:8px 6px">{actif_badge}</td>
+          <td style="padding:8px 6px;text-align:right">{sirene_cell}</td>
         </tr>"""
 
     nav = admin_nav(token, "professions")
@@ -197,6 +206,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
           <th>NAF</th>
           <th>Termes</th>
           <th onclick="sortTable('actif')">Statut <span class="sort-arrow">↕</span></th>
+          <th style="text-align:right">Suspects SIRENE</th>
         </tr>
       </thead>
       <tbody id="prof-tbody">{rows_html}</tbody>
@@ -411,10 +421,12 @@ async def launch_qualify(token: str = "", request: Request = None):
     if not profs:
         from fastapi import HTTPException
         raise HTTPException(400, "Aucune profession active")
-    labels = [p.label for p in profs]
-    # TODO: déclencher le job SIRENE en background
-    log.info(f"Qualification demandée pour {len(profs)} professions : {labels[:5]}...")
-    return JSONResponse({"ok": True, "message": f"✓ Qualification lancée pour {len(profs)} professions (pipeline SIRENE en cours...)"})
+    import threading
+    from ...scheduler import run_sirene_qualify
+    t = threading.Thread(target=run_sirene_qualify, kwargs={"max_per_naf": 200}, daemon=True)
+    t.start()
+    log.info(f"Qualification SIRENE lancée en background pour {len(profs)} professions")
+    return JSONResponse({"ok": True, "message": f"✓ Qualification lancée pour {len(profs)} professions — résultats visibles dans quelques minutes"})
 
 
 @router.post("/admin/professions/{prof_id}")

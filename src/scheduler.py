@@ -439,3 +439,20 @@ def _job_run_due_targets():
             db.close()
     except Exception as e:
         log.error("_job_run_due_targets : %s", e)
+
+
+def run_sirene_qualify(max_per_naf: int = 200):
+    """Qualification SIRENE one-shot — lancé à la demande depuis l'admin."""
+    try:
+        from .database import SessionLocal
+        from .sirene import qualify_all_active
+        log.info("[SIRENE] Démarrage qualification...")
+        db = SessionLocal()
+        try:
+            summary = qualify_all_active(db, max_per_naf=max_per_naf)
+            total = sum(v for v in summary.values() if v > 0)
+            log.info(f"[SIRENE] Qualification terminée — {total} établissements pour {len(summary)} professions")
+        finally:
+            db.close()
+    except Exception as e:
+        log.error("[SIRENE] Erreur qualification : %s", e)
