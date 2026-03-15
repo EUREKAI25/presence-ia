@@ -253,7 +253,7 @@ def _send_reply_alert(prospect_name: str, prospect_email: str, snippet: str, cha
             f"<blockquote style='border-left:3px solid #6366f1;padding:8px 16px;color:#555'>"
             f"{snippet[:500]}"
             f"</blockquote><br>"
-            f"<a href='https://presence-ia.com/admin/crm?token={os.getenv(\"ADMIN_TOKEN\",\"changeme\")}' "
+            f"<a href='https://presence-ia.com/admin/crm?token={os.getenv('ADMIN_TOKEN','changeme')}' "
             f"style='background:#6366f1;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none'>"
             f"Voir dans le CRM →</a>"
         )
