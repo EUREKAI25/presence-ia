@@ -108,7 +108,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{naf}</td>
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{termes}</td>
           <td style="padding:8px 6px">{actif_badge}</td>
-          <td style="padding:8px 6px;text-align:right">{sirene_cell}</td>
+          <td style="padding:8px 6px;text-align:right" class="sirene-count">{sirene_cell}</td>
           <td style="padding:8px 6px;text-align:center"><button onclick="event.stopPropagation();editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;color:#6b7280;font-size:11px" title="Modifier les scores">Scores</button></td>
         </tr>"""
 
@@ -403,8 +403,22 @@ async function openQualify() {{
   // Polling toutes les 4s
   _pollInterval = setInterval(async () => {{
     try {{
-      const pr = await fetch(`/admin/professions/qualify-status?token=${{TOKEN}}`);
+      const profIds = [...document.querySelectorAll('tr[data-id]')].map(r=>r.dataset.id).join(',');
+      const pr = await fetch(`/admin/professions/qualify-status?token=${{TOKEN}}&profs=${{profIds}}`);
       const pd = await pr.json();
+      // Mettre à jour les cellules suspects par profession
+      if(pd.by_prof) {{
+        document.querySelectorAll('tr[data-id]').forEach(row => {{
+          const pid = row.dataset.id;
+          const cnt = pd.by_prof[pid];
+          const cell = row.querySelector('.sirene-count');
+          if(cell && cnt !== undefined) {{
+            cell.innerHTML = cnt > 0
+              ? `<span style="font-size:12px;font-weight:600;color:#1d4ed8">${{cnt.toLocaleString('fr-FR')}}</span>`
+              : '<span style="font-size:11px;color:#d1d5db">\u2014</span>';
+          }}
+        }});
+      }}
       document.getElementById('qualify-count').textContent = (pd.total || 0).toLocaleString('fr-FR');
       document.getElementById('qualify-done-segs').textContent = (pd.done_segs || 0).toLocaleString('fr-FR');
       document.getElementById('qualify-total-segs').textContent = (pd.total_segs || 0).toLocaleString('fr-FR');
@@ -444,7 +458,7 @@ async def update_scoring(token: str = "", request: Request = None):
 
 
 @router.get("/admin/professions/qualify-status")
-def qualify_status(token: str = ""):
+def qualify_status(token: str = "", profs: str = ""):
     _require_admin(token)
     from ...scheduler import _sirene_qualify_state
     from ...database import db_segment_stats
@@ -452,6 +466,13 @@ def qualify_status(token: str = ""):
     with SessionLocal() as db:
         total = db_sirene_count(db)
         seg_stats = db_segment_stats(db)
+        # Counts par profession si demandés (liste prof_ids séparés par virgule)
+        by_prof = {}
+        if profs:
+            for pid in profs.split(","):
+                pid = pid.strip()
+                if pid:
+                    by_prof[pid] = db_sirene_count(db, profession_id=pid)
     return JSONResponse({
         "total":       total,
         "done":        state.get("done", True),
@@ -460,6 +481,7 @@ def qualify_status(token: str = ""):
         "done_segs":   seg_stats.get("done", 0),
         "error_segs":  seg_stats.get("error", 0),
         "total_segs":  seg_stats.get("total_segments", 0),
+        "by_prof":     by_prof,
     })
 
 
