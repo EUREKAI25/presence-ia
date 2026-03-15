@@ -71,15 +71,14 @@ def fetch_by_naf(naf: str, max_results: int = 200,
                 continue
             nom = (item.get("nom_complet")
                    or item.get("nom_raison_sociale")
-                   or siege.get("denomination_usuelle", ""))
-            ville = (siege.get("libelle_commune")
-                     or siege.get("commune", "")).strip().upper()
-            cp    = siege.get("code_postal", "").strip()
-            dept  = siege.get("departement", cp[:2] if len(cp) >= 2 else "").strip()
+                   or siege.get("denomination_usuelle") or "")
+            ville = (siege.get("libelle_commune") or siege.get("commune") or "").strip().upper()
+            cp    = (siege.get("code_postal") or "").strip()
+            dept  = (siege.get("departement") or cp[:2] if len(cp) >= 2 else "").strip()
 
             results.append({
                 "id":            siret,
-                "raison_sociale": nom.strip(),
+                "raison_sociale": (nom or "").strip() or siret,
                 "ville":         ville or None,
                 "code_postal":   cp or None,
                 "departement":   dept or None,
