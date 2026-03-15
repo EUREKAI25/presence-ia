@@ -235,32 +235,14 @@ tr:hover{{background:#fafafa;cursor:pointer}}
   </div>
 </div>
 
-<!-- Modal qualification -->
-<div class="modal" id="qualify-modal">
-  <div class="modal-box">
-    <h3 style="margin:0 0 12px;font-size:15px;font-weight:700">▶ Lancer la qualification SIRENE</h3>
-    <p style="font-size:13px;color:#374151;margin:0 0 8px">Cette opération va :</p>
-    <ol style="font-size:12px;color:#374151;margin:0 0 16px;padding-left:18px;line-height:1.8">
-      <li>Interroger SIRENE pour chaque profession <strong>active</strong></li>
-      <li>Recenser les établissements par ville</li>
-      <li>Stocker les suspects dans la base</li>
-    </ol>
-    <div id="qualify-actifs-info" style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin-bottom:12px;color:#166534"></div>
-    <div id="qualify-progress" style="display:none;margin-bottom:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e40af">
-      <div style="font-weight:600;margin-bottom:6px">⏳ Qualification en cours...</div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div>Suspects : <strong id="qualify-count">0</strong></div>
-        <div>Segments terminés : <strong id="qualify-done-segs">0</strong> / <strong id="qualify-total-segs">?</strong></div>
-        <div>En attente : <strong id="qualify-pending">?</strong></div>
-      </div>
-      <div style="margin-top:6px;font-size:11px;color:#6b7280">Mise à jour auto · <a href="#" onclick="location.reload()" style="color:#3b82f6">Actualiser maintenant</a></div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-sm btn-green" id="qualify-confirm-btn" onclick="launchQualify()">Confirmer et lancer</button>
-      <button class="btn btn-sm btn-gray" id="qualify-cancel-btn" onclick="document.getElementById('qualify-modal').classList.remove('show');stopPolling()">Fermer</button>
-      <span id="qualify-msg" style="font-size:12px;color:#16a34a;align-self:center"></span>
-    </div>
-  </div>
+<!-- Barre de progression qualification (inline) -->
+<div id="qualify-bar" style="display:none;margin-bottom:12px;padding:10px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1e40af;align-items:center;gap:16px;flex-wrap:wrap">
+  <span style="font-weight:600">⏳ Qualification en cours...</span>
+  <span>Suspects : <strong id="qualify-count">0</strong></span>
+  <span>Segments : <strong id="qualify-done-segs">0</strong> / <strong id="qualify-total-segs">?</strong></span>
+  <span>En attente : <strong id="qualify-pending">?</strong></span>
+  <a href="#" onclick="location.reload()" style="color:#3b82f6;font-size:11px">Actualiser</a>
+  <a href="/admin/sirene/segments?token={token}" style="color:#3b82f6;font-size:11px">Voir segments</a>
 </div>
 
 <script>
@@ -393,34 +375,31 @@ document.getElementById('edit-modal').addEventListener('click', function(e) {{
 }});
 
 // ── Qualification SIRENE ──────────────────────────
-function openQualify() {{
-  const nb = document.querySelectorAll('tr[data-actif="1"]').length;
-  document.getElementById('qualify-actifs-info').textContent =
-    nb > 0
-      ? `${{nb}} professions actives seront qualifi\u00e9es.`
-      : '\u26a0\ufe0f Aucune profession active \u2014 activez des m\u00e9tiers en premier.';
-  document.getElementById('qualify-confirm-btn').disabled = nb === 0;
-  document.getElementById('qualify-modal').classList.add('show');
-}}
 let _pollInterval = null;
 function stopPolling() {{ if(_pollInterval) {{ clearInterval(_pollInterval); _pollInterval = null; }} }}
 
-async function launchQualify() {{
-  document.getElementById('qualify-confirm-btn').disabled = true;
-  document.getElementById('qualify-confirm-btn').style.display = 'none';
-  document.getElementById('qualify-progress').style.display = 'block';
+async function openQualify() {{
+  const actifs = document.querySelectorAll('tr[data-actif="1"]');
+  if(actifs.length === 0) {{
+    alert('Aucune profession active — cochez des m\u00e9tiers d\u0027abord.');
+    return;
+  }}
+  const btn = document.querySelector('[onclick="openQualify()"]');
+  btn.disabled = true;
+  btn.textContent = '⏳ Lancement...';
+  const bar = document.getElementById('qualify-bar');
+  bar.style.display = 'flex';
   const r = await fetch(`/admin/professions/qualify?token=${{TOKEN}}`, {{
     method:'POST', headers:{{'Content-Type':'application/json'}}, body: '{{}}'
   }});
   if(!r.ok) {{
     const d = await r.json().catch(()=>({{}}));
-    document.getElementById('qualify-msg').style.color = '#dc2626';
-    document.getElementById('qualify-msg').textContent = d.detail || 'Erreur';
-    document.getElementById('qualify-progress').style.display = 'none';
-    document.getElementById('qualify-confirm-btn').style.display = '';
-    document.getElementById('qualify-confirm-btn').disabled = false;
+    bar.innerHTML = `<span style="color:#dc2626;font-weight:600">\u274c ${{d.detail || 'Erreur'}}</span>`;
+    btn.disabled = false;
+    btn.textContent = '\u25b6 Lancer qualification';
     return;
   }}
+  btn.textContent = '⏳ En cours...';
   // Polling toutes les 4s
   _pollInterval = setInterval(async () => {{
     try {{
@@ -430,18 +409,17 @@ async function launchQualify() {{
       document.getElementById('qualify-done-segs').textContent = (pd.done_segs || 0).toLocaleString('fr-FR');
       document.getElementById('qualify-total-segs').textContent = (pd.total_segs || 0).toLocaleString('fr-FR');
       document.getElementById('qualify-pending').textContent = (pd.pending || 0).toLocaleString('fr-FR');
-      if(pd.done) {{
+      if(pd.done && !pd.running) {{
         stopPolling();
-        document.getElementById('qualify-progress').innerHTML =
-          `<div style="color:#16a34a;font-weight:600">✓ Qualification terminée — ${{(pd.total||0).toLocaleString('fr-FR')}} suspects · ${{(pd.done_segs||0).toLocaleString('fr-FR')}} segments</div>
-           <div style="font-size:11px;margin-top:4px"><a href="#" onclick="location.reload()" style="color:#3b82f6">Actualiser la page</a> · <a href="/admin/sirene/segments?token=${{TOKEN}}" style="color:#3b82f6">Voir les segments</a></div>`;
+        bar.innerHTML = `<span style="color:#16a34a;font-weight:600">\u2713 Termin\u00e9 \u2014 ${{(pd.total||0).toLocaleString('fr-FR')}} suspects \u00b7 ${{(pd.done_segs||0).toLocaleString('fr-FR')}} segments</span>
+          <a href="#" onclick="location.reload()" style="color:#3b82f6;font-size:11px">Actualiser</a>
+          <a href="/admin/sirene/segments?token=${{TOKEN}}" style="color:#3b82f6;font-size:11px">Voir segments</a>`;
+        btn.disabled = false;
+        btn.textContent = '\u25b6 Lancer qualification';
       }}
     }} catch(e) {{}}
   }}, 4000);
 }}
-document.getElementById('qualify-modal').addEventListener('click', function(e) {{
-  if(e.target===this) this.classList.remove('show');
-}});
 
 // Tri par défaut : score desc
 sortTable('score');
