@@ -98,8 +98,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
             data-label="{p.label}" data-cat="{p.categorie or ''}"
             data-vis="{p.score_visibilite or 0}" data-conseil="{p.score_conseil_ia or 0}"
             data-valeur="{p.valeur_client or 0}" data-score="{sg}"
-            style="border-bottom:1px solid #f3f4f6"
-            onclick="editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},{'true' if p.actif else 'false'},'{p.label.replace("'", "\\'")}')">
+            style="border-bottom:1px solid #f3f4f6">
           <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
           <td style="padding:8px 6px;font-size:11px;color:#6b7280">{p.categorie}</td>
           <td style="padding:8px 6px">{_bar(p.score_visibilite)}</td>
@@ -110,6 +109,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{termes}</td>
           <td style="padding:8px 6px">{actif_badge}</td>
           <td style="padding:8px 6px;text-align:right">{sirene_cell}</td>
+          <td style="padding:8px 6px;text-align:center"><button onclick="editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:none;border:none;cursor:pointer;font-size:14px;color:#9ca3af" title="Modifier les scores">✏</button></td>
         </tr>"""
 
     nav = admin_nav(token, "professions")
@@ -203,6 +203,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
           <th>Termes</th>
           <th onclick="sortTable('actif')">Statut <span class="sort-arrow">↕</span></th>
           <th style="text-align:right">Suspects SIRENE</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="prof-tbody">{rows_html}</tbody>
@@ -224,9 +225,6 @@ tr:hover{{background:#fafafa;cursor:pointer}}
       </label>
       <label style="font-size:12px">Valeur client estimée (€)
         <input id="edit-valeur" type="number" min="0" style="width:100%;margin-top:4px">
-      </label>
-      <label style="font-size:12px;display:flex;align-items:center;gap:8px">
-        <input id="edit-actif" type="checkbox"> Actif (inclure dans la prospection)
       </label>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -356,13 +354,12 @@ async function toggleAll(thCb) {{
 }}
 
 // ── Modal édition ─────────────────────────────────
-function editProf(id, vis, conseil, valeur, actif, label) {{
+function editProf(id, vis, conseil, valeur, label) {{
   document.getElementById('edit-id').value = id;
-  document.getElementById('modal-title').textContent = 'Modifier — ' + label;
+  document.getElementById('modal-title').textContent = 'Scores — ' + label;
   document.getElementById('edit-visibilite').value = vis || '';
   document.getElementById('edit-conseil').value = conseil || '';
   document.getElementById('edit-valeur').value = valeur || '';
-  document.getElementById('edit-actif').checked = actif;
   document.getElementById('edit-modal').classList.add('show');
 }}
 function closeModal() {{
@@ -375,7 +372,6 @@ async function saveProf() {{
     score_visibilite: parseInt(document.getElementById('edit-visibilite').value) || null,
     score_conseil_ia: parseInt(document.getElementById('edit-conseil').value) || null,
     valeur_client:    parseInt(document.getElementById('edit-valeur').value) || null,
-    actif:            document.getElementById('edit-actif').checked,
   }};
   const r = await fetch(`/admin/professions/${{id}}?token=${{TOKEN}}`, {{
     method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)
