@@ -362,8 +362,8 @@ function openQualify() {{
   const nb = document.querySelectorAll('tr[data-actif="1"]').length;
   document.getElementById('qualify-actifs-info').textContent =
     nb > 0
-      ? `${{nb}} professions actives seront qualifiées.`
-      : '⚠️ Aucune profession active — activez d\'abord des métiers.';
+      ? `${{nb}} professions actives seront qualifi\u00e9es.`
+      : '\u26a0\ufe0f Aucune profession active \u2014 activez des m\u00e9tiers en premier.';
   document.getElementById('qualify-confirm-btn').disabled = nb === 0;
   document.getElementById('qualify-modal').classList.add('show');
 }}
