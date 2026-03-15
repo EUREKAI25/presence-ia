@@ -717,7 +717,7 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
     Calcule tous les KPIs du dashboard pour une période donnée.
     Retourne un dict avec les valeurs absolues + taux.
     """
-    from sqlalchemy import or_, and_, func
+    from sqlalchemy import or_, and_, func, case
     from .models import V3ProspectDB
 
     # ── Suspects SIRENE ──
@@ -750,7 +750,7 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
     breakdown_rows = (
         db.query(V3ProspectDB.profession, V3ProspectDB.city,
                  func.count(V3ProspectDB.token).label("n_contactables"),
-                 func.sum(V3ProspectDB.contacted.cast(db.bind.dialect.name == 'sqlite' and 'INTEGER' or 'INTEGER')).label("n_contactes"))
+                 func.sum(case((V3ProspectDB.contacted == True, 1), else_=0)).label("n_contactes"))
         .filter(
             V3ProspectDB.created_at.between(date_from, date_to),
             or_(V3ProspectDB.email.isnot(None), V3ProspectDB.phone.isnot(None))
