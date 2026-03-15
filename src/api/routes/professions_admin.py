@@ -99,7 +99,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
             data-vis="{p.score_visibilite or 0}" data-conseil="{p.score_conseil_ia or 0}"
             data-valeur="{p.valeur_client or 0}" data-score="{sg}"
             style="border-bottom:1px solid #f3f4f6">
-          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
+          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(event,this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
           <td style="padding:8px 6px;font-size:11px;color:#6b7280">{p.categorie}</td>
           <td style="padding:8px 6px">{_bar(p.score_visibilite)}</td>
           <td style="padding:8px 6px">{_bar(p.score_conseil_ia, color="#8b5cf6")}</td>
@@ -109,7 +109,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{termes}</td>
           <td style="padding:8px 6px">{actif_badge}</td>
           <td style="padding:8px 6px;text-align:right">{sirene_cell}</td>
-          <td style="padding:8px 6px;text-align:center"><button onclick="editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:none;border:none;cursor:pointer;font-size:14px;color:#9ca3af" title="Modifier les scores">✏</button></td>
+          <td style="padding:8px 6px;text-align:center"><button onclick="event.stopPropagation();editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;color:#6b7280;font-size:11px" title="Modifier les scores">Scores</button></td>
         </tr>"""
 
     nav = admin_nav(token, "professions")
@@ -301,8 +301,8 @@ function sortTable(col) {{
 }}
 
 // ── Toggle actif (clic sur checkbox ligne) ───────
-async function toggleActif(cb) {{
-  cb.stopPropagation && cb.stopPropagation();
+async function toggleActif(e, cb) {{
+  e.stopPropagation();
   const id    = cb.dataset.id;
   const actif = cb.checked;
   const row   = cb.closest('tr');
