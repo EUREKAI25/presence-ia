@@ -79,9 +79,9 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
     rows_html = ""
     for p, sg in profs_scored:
         actif_badge = (
-            '<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 6px;border-radius:10px">actif</span>'
+            '<span class="actif-badge" style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 6px;border-radius:10px">actif</span>'
             if p.actif else
-            '<span style="background:#f3f4f6;color:#9ca3af;font-size:10px;padding:1px 6px;border-radius:10px">inactif</span>'
+            '<span class="actif-badge" style="background:#f3f4f6;color:#9ca3af;font-size:10px;padding:1px 6px;border-radius:10px">inactif</span>'
         )
         naf    = ", ".join(json.loads(p.codes_naf or "[]")[:3]) or "—"
         termes = ", ".join(json.loads(p.termes_recherche or "[]")[:3]) or "—"
@@ -92,6 +92,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
         sirene_cell = (f'<span style="font-size:12px;font-weight:600;color:#1d4ed8">{nb_sirene:,}</span>'
                        if nb_sirene else '<span style="font-size:11px;color:#d1d5db">—</span>')
 
+        checked = "checked" if p.actif else ""
         rows_html += f"""
         <tr data-id="{p.id}" data-actif="{actif_int}"
             data-label="{p.label}" data-cat="{p.categorie or ''}"
@@ -99,7 +100,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
             data-valeur="{p.valeur_client or 0}" data-score="{sg}"
             style="border-bottom:1px solid #f3f4f6"
             onclick="editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},{'true' if p.actif else 'false'},'{p.label.replace("'", "\\'")}')">
-          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" onclick="event.stopPropagation()" style="margin-right:6px"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
+          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
           <td style="padding:8px 6px;font-size:11px;color:#6b7280">{p.categorie}</td>
           <td style="padding:8px 6px">{_bar(p.score_visibilite)}</td>
           <td style="padding:8px 6px">{_bar(p.score_conseil_ia, color="#8b5cf6")}</td>
@@ -184,12 +185,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
     <select id="actif-sel" onchange="applyFilters()">
       {actif_opts}
     </select>
-    <div style="display:flex;gap:6px;margin-left:auto">
-      <button class="btn btn-sm btn-outline" onclick="selectAll(true)">Tout cocher</button>
-      <button class="btn btn-sm btn-outline" onclick="selectAll(false)">Tout décocher</button>
-      <button class="btn btn-sm btn-green" onclick="bulkToggle(true)">Activer sélection</button>
-      <button class="btn btn-sm btn-gray" onclick="bulkToggle(false)">Désactiver sélection</button>
-    </div>
+    <span id="bulk-msg" style="font-size:12px;color:#16a34a;margin-left:auto"></span>
   </div>
 
   <!-- Tableau -->
@@ -197,7 +193,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
     <table id="prof-table">
       <thead>
         <tr>
-          <th onclick="sortTable('label')">Métier <span class="sort-arrow">↕</span></th>
+          <th><input type="checkbox" id="th-cb" onclick="toggleAll(this)" style="width:15px;height:15px;cursor:pointer" title="Tout activer / désactiver"> Métier <span class="sort-arrow" onclick="sortTable('label')" style="cursor:pointer">↕</span></th>
           <th onclick="sortTable('cat')">Catégorie <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('vis')" title="Dépendance à la recherche en ligne immédiate (Google, Maps)">Dép. recherche <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('conseil')" title="Dépendance au conseil IA / comparaison avant achat (ChatGPT, avis...)">Dép. conseil IA <span class="sort-arrow">↕</span></th>
@@ -212,7 +208,6 @@ tr:hover{{background:#fafafa;cursor:pointer}}
       <tbody id="prof-tbody">{rows_html}</tbody>
     </table>
   </div>
-  <div id="bulk-msg" style="margin-top:8px;font-size:12px;color:#16a34a;min-height:16px"></div>
 </div>
 
 <!-- Modal édition -->
@@ -307,32 +302,57 @@ function sortTable(col) {{
   }}
 }}
 
-// ── Sélection ────────────────────────────────────
-function selectAll(checked) {{
-  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = checked);
-}}
-function getSelectedIds() {{
-  return Array.from(document.querySelectorAll('.row-cb:checked')).map(cb => cb.dataset.id);
+// ── Toggle actif (clic sur checkbox ligne) ───────
+async function toggleActif(cb) {{
+  cb.stopPropagation && cb.stopPropagation();
+  const id    = cb.dataset.id;
+  const actif = cb.checked;
+  const row   = cb.closest('tr');
+  const msg   = document.getElementById('bulk-msg');
+  const r = await fetch(`/admin/professions/${{id}}?token=${{TOKEN}}`, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{actif}})
+  }});
+  if(r.ok) {{
+    row.dataset.actif = actif ? '1' : '0';
+    const badge = row.querySelector('.actif-badge');
+    if(badge) {{
+      badge.textContent = actif ? 'actif' : 'inactif';
+      badge.style.background = actif ? '#dcfce7' : '#f3f4f6';
+      badge.style.color = actif ? '#166534' : '#9ca3af';
+    }}
+    // Mettre à jour la checkbox du th
+    const allCbs = document.querySelectorAll('.row-cb');
+    const allChecked = Array.from(allCbs).every(c => c.checked);
+    document.getElementById('th-cb').checked = allChecked;
+    msg.style.color = '#16a34a';
+    msg.textContent = actif ? `✓ ${{id}} activé` : `✓ ${{id}} désactivé`;
+  }} else {{
+    cb.checked = !actif; // rollback
+    msg.style.color = '#dc2626';
+    msg.textContent = 'Erreur';
+  }}
 }}
 
-// ── Bulk toggle ──────────────────────────────────
-async function bulkToggle(actif) {{
-  const ids = getSelectedIds();
-  if(!ids.length) {{ alert('Aucune ligne sélectionnée'); return; }}
-  const msg = document.getElementById('bulk-msg');
+// ── Toggle all (checkbox th) ──────────────────────
+async function toggleAll(thCb) {{
+  const actif = thCb.checked;
+  const cbs   = document.querySelectorAll('.row-cb');
+  const msg   = document.getElementById('bulk-msg');
   msg.style.color = '#6b7280';
-  msg.textContent = `Mise à jour de ${{ids.length}} professions...`;
+  msg.textContent = `Mise à jour de ${{cbs.length}} professions...`;
   let ok = 0;
-  for(const id of ids) {{
+  for(const cb of cbs) {{
+    cb.checked = actif;
+    const id = cb.dataset.id;
     const r = await fetch(`/admin/professions/${{id}}?token=${{TOKEN}}`, {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
       body: JSON.stringify({{actif}})
     }});
-    if(r.ok) ok++;
+    if(r.ok) {{ ok++; cb.closest('tr').dataset.actif = actif ? '1' : '0'; }}
   }}
   msg.style.color = '#16a34a';
   msg.textContent = `✓ ${{ok}} professions ${{actif ? 'activées' : 'désactivées'}}`;
-  setTimeout(() => location.reload(), 900);
 }}
 
 // ── Modal édition ─────────────────────────────────
