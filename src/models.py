@@ -450,6 +450,32 @@ class ScoringConfigDB(Base):
     updated_at     : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SireneSegmentDB(Base):
+    """
+    Suivi des segments de requête SIRENE.
+    Un segment = une combinaison unique (profession × NAF × département).
+    Permet de reprendre, mettre à jour et éviter les doublons.
+    """
+    __tablename__ = "sirene_segments"
+    id               : Mapped[str]            = mapped_column(sa.String, primary_key=True)  # "{prof_id}|{naf}|{dept}"
+    profession_id    : Mapped[str]            = mapped_column(sa.String, nullable=False, index=True)
+    code_naf         : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    departement      : Mapped[str]            = mapped_column(sa.String, nullable=False)    # "75", "01"...
+    # Scoring / priorité
+    score            : Mapped[float]          = mapped_column(sa.Float, default=0.0)        # score profession × poids dept
+    nj_filter        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)     # JSON ["1000","5499"] ou null=tous
+    # Statut
+    status           : Mapped[str]            = mapped_column(sa.String, default="pending", index=True)  # pending/running/done/error
+    nb_results       : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    nb_inserted      : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    # Pour mises à jour incrémentales
+    last_fetched_at  : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    last_date_creation: Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)    # "YYYY-MM-DD" dernière entrée vue
+    error_msg        : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
+    created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    updated_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class JobDB(Base):
     __tablename__ = "jobs"
     job_id:       Mapped[str]           = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))

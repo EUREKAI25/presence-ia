@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB, SireneSegmentDB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -708,6 +708,33 @@ def db_sirene_upsert(db: Session, data: dict) -> SireneSuspectDB:
         obj = SireneSuspectDB(**data); db.add(obj)
     db.commit(); db.refresh(obj)
     return obj
+
+
+# ── Sirene segments ───────────────────────────────────────────────────────────
+
+def db_segment_stats(db: Session) -> dict:
+    from .models import SireneSegmentDB
+    from sqlalchemy import func
+    rows = (db.query(SireneSegmentDB.status, func.count(SireneSegmentDB.id))
+            .group_by(SireneSegmentDB.status).all())
+    stats = {r[0]: r[1] for r in rows}
+    stats["total_segments"] = sum(stats.values())
+    stats["total_suspects"] = db.query(func.count(SireneSuspectDB.id)).scalar() or 0
+    return stats
+
+def db_segment_next_pending(db: Session):
+    from .models import SireneSegmentDB
+    return (db.query(SireneSegmentDB)
+            .filter_by(status="pending")
+            .order_by(SireneSegmentDB.score.desc())
+            .first())
+
+def db_segment_list(db: Session, status: str = None, limit: int = 100):
+    from .models import SireneSegmentDB
+    q = db.query(SireneSegmentDB)
+    if status:
+        q = q.filter_by(status=status)
+    return q.order_by(SireneSegmentDB.score.desc()).limit(limit).all()
 
 
 # ── Dashboard stats ────────────────────────────────────────────────────────────

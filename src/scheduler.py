@@ -441,27 +441,43 @@ def _job_run_due_targets():
         log.error("_job_run_due_targets : %s", e)
 
 
-_SIRENE_STATE: dict = {"running": False, "done": True}
+_SIRENE_STATE: dict = {"running": False, "done": True, "pending": 0, "done_segs": 0, "total_segs": 0, "suspects": 0}
 
 def _sirene_qualify_state() -> dict:
     return dict(_SIRENE_STATE)
 
 def run_sirene_qualify(max_per_naf: int = 200):
-    """Qualification SIRENE one-shot — lancé à la demande depuis l'admin."""
+    """Qualification SIRENE par segments — lancé à la demande depuis l'admin."""
     global _SIRENE_STATE
-    _SIRENE_STATE = {"running": True, "done": False}
+    _SIRENE_STATE = {"running": True, "done": False, "pending": 0, "done_segs": 0, "total_segs": 0, "suspects": 0}
     try:
         from .database import SessionLocal
-        from .sirene import qualify_all_active
-        log.info("[SIRENE] Démarrage qualification...")
+        from .sirene import generate_segments, run_next_segment, segments_stats
+        log.info("[SIRENE] Démarrage qualification par segments...")
         db = SessionLocal()
         try:
-            summary = qualify_all_active(db, max_per_naf=max_per_naf)
-            total = sum(v for v in summary.values() if v > 0)
-            log.info(f"[SIRENE] Qualification terminée — {total} établissements pour {len(summary)} professions")
+            generated = generate_segments(db)
+            log.info(f"[SIRENE] {generated} nouveaux segments générés")
+            total_inserted = 0
+            while True:
+                result = run_next_segment(db)
+                if result is None:
+                    break
+                if "error" not in result:
+                    total_inserted += result.get("nb_inserted", 0)
+                # MAJ état en temps réel
+                stats = segments_stats(db)
+                _SIRENE_STATE.update({
+                    "pending":    stats.get("pending", 0),
+                    "done_segs":  stats.get("done", 0),
+                    "total_segs": stats.get("total_segments", 0),
+                    "suspects":   stats.get("total_suspects", 0),
+                })
+            log.info(f"[SIRENE] Qualification terminée — {total_inserted} nouveaux suspects")
         finally:
             db.close()
     except Exception as e:
         log.error("[SIRENE] Erreur qualification : %s", e)
     finally:
-        _SIRENE_STATE = {"running": False, "done": True}
+        _SIRENE_STATE["running"] = False
+        _SIRENE_STATE["done"]    = True
