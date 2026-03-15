@@ -36,6 +36,8 @@ def init_db():
             ("v3_landing_texts", "updated_at DATETIME"),
             ("v3_landing_texts", "email_template TEXT"),
             ("v3_landing_texts", "sms_template TEXT"),
+            ("sirene_suspects", "nature_juridique TEXT"),
+            ("sirene_suspects", "date_creation TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col}"))

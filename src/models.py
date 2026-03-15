@@ -411,6 +411,8 @@ class SireneSuspectDB(Base):
     code_postal      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     departement      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     code_naf         : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    nature_juridique : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)       # "1000" EI, "5710" SAS...
+    date_creation    : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)       # "2020-03-15"
     actif            : Mapped[bool]           = mapped_column(sa.Boolean, default=True)       # établissement ouvert
     enrichi_at       : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True) # date Google lookup
     contactable      : Mapped[bool]           = mapped_column(sa.Boolean, default=False)      # email ou tél trouvé
