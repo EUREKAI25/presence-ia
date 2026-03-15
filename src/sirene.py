@@ -206,19 +206,20 @@ def generate_segments(db, profession_ids: list[str] = None) -> int:
     return created
 
 
-def run_next_segment(db) -> Optional[dict]:
+def run_next_segment(db, profession_ids: list = None) -> Optional[dict]:
     """
     Exécute le prochain segment pending (score desc).
+    Si profession_ids fourni, ne traite que ces professions.
     Retourne un résumé ou None si aucun segment en attente.
     """
     from .models import SireneSegmentDB
     from .database import db_sirene_upsert
     from datetime import datetime as _dt
 
-    seg = (db.query(SireneSegmentDB)
-           .filter_by(status="pending")
-           .order_by(SireneSegmentDB.score.desc())
-           .first())
+    q = db.query(SireneSegmentDB).filter_by(status="pending")
+    if profession_ids:
+        q = q.filter(SireneSegmentDB.profession_id.in_(profession_ids))
+    seg = q.order_by(SireneSegmentDB.score.desc()).first()
 
     if not seg:
         return None

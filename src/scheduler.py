@@ -446,21 +446,24 @@ _SIRENE_STATE: dict = {"running": False, "done": True, "pending": 0, "done_segs"
 def _sirene_qualify_state() -> dict:
     return dict(_SIRENE_STATE)
 
-def run_sirene_qualify(max_per_naf: int = 200):
-    """Qualification SIRENE par segments — lancé à la demande depuis l'admin."""
+def run_sirene_qualify(profession_ids: list = None, max_per_naf: int = 200):
+    """Qualification SIRENE par segments — lancé à la demande depuis l'admin.
+    Si profession_ids est fourni, seuls ces métiers sont traités.
+    """
     global _SIRENE_STATE
     _SIRENE_STATE = {"running": True, "done": False, "pending": 0, "done_segs": 0, "total_segs": 0, "suspects": 0}
     try:
         from .database import SessionLocal
         from .sirene import generate_segments, run_next_segment, segments_stats
-        log.info("[SIRENE] Démarrage qualification par segments...")
+        label = f"{len(profession_ids)} professions" if profession_ids else "toutes professions actives"
+        log.info(f"[SIRENE] Démarrage qualification — {label}")
         db = SessionLocal()
         try:
-            generated = generate_segments(db)
+            generated = generate_segments(db, profession_ids=profession_ids)
             log.info(f"[SIRENE] {generated} nouveaux segments générés")
             total_inserted = 0
             while True:
-                result = run_next_segment(db)
+                result = run_next_segment(db, profession_ids=profession_ids)
                 if result is None:
                     break
                 if "error" not in result:

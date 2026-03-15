@@ -379,9 +379,10 @@ let _pollInterval = null;
 function stopPolling() {{ if(_pollInterval) {{ clearInterval(_pollInterval); _pollInterval = null; }} }}
 
 async function openQualify() {{
-  const actifs = document.querySelectorAll('tr[data-actif="1"]');
-  if(actifs.length === 0) {{
-    alert("Aucune profession active \u2014 activez des m\u00e9tiers en premier.");
+  // Uniquement les professions actives VISIBLES dans la vue courante
+  const visibleActifs = [...document.querySelectorAll('tr[data-id][data-actif="1"]')].map(r=>r.dataset.id);
+  if(visibleActifs.length === 0) {{
+    alert("Aucune profession active dans la vue \u2014 cochez des m\u00e9tiers d\u2019abord.");
     return;
   }}
   const btn = document.querySelector('[onclick="openQualify()"]');
@@ -390,7 +391,8 @@ async function openQualify() {{
   const bar = document.getElementById('qualify-bar');
   bar.style.display = 'flex';
   const r = await fetch(`/admin/professions/qualify?token=${{TOKEN}}`, {{
-    method:'POST', headers:{{'Content-Type':'application/json'}}, body: '{{}}'
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{profession_ids: visibleActifs}})
   }});
   if(!r.ok) {{
     const d = await r.json().catch(()=>({{}}));
@@ -488,17 +490,29 @@ def qualify_status(token: str = "", profs: str = ""):
 @router.post("/admin/professions/qualify")
 async def launch_qualify(token: str = "", request: Request = None):
     _require_admin(token)
+    body = {}
+    if request:
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+    profession_ids = body.get("profession_ids") or None  # None = toutes les actives
+    if profession_ids is not None and not isinstance(profession_ids, list):
+        profession_ids = None
     with SessionLocal() as db:
         profs = [p for p in db_list_professions(db) if p.actif]
+        if profession_ids:
+            profs = [p for p in profs if p.id in profession_ids]
     if not profs:
         from fastapi import HTTPException
-        raise HTTPException(400, "Aucune profession active")
+        raise HTTPException(400, "Aucune profession active dans la sélection")
     import threading
     from ...scheduler import run_sirene_qualify
-    t = threading.Thread(target=run_sirene_qualify, kwargs={"max_per_naf": 200}, daemon=True)
+    t = threading.Thread(target=run_sirene_qualify,
+                         kwargs={"profession_ids": profession_ids}, daemon=True)
     t.start()
-    log.info(f"Qualification SIRENE lancée en background pour {len(profs)} professions")
-    return JSONResponse({"ok": True, "message": f"✓ Qualification lancée pour {len(profs)} professions — résultats visibles dans quelques minutes"})
+    log.info(f"Qualification SIRENE lancée pour {len(profs)} professions: {[p.id for p in profs]}")
+    return JSONResponse({"ok": True, "message": f"✓ Qualification lancée pour {len(profs)} profession(s)"})
 
 
 @router.get("/admin/sirene/segments")
