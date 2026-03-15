@@ -145,10 +145,10 @@ tr:hover{{background:#fafafa;cursor:pointer}}
   <div id="scoring-panel" class="card hidden" style="margin-bottom:16px">
     <h3 style="margin:0 0 12px;font-size:14px;font-weight:700">Pondération du score global</h3>
     <form id="scoring-form" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <label style="font-size:12px">Visibilité (actuel: {cfg.w_visibilite})
+      <label style="font-size:12px">Dép. recherche (actuel: {cfg.w_visibilite})
         <input name="w_visibilite" type="number" step="0.05" min="0" max="1" value="{cfg.w_visibilite}" style="width:100%;margin-top:4px">
       </label>
-      <label style="font-size:12px">Conseil IA (actuel: {cfg.w_conseil_ia})
+      <label style="font-size:12px">Dép. conseil IA (actuel: {cfg.w_conseil_ia})
         <input name="w_conseil_ia" type="number" step="0.05" min="0" max="1" value="{cfg.w_conseil_ia}" style="width:100%;margin-top:4px">
       </label>
       <label style="font-size:12px">Concurrence (actuel: {cfg.w_concurrence})
@@ -190,8 +190,8 @@ tr:hover{{background:#fafafa;cursor:pointer}}
         <tr>
           <th onclick="sortTable('label')">Métier <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('cat')">Catégorie <span class="sort-arrow">↕</span></th>
-          <th onclick="sortTable('vis')">Visibilité <span class="sort-arrow">↕</span></th>
-          <th onclick="sortTable('conseil')">Conseil IA <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('vis')" title="Dépendance à la recherche en ligne immédiate (Google, Maps)">Dép. recherche <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('conseil')" title="Dépendance au conseil IA / comparaison avant achat (ChatGPT, avis...)">Dép. conseil IA <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('valeur')">Valeur client <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable('score')">Score ▼ <span class="sort-arrow">↕</span></th>
           <th>NAF</th>
@@ -211,10 +211,10 @@ tr:hover{{background:#fafafa;cursor:pointer}}
     <h3 style="margin:0 0 16px;font-size:15px;font-weight:700" id="modal-title">Modifier</h3>
     <input type="hidden" id="edit-id">
     <div style="display:grid;gap:12px">
-      <label style="font-size:12px">Score visibilité (1-10)
+      <label style="font-size:12px">Dép. recherche en ligne (1-10)
         <input id="edit-visibilite" type="number" min="1" max="10" style="width:100%;margin-top:4px">
       </label>
-      <label style="font-size:12px">Score conseil IA (1-10)
+      <label style="font-size:12px">Dép. conseil IA / comparaison (1-10)
         <input id="edit-conseil" type="number" min="1" max="10" style="width:100%;margin-top:4px">
       </label>
       <label style="font-size:12px">Valeur client estimée (€)
