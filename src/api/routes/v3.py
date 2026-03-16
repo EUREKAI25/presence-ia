@@ -462,7 +462,24 @@ def _render_landing(
     name       = p.name
     city_cap   = p.city.capitalize()
     pro_label  = p.profession.lower()
-    pro_plural = pro_label + "s" if not pro_label.endswith("s") else pro_label
+
+    # Chercher label_pluriel + termes_recherche dans le référentiel
+    _pro_plural = None
+    _termes     = []
+    try:
+        import json as _json
+        from ...database import SessionLocal as _SL
+        from ...models import ProfessionDB as _PDB
+        with _SL() as _db:
+            _pobj = (_db.query(_PDB)
+                     .filter(_PDB.label.ilike(p.profession))
+                     .first())
+            if _pobj:
+                _pro_plural = _pobj.label_pluriel.lower() if _pobj.label_pluriel else None
+                _termes     = _json.loads(_pobj.termes_recherche or "[]")
+    except Exception:
+        pass
+    pro_plural = _pro_plural or (pro_label + "s" if not pro_label.endswith("s") else pro_label)
 
     # ── Concurrents (fallback si liste courte) ────────────────────────────
     c = list(competitors[:3])
@@ -491,7 +508,7 @@ def _render_landing(
         if not ia_results_list and p.ia_response:
             ia_results_list = [{
                 "model":     p.ia_model or "ChatGPT",
-                "prompt":    p.ia_prompt or f"Quels {pro_label}s recommandes-tu à {city_cap} ?",
+                "prompt":    p.ia_prompt or (_termes and f"Tu connais quelqu'un pour {_termes[0]} à {city_cap} ?" or f"Quels {pro_plural} recommandes-tu à {city_cap} ?"),
                 "response":  p.ia_response,
                 "tested_at": p.ia_tested_at.isoformat() if isinstance(p.ia_tested_at, datetime)
                              else str(p.ia_tested_at) if p.ia_tested_at else None,
