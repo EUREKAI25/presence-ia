@@ -221,30 +221,34 @@ def generate_segments(db, profession_ids: list[str] = None) -> int:
 def _get_name_keywords_for_segment(db, profession_id: str, naf: str) -> Optional[list]:
     """
     Si le NAF est partagé par plusieurs professions, retourne les mots-clés
-    de la profession pour filtrer les résultats SIRENE par nom d'entreprise.
+    étymologiques (mots_cles_sirene) pour filtrer les raisons sociales SIRENE.
     Retourne None si le NAF est exclusif (pas de filtre nécessaire).
+    Retourne None aussi si mots_cles_sirene n'est pas encore renseigné
+    (la qualification ne doit pas tourner sans filtre sur un NAF ambigu).
     """
     from .models import ProfessionDB
 
     all_profs = db.query(ProfessionDB.id, ProfessionDB.codes_naf,
-                         ProfessionDB.termes_recherche).all()
+                         ProfessionDB.mots_cles_sirene).all()
 
     # Professions utilisant ce NAF
     using_naf = [p for p in all_profs if naf in json.loads(p.codes_naf or "[]")]
     if len(using_naf) < 2:
         return None  # NAF exclusif, pas besoin de filtrer
 
-    # NAF ambigu → charger les termes de recherche de cette profession
+    # NAF ambigu → utiliser mots_cles_sirene (racine étymologique)
     for p in using_naf:
         if p.id == profession_id:
             try:
-                terms = json.loads(p.termes_recherche or "[]")
-                # Garder les termes courts/simples comme mots-clés de filtrage
-                keywords = [t for t in terms if t and len(t) <= 30]
+                keywords = json.loads(p.mots_cles_sirene or "[]")
                 if keywords:
                     log.info(f"[SIRENE] NAF {naf} ambigu ({len(using_naf)} professions) "
-                             f"→ filtre nom: {keywords[:5]}")
-                    return keywords[:10]
+                             f"→ filtre étymologique: {keywords}")
+                    return keywords
+                else:
+                    log.warning(f"[SIRENE] NAF {naf} ambigu mais mots_cles_sirene vide "
+                                f"pour {profession_id} — segment bloqué")
+                    return []  # liste vide = aucun résultat ne passera le filtre
             except Exception:
                 pass
     return None

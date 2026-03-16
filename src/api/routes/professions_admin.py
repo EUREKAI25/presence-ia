@@ -93,6 +93,12 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
         )
         naf    = ", ".join(json.loads(p.codes_naf or "[]")[:3]) or "—"
         termes = ", ".join(json.loads(p.termes_recherche or "[]")[:3]) or "—"
+        kw_sirene = json.loads(p.mots_cles_sirene or "[]")
+        kw_cell = (
+            f'<span style="color:#16a34a;font-size:10px" title="{", ".join(kw_sirene)}">✓ {", ".join(kw_sirene[:2])}{"…" if len(kw_sirene)>2 else ""}</span>'
+            if kw_sirene else
+            f'<span onclick="event.stopPropagation();generateKeywords(\'{p.id}\')" style="color:#f59e0b;font-size:10px;cursor:pointer" title="Générer mots-clés SIRENE">⚠ générer</span>'
+        )
         vc     = f"{p.valeur_client:,}€".replace(",", " ") if p.valeur_client else "—"
         sg_color = "#16a34a" if sg >= 7 else ("#d97706" if sg >= 4 else "#dc2626")
         actif_int = 1 if p.actif else 0
@@ -122,6 +128,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;font-weight:700;color:{sg_color};font-size:13px">{sg}</td>
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{naf}</td>
           <td style="padding:8px 6px;font-size:10px;color:#9ca3af;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{termes}</td>
+          <td style="padding:8px 6px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{kw_cell}</td>
           <td style="padding:8px 6px">{actif_badge}</td>
           <td style="padding:8px 6px;text-align:right" class="sirene-count">{sirene_cell}</td>
           <td style="padding:8px 6px;text-align:center"><button onclick="event.stopPropagation();editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;color:#6b7280;font-size:11px" title="Modifier les scores">Scores</button></td>
@@ -161,6 +168,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
       <span style="font-size:13px;color:#6b7280;font-weight:400;margin-left:8px">{len(profs_scored)} professions · {nb_actifs} actives · <span style="color:#1d4ed8">{total_suspects_global:,}</span> suspects</span>
     </h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-blue" onclick="generateKeywords()" title="Générer mots_cles_sirene via LLM pour les professions sans mots-clés">🔑 Mots-clés SIRENE</button>
       <button class="btn btn-sm btn-green" onclick="openQualify()">▶ Lancer qualification</button>
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('scoring-panel').classList.toggle('hidden')">⚙ Pondération</button>
     </div>
@@ -221,6 +229,7 @@ tr:hover{{background:#fafafa;cursor:pointer}}
           <th id="th-score" onclick="sortTable('score')">Score ▼ <span class="sort-arrow">↕</span></th>
           <th>NAF</th>
           <th>Termes</th>
+          <th title="Mots-clés étymologiques pour filtre raison sociale SIRENE">Mots-clés SIRENE</th>
           <th onclick="sortTable('actif')">Statut <span class="sort-arrow">↕</span></th>
           <th style="text-align:right">Suspects SIRENE</th>
           <th></th>
@@ -780,9 +789,45 @@ async function runNext() {{
     toast(d.detail || 'Erreur', false);
   }}
 }}
+
+async function generateKeywords(profId, force) {{
+  const url = '/admin/sirene/generate-keywords?token='+TOKEN
+    + (profId ? '&profession_id='+encodeURIComponent(profId) : '')
+    + (force ? '&force=true' : '');
+  toast('⏳ Génération mots-clés SIRENE via LLM...');
+  try {{
+    const r = await fetch(url, {{method:'POST'}});
+    const d = await r.json();
+    if (d.ok) {{
+      const nb = Object.keys(d.results || {{}}).length;
+      toast('✓ ' + nb + ' profession(s) traitée(s)');
+      setTimeout(() => location.reload(), 1500);
+    }} else {{
+      toast(d.detail || 'Erreur', false);
+    }}
+  }} catch(e) {{
+    toast('Erreur: ' + e.message, false);
+  }}
+}}
 </script>
 </body></html>"""
     return HTMLResponse(html)
+
+
+@router.post("/admin/sirene/generate-keywords")
+def sirene_generate_keywords(token: str = "", profession_id: str = "", force: bool = False):
+    """Génère mots_cles_sirene via LLM pour les professions sans mots-clés.
+    Si profession_id fourni : uniquement cette profession.
+    Si force=True : régénère même si déjà renseigné."""
+    _require_admin(token)
+    from ...sirene_keywords import generate_sirene_keywords
+    with SessionLocal() as db:
+        results = generate_sirene_keywords(
+            db,
+            profession_id=profession_id or None,
+            force=force,
+        )
+    return JSONResponse({"ok": True, "results": results})
 
 
 @router.post("/admin/sirene/run-next")

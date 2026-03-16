@@ -429,6 +429,7 @@ class ProfessionDB(Base):
     categorie        : Mapped[str]            = mapped_column(sa.String, nullable=False)            # "Bâtiment"
     codes_naf        : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # JSON ["4322A"]
     termes_recherche : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # JSON ["plombier","plomberie"]
+    mots_cles_sirene : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)               # JSON ["piscine","piscines"] — racine étymologique pour filtre raison sociale
     score_visibilite : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10
     score_conseil_ia : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10
     score_concurrence: Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)            # 1-10 (SIRENE, renseigné plus tard)
