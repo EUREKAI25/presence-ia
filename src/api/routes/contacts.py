@@ -26,6 +26,17 @@ def _offer_labels(db: Session) -> dict:
     return {o.name: o.name for o in offers} if offers else {}
 
 
+def _prof_options(db) -> str:
+    """Professions avec mots_cles_sirene — prêtes pour leads runner."""
+    from ...models import ProfessionDB
+    profs = db.query(ProfessionDB).filter(
+        ProfessionDB.mots_cles_sirene.isnot(None)
+    ).order_by(ProfessionDB.label).all()
+    if not profs:
+        return '<option value="">Aucune profession prête</option>'
+    return "".join(f'<option value="{p.id}">{p.label}</option>' for p in profs)
+
+
 STATUS_BADGE = {
     "SUSPECT":  ("background:#fef9c3;color:#854d0e", "Suspect"),
     "PROSPECT": ("background:#dbeafe;color:#1e40af", "Prospect"),
@@ -98,8 +109,33 @@ tr:hover td{{background:#fafafa}}
       <span style="font-size:12px;color:#6b7280">{count_total} total · {count_prospect} prospects · {count_client} clients</span>
     </div>
     <div style="display:flex;gap:8px">
-      <a href="/admin/enrich?token={token}" class="btn" style="background:#16a34a">+ Enrichir suspects</a>
+      <button onclick="document.getElementById('leads-panel').classList.toggle('hidden')" class="btn" style="background:#16a34a">+ Obtenir des leads</button>
       <button onclick="document.getElementById('add-panel').classList.toggle('hidden')" class="btn btn-gray">+ Manuel</button>
+    </div>
+  </div>
+
+  <!-- Widget leads runner -->
+  <div id="leads-panel" class="card hidden" style="margin-bottom:12px">
+    <h3 style="font-size:13px;font-weight:700;margin:0 0 12px">Obtenir des leads qualifiés</h3>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Métier</label>
+        <select id="lr-prof" style="min-width:180px">
+          {_prof_options(db)}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Leads voulus</label>
+        <input type="number" id="lr-qty" value="20" min="1" max="200" style="width:80px">
+      </div>
+      <button id="lr-btn" onclick="startLeads()" class="btn" style="background:#16a34a">▶ Lancer</button>
+      <button id="lr-stop" onclick="stopLeads()" class="btn btn-gray" style="display:none">⏹ Stopper</button>
+    </div>
+    <div id="lr-status" style="margin-top:10px;font-size:12px;color:#6b7280;display:none">
+      <span id="lr-phase" style="font-weight:600"></span> —
+      <span id="lr-suspects"></span> suspects ·
+      <span id="lr-processed"></span> traités ·
+      <span style="color:#16a34a;font-weight:700"><span id="lr-contacts">0</span> leads</span>
     </div>
   </div>
 
@@ -177,6 +213,56 @@ async function createContact() {{
   const d = await r.json();
   if(d.id) location.reload(); else document.getElementById('add-status').textContent='Erreur';
 }}
+
+// ── Leads runner ──────────────────────────────────────────────────────────────
+let _lrPoll = null;
+async function startLeads() {{
+  const prof = document.getElementById('lr-prof').value;
+  const qty  = parseInt(document.getElementById('lr-qty').value) || 20;
+  document.getElementById('lr-btn').disabled = true;
+  document.getElementById('lr-stop').style.display = 'inline-block';
+  document.getElementById('lr-status').style.display = 'block';
+  document.getElementById('lr-phase').textContent = 'Démarrage…';
+  await fetch('/admin/leads/run?token='+T, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{profession_id: prof, qty: qty}})
+  }});
+  _lrPoll = setInterval(_pollLeads, 2000);
+}}
+async function stopLeads() {{
+  await fetch('/admin/leads/stop?token='+T, {{method:'POST'}});
+}}
+async function _pollLeads() {{
+  try {{
+    const r = await fetch('/admin/leads/status?token='+T);
+    const d = await r.json();
+    document.getElementById('lr-phase').textContent    = d.phase || '';
+    document.getElementById('lr-suspects').textContent = d.suspects || 0;
+    document.getElementById('lr-processed').textContent= d.processed || 0;
+    document.getElementById('lr-contacts').textContent = d.contacts || 0;
+    if (!d.running) {{
+      clearInterval(_lrPoll);
+      document.getElementById('lr-btn').disabled = false;
+      document.getElementById('lr-stop').style.display = 'none';
+      document.getElementById('lr-phase').textContent = '\u2713 Terminé — ' + (d.contacts||0) + ' leads';
+      if (d.contacts > 0) setTimeout(() => location.reload(), 1500);
+    }}
+  }} catch(e) {{}}
+}}
+// Reprendre polling si pipeline en cours
+(async function() {{
+  try {{
+    const r = await fetch('/admin/leads/status?token='+T);
+    const d = await r.json();
+    if (d.running) {{
+      document.getElementById('leads-panel').classList.remove('hidden');
+      document.getElementById('lr-btn').disabled = true;
+      document.getElementById('lr-stop').style.display = 'inline-block';
+      document.getElementById('lr-status').style.display = 'block';
+      _lrPoll = setInterval(_pollLeads, 2000);
+    }}
+  }} catch(e) {{}}
+}})();
 </script>
 </body></html>""")
 
