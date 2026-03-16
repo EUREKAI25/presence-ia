@@ -61,16 +61,91 @@ def _sample_sirene(naf: str, n: int = 6) -> list[str]:
         return []
 
 
+def _get_ambiguous_nafs(db) -> dict:
+    """
+    Retourne les NAF partagés par plusieurs professions.
+    dict: naf_code → list of {id, label, suspects_count}
+    """
+    from ...models import ProfessionDB, SireneSuspectDB
+    from sqlalchemy import func
+
+    profs = db.query(ProfessionDB).all()
+
+    # naf → [professions]
+    naf_map: dict[str, list] = {}
+    for p in profs:
+        try:
+            codes = json.loads(p.codes_naf or "[]")
+        except Exception:
+            codes = []
+        for c in codes:
+            naf_map.setdefault(c, []).append(p)
+
+    # Compter les suspects par profession
+    counts = dict(
+        db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+        .group_by(SireneSuspectDB.profession_id).all()
+    )
+
+    # Garder uniquement les NAF ambigus (2+ professions)
+    result = {}
+    for naf, plist in naf_map.items():
+        if len(plist) < 2:
+            continue
+        result[naf] = [
+            {"id": p.id, "label": p.label, "suspects": counts.get(p.id, 0)}
+            for p in plist
+        ]
+    return result
+
+
 @router.get("/admin/naf-audit", response_class=HTMLResponse)
-def naf_audit_page(token: str = ""):
+def naf_audit_page(token: str = "", view: str = "conflicts"):
     _require_admin(token)
 
     with SessionLocal() as db:
-        from ...models import ProfessionDB
-        profs = db.query(ProfessionDB).order_by(ProfessionDB.label).all()
+        from ...models import ProfessionDB, SireneSuspectDB
+        from sqlalchemy import func
+        profs     = db.query(ProfessionDB).order_by(ProfessionDB.label).all()
+        ambiguous = _get_ambiguous_nafs(db)
+        # IDs de professions ambiguës
+        ambig_prof_ids = {p["id"] for plist in ambiguous.values() for p in plist}
 
-    # Regrouper par NAF unique → liste de professions
-    naf_to_profs: dict[str, list] = {}
+    # Compte total de suspects à purger
+    total_to_purge = sum(
+        p["suspects"]
+        for plist in ambiguous.values()
+        for p in plist
+        if p["suspects"] > 0
+    )
+
+    # ── Vue CONFLITS ──────────────────────────────────────────────────────────
+    conflict_rows = ""
+    for naf, plist in sorted(ambiguous.items(), key=lambda x: -sum(p["suspects"] for p in x[1])):
+        nb_suspects = sum(p["suspects"] for p in plist)
+        profs_html  = "".join(
+            f'<div style="display:flex;align-items:center;gap:6px;padding:3px 0">'
+            f'<span style="font-size:12px;font-weight:500">{p["label"]}</span>'
+            f'{"" if not p["suspects"] else f"""<span style=\"background:#fee2e2;color:#991b1b;font-size:10px;padding:1px 6px;border-radius:10px\">{p["suspects"]:,} suspects</span>"""}'
+            f'</div>'
+            for p in plist
+        )
+        conflict_rows += f"""
+        <tr data-naf="{naf}">
+          <td style="padding:10px 12px;font-family:monospace;font-size:12px;font-weight:700;color:#1d4ed8;white-space:nowrap">{naf}</td>
+          <td style="padding:10px 12px">{profs_html}</td>
+          <td style="padding:10px 12px;text-align:right;white-space:nowrap">
+            {"" if not nb_suspects else f'<span style="font-size:12px;font-weight:700;color:#dc2626">{nb_suspects:,}</span>'}
+          </td>
+          <td style="padding:10px 12px;text-align:center">
+            {"" if not nb_suspects else
+              f'<button onclick="purgeNaf(\'{naf}\')" '
+              f'style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;'
+              f'padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600">Purger</button>'}
+          </td>
+        </tr>"""
+
+    # ── Vue PROFESSIONS (liste complète) ──────────────────────────────────────
     prof_data = []
     for p in profs:
         codes = []
@@ -78,17 +153,17 @@ def naf_audit_page(token: str = ""):
             codes = json.loads(p.codes_naf or "[]")
         except Exception:
             pass
-        prof_data.append({"id": p.id, "label": p.label, "codes": codes})
-        for c in codes:
-            naf_to_profs.setdefault(c, []).append(p.label)
+        prof_data.append({"id": p.id, "label": p.label, "codes": codes,
+                          "ambig": p.id in ambig_prof_ids})
 
     prof_rows = "".join(
-        f'<tr data-id="{p["id"]}">'
-        f'<td style="padding:8px 10px;font-size:12px;font-weight:600">{p["label"]}</td>'
+        f'<tr data-id="{p["id"]}" style="{"background:#fff7ed" if p["ambig"] else ""}">'
+        f'<td style="padding:8px 10px;font-size:12px;font-weight:600">'
+        f'{"⚠ " if p["ambig"] else ""}{p["label"]}</td>'
         f'<td style="padding:8px 10px;font-size:11px;font-family:monospace;color:#6b7280">'
         f'{", ".join(p["codes"]) or "—"}</td>'
         f'<td style="padding:8px 10px">'
-        f'<button onclick="testProf(\'{p["id"]}\',{json.dumps(p["codes"])},\'{p["label"]}\')" '
+        f'<button onclick="testProf(\'{p["id"]}\',{json.dumps(p["codes"])},\'{p["label"].replace(chr(39), chr(92)+chr(39))}\')" '
         f'style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:3px 10px;'
         f'font-size:11px;cursor:pointer;color:#374151">Tester →</button>'
         f'</td>'
@@ -98,6 +173,11 @@ def naf_audit_page(token: str = ""):
     )
 
     nav = admin_nav(token, "naf-audit")
+    tab_s = "border-bottom:2px solid #e94560;color:#e94560;font-weight:600;"
+    tab_n = "color:#6b7280;"
+    t_conf = tab_s if view == "conflicts" else tab_n
+    t_list = tab_s if view == "list" else tab_n
+
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Audit NAF</title>
 {nav}
@@ -111,8 +191,6 @@ th{{background:#f1f5f9;font-size:11px;font-weight:700;text-transform:uppercase;
 tr:hover td{{background:#fafafa}}
 .tag-naf{{background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;
           font-size:10px;font-family:monospace;font-weight:700;margin-right:3px}}
-.sample-ok{{color:#166534;font-size:11px}}
-.sample-warn{{color:#92400e;font-size:11px}}
 input[type=text]{{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;
                   font-size:13px;outline:none;width:100%;box-sizing:border-box}}
 input:focus{{border-color:#e94560}}
@@ -121,7 +199,6 @@ input:focus{{border-color:#e94560}}
 .btn:hover{{background:#c73652}}
 .btn-green{{background:#16a34a}}.btn-green:hover{{background:#15803d}}
 .btn-sm{{padding:4px 10px;font-size:11px}}
-/* Modal */
 .modal{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
         z-index:2000;align-items:center;justify-content:center}}
 .modal.show{{display:flex}}
@@ -129,37 +206,70 @@ input:focus{{border-color:#e94560}}
             max-width:95vw;max-height:85vh;overflow-y:auto}}
 </style></head><body>
 <div style="padding:20px 24px 0">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-    <h2 style="font-size:18px;font-weight:700;margin:0">Audit codes NAF</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-sm" onclick="testAll()" id="btn-all">
-        ▶ Tester toutes ({len(prof_data)})
-      </button>
-    </div>
-  </div>
-  <p style="color:#6b7280;font-size:13px;margin:0 0 16px">
-    Cliquez "Tester →" pour voir les vraies entreprises SIRENE correspondant à chaque code NAF.
-    Si les noms ne ressemblent pas au métier → le code est à corriger.
-  </p>
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">Audit codes NAF</h2>
 
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 14px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;align-items:center">
-      <input type="text" id="q-filter" placeholder="Filtrer par métier..." oninput="filterRows()"
-             style="width:280px">
-      <span id="test-progress" style="font-size:12px;color:#6b7280"></span>
+  <!-- Onglets -->
+  <div style="display:flex;gap:0;border-bottom:1px solid #e5e7eb;margin:12px 0">
+    <a href="/admin/naf-audit?token={token}&view=conflicts"
+       style="text-decoration:none;padding:8px 18px;font-size:13px;{t_conf}">
+      ⚠ Conflits NAF
+      <span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">{len(ambiguous)}</span>
+    </a>
+    <a href="/admin/naf-audit?token={token}&view=list"
+       style="text-decoration:none;padding:8px 18px;font-size:13px;{t_list}">
+      Liste complète
+    </a>
+  </div>
+
+  {"" if view != "conflicts" else f"""
+  <!-- Vue Conflits -->
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <strong style="font-size:13px">{len(ambiguous)} codes NAF ambigus</strong>
+      <span style="font-size:12px;color:#92400e;margin-left:8px">→ {total_to_purge:,} suspects inutilisables</span>
     </div>
-    <div style="overflow-y:auto;max-height:calc(100vh - 180px)">
+    <button onclick="purgeAll()" class="btn" style="background:#dc2626;font-size:12px;padding:6px 16px">
+      ✕ Purger TOUS les suspects ambigus ({total_to_purge:,})
+    </button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-y:auto;max-height:calc(100vh - 240px)">
     <table>
       <thead><tr>
-        <th style="width:25%">Métier</th>
-        <th style="width:15%">Codes NAF</th>
+        <th style="width:10%">NAF</th>
+        <th>Professions en conflit</th>
+        <th style="width:12%;text-align:right">Suspects</th>
+        <th style="width:10%;text-align:center">Action</th>
+      </tr></thead>
+      <tbody>{conflict_rows}</tbody>
+    </table>
+    </div>
+  </div>"""}
+
+  {"" if view != "list" else f"""
+  <!-- Vue Liste complète -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <input type="text" id="q-filter" placeholder="Filtrer par métier..."
+           oninput="filterRows()" style="width:280px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:11px;color:#f97316">⚠ fond orange = NAF ambigu</span>
+      <button class="btn btn-sm" onclick="testAll()" id="btn-all">▶ Tester toutes</button>
+      <span id="test-progress" style="font-size:12px;color:#6b7280"></span>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-y:auto;max-height:calc(100vh - 200px)">
+    <table>
+      <thead><tr>
+        <th style="width:28%">Métier</th>
+        <th style="width:18%">Codes NAF</th>
         <th style="width:8%">Test</th>
-        <th>Entreprises SIRENE trouvées (Paris)</th>
+        <th>Entreprises SIRENE (Paris)</th>
       </tr></thead>
       <tbody id="prof-tbody">{prof_rows}</tbody>
     </table>
     </div>
-  </div>
+  </div>"""}
 </div>
 
 <!-- Modal correction NAF -->
@@ -327,6 +437,49 @@ async function saveNaf() {{
     await testProf(_fixProfId, codes, _fixProfLabel);
   }}
 }}
+
+async function purgeNaf(naf) {{
+  if (!confirm('Supprimer TOUS les suspects des professions utilisant le NAF ' + naf + ' ?\\n\\nCette action est irréversible.')) return;
+  const btn = document.querySelector(`tr[data-naf="${{naf}}"] button`);
+  if (btn) {{ btn.disabled = true; btn.textContent = '⏳...'; }}
+  const res = await fetch('/admin/naf-audit/purge?token='+TOKEN, {{
+    method: 'POST', headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify({{naf}})
+  }});
+  const d = await res.json();
+  if (d.ok) {{
+    const row = document.querySelector(`tr[data-naf="${{naf}}"]`);
+    if (row) {{
+      row.querySelectorAll('td')[2].innerHTML = '<span style="color:#16a34a;font-size:11px">✓ purgé</span>';
+      row.querySelectorAll('td')[3].innerHTML = '';
+    }}
+    // Mettre à jour le compteur global
+    const banner = document.querySelector('[onclick="purgeAll()"]');
+    if (banner) location.reload();
+  }} else {{
+    alert('Erreur : ' + (d.error || 'inconnue'));
+    if (btn) {{ btn.disabled = false; btn.textContent = 'Purger'; }}
+  }}
+}}
+
+async function purgeAll() {{
+  const total = {total_to_purge};
+  if (!confirm('Supprimer ' + total.toLocaleString() + ' suspects appartenant à des NAF ambigus ?\\n\\nTous les suspects de ces professions seront supprimés. Action irréversible.')) return;
+  const btn = document.querySelector('[onclick="purgeAll()"]');
+  if (btn) {{ btn.disabled = true; btn.textContent = '⏳ Purge en cours...'; }}
+  const res = await fetch('/admin/naf-audit/purge?token='+TOKEN, {{
+    method: 'POST', headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify({{all_ambiguous: true}})
+  }});
+  const d = await res.json();
+  if (d.ok) {{
+    alert('✓ ' + d.deleted.toLocaleString() + ' suspects supprimés');
+    location.reload();
+  }} else {{
+    alert('Erreur : ' + (d.error || 'inconnue'));
+    if (btn) {{ btn.disabled = false; btn.textContent = '✕ Purger TOUS'; }}
+  }}
+}}
 </script>
 </body></html>""")
 
@@ -347,6 +500,41 @@ async def naf_test(request: Request, token: str = ""):
         time.sleep(0.15)
 
     return JSONResponse({"results": all_names[:12], "by_naf": by_naf})
+
+
+@router.post("/admin/naf-audit/purge")
+async def naf_purge(request: Request, token: str = ""):
+    _require_admin(token)
+    data = await request.json()
+    naf_code     = data.get("naf")
+    all_ambiguous = data.get("all_ambiguous", False)
+
+    with SessionLocal() as db:
+        from ...models import SireneSuspectDB, SireneSuspectDB as SS
+        from sqlalchemy import delete
+
+        if all_ambiguous:
+            ambiguous = _get_ambiguous_nafs(db)
+            prof_ids = {p["id"] for plist in ambiguous.values() for p in plist}
+        elif naf_code:
+            ambiguous = _get_ambiguous_nafs(db)
+            if naf_code not in ambiguous:
+                return JSONResponse({"error": f"NAF {naf_code} non trouvé dans les conflits"}, status_code=404)
+            prof_ids = {p["id"] for p in ambiguous[naf_code]}
+        else:
+            return JSONResponse({"error": "naf ou all_ambiguous requis"}, status_code=400)
+
+        if not prof_ids:
+            return JSONResponse({"ok": True, "deleted": 0})
+
+        result = db.execute(
+            delete(SireneSuspectDB).where(SireneSuspectDB.profession_id.in_(list(prof_ids)))
+        )
+        db.commit()
+        deleted = result.rowcount
+
+    log.info(f"NAF purge: {deleted} suspects supprimés (naf={naf_code}, all={all_ambiguous})")
+    return JSONResponse({"ok": True, "deleted": deleted})
 
 
 @router.post("/admin/naf-audit/fix")
