@@ -26,106 +26,141 @@ def _offer_labels(db: Session) -> dict:
     return {o.name: o.name for o in offers} if offers else {}
 
 
+STATUS_BADGE = {
+    "SUSPECT":  ("background:#fef9c3;color:#854d0e", "Suspect"),
+    "PROSPECT": ("background:#dbeafe;color:#1e40af", "Prospect"),
+    "CLIENT":   ("background:#dcfce7;color:#166534", "Client"),
+}
+
 @router.get("/admin/contacts", response_class=HTMLResponse)
-def contacts_page(request: Request, db: Session = Depends(get_db)):
+def contacts_page(request: Request, db: Session = Depends(get_db),
+                  status_filter: str = "", search: str = ""):
     token = _check_token(request)
-    # Les contacts sont gérés dans Admin V3 (source unique)
-    return RedirectResponse(f"/admin/v3?token={token}", status_code=302)
     contacts = db_list_contacts(db)
-    offer_labels = _offer_labels(db)
+
+    # Filtres
+    if status_filter:
+        contacts = [c for c in contacts if c.status == status_filter]
+    if search:
+        q = search.lower()
+        contacts = [c for c in contacts if q in (c.company_name or "").lower()
+                    or q in (c.email or "").lower() or q in (c.city or "").lower()
+                    or q in (c.profession or "").lower()]
 
     rows = ""
     for c in contacts:
-        sc = STATUS_COLORS.get(c.status, "#aaa")
-        offer = offer_labels.get(c.offer_selected or "", c.offer_selected or "—")
-        sent_icon  = "✅" if c.message_sent  else "—"
-        read_icon  = "✅" if c.message_read  else "—"
-        paid_icon  = "✅" if c.paid          else "—"
-        rows += f"""<tr id="row-{c.id}">
-  <td>{c.company_name}</td>
-  <td style="color:{sc};font-weight:bold">{c.status}</td>
-  <td>{c.email or "—"}</td>
-  <td>{c.city or "—"}</td>
-  <td style="text-align:center">{sent_icon}</td>
-  <td style="text-align:center">{read_icon}</td>
-  <td style="text-align:center">{paid_icon}</td>
-  <td>{offer}</td>
-  <td style="color:#aaa">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
-  <td style="color:#e9a020">{c.acquisition_cost or "—"}</td>
-  <td style="display:flex;gap:6px;flex-wrap:wrap;padding:6px">
-    <button onclick="markContact('{c.id}','sent',this)" style="{_btn_style('#2a2a4e')}">📨 Envoyé</button>
-    <button onclick="markContact('{c.id}','read',this)" style="{_btn_style('#2a2a4e')}">👁 Lu</button>
-    <button onclick="markContact('{c.id}','paid',this)" style="{_btn_style('#1a4a2e')}">💳 Payé</button>
-    <button onclick="setStatus('{c.id}',this)" style="{_btn_style('#2a2a4e')}">🔄 Statut</button>
-    <button onclick="deleteContact('{c.id}',this)" style="{_btn_style('#4a1a1a')}">🗑</button>
+        badge_style, badge_label = STATUS_BADGE.get(c.status, ("background:#f3f4f6;color:#374151", c.status))
+        mobile = ""
+        fixe   = ""
+        if c.notes:
+            import re
+            m = re.search(r"mobile:([^\s|]+)", c.notes or "")
+            f = re.search(r"fixe:([^\s|]+)", c.notes or "")
+            if m: mobile = m.group(1)
+            if f: fixe   = f.group(1)
+        phone_display = mobile or fixe or c.phone or "—"
+        mobile_tag = ' <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 4px;border-radius:3px">mob</span>' if mobile else ""
+        rows += f"""<tr id="row-{c.id}" style="border-bottom:1px solid #f3f4f6">
+  <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
+  <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
+  <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
+  <td style="padding:8px 6px;font-size:11px;color:#374151">{phone_display}{mobile_tag}</td>
+  <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
+  <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.profession or "—"}</td>
+  <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
+  <td style="padding:8px 6px;text-align:right">
+    <button onclick="deleteContact('{c.id}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
   </td>
 </tr>"""
 
+    count_total    = len(db_list_contacts(db))
+    count_prospect = sum(1 for c in db_list_contacts(db) if c.status == "PROSPECT")
+    count_client   = sum(1 for c in db_list_contacts(db) if c.status == "CLIENT")
+
+    nav = admin_nav(token, "contacts")
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Contacts — PRESENCE_IA Admin</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
-table{{border-collapse:collapse;width:100%}}th{{background:#16213e;color:#aaa;padding:10px;font-size:11px;text-align:left}}
-td{{padding:9px 10px;border-bottom:1px solid #1a1a2e;font-size:12px;vertical-align:middle}}
-tr:hover td{{background:#12122a}}.add-form{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin:20px}}
-input,select,textarea{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:7px 10px;border-radius:4px;font-size:12px}}
-label{{color:#aaa;font-size:11px;display:block;margin-bottom:3px}}</style></head><body>
-{admin_nav(token, "contacts")}
-<div style="padding:20px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-  <h1 style="color:#fff;font-size:18px">👥 Contacts ({len(contacts)})</h1>
-  <button onclick="document.getElementById('add-form').style.display=document.getElementById('add-form').style.display==='none'?'block':'none'"
-    style="background:#e94560;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px">+ Nouveau contact</button>
-</div>
+<meta charset="UTF-8"><title>Contacts</title>
+{nav}
+<style>
+body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111;margin:0}}
+.card{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:16px 24px}}
+input,select{{border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:12px}}
+.btn{{background:#e94560;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}}
+.btn-gray{{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}}
+table{{width:100%;border-collapse:collapse}}
+th{{font-size:11px;font-weight:600;color:#6b7280;text-align:left;padding:8px 6px;border-bottom:2px solid #f3f4f6}}
+tr:hover td{{background:#fafafa}}
+</style></head><body>
+<div style="padding:20px 24px 0">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">Contacts</h2>
+      <span style="font-size:12px;color:#6b7280">{count_total} total · {count_prospect} prospects · {count_client} clients</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="/admin/enrich?token={token}" class="btn" style="background:#16a34a">+ Enrichir suspects</a>
+      <button onclick="document.getElementById('add-panel').classList.toggle('hidden')" class="btn btn-gray">+ Manuel</button>
+    </div>
+  </div>
 
-<div id="add-form" class="add-form" style="display:none">
-<h3 style="color:#fff;margin-bottom:16px">Nouveau contact</h3>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-  <div><label>Entreprise *</label><input id="n-name" type="text" placeholder="Martin Toiture" style="width:100%"></div>
-  <div><label>Email</label><input id="n-email" type="email" placeholder="contact@..." style="width:100%"></div>
-  <div><label>Téléphone</label><input id="n-phone" type="text" placeholder="06..." style="width:100%"></div>
-  <div><label>Ville</label><input id="n-city" type="text" placeholder="Rennes" style="width:100%"></div>
-  <div><label>Profession</label><input id="n-profession" type="text" placeholder="couvreur" style="width:100%"></div>
-  <div><label>Statut</label><select id="n-status" style="width:100%"><option value="SUSPECT">SUSPECT</option><option value="PROSPECT">PROSPECT</option><option value="CLIENT">CLIENT</option></select></div>
-  <div><label>Offre</label><select id="n-offer" style="width:100%"><option value="">—</option><option value="FLASH">Audit Flash</option><option value="KIT">Kit Visibilité</option><option value="DONE_FOR_YOU">Tout inclus</option></select></div>
-  <div><label>Coût acquisition (€)</label><input id="n-cost" type="number" step="0.01" style="width:100%"></div>
-</div>
-<div style="margin-top:12px"><label>Notes</label><textarea id="n-notes" rows="2" style="width:100%"></textarea></div>
-<button onclick="createContact()" style="margin-top:12px;background:#e94560;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:13px">Créer</button>
-<span id="add-status" style="margin-left:12px;font-size:12px"></span>
-</div>
+  <!-- Filtres -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="text" placeholder="Rechercher…" id="q" value="{search}"
+      onkeydown="if(event.key==='Enter')applyFilter()"
+      style="flex:1;min-width:160px;max-width:300px">
+    <select id="sf" onchange="applyFilter()">
+      <option value="" {"selected" if not status_filter else ""}>Tous statuts</option>
+      <option value="SUSPECT"  {"selected" if status_filter=="SUSPECT"  else ""}>Suspects</option>
+      <option value="PROSPECT" {"selected" if status_filter=="PROSPECT" else ""}>Prospects</option>
+      <option value="CLIENT"   {"selected" if status_filter=="CLIENT"   else ""}>Clients</option>
+    </select>
+  </div>
 
-<div style="overflow-x:auto">
-<table>
-<tr><th>Entreprise</th><th>Statut</th><th>Email</th><th>Ville</th><th>Envoyé</th><th>Lu</th><th>Payé</th><th>Offre</th><th>Ajouté</th><th>Acq. €</th><th>Actions</th></tr>
-{rows if rows else '<tr><td colspan="11" style="text-align:center;color:#555;padding:40px">Aucun contact</td></tr>'}
-</table>
-</div>
+  <!-- Formulaire ajout manuel -->
+  <div id="add-panel" class="card hidden" style="margin-bottom:12px">
+    <h3 style="font-size:13px;font-weight:700;margin:0 0 12px">Nouveau contact manuel</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Entreprise *</label><input id="n-name" type="text" style="width:100%"></div>
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Email</label><input id="n-email" type="email" style="width:100%"></div>
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Mobile</label><input id="n-phone" type="text" placeholder="06…" style="width:100%"></div>
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Ville</label><input id="n-city" type="text" style="width:100%"></div>
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Profession</label><input id="n-profession" type="text" style="width:100%"></div>
+      <div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Statut</label>
+        <select id="n-status" style="width:100%"><option value="PROSPECT">Prospect</option><option value="SUSPECT">Suspect</option><option value="CLIENT">Client</option></select>
+      </div>
+    </div>
+    <button onclick="createContact()" class="btn" style="margin-top:10px">Créer</button>
+    <span id="add-status" style="margin-left:10px;font-size:11px;color:#6b7280"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th style="padding:10px 10px">Entreprise</th>
+        <th>Statut</th><th>Email</th><th>Téléphone</th>
+        <th>Ville</th><th>Métier</th><th>Ajouté</th><th></th>
+      </tr></thead>
+      <tbody>
+        {rows if rows else '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
 const T = '{token}';
-async function api(url, data) {{
-  const r = await fetch(url + '?token=' + T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)}});
-  return r.json();
-}}
-async function markContact(id, action, btn) {{
-  btn.disabled=true; btn.textContent='…';
-  const r = await api('/admin/contacts/'+id+'/'+action, {{}});
-  if(r.ok) location.reload(); else {{ btn.disabled=false; btn.textContent='Erreur'; }}
-}}
-async function setStatus(id, btn) {{
-  const s = prompt('Nouveau statut (SUSPECT/PROSPECT/CLIENT):');
-  if(!s) return;
-  btn.disabled=true;
-  const r = await api('/admin/contacts/'+id+'/set-status', {{status:s.toUpperCase()}});
-  if(r.ok) location.reload(); else {{ btn.disabled=false; alert('Erreur: '+JSON.stringify(r)); }}
+function applyFilter() {{
+  const q  = document.getElementById('q').value;
+  const sf = document.getElementById('sf').value;
+  location.href = '/admin/contacts?token='+T+'&search='+encodeURIComponent(q)+'&status_filter='+sf;
 }}
 async function deleteContact(id, btn) {{
   if(!confirm('Supprimer ce contact ?')) return;
   btn.disabled=true;
-  const r = await api('/admin/contacts/'+id+'/delete', {{}});
-  if(r.ok) document.getElementById('row-'+id).remove();
+  const r = await fetch('/admin/contacts/'+id+'/delete?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}});
+  const d = await r.json();
+  if(d.ok) document.getElementById('row-'+id).remove();
   else {{ btn.disabled=false; alert('Erreur'); }}
 }}
 async function createContact() {{
@@ -133,16 +168,14 @@ async function createContact() {{
     company_name: document.getElementById('n-name').value,
     email: document.getElementById('n-email').value||null,
     phone: document.getElementById('n-phone').value||null,
-    city: document.getElementById('n-city').value||null,
+    city:  document.getElementById('n-city').value||null,
     profession: document.getElementById('n-profession').value||null,
     status: document.getElementById('n-status').value,
-    offer_selected: document.getElementById('n-offer').value||null,
-    acquisition_cost: parseFloat(document.getElementById('n-cost').value)||null,
-    notes: document.getElementById('n-notes').value||null,
   }};
   if(!data.company_name) {{ document.getElementById('add-status').textContent='Nom requis'; return; }}
-  const r = await api('/admin/contacts/create', data);
-  if(r.id) location.reload(); else document.getElementById('add-status').textContent='Erreur: '+JSON.stringify(r);
+  const r = await fetch('/admin/contacts/create?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)}});
+  const d = await r.json();
+  if(d.id) location.reload(); else document.getElementById('add-status').textContent='Erreur';
 }}
 </script>
 </body></html>""")

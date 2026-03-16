@@ -13,13 +13,10 @@ def admin_token() -> str:
 def admin_nav(token: str, active: str = "") -> str:
     sections = [
         ("PROSPECTION", [
-            ("v3",           "Contacts"),
+            ("contacts",     "Contacts"),
             ("prospection",  "Campagnes"),
             ("scan",         "Scan IA"),
             ("professions",  "Métiers"),
-            ("enrich",       "Enrichir suspects"),
-            ("naf-audit",    "Audit NAF"),
-            ("sirene/segments", "Segments SIRENE"),
             ("send-queue",   "File d'envoi"),
             ("analytics",    "Analytics"),
             ("scheduler",    "Planificateur"),
