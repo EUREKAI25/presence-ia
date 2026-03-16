@@ -106,7 +106,7 @@ select,input[type=number],input[type=text]{{border:1px solid #d1d5db;border-radi
         <select id="sel-dept">{dept_opts}</select>
       </div>
       <div>
-        <label>Quantité souhaitée</label>
+        <label>Prospects contactables voulus</label>
         <input type="number" id="inp-qty" value="50" min="1" max="500">
       </div>
       <div>
@@ -126,9 +126,10 @@ select,input[type=number],input[type=text]{{border:1px solid #d1d5db;border-radi
     </div>
     <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
     <div style="display:flex;gap:16px;margin:10px 0;font-size:12px">
-      <span>✓ <strong id="cnt-enriched">0</strong> enrichis</span>
-      <span style="color:#16a34a">✉ <strong id="cnt-email">0</strong> emails</span>
+      <span style="color:#16a34a;font-weight:700">✉ <strong id="cnt-contact">0</strong> avec email/mobile</span>
+      <span style="color:#2563eb">◉ <strong id="cnt-enriched">0</strong> sur Google Places</span>
       <span style="color:#9ca3af">⊘ <strong id="cnt-skip">0</strong> ignorés</span>
+      <span style="color:#6b7280">⚙ <strong id="cnt-processed">0</strong> traités</span>
     </div>
     <div id="results-list" style="max-height:380px;overflow-y:auto"></div>
   </div>
@@ -169,36 +170,40 @@ function _poll() {{
   fetch('/admin/enrich/status?token='+TOKEN)
     .then(r => r.json())
     .then(d => {{
-      const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
+      const pct = d.qty > 0 ? Math.round(Math.min(d.contactable / d.qty * 100, 100)) : 0;
       document.getElementById('prog-fill').style.width = pct + '%';
-      document.getElementById('prog-counts').textContent = d.done + ' / ' + d.total;
+      document.getElementById('prog-counts').textContent = d.contactable + ' / ' + d.qty + ' avec contact';
+      document.getElementById('cnt-contact').textContent = d.contactable;
       document.getElementById('cnt-enriched').textContent = d.enriched;
       document.getElementById('cnt-skip').textContent = d.skipped;
-      const emailCnt = d.results.filter(r => r.email).length;
-      document.getElementById('cnt-email').textContent = emailCnt;
+      document.getElementById('cnt-processed').textContent = d.processed;
 
-      // Résultats récents
+      // Résultats récents (les contactables en premier, puis les autres)
       const list = document.getElementById('results-list');
-      list.innerHTML = d.results.slice(-30).reverse().map(r => `
+      list.innerHTML = d.results.slice(-40).reverse().map(r => `
         <div class="result-row">
           <span style="flex:1;font-weight:500">${{r.name}}</span>
-          <span style="color:#9ca3af">${{r.city}}</span>
-          ${{r.enriched
-            ? `<span class="tag-ok">Google ✓</span>${{r.email ? '<span class="tag-email">✉ '+r.email+'</span>' : ''}}`
-            : '<span class="tag-skip">pas de site</span>'}}
+          <span style="color:#9ca3af;font-size:11px">${{r.city}}</span>
+          ${{r.contact
+            ? `<span class="tag-ok">✓ contact</span>
+               ${{r.email ? '<span class="tag-email">✉ '+r.email+'</span>' : ''}}
+               ${{r.mobile ? '<span class="tag-email">📱 '+r.mobile+'</span>' : ''}}`
+            : r.enriched
+              ? '<span style="color:#d97706;font-size:10px">site web, pas de contact</span>'
+              : '<span class="tag-skip">pas sur Google</span>'}}
         </div>`).join('');
 
       if (d.running) {{
         _pollTimer = setTimeout(_poll, 2000);
       }} else {{
         document.getElementById('btn-run').disabled = false;
-        if (d.enriched > 0) {{
-          document.getElementById('prog-title').textContent = '✓ Terminé — ' + d.enriched + ' prospects créés';
+        if (d.contactable > 0) {{
+          document.getElementById('prog-title').textContent = '✓ Terminé — ' + d.contactable + ' prospects avec contact';
           const btn = document.getElementById('btn-crm');
           btn.href = '/admin/v3?token='+TOKEN;
           btn.style.display = 'inline-block';
         }} else {{
-          document.getElementById('prog-title').textContent = '⚠ Aucun prospect trouvé sur Google Places';
+          document.getElementById('prog-title').textContent = '⚠ Aucun prospect contactable trouvé';
         }}
       }}
     }})
@@ -207,7 +212,11 @@ function _poll() {{
 
 // Reprendre polling si enrichissement déjà en cours
 const _initState = {state_json};
-if (_initState.running) {{ document.getElementById('progress-card').style.display='block'; _poll(); }}
+if (_initState.running) {{
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('btn-run').disabled = true;
+  _poll();
+}}
 </script>
 </body></html>""")
 
@@ -242,101 +251,97 @@ def _run_enrich(profession_id: str, dept: Optional[str], qty: int):
     api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
     with _LOCK:
-        _STATE.update({"running": True, "total": 0, "done": 0, "enriched": 0,
-                       "skipped": 0, "errors": 0, "results": [],
+        _STATE.update({"running": True, "qty": qty, "contactable": 0, "enriched": 0,
+                       "skipped": 0, "errors": 0, "processed": 0, "results": [],
                        "profession_id": profession_id, "dept": dept or "",
                        "finished_at": None})
 
+    BATCH = 50  # suspects chargés par page
+
     try:
         with SessionLocal() as db:
-            # Récupérer label + label_pluriel de la profession
             prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
-            prof_label    = prof.label    if prof else profession_id
-            prof_plural   = prof.label_pluriel if prof and prof.label_pluriel else prof_label
+            prof_label = prof.label if prof else profession_id
 
-            # Prendre les suspects (priorité : sans enrichissement)
-            total, suspects = db_suspects_list(
-                db, profession_id=profession_id, dept=dept, page=1, per_page=min(qty * 3, 500)
-            )
+        page = 1
+        contactable = 0
 
-        _STATE["total"] = min(len(suspects), qty)
+        while contactable < qty:
+            # Charger le prochain lot de suspects
+            with SessionLocal() as db:
+                _, suspects = db_suspects_list(
+                    db, profession_id=profession_id, dept=dept,
+                    page=page, per_page=BATCH
+                )
+            if not suspects:
+                break  # plus de suspects disponibles
 
-        processed = 0
-        for s in suspects:
-            if processed >= qty:
-                break
+            for s in suspects:
+                if contactable >= qty:
+                    break
 
-            ville = s.ville or ""
-            query = f"{s.raison_sociale} {ville}".strip()
+                ville = s.ville or ""
+                result_entry = {"name": s.raison_sociale, "city": ville,
+                                "siret": s.id, "enriched": False,
+                                "contact": False, "email": None, "mobile": None}
+                try:
+                    places = fetch_text_search(
+                        f"{s.raison_sociale} {ville}".strip(), "", api_key, max_results=1
+                    ) if api_key else []
 
-            result_entry = {"name": s.raison_sociale, "city": ville,
-                            "siret": s.id, "enriched": False, "email": None}
-
-            try:
-                # Google Places : chercher par nom + ville
-                places = fetch_text_search(query, "", api_key, max_results=1) if api_key else []
-
-                if not places:
-                    result_entry["enriched"] = False
-                    with _LOCK:
-                        _STATE["skipped"] += 1
-                else:
-                    place = places[0]
-                    place_id = place.get("place_id", "")
-                    details  = fetch_place_details(place_id, api_key) if place_id and api_key else {}
-
-                    website = details.get("website") or ""
-                    phone   = details.get("formatted_phone_number") or s.code_postal and None or None
-                    rating  = details.get("rating")
-                    reviews = details.get("user_ratings_total")
-
-                    if not website:
-                        result_entry["enriched"] = False
-                        with _LOCK:
-                            _STATE["skipped"] += 1
+                    if not places:
+                        with _LOCK: _STATE["skipped"] += 1
                     else:
-                        # Scraping email
-                        enriched = enrich_website(website, timeout=5)
-                        email  = enriched.get("email")
-                        mobile = enriched.get("mobile")
+                        details = fetch_place_details(places[0].get("place_id",""), api_key) if api_key else {}
+                        website = details.get("website") or ""
+                        phone   = details.get("formatted_phone_number") or ""
+                        rating  = details.get("rating")
+                        reviews = details.get("user_ratings_total")
 
-                        result_entry.update({"enriched": True, "email": email,
-                                             "website": website, "phone": phone})
+                        if not website:
+                            with _LOCK: _STATE["skipped"] += 1
+                        else:
+                            result_entry["enriched"] = True
+                            scraped = enrich_website(website, timeout=5)
+                            email  = scraped.get("email")
+                            mobile = scraped.get("mobile") or phone or None
 
-                        # Créer V3ProspectDB
-                        tok = secrets.token_hex(16)
-                        landing_url = f"/v3/{tok}"
-                        v3 = V3ProspectDB(
-                            token=tok,
-                            name=s.raison_sociale,
-                            city=ville,
-                            profession=prof_label,
-                            phone=phone or mobile,
-                            website=website,
-                            email=email,
-                            rating=rating,
-                            reviews_count=reviews,
-                            landing_url=landing_url,
-                            scrape_status="done",
-                        )
-                        with SessionLocal() as db2:
-                            db2.add(v3)
-                            db2.commit()
+                            result_entry.update({"email": email, "mobile": mobile,
+                                                 "website": website})
 
-                        with _LOCK:
-                            _STATE["enriched"] += 1
+                            has_contact = bool(email or mobile)
+                            result_entry["contact"] = has_contact
 
-            except Exception as e:
-                log.warning(f"Enrich {s.raison_sociale}: {e}")
+                            # Créer prospect seulement si contactable
+                            if has_contact:
+                                tok = secrets.token_hex(16)
+                                v3  = V3ProspectDB(
+                                    token=tok, name=s.raison_sociale,
+                                    city=ville, profession=prof_label,
+                                    phone=mobile, website=website, email=email,
+                                    rating=rating, reviews_count=reviews,
+                                    landing_url=f"/v3/{tok}", scrape_status="done",
+                                )
+                                with SessionLocal() as db2:
+                                    db2.add(v3); db2.commit()
+                                contactable += 1
+                                with _LOCK:
+                                    _STATE["contactable"] = contactable
+                                    _STATE["enriched"]   += 1
+                            else:
+                                with _LOCK: _STATE["enriched"] += 1
+
+                except Exception as e:
+                    log.warning(f"Enrich {s.raison_sociale}: {e}")
+                    with _LOCK: _STATE["errors"] += 1
+
                 with _LOCK:
-                    _STATE["errors"] += 1
+                    _STATE["processed"] += 1
+                    _STATE["results"].append(result_entry)
+                    if len(_STATE["results"]) > 200:
+                        _STATE["results"] = _STATE["results"][-200:]
 
-            processed += 1
-            with _LOCK:
-                _STATE["done"] = processed
-                _STATE["results"].append(result_entry)
-                if len(_STATE["results"]) > 200:
-                    _STATE["results"] = _STATE["results"][-200:]
+            page += 1
 
     except Exception as e:
         log.error(f"Enrichissement fatal: {e}")
