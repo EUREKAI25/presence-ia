@@ -1,8 +1,39 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — CRM Kanban + Closer recruitment + reply tracking
+**Statut** : 🟢 actif — Pipeline SIRENE suspects → prospects + audit NAF
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-03-13
+**Dernière MAJ** : 2026-03-16
+
+---
+
+## 🔌 SESSION 2026-03-16 — SIRENE pipeline, Audit NAF, filtre suspects
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/api/routes/enrich_admin.py` | **NOUVEAU** — `/admin/enrich` : enrichissement suspects → prospects V3 via Google Places + scraping (qty = nb contactables voulus, pas suspects traités) | ✅ |
+| `src/api/routes/naf_audit.py` | **NOUVEAU** — `/admin/naf-audit` : audit codes NAF en direct sur SIRENE, détection conflits (55 NAF partagés), purge suspects ambigus par NAF ou en masse | ✅ |
+| `src/api/routes/professions_admin.py` | Liste suspects cliquable, page `/admin/suspects` paginée, modal qualification redesignée (tableau par profession : suspects + segments done/total), checkbox masquer NAF litigieux | ✅ |
+| `src/database.py` | `db_suspects_list()` paginée avec filtres | ✅ |
+| `src/sirene.py` | `_get_name_keywords_for_segment()` : si NAF ambigu (partagé 2+ professions), filtre résultats SIRENE par raison sociale sur `termes_recherche` | ✅ |
+| `src/api/routes/_nav.py` | Ajout "Enrichir suspects" + "Audit NAF" dans sidebar | ✅ |
+
+### Corrections données VPS (SQL direct)
+- `pisciniste` : NAF 4329A → **4329B**, suspects erronés supprimés + resegmentés (OTIS/KONE exclus par filtre nom)
+- `dentiste-implantologie` + `orthodontiste-prive` : 8621Z → **8623Z**
+- `chirurgien-esthetique` : 8621Z → **8622B**
+- **Purge globale 2026-03-16 21h** : 133 769 suspects supprimés, 419 segments remis en `pending` (base vide, qualif à relancer)
+
+### État base au 2026-03-16
+- Suspects : **0** (purgé, relance nécessaire)
+- Segments : **419 pending**
+- Professions actives : 1 (pisciniste coché) + autres à activer selon besoin
+
+### Prochaine étape
+- [ ] Relancer qualification (pisciniste d'abord pour valider filtre nom)
+- [ ] Automatisation `mots_cles_sirene` via LLM pour chaque profession (termes apparaissant dans raison sociale SIRENE, différents de termes_recherche Google)
+- [ ] Tester pipeline complet suspects → enrichissement → prospects V3
 
 ---
 
