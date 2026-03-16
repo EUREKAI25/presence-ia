@@ -60,6 +60,13 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
     profs_scored = [(p, db_score_global(p, cfg)) for p in profs]
     profs_scored.sort(key=lambda x: x[1], reverse=True)
 
+    # Professions aux NAF ambigus (partagés par plusieurs professions)
+    with SessionLocal() as db_naf:
+        from .naf_audit import _get_ambiguous_nafs
+        ambig_map = _get_ambiguous_nafs(db_naf)
+    ambig_prof_ids = {p["id"] for plist in ambig_map.values() for p in plist}
+    nb_ambig = len(ambig_prof_ids)
+
     # Comptages SIRENE par profession (une seule requête par profession) + total global
     with SessionLocal() as db2:
         sirene_counts = {p.id: db_sirene_count(db2, profession_id=p.id) for p, _ in profs_scored}
@@ -99,12 +106,14 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
             label_link  = f'<span style="font-size:12px;font-weight:600">{p.label}</span>'
 
         checked = "checked" if p.actif else ""
+        ambig_attr = ' data-ambig="1"' if p.id in ambig_prof_ids else ''
+        ambig_style = ";background:#fff7ed" if p.id in ambig_prof_ids else ""
         rows_html += f"""
         <tr data-id="{p.id}" data-actif="{actif_int}"
             data-label="{p.label}" data-cat="{p.categorie or ''}"
             data-vis="{p.score_visibilite or 0}" data-conseil="{p.score_conseil_ia or 0}"
-            data-valeur="{p.valeur_client or 0}" data-score="{sg}"
-            style="border-bottom:1px solid #f3f4f6">
+            data-valeur="{p.valeur_client or 0}" data-score="{sg}"{ambig_attr}
+            style="border-bottom:1px solid #f3f4f6{ambig_style}">
           <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(event,this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer">{label_link}</td>
           <td style="padding:8px 6px;font-size:11px;color:#6b7280">{p.categorie}</td>
           <td style="padding:8px 6px">{_bar(p.score_visibilite)}</td>
@@ -191,6 +200,11 @@ tr:hover{{background:#fafafa;cursor:pointer}}
     <select id="actif-sel" onchange="applyFilters()">
       {actif_opts}
     </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap;margin-left:8px;color:#374151">
+      <input type="checkbox" id="hide-ambig" onchange="applyAmbigFilter()" style="width:14px;height:14px;cursor:pointer;accent-color:#e94560">
+      Masquer NAF litigieux
+      <span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 7px;font-size:11px">{nb_ambig}</span>
+    </label>
     <span id="bulk-msg" style="font-size:12px;color:#16a34a;margin-left:auto"></span>
   </div>
 
@@ -275,6 +289,23 @@ tr:hover{{background:#fafafa;cursor:pointer}}
 <script>
 const TOKEN = '{token}';
 let sortCol = 'score', sortAsc = false;
+
+// ── Masquer / afficher NAF litigieux ─────────────
+function applyAmbigFilter() {{
+  const hide = document.getElementById('hide-ambig').checked;
+  localStorage.setItem('hide_ambig_nafs', hide ? '1' : '0');
+  document.querySelectorAll('#prof-tbody tr[data-ambig="1"]').forEach(tr => {{
+    tr.style.display = hide ? 'none' : '';
+  }});
+}}
+// Restaurer l'état depuis localStorage au chargement
+(function() {{
+  const saved = localStorage.getItem('hide_ambig_nafs');
+  if (saved === '1') {{
+    const cb = document.getElementById('hide-ambig');
+    if (cb) {{ cb.checked = true; applyAmbigFilter(); }}
+  }}
+}})();
 
 // ── Filtres ──────────────────────────────────────
 function applyFilters() {{
