@@ -97,14 +97,19 @@ def _fetch_segment(naf: str, dept: str, since_date: Optional[str] = None,
 
 
 def fetch_segment_complete(naf: str, dept: str,
-                           since_date: Optional[str] = None) -> list[dict]:
+                           since_date: Optional[str] = None,
+                           name_keywords: Optional[list] = None) -> list[dict]:
     """
     Récupère TOUS les établissements d'un segment NAF × département.
     Pagine jusqu'à épuisement (max 400 pages = 10 000 résultats).
+    Si name_keywords est fourni, ne garde que les entreprises dont la raison
+    sociale contient au moins un des mots-clés (insensible à la casse).
+    Utile pour les NAF ambigus (ex: 4329B = pisciniste + ascenseur + ...).
     """
     results = []
     page = 1
     total_pages = 1
+    kws_lower = [k.lower() for k in name_keywords] if name_keywords else None
 
     while page <= total_pages:
         data = _fetch_segment(naf, dept, since_date, page)
@@ -122,6 +127,13 @@ def fetch_segment_complete(naf: str, dept: str,
 
             nom  = (item.get("nom_complet") or item.get("nom_raison_sociale")
                     or siege.get("denomination_usuelle") or "").strip() or siret
+
+            # Filtre par nom si NAF ambigu
+            if kws_lower:
+                nom_l = nom.lower()
+                if not any(kw in nom_l for kw in kws_lower):
+                    continue
+
             ville = (siege.get("libelle_commune") or siege.get("commune") or "").strip().upper()
             cp    = (siege.get("code_postal") or "").strip()
             d     = (siege.get("departement") or cp[:2] if len(cp) >= 2 else dept).strip()
@@ -206,6 +218,38 @@ def generate_segments(db, profession_ids: list[str] = None) -> int:
     return created
 
 
+def _get_name_keywords_for_segment(db, profession_id: str, naf: str) -> Optional[list]:
+    """
+    Si le NAF est partagé par plusieurs professions, retourne les mots-clés
+    de la profession pour filtrer les résultats SIRENE par nom d'entreprise.
+    Retourne None si le NAF est exclusif (pas de filtre nécessaire).
+    """
+    from .models import ProfessionDB
+
+    all_profs = db.query(ProfessionDB.id, ProfessionDB.codes_naf,
+                         ProfessionDB.termes_recherche).all()
+
+    # Professions utilisant ce NAF
+    using_naf = [p for p in all_profs if naf in json.loads(p.codes_naf or "[]")]
+    if len(using_naf) < 2:
+        return None  # NAF exclusif, pas besoin de filtrer
+
+    # NAF ambigu → charger les termes de recherche de cette profession
+    for p in using_naf:
+        if p.id == profession_id:
+            try:
+                terms = json.loads(p.termes_recherche or "[]")
+                # Garder les termes courts/simples comme mots-clés de filtrage
+                keywords = [t for t in terms if t and len(t) <= 30]
+                if keywords:
+                    log.info(f"[SIRENE] NAF {naf} ambigu ({len(using_naf)} professions) "
+                             f"→ filtre nom: {keywords[:5]}")
+                    return keywords[:10]
+            except Exception:
+                pass
+    return None
+
+
 def run_next_segment(db, profession_ids: list = None) -> Optional[dict]:
     """
     Exécute le prochain segment pending (score desc).
@@ -227,10 +271,14 @@ def run_next_segment(db, profession_ids: list = None) -> Optional[dict]:
     seg.status = "running"
     db.commit()
 
+    # Filtre par nom si le NAF est partagé par plusieurs professions
+    name_keywords = _get_name_keywords_for_segment(db, seg.profession_id, seg.code_naf)
+
     try:
         items = fetch_segment_complete(
             seg.code_naf, seg.departement,
-            since_date=seg.last_date_creation
+            since_date=seg.last_date_creation,
+            name_keywords=name_keywords,
         )
 
         inserted = 0
