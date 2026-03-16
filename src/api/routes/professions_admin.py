@@ -594,8 +594,8 @@ async function generateKeywords(profId, force) {{
     const d = await r.json();
     if (d.ok) {{
       const nb = Object.keys(d.results || {{}}).length;
-      alert('\u2713 ' + nb + ' profession(s) traitée(s)');
-      location.reload();
+      alert(d.message || ('\u2713 ' + nb + ' profession(s) traitée(s)'));
+      if (!d.message) location.reload();
     }} else {{
       alert('Erreur: ' + (d.detail || JSON.stringify(d)));
     }}
@@ -816,18 +816,25 @@ async function runNext() {{
 
 @router.post("/admin/sirene/generate-keywords")
 def sirene_generate_keywords(token: str = "", profession_id: str = "", force: bool = False):
-    """Génère mots_cles_sirene via LLM pour les professions sans mots-clés.
-    Si profession_id fourni : uniquement cette profession.
-    Si force=True : régénère même si déjà renseigné."""
+    """Génère mots_cles_sirene via LLM.
+    - profession_id fourni : exécution synchrone (1 profession, rapide).
+    - Sans profession_id : lancé en arrière-plan (283 professions, long)."""
     _require_admin(token)
+    import threading
     from ...sirene_keywords import generate_sirene_keywords
-    with SessionLocal() as db:
-        results = generate_sirene_keywords(
-            db,
-            profession_id=profession_id or None,
-            force=force,
-        )
-    return JSONResponse({"ok": True, "results": results})
+
+    if profession_id:
+        # 1 profession → synchrone, réponse immédiate
+        with SessionLocal() as db:
+            results = generate_sirene_keywords(db, profession_id=profession_id, force=force)
+        return JSONResponse({"ok": True, "results": results})
+    else:
+        # Toutes les professions → arrière-plan pour éviter timeout nginx
+        def _do():
+            with SessionLocal() as db:
+                generate_sirene_keywords(db, force=force)
+        threading.Thread(target=_do, daemon=True).start()
+        return JSONResponse({"ok": True, "results": {}, "message": "Génération lancée en arrière-plan — recharge la page dans quelques minutes"})
 
 
 @router.post("/admin/sirene/run-next")
