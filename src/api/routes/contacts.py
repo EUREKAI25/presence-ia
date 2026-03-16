@@ -1,11 +1,11 @@
 """Admin — onglet CONTACTS (SUSPECT/PROSPECT/CLIENT)."""
-import os
+import os, re
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from ...database import get_db, db_list_contacts, db_get_contact, db_create_contact, db_update_contact, db_delete_contact
+from ...database import get_db, db_list_contacts, db_get_contact, db_create_contact, db_update_contact, db_delete_contact, SessionLocal
 from ...models import ContactDB
 from ._nav import admin_nav
 
@@ -61,11 +61,17 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
     rows = ""
     for c in contacts:
         badge_style, badge_label = STATUS_BADGE.get(c.status, ("background:#f3f4f6;color:#374151", c.status))
-        import re
         phone_raw = c.phone or ""
         is_mob = bool(re.match(r"^(\+33[67]|0[67])", re.sub(r"[\s\.\-]", "", phone_raw)))
         phone_display = phone_raw or "—"
         mobile_tag = ' <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 4px;border-radius:3px">mob</span>' if (phone_raw and is_mob) else ""
+        sent_style = "background:#dcfce7;color:#166534" if c.message_sent else "background:#f3f4f6;color:#6b7280"
+        btn_email = (f'<button onclick="sendContactEmail(\'{c.id}\',this)" title="Envoyer email" '
+                     f'style="{sent_style};border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">✉</button>'
+                     if c.email else "")
+        btn_sms = (f'<button onclick="sendContactSMS(\'{c.id}\',this)" title="Envoyer SMS" '
+                   f'style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">💬</button>'
+                   if (phone_raw and is_mob) else "")
         rows += f"""<tr id="row-{c.id}" style="border-bottom:1px solid #f3f4f6">
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
@@ -74,8 +80,8 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.profession or "—"}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
-  <td style="padding:8px 6px;text-align:right">
-    <button onclick="deleteContact('{c.id}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
+  <td style="padding:8px 6px;text-align:right;white-space:nowrap">
+    {btn_email}{btn_sms}<button onclick="deleteContact('{c.id}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
   </td>
 </tr>"""
 
@@ -258,6 +264,28 @@ async function _pollLeads() {{
     }}
   }} catch(e) {{}}
 }})();
+
+// ── Envoi email / SMS par contact ─────────────────────────────────────────────
+async function sendContactEmail(id, btn) {{
+  if(!confirm('Envoyer l\'email à ce contact ?')) return;
+  btn.disabled = true;
+  try {{
+    const r = await fetch('/admin/contacts/'+id+'/send-email?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}});
+    const d = await r.json();
+    if(d.ok) {{ btn.style.background='#dcfce7'; btn.style.color='#166534'; btn.title='Email envoyé'; }}
+    else {{ alert('Erreur: '+(d.error||'inconnue')); btn.disabled=false; }}
+  }} catch(e) {{ btn.disabled=false; alert('Erreur réseau'); }}
+}}
+async function sendContactSMS(id, btn) {{
+  if(!confirm('Envoyer le SMS à ce contact ?')) return;
+  btn.disabled = true;
+  try {{
+    const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}});
+    const d = await r.json();
+    if(d.ok) {{ btn.style.background='#dcfce7'; btn.style.color='#166534'; btn.title='SMS envoyé'; }}
+    else {{ alert('Erreur: '+(d.error||'inconnue')); btn.disabled=false; }}
+  }} catch(e) {{ btn.disabled=false; alert('Erreur réseau'); }}
+}}
 </script>
 </body></html>""")
 
@@ -336,3 +364,47 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     if not c: raise HTTPException(404)
     db_delete_contact(db, c)
     return {"ok": True}
+
+
+@router.post("/admin/contacts/{cid}/send-email")
+async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    c = db_get_contact(db, cid)
+    if not c: raise HTTPException(404)
+    if not c.email:
+        return JSONResponse({"ok": False, "error": "Pas d'email"})
+    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT
+    from ...models import V3LandingTextDB
+    lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
+    tpl      = lt.email_template if lt and lt.email_template else None
+    subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
+    name       = c.company_name or ""
+    city       = c.city or ""
+    profession = c.profession or ""
+    metier     = profession.lower()
+    metiers    = metier + "s" if metier and not metier.endswith("s") else metier
+    subj = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
+                           city=city, profession=profession, name=name)
+    msg  = _contact_message(name, city, profession, "", tpl)
+    ok   = _send_brevo_email(c.email, name, subj, msg)
+    if ok:
+        db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+    return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
+
+
+@router.post("/admin/contacts/{cid}/send-sms")
+async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    c = db_get_contact(db, cid)
+    if not c: raise HTTPException(404)
+    if not c.phone:
+        return JSONResponse({"ok": False, "error": "Pas de téléphone"})
+    from .v3 import _send_brevo_sms, _contact_message_sms
+    name       = c.company_name or ""
+    city       = c.city or ""
+    profession = c.profession or ""
+    msg = _contact_message_sms(name, city, profession, "")
+    ok  = _send_brevo_sms(c.phone, msg)
+    if ok:
+        db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+    return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})

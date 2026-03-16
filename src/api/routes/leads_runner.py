@@ -91,9 +91,35 @@ def leads_stop(token: str = ""):
 
 def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
     try:
-        _phase1_qualify(profession_id, qty)
-        if not _STATE["stop_requested"]:
+        processed_offset = 0
+        while True:
+            if _STATE["stop_requested"]:
+                break
+
+            _phase1_qualify(profession_id, qty, processed_offset=processed_offset)
+            if _STATE["stop_requested"]:
+                break
+
             _phase2_enrich(profession_id, qty, dept)
+
+            with _LOCK:
+                contacts_done = _STATE["contacts"]
+                processed_offset = _STATE["processed"]
+
+            if contacts_done >= qty:
+                break
+
+            # Vérifier s'il reste des segments à traiter
+            from ...sirene import segments_stats
+            with SessionLocal() as db_:
+                stats = segments_stats(db_)
+            pending = stats.get("total_segments", 0) - stats.get("done", 0)
+            if pending <= 0:
+                break
+
+            log.info("[LEADS] %d/%d leads — %d segments restants, on continue",
+                     contacts_done, qty, pending)
+
     except Exception as e:
         log.error("[LEADS] Erreur pipeline: %s", e)
         with _LOCK:
@@ -105,19 +131,19 @@ def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
             _STATE["finished_at"] = datetime.utcnow().isoformat()
 
 
-def _phase1_qualify(profession_id: str, qty_wanted: int):
-    """Qualifie jusqu'à avoir au moins qty_wanted × 5 suspects (ratio enrichissement ~20%)."""
+def _phase1_qualify(profession_id: str, qty_wanted: int, processed_offset: int = 0):
+    """Qualifie jusqu'à avoir assez de suspects au-delà de ceux déjà traités."""
     from ...sirene import generate_segments, run_next_segment, segments_stats
 
     with SessionLocal() as db:
-        # Vérifier si on a déjà assez de suspects
         from ...models import SireneSuspectDB
         from sqlalchemy import func
         nb_existing = db.query(func.count(SireneSuspectDB.id)).filter_by(
             profession_id=profession_id
         ).scalar() or 0
 
-    target = qty_wanted * 5  # marge pour le taux d'échec enrichissement
+    # Cible = suspects traités + marge pour le taux d'échec
+    target = processed_offset + qty_wanted * 5
     if nb_existing >= target:
         with _LOCK:
             _STATE["suspects"] = nb_existing
