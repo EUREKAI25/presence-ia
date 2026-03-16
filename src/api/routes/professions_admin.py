@@ -257,31 +257,28 @@ tr:hover{{background:#fafafa;cursor:pointer}}
 
 <!-- Modale de progression qualification -->
 <div class="modal" id="qualify-modal">
-  <div class="modal-box" style="width:480px">
+  <div class="modal-box" style="width:520px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 id="qualify-modal-title" style="margin:0;font-size:15px;font-weight:700">⏳ Qualification en cours...</h3>
       <button onclick="document.getElementById('qualify-modal').classList.remove('show')" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af">✕</button>
     </div>
-    <div id="qualify-prof-list" style="font-size:12px;color:#6b7280;margin-bottom:12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:#eff6ff;border-radius:8px;padding:12px;text-align:center">
-        <div id="qualify-count" style="font-size:22px;font-weight:700;color:#1d4ed8">—</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px">Suspects trouvés</div>
-      </div>
-      <div style="background:#f0fdf4;border-radius:8px;padding:12px;text-align:center">
-        <div id="qualify-segs-display" style="font-size:22px;font-weight:700;color:#16a34a">—</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px">Segments traités</div>
-      </div>
-    </div>
-    <div id="qualify-progress-bar" style="height:6px;background:#f3f4f6;border-radius:3px;margin-bottom:12px;overflow:hidden">
+    <!-- Tableau par profession -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+      <thead>
+        <tr style="border-bottom:2px solid #e5e7eb">
+          <th style="text-align:left;font-size:11px;color:#9ca3af;font-weight:600;padding:6px 8px">Métier</th>
+          <th style="text-align:right;font-size:11px;color:#9ca3af;font-weight:600;padding:6px 8px">Suspects</th>
+          <th style="text-align:right;font-size:11px;color:#9ca3af;font-weight:600;padding:6px 8px">Segments</th>
+        </tr>
+      </thead>
+      <tbody id="qualify-prof-rows"></tbody>
+    </table>
+    <div id="qualify-progress-bar" style="height:5px;background:#f3f4f6;border-radius:3px;margin-bottom:12px;overflow:hidden">
       <div id="qualify-progress-fill" style="height:100%;background:#2563eb;border-radius:3px;width:0%;transition:width .5s"></div>
     </div>
-    <div id="qualify-bottom" style="display:flex;justify-content:space-between;align-items:center">
-      <span id="qualify-pending-label" style="font-size:11px;color:#6b7280"></span>
-      <div style="display:flex;gap:8px">
-        <a id="qualify-segs-link" href="/admin/sirene/segments?token={token}" style="font-size:11px;color:#3b82f6">Voir segments &rarr;</a>
-        <button class="btn btn-sm btn-gray" onclick="document.getElementById('qualify-modal').classList.remove('show')">Fermer</button>
-      </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <a href="/admin/sirene/segments?token={token}" style="font-size:11px;color:#3b82f6;align-self:center">Voir segments →</a>
+      <button class="btn btn-sm btn-gray" onclick="document.getElementById('qualify-modal').classList.remove('show')">Fermer</button>
     </div>
   </div>
 </div>
@@ -435,10 +432,49 @@ document.getElementById('edit-modal').addEventListener('click', function(e) {{
 // ── Qualification SIRENE ──────────────────────────
 let _pollInterval = null;
 let _qualifyProfIds = [];
+let _profLabels = {{}};
 function stopPolling() {{ if(_pollInterval) {{ clearInterval(_pollInterval); _pollInterval = null; }} }}
 
+function _updateQualifyTable(by_prof, segs_by_prof, running) {{
+  const tbody = document.getElementById('qualify-prof-rows');
+  if (!tbody) return;
+  // Progress global (sur les professions en cours seulement)
+  let totalDone = 0, totalSegs = 0;
+  tbody.innerHTML = _qualifyProfIds.map(pid => {{
+    const label    = _profLabels[pid] || pid;
+    const suspects = (by_prof[pid] || 0).toLocaleString('fr-FR');
+    const segs     = segs_by_prof ? segs_by_prof[pid] : null;
+    const segDone  = segs ? segs.done  : 0;
+    const segTotal = segs ? segs.total : 0;
+    totalDone  += segDone;
+    totalSegs  += segTotal;
+    const segDone100 = segTotal > 0 && segDone >= segTotal;
+    const segStr = segTotal > 0
+      ? `${{segDone.toLocaleString('fr-FR')}} / ${{segTotal.toLocaleString('fr-FR')}} ${{segDone100 ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#d97706">⏳</span>'}}`
+      : '—';
+    const suspectsHtml = by_prof[pid] !== undefined
+      ? `<strong style="font-size:15px;color:#1d4ed8">${{suspects}}</strong>`
+      : '<span style="color:#9ca3af">—</span>';
+    return `<tr style="border-bottom:1px solid #f3f4f6">
+      <td style="padding:8px 8px;font-size:13px;font-weight:600">${{label}}</td>
+      <td style="padding:8px 8px;text-align:right">${{suspectsHtml}}</td>
+      <td style="padding:8px 8px;text-align:right;font-size:12px;color:#374151">${{segStr}}</td>
+    </tr>`;
+  }}).join('');
+  // Barre de progression
+  if(totalSegs > 0) {{
+    document.getElementById('qualify-progress-fill').style.width =
+      Math.round(totalDone / totalSegs * 100) + '%';
+  }}
+}}
+
 async function openQualify() {{
-  _qualifyProfIds = [...document.querySelectorAll('tr[data-id][data-actif="1"]')].map(r=>r.dataset.id);
+  const activeRows = [...document.querySelectorAll('tr[data-id][data-actif="1"]')]
+    .filter(r => r.style.display !== 'none'); // respecter le filtre ambig
+  _qualifyProfIds = activeRows.map(r => r.dataset.id);
+  _profLabels = {{}};
+  activeRows.forEach(r => {{ _profLabels[r.dataset.id] = r.dataset.label; }});
+
   if(_qualifyProfIds.length === 0) {{
     alert("Aucune profession active dans la vue \u2014 cochez des m\u00e9tiers d\u2019abord.");
     return;
@@ -447,16 +483,10 @@ async function openQualify() {{
   btn.disabled = true;
   btn.textContent = '\u23f3 Lancement...';
 
-  // Afficher modale
-  const modal = document.getElementById('qualify-modal');
   document.getElementById('qualify-modal-title').textContent = '\u23f3 Qualification en cours...';
-  document.getElementById('qualify-prof-list').textContent =
-    'Professions : ' + _qualifyProfIds.join(', ');
-  document.getElementById('qualify-count').textContent = '\u2014';
-  document.getElementById('qualify-segs-display').textContent = '\u2014';
-  document.getElementById('qualify-pending-label').textContent = '';
   document.getElementById('qualify-progress-fill').style.width = '0%';
-  modal.classList.add('show');
+  _updateQualifyTable({{}}, {{}}, true);
+  document.getElementById('qualify-modal').classList.add('show');
 
   const r = await fetch(`/admin/professions/qualify?token=${{TOKEN}}`, {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
@@ -466,54 +496,36 @@ async function openQualify() {{
     const d = await r.json().catch(()=>({{}}));
     document.getElementById('qualify-modal-title').innerHTML =
       `<span style="color:#dc2626">\u274c ${{d.detail || 'Erreur'}}</span>`;
-    btn.disabled = false;
-    btn.textContent = '\u25b6 Lancer qualification';
+    btn.disabled = false; btn.textContent = '\u25b6 Lancer qualification';
     return;
   }}
   btn.textContent = '\u23f3 En cours...';
 
-  // Polling toutes les 4s
   _pollInterval = setInterval(async () => {{
     try {{
       const profIds = _qualifyProfIds.join(',');
       const pr = await fetch(`/admin/professions/qualify-status?token=${{TOKEN}}&profs=${{profIds}}`);
       const pd = await pr.json();
 
-      // Suspects pour les professions qualifiées
-      let suspectsCurrent = 0;
-      if(pd.by_prof) {{
-        _qualifyProfIds.forEach(pid => {{ suspectsCurrent += pd.by_prof[pid] || 0; }});
-        // MAJ cellules tableau
-        document.querySelectorAll('tr[data-id]').forEach(row => {{
-          const cnt = pd.by_prof[row.dataset.id];
-          const cell = row.querySelector('.sirene-count');
-          if(cell && cnt !== undefined) {{
-            cell.innerHTML = cnt > 0
-              ? `<span style="font-size:12px;font-weight:600;color:#1d4ed8">${{cnt.toLocaleString('fr-FR')}}</span>`
-              : '<span style="font-size:11px;color:#d1d5db">\u2014</span>';
-          }}
-        }});
-      }}
+      _updateQualifyTable(pd.by_prof || {{}}, pd.segs_by_prof || {{}}, pd.running);
 
-      // MAJ modale
-      document.getElementById('qualify-count').textContent = suspectsCurrent.toLocaleString('fr-FR');
-      const done = pd.done_segs || 0;
-      const total = pd.total_segs || 0;
-      document.getElementById('qualify-segs-display').textContent =
-        done.toLocaleString('fr-FR') + ' / ' + total.toLocaleString('fr-FR');
-      document.getElementById('qualify-pending-label').textContent =
-        (pd.pending || 0).toLocaleString('fr-FR') + ' segments en attente';
-      if(total > 0) {{
-        document.getElementById('qualify-progress-fill').style.width = Math.round(done/total*100) + '%';
-      }}
+      // MAJ cellules tableau principal
+      document.querySelectorAll('tr[data-id]').forEach(row => {{
+        const cnt = (pd.by_prof || {{}})[row.dataset.id];
+        const cell = row.querySelector('.sirene-count');
+        if(cell && cnt !== undefined) {{
+          const url = `/admin/suspects?profession_id=${{row.dataset.id}}&token=${{TOKEN}}`;
+          cell.innerHTML = cnt > 0
+            ? `<a href="${{url}}" style="font-size:12px;font-weight:600;color:#1d4ed8;text-decoration:none">${{cnt.toLocaleString('fr-FR')}}</a>`
+            : '<span style="font-size:11px;color:#d1d5db">\u2014</span>';
+        }}
+      }});
 
       if(pd.done && !pd.running) {{
         stopPolling();
         document.getElementById('qualify-modal-title').innerHTML =
           '<span style="color:#16a34a;font-weight:700">\u2713 Qualification termin\u00e9e</span>';
-        document.getElementById('qualify-pending-label').textContent = '';
-        btn.disabled = false;
-        btn.textContent = '\u25b6 Lancer qualification';
+        btn.disabled = false; btn.textContent = '\u25b6 Lancer qualification';
       }}
     }} catch(e) {{}}
   }}, 4000);
@@ -526,15 +538,41 @@ async function openQualify() {{
 }})();
 
 async function quickQualify(profId) {{
+  const row = document.querySelector(`tr[data-id="${{profId}}"]`);
+  _qualifyProfIds = [profId];
+  _profLabels = {{}};
+  if(row) _profLabels[profId] = row.dataset.label || profId;
+  document.getElementById('qualify-modal-title').textContent = '\u23f3 Qualification en cours...';
+  document.getElementById('qualify-progress-fill').style.width = '0%';
+  _updateQualifyTable({{}}, {{}}, true);
+  document.getElementById('qualify-modal').classList.add('show');
   const r = await fetch('/admin/professions/qualify?token={token}', {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
     body: JSON.stringify({{profession_ids:[profId]}})
   }});
   if(r.ok) {{
-    _qualifyProfIds = [profId];
-    document.getElementById('qualify-prof-list').textContent = 'Professions : '+profId;
-    document.getElementById('qualify-modal').classList.add('show');
-    _pollQualify();
+    _pollInterval = setInterval(async () => {{
+      try {{
+        const pr = await fetch(`/admin/professions/qualify-status?token=${{TOKEN}}&profs=${{profId}}`);
+        const pd = await pr.json();
+        _updateQualifyTable(pd.by_prof || {{}}, pd.segs_by_prof || {{}}, pd.running);
+        const cnt = (pd.by_prof || {{}})[profId];
+        if(cnt !== undefined) {{
+          const cell = row ? row.querySelector('.sirene-count') : null;
+          if(cell) {{
+            const url = `/admin/suspects?profession_id=${{profId}}&token=${{TOKEN}}`;
+            cell.innerHTML = cnt > 0
+              ? `<a href="${{url}}" style="font-size:12px;font-weight:600;color:#1d4ed8;text-decoration:none">${{cnt.toLocaleString('fr-FR')}}</a>`
+              : '<span style="font-size:11px;color:#d1d5db">\u2014</span>';
+          }}
+        }}
+        if(pd.done && !pd.running) {{
+          stopPolling();
+          document.getElementById('qualify-modal-title').innerHTML =
+            '<span style="color:#16a34a;font-weight:700">\u2713 Qualification termin\u00e9e</span>';
+        }}
+      }} catch(e) {{}}
+    }}, 4000);
   }}
 }}
 </script>
@@ -557,26 +595,31 @@ def qualify_status(token: str = "", profs: str = ""):
     _require_admin(token)
     from ...scheduler import _sirene_qualify_state
     from ...database import db_segment_stats
+    from ...models import SireneSegmentDB
+    from sqlalchemy import func
     state = _sirene_qualify_state()
+    prof_ids = [p.strip() for p in profs.split(",") if p.strip()] if profs else []
     with SessionLocal() as db:
         total = db_sirene_count(db)
         seg_stats = db_segment_stats(db)
-        # Counts par profession si demandés (liste prof_ids séparés par virgule)
-        by_prof = {}
-        if profs:
-            for pid in profs.split(","):
-                pid = pid.strip()
-                if pid:
-                    by_prof[pid] = db_sirene_count(db, profession_id=pid)
+        by_prof = {pid: db_sirene_count(db, profession_id=pid) for pid in prof_ids}
+        # Segments done/total par profession (uniquement celles demandées)
+        segs_by_prof = {}
+        for pid in prof_ids:
+            rows = (db.query(SireneSegmentDB.status, func.count(SireneSegmentDB.id))
+                    .filter(SireneSegmentDB.profession_id == pid)
+                    .group_by(SireneSegmentDB.status).all())
+            counts = {r[0]: r[1] for r in rows}
+            segs_by_prof[pid] = {
+                "done":  counts.get("done", 0),
+                "total": sum(counts.values()),
+            }
     return JSONResponse({
-        "total":       total,
-        "done":        state.get("done", True),
-        "running":     state.get("running", False),
-        "pending":     seg_stats.get("pending", 0),
-        "done_segs":   seg_stats.get("done", 0),
-        "error_segs":  seg_stats.get("error", 0),
-        "total_segs":  seg_stats.get("total_segments", 0),
-        "by_prof":     by_prof,
+        "total":        total,
+        "done":         state.get("done", True),
+        "running":      state.get("running", False),
+        "by_prof":      by_prof,
+        "segs_by_prof": segs_by_prof,
     })
 
 
