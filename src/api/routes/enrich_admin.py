@@ -243,10 +243,34 @@ async def enrich_run(request: Request, token: str = ""):
     return JSONResponse({"ok": True})
 
 
+_EMAIL_BLACKLIST = (
+    "sentry.io", "noreply", "no-reply", "donotreply", "mailer-daemon",
+    "bounce", "postmaster", "webmaster", "hostmaster", "spam", "abuse",
+    "ingest.", "example.com", "test.com",
+)
+
+def _valid_email(email: Optional[str]) -> Optional[str]:
+    """Retourne l'email si valide, None sinon."""
+    if not email:
+        return None
+    e = email.strip().lower()
+    if "@" not in e or "." not in e.split("@")[-1]:
+        return None
+    if any(b in e for b in _EMAIL_BLACKLIST):
+        return None
+    return email.strip()
+
+def _is_mobile(phone: str) -> bool:
+    """Détecte un numéro mobile français (06/07 ou +336/+337)."""
+    import re
+    p = re.sub(r"[\s\.\-\(\)]", "", phone)
+    return bool(re.match(r"^(\+33[67]|0[67])", p))
+
+
 def _run_enrich(profession_id: str, dept: Optional[str], qty: int):
     from ...google_places import fetch_text_search, fetch_place_details
     from ...enrich import enrich_website
-    from ...models import V3ProspectDB, ProfessionDB
+    from ...models import V3ProspectDB, ProfessionDB, ContactDB
 
     api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
@@ -302,28 +326,51 @@ def _run_enrich(profession_id: str, dept: Optional[str], qty: int):
                             with _LOCK: _STATE["skipped"] += 1
                         else:
                             result_entry["enriched"] = True
-                            scraped = enrich_website(website, timeout=5)
-                            email  = scraped.get("email")
-                            mobile = scraped.get("mobile") or phone or None
-
-                            result_entry.update({"email": email, "mobile": mobile,
-                                                 "website": website})
+                            scraped     = enrich_website(website, timeout=5)
+                            email       = _valid_email(scraped.get("email"))
+                            scraped_mob = scraped.get("mobile") or ""
+                            # Mobile : préférer le numéro scrappé s'il est mobile, sinon Google phone si mobile
+                            if scraped_mob and _is_mobile(scraped_mob):
+                                mobile = scraped_mob
+                            elif phone and _is_mobile(phone):
+                                mobile = phone
+                            else:
+                                mobile = None
+                            # Fixe = phone Google si pas mobile
+                            fixe = phone if phone and not _is_mobile(phone) else None
 
                             has_contact = bool(email or mobile)
-                            result_entry["contact"] = has_contact
+                            result_entry.update({
+                                "email": email, "mobile": mobile, "fixe": fixe,
+                                "website": website, "contact": has_contact,
+                            })
 
-                            # Créer prospect seulement si contactable
                             if has_contact:
                                 tok = secrets.token_hex(16)
-                                v3  = V3ProspectDB(
-                                    token=tok, name=s.raison_sociale,
-                                    city=ville, profession=prof_label,
-                                    phone=mobile, website=website, email=email,
-                                    rating=rating, reviews_count=reviews,
-                                    landing_url=f"/v3/{tok}", scrape_status="done",
-                                )
                                 with SessionLocal() as db2:
-                                    db2.add(v3); db2.commit()
+                                    # V3Prospect (landing personnalisée)
+                                    v3 = V3ProspectDB(
+                                        token=tok, name=s.raison_sociale,
+                                        city=ville, profession=prof_label,
+                                        phone=mobile or fixe, website=website, email=email,
+                                        rating=rating, reviews_count=reviews,
+                                        landing_url=f"/v3/{tok}", scrape_status="done",
+                                    )
+                                    db2.add(v3)
+                                    # ContactDB (CRM)
+                                    contact = ContactDB(
+                                        company_name=s.raison_sociale,
+                                        email=email,
+                                        phone=mobile or fixe,
+                                        city=ville,
+                                        profession=prof_label,
+                                        status="PROSPECT",
+                                        notes=f"siret:{s.id} | web:{website}"
+                                              + (f" | mobile:{mobile}" if mobile else "")
+                                              + (f" | fixe:{fixe}" if fixe else ""),
+                                    )
+                                    db2.add(contact)
+                                    db2.commit()
                                 contactable += 1
                                 with _LOCK:
                                     _STATE["contactable"] = contactable
