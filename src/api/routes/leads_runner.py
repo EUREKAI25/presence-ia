@@ -15,7 +15,7 @@ import json, logging, os, secrets, threading
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ...database import SessionLocal, db_suspects_list
@@ -41,7 +41,7 @@ def _require_admin(token: str):
 
 
 @router.post("/admin/leads/run")
-async def leads_run(request, token: str = ""):
+async def leads_run(request: Request, token: str = ""):
     _require_admin(token)
     from fastapi import HTTPException
     body = {}
