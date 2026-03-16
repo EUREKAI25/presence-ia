@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...database import (SessionLocal, db_list_professions, db_update_profession,
                          db_get_scoring_config, db_update_scoring_config, db_score_global,
-                         db_sirene_count, db_segment_stats, db_segment_list)
+                         db_sirene_count, db_segment_stats, db_segment_list, db_suspects_list)
 from ._nav import admin_nav, admin_token
 
 log    = logging.getLogger(__name__)
@@ -90,8 +90,13 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
         sg_color = "#16a34a" if sg >= 7 else ("#d97706" if sg >= 4 else "#dc2626")
         actif_int = 1 if p.actif else 0
         nb_sirene = sirene_counts.get(p.id, 0)
-        sirene_cell = (f'<span style="font-size:12px;font-weight:600;color:#1d4ed8">{nb_sirene:,}</span>'
-                       if nb_sirene else '<span style="font-size:11px;color:#d1d5db">—</span>')
+        suspects_url = f"/admin/suspects?profession_id={p.id}&token={token}"
+        if nb_sirene:
+            sirene_cell = f'<a href="{suspects_url}" style="font-size:12px;font-weight:600;color:#1d4ed8;text-decoration:none" title="Voir les suspects">{nb_sirene:,}</a>'
+            label_link  = f'<a href="{suspects_url}" style="color:inherit;text-decoration:none;font-size:12px;font-weight:600" title="Voir {nb_sirene:,} suspects">{p.label}</a>'
+        else:
+            sirene_cell = f'<span onclick="quickQualify(\'{p.id}\')" style="font-size:11px;color:#9ca3af;cursor:pointer" title="Lancer la qualification">—</span>'
+            label_link  = f'<span style="font-size:12px;font-weight:600">{p.label}</span>'
 
         checked = "checked" if p.actif else ""
         rows_html += f"""
@@ -100,7 +105,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
             data-vis="{p.score_visibilite or 0}" data-conseil="{p.score_conseil_ia or 0}"
             data-valeur="{p.valeur_client or 0}" data-score="{sg}"
             style="border-bottom:1px solid #f3f4f6">
-          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(event,this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer"><span style="font-size:12px;font-weight:600">{p.label}</span></td>
+          <td style="padding:8px 10px"><input type="checkbox" class="row-cb" data-id="{p.id}" {checked} onclick="toggleActif(event,this)" style="margin-right:6px;width:15px;height:15px;cursor:pointer">{label_link}</td>
           <td style="padding:8px 6px;font-size:11px;color:#6b7280">{p.categorie}</td>
           <td style="padding:8px 6px">{_bar(p.score_visibilite)}</td>
           <td style="padding:8px 6px">{_bar(p.score_conseil_ia, color="#8b5cf6")}</td>
@@ -488,6 +493,19 @@ async function openQualify() {{
   const th = document.getElementById('th-score');
   if(th) {{ const a = th.querySelector('.sort-arrow'); if(a) a.textContent = '\u2193'; th.classList.add('sorted'); }}
 }})();
+
+async function quickQualify(profId) {{
+  const r = await fetch('/admin/professions/qualify?token={token}', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{profession_ids:[profId]}})
+  }});
+  if(r.ok) {{
+    _qualifyProfIds = [profId];
+    document.getElementById('qualify-prof-list').textContent = 'Professions : '+profId;
+    document.getElementById('qualify-modal').classList.add('show');
+    _pollQualify();
+  }}
+}}
 </script>
 </body></html>""")
 
@@ -703,6 +721,118 @@ def sirene_run_next(token: str = ""):
             _run_next(db)
     threading.Thread(target=_do, daemon=True).start()
     return JSONResponse({"ok": True, "message": "Segment lancé en arrière-plan"})
+
+
+NJ_LABEL = {
+    "1000": "EI", "1100": "Micro-entreprise", "1200": "Pers. physique",
+    "5499": "SARL", "5720": "EURL", "5710": "SAS", "5308": "SASU",
+    "6532": "SELARL",
+}
+
+@router.get("/admin/suspects", response_class=HTMLResponse)
+def suspects_page(token: str = "", profession_id: str = "", dept: str = "",
+                  search: str = "", page: int = 1):
+    _require_admin(token)
+    per_page = 100
+
+    with SessionLocal() as db:
+        total, items = db_suspects_list(
+            db, profession_id=profession_id or None,
+            dept=dept or None, search=search or None,
+            page=page, per_page=per_page
+        )
+        # Label de la profession
+        if profession_id:
+            from ...models import ProfessionDB
+            prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
+            prof_label = prof.label if prof else profession_id
+        else:
+            prof_label = "Tous métiers"
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    def page_link(p, label=None):
+        label = label or str(p)
+        active = "font-weight:700;color:#1d4ed8;" if p == page else "color:#6b7280;"
+        return f'<a href="/admin/suspects?token={token}&profession_id={profession_id}&dept={dept}&search={search}&page={p}" style="text-decoration:none;padding:4px 8px;{active}">{label}</a>'
+
+    pages_html = page_link(max(1, page-1), "‹")
+    for p in range(max(1, page-2), min(total_pages+1, page+3)):
+        pages_html += page_link(p)
+    pages_html += page_link(min(total_pages, page+1), "›")
+
+    rows = []
+    for s in items:
+        nj = NJ_LABEL.get(s.nature_juridique or "", s.nature_juridique or "—")
+        enrichi = '<span style="color:#16a34a">✓</span>' if s.enrichi_at else '<span style="color:#d1d5db">—</span>'
+        contactable = '<span style="color:#16a34a">✓</span>' if s.contactable else '<span style="color:#d1d5db">—</span>'
+        rows.append(f"""<tr>
+          <td style="padding:6px 8px;font-size:11px;color:#9ca3af;font-family:monospace">{s.id}</td>
+          <td style="padding:6px 8px;font-size:12px;font-weight:500">{s.raison_sociale}</td>
+          <td style="padding:6px 8px;font-size:12px">{s.ville or "—"}</td>
+          <td style="padding:6px 8px;font-size:12px;text-align:center">{s.departement or "—"}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#6b7280">{nj}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#6b7280">{s.date_creation or "—"}</td>
+          <td style="padding:6px 8px;text-align:center">{enrichi}</td>
+          <td style="padding:6px 8px;text-align:center">{contactable}</td>
+        </tr>""")
+
+    rows_html = "\n".join(rows) if rows else '<tr><td colspan="8" style="padding:24px;text-align:center;color:#9ca3af">Aucun suspect trouvé</td></tr>'
+    nav = admin_nav(token, "professions")
+
+    qualify_btn = ""
+    if profession_id and total == 0:
+        qualify_btn = f'<a href="/admin/professions?token={token}" onclick="..." style="background:#e94560;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none">▶ Lancer la qualification</a>'
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Suspects — {prof_label}</title>
+{nav}
+<style>
+body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111;margin:0}}
+.card{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 24px}}
+table{{width:100%;border-collapse:collapse}}
+th{{background:#f1f5f9;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:8px;text-align:left;color:#64748b;position:sticky;top:0}}
+tr:hover td{{background:#f8fafc}}
+input[type=text],select{{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;outline:none}}
+input:focus,select:focus{{border-color:#e94560}}
+</style></head><body>
+<div style="padding:20px 24px 0">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <a href="/admin/professions?token={token}" style="color:#6b7280;text-decoration:none;font-size:13px">← Référentiel</a>
+    <h2 style="margin:0;font-size:18px">{prof_label}
+      <span style="font-size:13px;font-weight:400;color:#6b7280;margin-left:8px">{total:,} suspects</span>
+    </h2>
+    {qualify_btn}
+  </div>
+
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <input type="hidden" name="token" value="{token}">
+    <input type="hidden" name="profession_id" value="{profession_id}">
+    <input type="text" name="search" value="{search}" placeholder="Rechercher (nom, ville)..." style="width:220px">
+    <input type="text" name="dept" value="{dept}" placeholder="Département (ex: 75)" style="width:120px">
+    <button type="submit" style="background:#e94560;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Filtrer</button>
+    {"" if not (search or dept) else f'<a href="/admin/suspects?token={token}&profession_id={profession_id}" style="padding:7px 12px;font-size:13px;color:#6b7280;text-decoration:none;border:1px solid #d1d5db;border-radius:6px">Réinitialiser</a>'}
+  </form>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto;max-height:70vh;overflow-y:auto">
+    <table>
+      <thead><tr>
+        <th>SIRET</th><th>Raison sociale</th><th>Ville</th>
+        <th style="text-align:center">Dept</th><th>Forme jur.</th>
+        <th>Date création</th><th style="text-align:center">Enrichi</th>
+        <th style="text-align:center">Contactable</th>
+      </tr></thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    </div>
+    <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280">
+      <span>Page {page} / {total_pages} · {total:,} résultats</span>
+      <div>{pages_html}</div>
+    </div>
+  </div>
+</div>
+</body></html>""")
 
 
 @router.post("/admin/professions/{prof_id}")

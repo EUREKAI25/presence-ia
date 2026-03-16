@@ -739,6 +739,24 @@ def db_segment_list(db: Session, status: str = None, limit: int = 100):
     return q.order_by(SireneSegmentDB.score.desc()).limit(limit).all()
 
 
+def db_suspects_list(db: Session, profession_id: str = None, dept: str = None,
+                     search: str = None, page: int = 1, per_page: int = 100):
+    """Liste paginée des suspects SIRENE avec filtres."""
+    q = db.query(SireneSuspectDB)
+    if profession_id: q = q.filter_by(profession_id=profession_id)
+    if dept:          q = q.filter_by(departement=dept)
+    if search:
+        like = f"%{search.upper()}%"
+        from sqlalchemy import or_
+        q = q.filter(or_(
+            SireneSuspectDB.raison_sociale.ilike(f"%{search}%"),
+            SireneSuspectDB.ville.ilike(f"%{search}%"),
+        ))
+    total = q.count()
+    items = q.order_by(SireneSuspectDB.raison_sociale).offset((page - 1) * per_page).limit(per_page).all()
+    return total, items
+
+
 # ── Dashboard stats ────────────────────────────────────────────────────────────
 
 def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
