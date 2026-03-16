@@ -584,6 +584,26 @@ async function quickQualify(profId) {{
     }}, 4000);
   }}
 }}
+
+async function generateKeywords(profId, force) {{
+  const url = '/admin/sirene/generate-keywords?token='+TOKEN
+    + (profId ? '&profession_id='+encodeURIComponent(profId) : '')
+    + (force ? '&force=true' : '');
+  toast('⏳ Génération mots-clés SIRENE via LLM...');
+  try {{
+    const r = await fetch(url, {{method:'POST'}});
+    const d = await r.json();
+    if (d.ok) {{
+      const nb = Object.keys(d.results || {{}}).length;
+      toast('\u2713 ' + nb + ' profession(s) traitée(s)');
+      setTimeout(() => location.reload(), 1500);
+    }} else {{
+      toast(d.detail || 'Erreur', false);
+    }}
+  }} catch(e) {{
+    toast('Erreur: ' + e.message, false);
+  }}
+}}
 </script>
 </body></html>""")
 
@@ -790,25 +810,6 @@ async function runNext() {{
   }}
 }}
 
-async function generateKeywords(profId, force) {{
-  const url = '/admin/sirene/generate-keywords?token='+TOKEN
-    + (profId ? '&profession_id='+encodeURIComponent(profId) : '')
-    + (force ? '&force=true' : '');
-  toast('⏳ Génération mots-clés SIRENE via LLM...');
-  try {{
-    const r = await fetch(url, {{method:'POST'}});
-    const d = await r.json();
-    if (d.ok) {{
-      const nb = Object.keys(d.results || {{}}).length;
-      toast('✓ ' + nb + ' profession(s) traitée(s)');
-      setTimeout(() => location.reload(), 1500);
-    }} else {{
-      toast(d.detail || 'Erreur', false);
-    }}
-  }} catch(e) {{
-    toast('Erreur: ' + e.message, false);
-  }}
-}}
 </script>
 </body></html>"""
     return HTMLResponse(html)
