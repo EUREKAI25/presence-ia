@@ -18,6 +18,7 @@ def admin_nav(token: str, active: str = "") -> str:
             ("scan",         "Scan IA"),
             ("professions",  "Métiers"),
             ("enrich",       "Enrichir suspects"),
+            ("naf-audit",    "Audit NAF"),
             ("sirene/segments", "Segments SIRENE"),
             ("send-queue",   "File d'envoi"),
             ("analytics",    "Analytics"),

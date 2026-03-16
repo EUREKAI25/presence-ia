@@ -668,5 +668,8 @@ app.include_router(professions_admin.router)
 from .routes.enrich_admin import router as enrich_admin_router
 app.include_router(enrich_admin_router)
 
+from .routes.naf_audit import router as naf_audit_router
+app.include_router(naf_audit_router)
+
 from .routes.active_models import router as active_models_router
 app.include_router(active_models_router)
