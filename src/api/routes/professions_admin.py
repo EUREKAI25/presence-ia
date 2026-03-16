@@ -115,7 +115,7 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
         ambig_attr = ' data-ambig="1"' if p.id in ambig_prof_ids else ''
         ambig_style = ";background:#fff7ed" if p.id in ambig_prof_ids else ""
         rows_html += f"""
-        <tr data-id="{p.id}" data-actif="{actif_int}"
+        <tr data-id="{p.id}" data-actif="{actif_int}" data-has-kw="{'1' if kw_sirene else '0'}"
             data-label="{p.label}" data-cat="{p.categorie or ''}"
             data-vis="{p.score_visibilite or 0}" data-conseil="{p.score_conseil_ia or 0}"
             data-valeur="{p.valeur_client or 0}" data-score="{sg}"{ambig_attr}
@@ -478,8 +478,8 @@ function _updateQualifyTable(by_prof, segs_by_prof, running) {{
 }}
 
 async function openQualify() {{
-  const activeRows = [...document.querySelectorAll('tr[data-id][data-actif="1"]')]
-    .filter(r => r.style.display !== 'none'); // respecter le filtre ambig
+  const activeRows = [...document.querySelectorAll('tr[data-id][data-actif="1"][data-has-kw="1"]')]
+    .filter(r => r.style.display !== 'none');
   _qualifyProfIds = activeRows.map(r => r.dataset.id);
   _profLabels = {{}};
   activeRows.forEach(r => {{ _profLabels[r.dataset.id] = r.dataset.label; }});
