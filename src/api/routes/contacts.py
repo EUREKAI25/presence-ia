@@ -61,16 +61,11 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
     rows = ""
     for c in contacts:
         badge_style, badge_label = STATUS_BADGE.get(c.status, ("background:#f3f4f6;color:#374151", c.status))
-        mobile = ""
-        fixe   = ""
-        if c.notes:
-            import re
-            m = re.search(r"mobile:([^\s|]+)", c.notes or "")
-            f = re.search(r"fixe:([^\s|]+)", c.notes or "")
-            if m: mobile = m.group(1)
-            if f: fixe   = f.group(1)
-        phone_display = mobile or fixe or c.phone or "—"
-        mobile_tag = ' <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 4px;border-radius:3px">mob</span>' if mobile else ""
+        import re
+        phone_raw = c.phone or ""
+        is_mob = bool(re.match(r"^(\+33[67]|0[67])", re.sub(r"[\s\.\-]", "", phone_raw)))
+        phone_display = phone_raw or "—"
+        mobile_tag = ' <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 4px;border-radius:3px">mob</span>' if (phone_raw and is_mob) else ""
         rows += f"""<tr id="row-{c.id}" style="border-bottom:1px solid #f3f4f6">
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>

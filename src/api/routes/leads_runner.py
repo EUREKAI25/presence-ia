@@ -166,6 +166,9 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
     with SessionLocal() as db:
         prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
         prof_label = prof.label if prof else profession_id
+        # Mots-clés de filtrage raison sociale (sécurité anti-pollutions)
+        kw_sirene = json.loads(prof.mots_cles_sirene or "[]") if prof else []
+        kw_lower  = [k.lower() for k in kw_sirene]
 
     BATCH = 50
     page  = 1
@@ -184,6 +187,13 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
         for s in suspects:
             if contacts_created >= qty or _STATE["stop_requested"]:
                 break
+
+            # Filtre de sécurité : raison sociale doit contenir un mot-clé SIRENE
+            if kw_lower:
+                nom_l = (s.raison_sociale or "").lower()
+                if not any(kw in nom_l for kw in kw_lower):
+                    with _LOCK: _STATE["processed"] += 1
+                    continue
 
             ville = s.ville or ""
             entry = {"name": s.raison_sociale, "city": ville, "contact": False,
