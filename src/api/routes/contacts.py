@@ -267,7 +267,7 @@ async function _pollLeads() {{
 
 // ── Envoi email / SMS par contact ─────────────────────────────────────────────
 async function sendContactEmail(id, btn) {{
-  if(!confirm('Envoyer l\'email à ce contact ?')) return;
+  if(!confirm("Envoyer l'email ?")) return;
   btn.disabled = true;
   try {{
     const r = await fetch('/admin/contacts/'+id+'/send-email?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}});
@@ -277,7 +277,7 @@ async function sendContactEmail(id, btn) {{
   }} catch(e) {{ btn.disabled=false; alert('Erreur réseau'); }}
 }}
 async function sendContactSMS(id, btn) {{
-  if(!confirm('Envoyer le SMS à ce contact ?')) return;
+  if(!confirm("Envoyer le SMS ?")) return;
   btn.disabled = true;
   try {{
     const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}});
