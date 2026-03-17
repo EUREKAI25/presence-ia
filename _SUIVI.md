@@ -1,8 +1,53 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — Pipeline SIRENE suspects → prospects + audit NAF
+**Statut** : 🟢 actif — Pipeline leads unifié opérationnel
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-03-16
+**Dernière MAJ** : 2026-03-17
+
+---
+
+## 🔌 SESSION 2026-03-17 — Pipeline leads unifié + page Contacts
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/models.py` | Champ `mots_cles_sirene TEXT` sur `ProfessionDB` | ✅ |
+| `src/database.py` | Migration AUTO `mots_cles_sirene` au démarrage | ✅ |
+| `src/sirene.py` | `_get_name_keywords_for_segment()` utilise `mots_cles_sirene` (filtre étymologique, non aqua/natation) | ✅ |
+| `src/sirene_keywords.py` | **NOUVEAU** — génération LLM (Anthropic) des mots-clés SIRENE par profession | ✅ |
+| `src/api/routes/professions_admin.py` | Bouton "🔑 Mots-clés SIRENE", colonne ✓/⚠, `data-has-kw`, endpoint `POST /admin/sirene/generate-keywords` | ✅ |
+| `src/api/routes/leads_runner.py` | **NOUVEAU** — pipeline unifié qualification+enrichissement, boucle par lots, `enrichi_at` pour ne jamais retraiter | ✅ |
+| `src/api/routes/contacts.py` | **RÉÉCRIT** — page ContactDB, widget leads inline, checkboxes sélection groupée, mode test email/SMS, boutons ✉/💬 par ligne | ✅ |
+| `src/api/routes/_nav.py` | Sidebar simplifiée (suppression enrich, naf-audit, segments, v3 contacts) | ✅ |
+| `src/api/main.py` | Mount router `leads_runner` | ✅ |
+
+### Bugs corrigés
+- `generateKeywords` JS dans mauvais bloc script → corrigé
+- `toast` non défini sur page professions → remplacé par `alert()`
+- 422 sur `/admin/leads/run` : `Request` non typé FastAPI → corrigé
+- Téléphone tronqué : regex `[^\s|]+` → lecture directe `c.phone`
+- Pipeline stoppé après 1 lead : retraitait les mêmes suspects en boucle → fix `enrichi_at IS NULL`
+- Compteur `traités > suspects` (quadratique) → `enrichi_at` marqué AVANT appel API
+- Apostrophe dans `confirm()` JS → guillemets doubles
+- 550 doublons contacts supprimés (pipeline bugué avait tout retraité)
+
+### État base au 2026-03-17
+- Suspects : **6 637** (tous `enrichi_at = NULL` — remis à zéro pour relance propre)
+- Contacts : **11 prospects piscinistes** (collectés malgré le bug)
+- Segments : **~1 719 total, ~99 done**
+- `mots_cles_sirene` généré pour : pisciniste ✅ (autres à faire)
+
+### Prochaine étape
+- [ ] Relancer pipeline pisciniste (20 leads) pour valider la logique `enrichi_at`
+- [ ] Générer `mots_cles_sirene` pour les autres professions
+- [ ] Tester envoi email/SMS depuis page Contacts (mode test + groupé)
+- [ ] Vérifier template email/SMS global (`__global__`) est bien configuré
+
+### Mode test contacts
+- Email : `nathalie.brigitte@gmail.com` (pré-rempli par défaut)
+- Tel : `0660474292` (pré-rempli par défaut)
+- Métier : lu depuis le select du widget leads
 
 ---
 
