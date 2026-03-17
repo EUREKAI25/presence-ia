@@ -6,10 +6,10 @@ GET  /admin/leads/status → état en temps réel
 POST /admin/leads/stop   → demande d'arrêt propre
 
 Logique :
-1. Génère les segments si nécessaire
-2. Qualifie (run_next_segment) jusqu'à avoir des suspects
-3. Enrichit (Google Places + scraping) jusqu'à avoir qty contacts
-4. Stoppe dès que qty atteint OU plus de suspects disponibles
+1. Phase 1 — qualifie des segments SIRENE jusqu'à avoir qty×5 suspects non encore tentés
+2. Phase 2 — enrichit (Google Places + scraping) uniquement les suspects enrichi_at IS NULL
+   Marque chaque suspect enrichi_at=now() AVANT l'appel API → jamais retraité
+3. Boucle jusqu'à qty contacts OU plus de segments disponibles
 """
 import json, logging, os, secrets, threading
 from datetime import datetime
@@ -61,7 +61,7 @@ async def leads_run(request: Request, token: str = ""):
 
     with _LOCK:
         _STATE.update({
-            "running": True, "phase": "qualification", "stop_requested": False,
+            "running": True, "phase": "qualification SIRENE", "stop_requested": False,
             "profession_id": profession_id, "qty": qty,
             "suspects": 0, "segments_done": 0, "segments_total": 0,
             "processed": 0, "enriched": 0, "contacts": 0,
@@ -91,33 +91,38 @@ def leads_stop(token: str = ""):
 
 def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
     try:
-        processed_offset = 0
         while True:
             if _STATE["stop_requested"]:
                 break
 
-            _phase1_qualify(profession_id, qty, processed_offset=processed_offset)
+            # Phase 1 : qualifier jusqu'à avoir qty×5 suspects non encore tentés
+            has_untried = _phase1_qualify(profession_id, qty)
             if _STATE["stop_requested"]:
                 break
 
+            if not has_untried:
+                # Aucun suspect dispo et plus de segments → terminé
+                break
+
+            # Phase 2 : enrichir uniquement les suspects non tentés
             _phase2_enrich(profession_id, qty, dept)
 
             with _LOCK:
                 contacts_done = _STATE["contacts"]
-                processed_offset = _STATE["processed"]
 
             if contacts_done >= qty:
                 break
 
-            # Vérifier s'il reste des segments à traiter
+            # Pas assez de leads — vérifier s'il reste des segments
             from ...sirene import segments_stats
             with SessionLocal() as db_:
                 stats = segments_stats(db_)
             pending = stats.get("total_segments", 0) - stats.get("done", 0)
             if pending <= 0:
+                log.info("[LEADS] Plus de segments disponibles, arrêt")
                 break
 
-            log.info("[LEADS] %d/%d leads — %d segments restants, on continue",
+            log.info("[LEADS] %d/%d leads — %d segments restants, relance qualification",
                      contacts_done, qty, pending)
 
     except Exception as e:
@@ -131,31 +136,37 @@ def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
             _STATE["finished_at"] = datetime.utcnow().isoformat()
 
 
-def _phase1_qualify(profession_id: str, qty_wanted: int, processed_offset: int = 0):
-    """Qualifie jusqu'à avoir assez de suspects au-delà de ceux déjà traités."""
-    from ...sirene import generate_segments, run_next_segment, segments_stats
-
+def _count_untried(profession_id: str) -> int:
+    """Nombre de suspects non encore tentés pour cette profession."""
+    from ...models import SireneSuspectDB
+    from sqlalchemy import func
     with SessionLocal() as db:
-        from ...models import SireneSuspectDB
-        from sqlalchemy import func
-        nb_existing = db.query(func.count(SireneSuspectDB.id)).filter_by(
-            profession_id=profession_id
+        return db.query(func.count(SireneSuspectDB.id)).filter(
+            SireneSuspectDB.profession_id == profession_id,
+            SireneSuspectDB.enrichi_at.is_(None),
         ).scalar() or 0
 
-    # Cible = suspects traités + marge pour le taux d'échec
-    target = processed_offset + qty_wanted * 5
-    if nb_existing >= target:
+
+def _phase1_qualify(profession_id: str, qty_wanted: int) -> bool:
+    """Qualifie des segments jusqu'à avoir qty_wanted×5 suspects non encore tentés.
+    Retourne True si des suspects non tentés sont disponibles."""
+    from ...sirene import generate_segments, run_next_segment, segments_stats
+
+    target = qty_wanted * 5
+
+    untried = _count_untried(profession_id)
+    if untried >= target:
         with _LOCK:
-            _STATE["suspects"] = nb_existing
+            _STATE["suspects"] = untried
             _STATE["phase"]    = "enrichissement"
-        return
+        return True
 
     with _LOCK:
         _STATE["phase"] = "qualification SIRENE"
 
     with SessionLocal() as db:
         generated = generate_segments(db, profession_ids=[profession_id])
-        log.info("[LEADS] %d segments générés", generated)
+        log.info("[LEADS] %d segments générés/vérifiés", generated)
 
     while True:
         if _STATE["stop_requested"]:
@@ -166,67 +177,91 @@ def _phase1_qualify(profession_id: str, qty_wanted: int, processed_offset: int =
             stats  = segments_stats(db)
 
         if result is None:
-            break
+            break  # plus de segments pending
 
         with _LOCK:
-            _STATE["suspects"]       = stats.get("total_suspects", 0)
             _STATE["segments_done"]  = stats.get("done", 0)
             _STATE["segments_total"] = stats.get("total_segments", 0)
 
-        if _STATE["suspects"] >= target:
+        untried = _count_untried(profession_id)
+        with _LOCK:
+            _STATE["suspects"] = untried
+
+        if untried >= target:
             break
+
+    untried = _count_untried(profession_id)
+    with _LOCK:
+        _STATE["suspects"] = untried
+    return untried > 0
 
 
 def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
-    """Enrichit les suspects jusqu'à qty contacts créés dans ContactDB."""
+    """Enrichit les suspects enrichi_at IS NULL jusqu'à qty contacts créés."""
     from ...google_places import fetch_text_search, fetch_place_details
     from ...enrich import enrich_website
-    from ...models import V3ProspectDB, ContactDB, ProfessionDB
+    from ...models import V3ProspectDB, ContactDB, ProfessionDB, SireneSuspectDB
     from ...api.routes.enrich_admin import _valid_email, _is_mobile
 
     api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
     with _LOCK:
         _STATE["phase"] = "enrichissement"
+        contacts_created = _STATE["contacts"]
 
     with SessionLocal() as db:
-        prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
+        prof       = db.query(ProfessionDB).filter_by(id=profession_id).first()
         prof_label = prof.label if prof else profession_id
-        # Mots-clés de filtrage raison sociale (sécurité anti-pollutions)
-        kw_sirene = json.loads(prof.mots_cles_sirene or "[]") if prof else []
-        kw_lower  = [k.lower() for k in kw_sirene]
+        kw_sirene  = json.loads(prof.mots_cles_sirene or "[]") if prof else []
+        kw_lower   = [k.lower() for k in kw_sirene]
 
     BATCH = 50
-    page  = 1
-    contacts_created = 0
 
     while contacts_created < qty:
         if _STATE["stop_requested"]:
             break
 
+        # Récupère le prochain batch de suspects non encore tentés
         with SessionLocal() as db:
-            _, suspects = db_suspects_list(db, profession_id=profession_id, dept=dept,
-                                           page=page, per_page=BATCH)
-        if not suspects:
-            break
+            rows = db.query(SireneSuspectDB).filter(
+                SireneSuspectDB.profession_id == profession_id,
+                SireneSuspectDB.enrichi_at.is_(None),
+            ).limit(BATCH).all()
+            # Extraire les données avant fermeture session
+            suspects = [(s.id, s.raison_sociale, s.ville) for s in rows]
 
-        for s in suspects:
+        if not suspects:
+            break  # plus rien à traiter
+
+        # Mise à jour du compteur suspects restants
+        with _LOCK:
+            _STATE["suspects"] = _count_untried(profession_id)
+
+        for s_id, raison_sociale, ville in suspects:
             if contacts_created >= qty or _STATE["stop_requested"]:
                 break
 
-            # Filtre de sécurité : raison sociale doit contenir un mot-clé SIRENE
+            # ── Marquer immédiatement comme "tenté" ──────────────────────────
+            with SessionLocal() as db:
+                s_obj = db.get(SireneSuspectDB, s_id)
+                if s_obj:
+                    s_obj.enrichi_at = datetime.utcnow()
+                    db.commit()
+
+            # Filtre de sécurité mots-clés SIRENE
             if kw_lower:
-                nom_l = (s.raison_sociale or "").lower()
+                nom_l = (raison_sociale or "").lower()
                 if not any(kw in nom_l for kw in kw_lower):
-                    with _LOCK: _STATE["processed"] += 1
+                    with _LOCK:
+                        _STATE["processed"] += 1
                     continue
 
-            ville = s.ville or ""
-            entry = {"name": s.raison_sociale, "city": ville, "contact": False,
-                     "email": None, "mobile": None}
+            ville_str = ville or ""
+            entry = {"name": raison_sociale, "city": ville_str,
+                     "contact": False, "email": None, "mobile": None}
             try:
                 places = fetch_text_search(
-                    f"{s.raison_sociale} {ville}".strip(), "", api_key, max_results=1
+                    f"{raison_sociale} {ville_str}".strip(), "", api_key, max_results=1
                 ) if api_key else []
 
                 if places:
@@ -235,8 +270,8 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                     phone   = details.get("formatted_phone_number") or ""
 
                     if website:
-                        scraped = enrich_website(website, timeout=5)
-                        email   = _valid_email(scraped.get("email"))
+                        scraped     = enrich_website(website, timeout=5)
+                        email       = _valid_email(scraped.get("email"))
                         scraped_mob = scraped.get("mobile") or ""
                         if scraped_mob and _is_mobile(scraped_mob):
                             mobile = scraped_mob
@@ -253,7 +288,7 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                             tok = secrets.token_hex(16)
                             with SessionLocal() as db2:
                                 db2.add(V3ProspectDB(
-                                    token=tok, name=s.raison_sociale, city=ville,
+                                    token=tok, name=raison_sociale, city=ville_str,
                                     profession=prof_label, phone=mobile or fixe,
                                     website=website, email=email,
                                     rating=details.get("rating"),
@@ -261,10 +296,10 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                                     landing_url=f"/v3/{tok}", scrape_status="done",
                                 ))
                                 db2.add(ContactDB(
-                                    company_name=s.raison_sociale, email=email,
-                                    phone=mobile or fixe, city=ville,
+                                    company_name=raison_sociale, email=email,
+                                    phone=mobile or fixe, city=ville_str,
                                     profession=prof_label, status="PROSPECT",
-                                    notes=f"siret:{s.id} | web:{website}"
+                                    notes=f"siret:{s_id} | web:{website}"
                                           + (f" | mobile:{mobile}" if mobile else "")
                                           + (f" | fixe:{fixe}" if fixe else ""),
                                 ))
@@ -278,7 +313,7 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                                 _STATE["enriched"] += 1
 
             except Exception as e:
-                log.warning("[LEADS] %s: %s", s.raison_sociale, e)
+                log.warning("[LEADS] %s: %s", raison_sociale, e)
 
             with _LOCK:
                 _STATE["processed"] += 1
@@ -286,4 +321,6 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                 if len(_STATE["results"]) > 100:
                     _STATE["results"] = _STATE["results"][-100:]
 
-        page += 1
+        # Mise à jour suspects restants après chaque batch
+        with _LOCK:
+            _STATE["suspects"] = _count_untried(profession_id)
