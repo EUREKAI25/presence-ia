@@ -173,6 +173,16 @@ tr:hover td{{background:#fafafa}}
     <span id="add-status" style="margin-left:10px;font-size:11px;color:#6b7280"></span>
   </div>
 
+  <!-- Mode test -->
+  <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:11px;color:#6b7280;font-weight:600">TEST :</span>
+    <input id="test-email" type="email" placeholder="email test" style="font-size:11px;padding:5px 8px;width:190px">
+    <input id="test-phone" type="text" placeholder="tel test (06…)" style="font-size:11px;padding:5px 8px;width:130px">
+    <button onclick="testSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Tester email</button>
+    <button onclick="testSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Tester SMS</button>
+    <span id="test-result" style="font-size:11px;color:#6b7280"></span>
+  </div>
+
   <!-- Barre actions groupées -->
   <div id="bulk-bar" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <span id="bulk-count" style="font-size:12px;color:#6b7280;margin-right:4px">0 sélectionné(s)</span>
@@ -281,6 +291,43 @@ async function _pollLeads() {{
     }}
   }} catch(e) {{}}
 }})();
+
+// ── Mode test ─────────────────────────────────────────────────────────────────
+(function() {{
+  const em = localStorage.getItem('test_email') || '';
+  const ph = localStorage.getItem('test_phone') || '';
+  if(em) document.getElementById('test-email').value = em;
+  if(ph) document.getElementById('test-phone').value = ph;
+}})();
+document.getElementById('test-email').addEventListener('change', function() {{ localStorage.setItem('test_email', this.value); }});
+document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
+
+async function testSendEmail() {{
+  const email = document.getElementById('test-email').value.trim();
+  if(!email) {{ alert('Saisir un email de test'); return; }}
+  const res = document.getElementById('test-result');
+  res.textContent = 'Envoi…';
+  const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{email: email}})
+  }});
+  const d = await r.json();
+  res.textContent = d.ok ? '✓ Email envoyé à '+email : '✗ '+( d.error||'erreur');
+  res.style.color = d.ok ? '#16a34a' : '#dc2626';
+}}
+async function testSendSMS() {{
+  const phone = document.getElementById('test-phone').value.trim();
+  if(!phone) {{ alert('Saisir un numéro de test'); return; }}
+  const res = document.getElementById('test-result');
+  res.textContent = 'Envoi SMS…';
+  const r = await fetch('/admin/contacts/test/send-sms?token='+T, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{phone: phone}})
+  }});
+  const d = await r.json();
+  res.textContent = d.ok ? '✓ SMS envoyé au '+phone : '✗ '+(d.error||'erreur');
+  res.style.color = d.ok ? '#16a34a' : '#dc2626';
+}}
 
 // ── Checkboxes + sélection ────────────────────────────────────────────────────
 function _updateBulkBar() {{
@@ -441,6 +488,38 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     if not c: raise HTTPException(404)
     db_delete_contact(db, c)
     return {"ok": True}
+
+
+@router.post("/admin/contacts/test/send-email")
+async def contact_test_email(request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    data  = await request.json()
+    email = data.get("email", "").strip()
+    if not email:
+        return JSONResponse({"ok": False, "error": "email requis"})
+    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT
+    from ...models import V3LandingTextDB
+    lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
+    tpl      = lt.email_template if lt and lt.email_template else None
+    subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
+    subj = "[TEST] " + subj_tpl.format(ville="Paris", metier="pisciniste", metiers="piscinistes",
+                                       city="Paris", profession="Pisciniste", name="Test")
+    msg  = _contact_message("Prospect Test", "Paris", "Pisciniste", "", tpl)
+    ok   = _send_brevo_email(email, "Test", subj, msg)
+    return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
+
+
+@router.post("/admin/contacts/test/send-sms")
+async def contact_test_sms(request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    data  = await request.json()
+    phone = data.get("phone", "").strip()
+    if not phone:
+        return JSONResponse({"ok": False, "error": "phone requis"})
+    from .v3 import _send_brevo_sms, _contact_message_sms
+    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", "Pisciniste", "")
+    ok  = _send_brevo_sms(phone, msg)
+    return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})
 
 
 @router.post("/admin/contacts/{cid}/send-email")
