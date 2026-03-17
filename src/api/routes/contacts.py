@@ -294,35 +294,39 @@ async function _pollLeads() {{
 
 // ── Mode test ─────────────────────────────────────────────────────────────────
 (function() {{
-  const em = localStorage.getItem('test_email') || '';
-  const ph = localStorage.getItem('test_phone') || '';
-  if(em) document.getElementById('test-email').value = em;
-  if(ph) document.getElementById('test-phone').value = ph;
+  const em = localStorage.getItem('test_email') || 'nathalie.brigitte@gmail.com';
+  const ph = localStorage.getItem('test_phone') || '0660474292';
+  document.getElementById('test-email').value = em;
+  document.getElementById('test-phone').value = ph;
 }})();
 document.getElementById('test-email').addEventListener('change', function() {{ localStorage.setItem('test_email', this.value); }});
 document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
 
+function _testProfession() {{
+  const sel = document.getElementById('lr-prof');
+  return sel ? sel.options[sel.selectedIndex].text : 'Pisciniste';
+}}
 async function testSendEmail() {{
   const email = document.getElementById('test-email').value.trim();
   if(!email) {{ alert('Saisir un email de test'); return; }}
   const res = document.getElementById('test-result');
-  res.textContent = 'Envoi…';
+  res.textContent = 'Envoi…'; res.style.color='#6b7280';
   const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{email: email}})
+    body: JSON.stringify({{email: email, profession: _testProfession()}})
   }});
   const d = await r.json();
-  res.textContent = d.ok ? '✓ Email envoyé à '+email : '✗ '+( d.error||'erreur');
+  res.textContent = d.ok ? '✓ Email envoyé à '+email : '✗ '+(d.error||'erreur');
   res.style.color = d.ok ? '#16a34a' : '#dc2626';
 }}
 async function testSendSMS() {{
   const phone = document.getElementById('test-phone').value.trim();
   if(!phone) {{ alert('Saisir un numéro de test'); return; }}
   const res = document.getElementById('test-result');
-  res.textContent = 'Envoi SMS…';
+  res.textContent = 'Envoi SMS…'; res.style.color='#6b7280';
   const r = await fetch('/admin/contacts/test/send-sms?token='+T, {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{phone: phone}})
+    body: JSON.stringify({{phone: phone, profession: _testProfession()}})
   }});
   const d = await r.json();
   res.textContent = d.ok ? '✓ SMS envoyé au '+phone : '✗ '+(d.error||'erreur');
@@ -493,8 +497,9 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
 @router.post("/admin/contacts/test/send-email")
 async def contact_test_email(request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    data  = await request.json()
-    email = data.get("email", "").strip()
+    data       = await request.json()
+    email      = data.get("email", "").strip()
+    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
     if not email:
         return JSONResponse({"ok": False, "error": "email requis"})
     from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT
@@ -502,9 +507,11 @@ async def contact_test_email(request: Request, db: Session = Depends(get_db)):
     lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
     tpl      = lt.email_template if lt and lt.email_template else None
     subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
-    subj = "[TEST] " + subj_tpl.format(ville="Paris", metier="pisciniste", metiers="piscinistes",
-                                       city="Paris", profession="Pisciniste", name="Test")
-    msg  = _contact_message("Prospect Test", "Paris", "Pisciniste", "", tpl)
+    metier   = profession.lower()
+    metiers  = metier + "s" if not metier.endswith("s") else metier
+    subj = "[TEST] " + subj_tpl.format(ville="Paris", metier=metier, metiers=metiers,
+                                       city="Paris", profession=profession, name="Test")
+    msg  = _contact_message("Prospect Test", "Paris", profession, "", tpl)
     ok   = _send_brevo_email(email, "Test", subj, msg)
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
 
@@ -512,12 +519,13 @@ async def contact_test_email(request: Request, db: Session = Depends(get_db)):
 @router.post("/admin/contacts/test/send-sms")
 async def contact_test_sms(request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    data  = await request.json()
-    phone = data.get("phone", "").strip()
+    data       = await request.json()
+    phone      = data.get("phone", "").strip()
+    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
     if not phone:
         return JSONResponse({"ok": False, "error": "phone requis"})
     from .v3 import _send_brevo_sms, _contact_message_sms
-    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", "Pisciniste", "")
+    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "")
     ok  = _send_brevo_sms(phone, msg)
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})
 
