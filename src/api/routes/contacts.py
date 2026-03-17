@@ -72,7 +72,10 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         btn_sms = (f'<button onclick="sendContactSMS(\'{c.id}\',this)" title="Envoyer SMS" '
                    f'style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">💬</button>'
                    if (phone_raw and is_mob) else "")
-        rows += f"""<tr id="row-{c.id}" style="border-bottom:1px solid #f3f4f6">
+        has_email = "1" if c.email else "0"
+        has_mob   = "1" if (phone_raw and is_mob) else "0"
+        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" style="border-bottom:1px solid #f3f4f6">
+  <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
@@ -170,16 +173,30 @@ tr:hover td{{background:#fafafa}}
     <span id="add-status" style="margin-left:10px;font-size:11px;color:#6b7280"></span>
   </div>
 
+  <!-- Barre actions groupées -->
+  <div id="bulk-bar" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span id="bulk-count" style="font-size:12px;color:#6b7280;margin-right:4px">0 sélectionné(s)</span>
+    <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Avec email</button>
+    <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Avec mobile</button>
+    <button onclick="selectAll()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
+    <button onclick="selectNone()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
+    <div style="flex:1"></div>
+    <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
+    <button onclick="bulkSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Envoyer SMS</button>
+    <div id="bulk-progress" style="font-size:11px;color:#6b7280;display:none"></div>
+  </div>
+
   <!-- Table -->
   <div class="card" style="padding:0;overflow-x:auto">
     <table>
       <thead><tr>
+        <th style="padding:10px 6px;text-align:center;width:32px"><input type="checkbox" id="cb-all" title="Tout sélectionner" style="cursor:pointer"></th>
         <th style="padding:10px 10px">Entreprise</th>
         <th>Statut</th><th>Email</th><th>Téléphone</th>
         <th>Ville</th><th>Métier</th><th>Ajouté</th><th></th>
       </tr></thead>
       <tbody>
-        {rows if rows else '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
+        {rows if rows else '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -264,6 +281,66 @@ async function _pollLeads() {{
     }}
   }} catch(e) {{}}
 }})();
+
+// ── Checkboxes + sélection ────────────────────────────────────────────────────
+function _updateBulkBar() {{
+  const checked = document.querySelectorAll('.row-cb:checked');
+  document.getElementById('bulk-count').textContent = checked.length + ' sélectionné(s)';
+  document.getElementById('bulk-bar').style.display = checked.length > 0 ? 'flex' : 'none';
+}}
+document.addEventListener('change', function(e) {{
+  if(e.target.id === 'cb-all') {{
+    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = e.target.checked);
+  }}
+  _updateBulkBar();
+}});
+function selectByType(type) {{
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    const tr = cb.closest('tr');
+    cb.checked = tr && tr.dataset['has'+type.charAt(0).toUpperCase()+type.slice(1)] === '1';
+  }});
+  _updateBulkBar();
+}}
+function selectAll()  {{ document.querySelectorAll('.row-cb').forEach(cb => cb.checked=true);  _updateBulkBar(); }}
+function selectNone() {{ document.querySelectorAll('.row-cb').forEach(cb => cb.checked=false); _updateBulkBar(); }}
+function _selectedIds() {{ return [...document.querySelectorAll('.row-cb:checked')].map(cb=>cb.dataset.cid); }}
+
+async function bulkSendEmail() {{
+  const ids = _selectedIds();
+  if(!ids.length) return;
+  if(!confirm("Envoyer un email a " + ids.length + " contact(s) ?")) return;
+  const prog = document.getElementById('bulk-progress');
+  prog.style.display='inline'; prog.textContent='Envoi en cours…';
+  let ok=0, err=0;
+  for(const id of ids) {{
+    try {{
+      const r = await fetch('/admin/contacts/'+id+'/send-email?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
+      const d = await r.json();
+      if(d.ok) ok++; else err++;
+    }} catch(e) {{ err++; }}
+    prog.textContent = ok+' envoyés, '+err+' erreurs…';
+    await new Promise(r=>setTimeout(r,500));
+  }}
+  prog.textContent = 'Terminé — '+ok+' envoyés, '+err+' erreurs';
+}}
+async function bulkSendSMS() {{
+  const ids = _selectedIds();
+  if(!ids.length) return;
+  if(!confirm("Envoyer un SMS a " + ids.length + " contact(s) ?")) return;
+  const prog = document.getElementById('bulk-progress');
+  prog.style.display='inline'; prog.textContent='Envoi SMS en cours…';
+  let ok=0, err=0;
+  for(const id of ids) {{
+    try {{
+      const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
+      const d = await r.json();
+      if(d.ok) ok++; else err++;
+    }} catch(e) {{ err++; }}
+    prog.textContent = ok+' envoyés, '+err+' erreurs…';
+    await new Promise(r=>setTimeout(r,500));
+  }}
+  prog.textContent = 'Terminé — '+ok+' envoyés, '+err+' erreurs';
+}}
 
 // ── Envoi email / SMS par contact ─────────────────────────────────────────────
 async function sendContactEmail(id, btn) {{
