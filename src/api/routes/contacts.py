@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ...database import get_db, db_list_contacts, db_get_contact, db_create_contact, db_update_contact, db_delete_contact, SessionLocal
 from ...models import ContactDB
 from ._nav import admin_nav
+from . import v3_mkt_bridge as _mkt
 
 router = APIRouter(tags=["Admin Contacts"])
 
@@ -24,6 +25,31 @@ def _offer_labels(db: Session) -> dict:
     from offers_module.database import db_list_offers
     offers = db_list_offers(db)
     return {o.name: o.name for o in offers} if offers else {}
+
+
+def _tracking_map(contact_ids: list) -> dict:
+    """Retourne {contact_id: delivery} avec opened_at/clicked_at/calendly_clicked_at."""
+    if not contact_ids:
+        return {}
+    try:
+        db = _mkt._mkt_db()
+        if not db:
+            return {}
+        from marketing_module.models import ProspectDeliveryDB
+        rows = (
+            db.query(ProspectDeliveryDB)
+            .filter(ProspectDeliveryDB.prospect_id.in_(contact_ids))
+            .order_by(ProspectDeliveryDB.created_at.desc())
+            .all()
+        )
+        db.close()
+        result = {}
+        for r in rows:
+            if r.prospect_id not in result:
+                result[r.prospect_id] = r
+        return result
+    except Exception:
+        return {}
 
 
 def _prof_options(db) -> str:
@@ -58,6 +84,8 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
                     or q in (c.email or "").lower() or q in (c.city or "").lower()
                     or q in (c.profession or "").lower()]
 
+    tracking = _tracking_map([c.id for c in contacts])
+
     rows = ""
     for c in contacts:
         badge_style, badge_label = STATUS_BADGE.get(c.status, ("background:#f3f4f6;color:#374151", c.status))
@@ -74,6 +102,17 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
                    if (phone_raw and is_mob) else "")
         has_email = "1" if c.email else "0"
         has_mob   = "1" if (phone_raw and is_mob) else "0"
+        trk = tracking.get(c.id)
+        def _trk_icon(val, emoji, label):
+            if not val:
+                return f'<span title="{label}" style="color:#d1d5db;font-size:13px">{emoji}</span>'
+            ts = val.strftime("%d/%m %H:%M")
+            return f'<span title="{label} {ts}" style="color:#16a34a;font-size:13px">{emoji}</span>'
+        trk_html = (
+            _trk_icon(trk.opened_at if trk else None, "👁", "Ouvert") + " " +
+            _trk_icon(trk.clicked_at if trk else None, "🔗", "Cliqué") + " " +
+            _trk_icon(trk.calendly_clicked_at if trk else None, "📅", "Calendly")
+        ) if True else ""
         rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" style="border-bottom:1px solid #f3f4f6">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
@@ -83,6 +122,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.profession or "—"}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
+  <td style="padding:8px 6px;text-align:center;white-space:nowrap">{trk_html}</td>
   <td style="padding:8px 6px;text-align:right;white-space:nowrap">
     {btn_email}{btn_sms}<button onclick="deleteContact('{c.id}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
   </td>
@@ -203,7 +243,8 @@ tr:hover td{{background:#fafafa}}
         <th style="padding:10px 6px;text-align:center;width:32px"><input type="checkbox" id="cb-all" title="Tout sélectionner" style="cursor:pointer"></th>
         <th style="padding:10px 10px">Entreprise</th>
         <th>Statut</th><th>Email</th><th>Téléphone</th>
-        <th>Ville</th><th>Métier</th><th>Ajouté</th><th></th>
+        <th>Ville</th><th>Métier</th><th>Ajouté</th>
+        <th style="text-align:center" title="👁 Ouvert · 🔗 Cliqué · 📅 Calendly">Tracking</th><th></th>
       </tr></thead>
       <tbody>
         {rows if rows else '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
@@ -550,7 +591,9 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     subj = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
                            city=city, profession=profession, name=name)
     msg  = _contact_message(name, city, profession, "", tpl)
-    ok   = _send_brevo_email(c.email, name, subj, msg)
+    delivery_id = _mkt.create_delivery(c.id)
+    ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "")
+    _mkt.mark_sent(delivery_id, ok)
     if ok:
         db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
@@ -568,7 +611,9 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     city       = c.city or ""
     profession = c.profession or ""
     msg = _contact_message_sms(name, city, profession, "")
+    delivery_id = _mkt.create_sms_delivery(c.id)
     ok  = _send_brevo_sms(c.phone, msg)
+    _mkt.mark_sent(delivery_id, ok)
     if ok:
         db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})
