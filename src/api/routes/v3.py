@@ -38,6 +38,32 @@ router = APIRouter()
 
 CALENDLY_URL  = "https://calendly.com/contact-presence-ia/20min"
 BASE_URL      = os.getenv("BASE_URL", "https://presence-ia.com")
+
+# Préfectures par département — fallback image si pas d'image spécifique à la ville
+DEPT_PREFECTURE: dict[str, str] = {
+    "01":"Bourg-en-Bresse","02":"Laon","03":"Moulins","04":"Digne-les-Bains","05":"Gap",
+    "06":"Nice","07":"Privas","08":"Charleville-Mézières","09":"Foix","10":"Troyes",
+    "11":"Carcassonne","12":"Rodez","13":"Marseille","14":"Caen","15":"Aurillac",
+    "16":"Angoulême","17":"La Rochelle","18":"Bourges","19":"Tulle",
+    "2A":"Ajaccio","2B":"Bastia",
+    "21":"Dijon","22":"Saint-Brieuc","23":"Guéret","24":"Périgueux","25":"Besançon",
+    "26":"Valence","27":"Évreux","28":"Chartres","29":"Quimper","30":"Nîmes",
+    "31":"Toulouse","32":"Auch","33":"Bordeaux","34":"Montpellier","35":"Rennes",
+    "36":"Châteauroux","37":"Tours","38":"Grenoble","39":"Lons-le-Saunier",
+    "40":"Mont-de-Marsan","41":"Blois","42":"Saint-Étienne","43":"Le Puy-en-Velay",
+    "44":"Nantes","45":"Orléans","46":"Cahors","47":"Agen","48":"Mende",
+    "49":"Angers","50":"Saint-Lô","51":"Châlons-en-Champagne","52":"Chaumont",
+    "53":"Laval","54":"Nancy","55":"Bar-le-Duc","56":"Vannes","57":"Metz",
+    "58":"Nevers","59":"Lille","60":"Beauvais","61":"Alençon","62":"Arras",
+    "63":"Clermont-Ferrand","64":"Pau","65":"Tarbes","66":"Perpignan",
+    "67":"Strasbourg","68":"Colmar","69":"Lyon","70":"Vesoul","71":"Mâcon",
+    "72":"Le Mans","73":"Chambéry","74":"Annecy","75":"Paris","76":"Rouen",
+    "77":"Melun","78":"Versailles","79":"Niort","80":"Amiens","81":"Albi",
+    "82":"Montauban","83":"Toulon","84":"Avignon","85":"La Roche-sur-Yon",
+    "86":"Poitiers","87":"Limoges","88":"Épinal","89":"Auxerre","90":"Belfort",
+    "91":"Évry-Courcouronnes","92":"Nanterre","93":"Bobigny","94":"Créteil","95":"Cergy",
+    "971":"Basse-Terre","972":"Fort-de-France","973":"Cayenne","974":"Saint-Denis","976":"Mamoudzou",
+}
 UPLOADS_DIR   = Path(os.getenv("UPLOADS_DIR", "/opt/presence-ia/dist/uploads"))
 
 # Cookie d'authentification admin — mot de passe "zorbec"
@@ -1095,7 +1121,18 @@ def landing_v3(token: str):
         if not p:
             from starlette.responses import RedirectResponse
             return RedirectResponse(url="https://presence-ia.com", status_code=302)
-        city_img       = db.get(V3CityImageDB, _city_image_key(p.city))
+        city_img = db.get(V3CityImageDB, _city_image_key(p.city))
+        if not city_img:
+            # Fallback : image de la préfecture du département
+            from ...models import SireneSuspectDB
+            suspect = db.query(SireneSuspectDB).filter(
+                SireneSuspectDB.ville == p.city,
+                SireneSuspectDB.departement.isnot(None),
+            ).first()
+            if suspect and suspect.departement:
+                prefecture = DEPT_PREFECTURE.get(suspect.departement, "")
+                if prefecture:
+                    city_img = db.get(V3CityImageDB, _city_image_key(prefecture))
         city_image_url = city_img.image_url if city_img else ""
         competitors    = json.loads(p.competitors) if p.competitors else []
         if not competitors:

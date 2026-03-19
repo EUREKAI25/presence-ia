@@ -9,6 +9,7 @@ from ...database import get_db, db_list_contacts, db_get_contact, db_create_cont
 from ...models import ContactDB
 from ._nav import admin_nav
 from . import v3_mkt_bridge as _mkt
+from .v3 import DEPT_PREFECTURE
 
 router = APIRouter(tags=["Admin Contacts"])
 
@@ -52,6 +53,44 @@ def _tracking_map(contact_ids: list) -> dict:
         return {}
 
 
+def _image_readiness(db, contacts) -> tuple[set, dict]:
+    """
+    Retourne (ready_cities, city_to_dept) :
+    - ready_cities : set de villes.lower() ayant une image (directe ou préfecture)
+    - city_to_dept : {ville.lower(): dept_code}
+    """
+    from ...models import V3CityImageDB, SireneSuspectDB
+    images = {img.id for img in db.query(V3CityImageDB).all()}
+    cities = {(c.city or "").lower() for c in contacts if c.city}
+
+    # dept par ville via SireneSuspectDB
+    city_to_dept: dict = {}
+    for city_l in cities:
+        s = db.query(SireneSuspectDB).filter(
+            SireneSuspectDB.ville == city_l.title(),
+            SireneSuspectDB.departement.isnot(None),
+        ).first()
+        if not s:
+            s = db.query(SireneSuspectDB).filter(
+                SireneSuspectDB.ville.ilike(city_l),
+                SireneSuspectDB.departement.isnot(None),
+            ).first()
+        if s and s.departement:
+            city_to_dept[city_l] = s.departement
+
+    ready_cities: set = set()
+    for city_l in cities:
+        if city_l in images:
+            ready_cities.add(city_l)
+        else:
+            dept = city_to_dept.get(city_l, "")
+            if dept:
+                prefecture = DEPT_PREFECTURE.get(dept, "").lower()
+                if prefecture and prefecture in images:
+                    ready_cities.add(city_l)
+    return ready_cities, city_to_dept
+
+
 def _prof_options(db) -> str:
     """Professions avec mots_cles_sirene — prêtes pour leads runner."""
     from ...models import ProfessionDB
@@ -85,6 +124,19 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
                     or q in (c.profession or "").lower()]
 
     tracking = _tracking_map([c.id for c in contacts])
+    ready_cities, city_to_dept = _image_readiness(db, contacts)
+
+    # Images manquantes
+    missing_cities = []
+    for c in contacts:
+        city_l = (c.city or "").lower()
+        if city_l and city_l not in ready_cities:
+            dept = city_to_dept.get(city_l, "")
+            prefecture = DEPT_PREFECTURE.get(dept, "") if dept else ""
+            entry = (c.city or "").title()
+            label = f"{entry} (dept {dept} → préfecture : {prefecture})" if dept else entry
+            if label not in missing_cities:
+                missing_cities.append(label)
 
     rows = ""
     for c in contacts:
@@ -100,8 +152,12 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         btn_sms = (f'<button onclick="sendContactSMS(\'{c.id}\',this)" title="Envoyer SMS" '
                    f'style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">💬</button>'
                    if (phone_raw and is_mob) else "")
-        has_email = "1" if c.email else "0"
-        has_mob   = "1" if (phone_raw and is_mob) else "0"
+        has_email    = "1" if c.email else "0"
+        has_mob      = "1" if (phone_raw and is_mob) else "0"
+        city_l       = (c.city or "").lower()
+        img_ready    = city_l in ready_cities
+        row_style    = "border-bottom:1px solid #f3f4f6" + ("" if img_ready else ";opacity:.45")
+        img_attr     = "1" if img_ready else "0"
         trk = tracking.get(c.id)
         def _trk_icon(val, emoji, label):
             if not val:
@@ -113,7 +169,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
             _trk_icon(trk.clicked_at if trk else None, "🔗", "Cliqué") + " " +
             _trk_icon(trk.calendly_clicked_at if trk else None, "📅", "Calendly")
         ) if True else ""
-        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" style="border-bottom:1px solid #f3f4f6">
+        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-img-ready="{img_attr}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
@@ -169,6 +225,10 @@ tr:hover td{{background:#fafafa}}
         </select>
       </div>
       <div>
+        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Département</label>
+        <input type="text" id="lr-dept" placeholder="ex: 33" maxlength="3" style="width:60px;text-align:center">
+      </div>
+      <div>
         <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Leads voulus</label>
         <input type="number" id="lr-qty" value="20" min="1" max="200" style="width:80px">
       </div>
@@ -182,6 +242,19 @@ tr:hover td{{background:#fafafa}}
       <span style="color:#16a34a;font-weight:700"><span id="lr-contacts">0</span> leads</span>
     </div>
   </div>
+
+  <!-- Images manquantes -->
+  {'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 16px;margin-bottom:10px">' +
+   '<div style="display:flex;justify-content:space-between;align-items:center">' +
+   f'<span style="font-size:12px;font-weight:700;color:#92400e">⚠ {len(missing_cities)} ville(s) sans image — landing sans visuel</span>' +
+   '<div style="display:flex;gap:8px;align-items:center">' +
+   '<label style="font-size:11px;color:#92400e;cursor:pointer"><input type="checkbox" id="hide-no-img" onchange="toggleNoImg()" style="margin-right:4px">Masquer</label>' +
+   '<button onclick="this.parentElement.parentElement.parentElement.style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:14px;color:#92400e">✕</button>' +
+   '</div></div>' +
+   '<div style="font-size:11px;color:#78350f;margin-top:6px;columns:2;gap:16px">' +
+   ''.join(f'<div>· {m}</div>' for m in sorted(missing_cities)) +
+   '</div></div>'
+   if missing_cities else ''}
 
   <!-- Filtres -->
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -285,16 +358,23 @@ async function createContact() {{
 
 // ── Leads runner ──────────────────────────────────────────────────────────────
 let _lrPoll = null;
+function toggleNoImg() {{
+  const hide = document.getElementById('hide-no-img').checked;
+  document.querySelectorAll('tr[data-img-ready="0"]').forEach(tr => {{
+    tr.style.display = hide ? 'none' : '';
+  }});
+}}
 async function startLeads() {{
   const prof = document.getElementById('lr-prof').value;
   const qty  = parseInt(document.getElementById('lr-qty').value) || 20;
+  const dept = (document.getElementById('lr-dept').value || '').trim() || null;
   document.getElementById('lr-btn').disabled = true;
   document.getElementById('lr-stop').style.display = 'inline-block';
   document.getElementById('lr-status').style.display = 'block';
   document.getElementById('lr-phase').textContent = 'Démarrage…';
   await fetch('/admin/leads/run?token='+T, {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{profession_id: prof, qty: qty}})
+    body: JSON.stringify({{profession_id: prof, qty: qty, dept: dept}})
   }});
   _lrPoll = setInterval(_pollLeads, 2000);
 }}

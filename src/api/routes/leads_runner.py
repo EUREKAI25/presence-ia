@@ -96,7 +96,7 @@ def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
                 break
 
             # Phase 1 : qualifier jusqu'à avoir qty×5 suspects non encore tentés
-            has_untried = _phase1_qualify(profession_id, qty)
+            has_untried = _phase1_qualify(profession_id, qty, dept)
             if _STATE["stop_requested"]:
                 break
 
@@ -136,25 +136,29 @@ def _run_pipeline(profession_id: str, qty: int, dept: Optional[str]):
             _STATE["finished_at"] = datetime.utcnow().isoformat()
 
 
-def _count_untried(profession_id: str) -> int:
-    """Nombre de suspects non encore tentés pour cette profession."""
+def _count_untried(profession_id: str, dept: Optional[str] = None) -> int:
+    """Nombre de suspects non encore tentés pour cette profession (et dept optionnel)."""
     from ...models import SireneSuspectDB
     from sqlalchemy import func
     with SessionLocal() as db:
-        return db.query(func.count(SireneSuspectDB.id)).filter(
+        q = db.query(func.count(SireneSuspectDB.id)).filter(
             SireneSuspectDB.profession_id == profession_id,
             SireneSuspectDB.enrichi_at.is_(None),
-        ).scalar() or 0
+        )
+        if dept:
+            q = q.filter(SireneSuspectDB.departement == dept)
+        return q.scalar() or 0
 
 
-def _phase1_qualify(profession_id: str, qty_wanted: int) -> bool:
+def _phase1_qualify(profession_id: str, qty_wanted: int, dept: Optional[str] = None) -> bool:
     """Qualifie des segments jusqu'à avoir qty_wanted×5 suspects non encore tentés.
     Retourne True si des suspects non tentés sont disponibles."""
     from ...sirene import generate_segments, run_next_segment, segments_stats
 
-    target = qty_wanted * 5
+    target  = qty_wanted * 5
+    dept_ids = [dept] if dept else None
 
-    untried = _count_untried(profession_id)
+    untried = _count_untried(profession_id, dept)
     if untried >= target:
         with _LOCK:
             _STATE["suspects"] = untried
@@ -173,7 +177,7 @@ def _phase1_qualify(profession_id: str, qty_wanted: int) -> bool:
             break
 
         with SessionLocal() as db:
-            result = run_next_segment(db, profession_ids=[profession_id])
+            result = run_next_segment(db, profession_ids=[profession_id], dept_ids=dept_ids)
             stats  = segments_stats(db)
 
         if result is None:
@@ -183,14 +187,14 @@ def _phase1_qualify(profession_id: str, qty_wanted: int) -> bool:
             _STATE["segments_done"]  = stats.get("done", 0)
             _STATE["segments_total"] = stats.get("total_segments", 0)
 
-        untried = _count_untried(profession_id)
+        untried = _count_untried(profession_id, dept)
         with _LOCK:
             _STATE["suspects"] = untried
 
         if untried >= target:
             break
 
-    untried = _count_untried(profession_id)
+    untried = _count_untried(profession_id, dept)
     with _LOCK:
         _STATE["suspects"] = untried
     return untried > 0
@@ -223,21 +227,24 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
 
         # Récupère le prochain batch de suspects non encore tentés
         with SessionLocal() as db:
-            rows = db.query(SireneSuspectDB).filter(
+            q = db.query(SireneSuspectDB).filter(
                 SireneSuspectDB.profession_id == profession_id,
                 SireneSuspectDB.enrichi_at.is_(None),
-            ).limit(BATCH).all()
+            )
+            if dept:
+                q = q.filter(SireneSuspectDB.departement == dept)
+            rows = q.limit(BATCH).all()
             # Extraire les données avant fermeture session
-            suspects = [(s.id, s.raison_sociale, s.ville) for s in rows]
+            suspects = [(s.id, s.raison_sociale, s.ville, s.departement) for s in rows]
 
         if not suspects:
             break  # plus rien à traiter
 
         # Mise à jour du compteur suspects restants
         with _LOCK:
-            _STATE["suspects"] = _count_untried(profession_id)
+            _STATE["suspects"] = _count_untried(profession_id, dept)
 
-        for s_id, raison_sociale, ville in suspects:
+        for s_id, raison_sociale, ville, s_dept in suspects:
             if contacts_created >= qty or _STATE["stop_requested"]:
                 break
 
@@ -293,13 +300,13 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                                     website=website, email=email,
                                     rating=details.get("rating"),
                                     reviews_count=details.get("user_ratings_total"),
-                                    landing_url=f"/v3/{tok}", scrape_status="done",
+                                    landing_url=f"/l/{tok}", scrape_status="done",
                                 ))
                                 db2.add(ContactDB(
                                     company_name=raison_sociale, email=email,
                                     phone=mobile or fixe, city=ville_str,
                                     profession=prof_label, status="PROSPECT",
-                                    notes=f"siret:{s_id} | web:{website}"
+                                    notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website}"
                                           + (f" | mobile:{mobile}" if mobile else "")
                                           + (f" | fixe:{fixe}" if fixe else ""),
                                 ))

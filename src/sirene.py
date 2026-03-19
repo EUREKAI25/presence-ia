@@ -254,10 +254,11 @@ def _get_name_keywords_for_segment(db, profession_id: str, naf: str) -> Optional
     return None
 
 
-def run_next_segment(db, profession_ids: list = None) -> Optional[dict]:
+def run_next_segment(db, profession_ids: list = None, dept_ids: list = None) -> Optional[dict]:
     """
     Exécute le prochain segment pending (score desc).
     Si profession_ids fourni, ne traite que ces professions.
+    Si dept_ids fourni, ne traite que ces départements.
     Retourne un résumé ou None si aucun segment en attente.
     """
     from .models import SireneSegmentDB
@@ -267,6 +268,8 @@ def run_next_segment(db, profession_ids: list = None) -> Optional[dict]:
     q = db.query(SireneSegmentDB).filter_by(status="pending")
     if profession_ids:
         q = q.filter(SireneSegmentDB.profession_id.in_(profession_ids))
+    if dept_ids:
+        q = q.filter(SireneSegmentDB.departement.in_(dept_ids))
     seg = q.order_by(SireneSegmentDB.score.desc()).first()
 
     if not seg:
