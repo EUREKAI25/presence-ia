@@ -268,7 +268,7 @@ def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str,
             "https://api.brevo.com/v3/smtp/email",
             headers={"api-key": api_key, "Content-Type": "application/json"},
             json={
-                "sender": {"name": "Présence IA", "email": "contact@presence-ia.com"},
+                "sender": {"name": os.getenv("SENDER_NAME", "Présence IA"), "email": os.getenv("SENDER_EMAIL", "contact@presence-ia.online")},
                 "to": [{"email": to_email, "name": to_name}],
                 "subject": subject,
                 "textContent": body,
