@@ -53,7 +53,8 @@ def _mkt_delivery_stats() -> dict:
         from marketing_module.models import (
             ProspectDeliveryDB, DeliveryStatus, MeetingDB,
         )
-        with MktSession() as mdb:
+        mdb = MktSession()
+        try:
             deliveries = (mdb.query(ProspectDeliveryDB)
                           .filter_by(project_id="presence-ia").all())
             meetings   = (mdb.query(MeetingDB)
@@ -65,6 +66,8 @@ def _mkt_delivery_stats() -> dict:
                 "bounced": sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.bounced),
                 "rdv":     len(meetings),
             }
+        finally:
+            mdb.close()
     except Exception:
         return empty
 
