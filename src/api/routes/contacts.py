@@ -590,11 +590,11 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     metiers    = metier + "s" if metier and not metier.endswith("s") else metier
     subj = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
                            city=city, profession=profession, name=name)
-    # Cherche un prospect V3 associé pour le lien personnalisé
+    # Cherche un prospect V3 associé pour la landing personnalisée
     v3 = db.query(V3ProspectDB).filter(
         (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
     ).first()
-    landing_url = v3.landing_url if v3 else CALENDLY_URL
+    landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else CALENDLY_URL
     msg  = _contact_message(name, city, profession, landing_url, tpl)
     delivery_id = _mkt.create_delivery(c.id)
     ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "", landing_url=landing_url)
