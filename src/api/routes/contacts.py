@@ -578,7 +578,7 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     if not c: raise HTTPException(404)
     if not c.email:
         return JSONResponse({"ok": False, "error": "Pas d'email"})
-    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT, BASE_URL
+    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT, BASE_URL, CALENDLY_URL
     from ...models import V3LandingTextDB, V3ProspectDB
     lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
     tpl      = lt.email_template if lt and lt.email_template else None
@@ -594,7 +594,7 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     v3 = db.query(V3ProspectDB).filter(
         (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
     ).first()
-    landing_url = v3.landing_url if v3 else BASE_URL
+    landing_url = v3.landing_url if v3 else CALENDLY_URL
     msg  = _contact_message(name, city, profession, landing_url, tpl)
     delivery_id = _mkt.create_delivery(c.id)
     ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "", landing_url=landing_url)
