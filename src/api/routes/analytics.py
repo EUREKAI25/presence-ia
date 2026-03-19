@@ -57,15 +57,20 @@ def _mkt_delivery_stats() -> dict:
         try:
             deliveries = (mdb.query(ProspectDeliveryDB)
                           .filter_by(project_id="presence-ia").all())
-            meetings   = (mdb.query(MeetingDB)
-                          .filter_by(project_id="presence-ia").all())
-            return {
+            stats = {
                 "sent":    sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.sent),
                 "opened":  sum(1 for d in deliveries if d.opened_at),
                 "clicked": sum(1 for d in deliveries if d.clicked_at),
                 "bounced": sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.bounced),
-                "rdv":     len(meetings),
+                "rdv":     0,
             }
+            try:
+                meetings = (mdb.query(MeetingDB)
+                            .filter_by(project_id="presence-ia").all())
+                stats["rdv"] = len(meetings)
+            except Exception:
+                pass
+            return stats
         finally:
             mdb.close()
     except Exception:
