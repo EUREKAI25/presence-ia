@@ -124,6 +124,112 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     headers = db_list_headers(db)
 
+    # Villes manquantes : dans ContactDB mais sans header (ni directe ni préfecture)
+    from ...models import ContactDB, CityHeaderDB
+    try:
+        from ...api.routes.v3 import DEPT_PREFECTURE
+    except Exception:
+        DEPT_PREFECTURE = {}
+    img_cities = {h.city for h in headers}
+    contact_cities = {(c.city or "").lower().strip().replace(" ", "-")
+                      for c in db.query(ContactDB).all() if c.city}
+    # Dériver le département depuis le code postal
+    def _dept_from_cp(cp: str) -> str:
+        if not cp:
+            return ""
+        cp = cp.strip()
+        if cp.startswith("971") or cp.startswith("972") or cp.startswith("973") or cp.startswith("974"):
+            return cp[:3]
+        if cp.startswith("20"):  # Corse — approximation
+            return "2A" if int(cp) < 20200 else "2B"
+        return cp[:2]
+
+    from ...models import SireneSuspectDB, ContactDB as _CDB
+    city_dept: dict = {}
+    for city_l in contact_cities:
+        if city_l in img_cities:
+            continue
+        ville_search       = city_l.replace("-", " ")   # "aspach michelbach"
+        ville_search_hyph  = city_l                      # "aspach-michelbach"
+        from sqlalchemy import or_ as _or
+        # 1. Via SireneSuspectDB.departement (champ direct)
+        s = db.query(SireneSuspectDB).filter(
+            _or(
+                SireneSuspectDB.ville.ilike(ville_search),
+                SireneSuspectDB.ville.ilike(ville_search_hyph),
+            ),
+            SireneSuspectDB.departement.isnot(None),
+        ).first()
+        if s and s.departement:
+            city_dept[city_l] = s.departement
+            continue
+        # 2. Via SireneSuspectDB.code_postal (fallback)
+        s2 = db.query(SireneSuspectDB).filter(
+            _or(
+                SireneSuspectDB.ville.ilike(ville_search),
+                SireneSuspectDB.ville.ilike(ville_search_hyph),
+            ),
+            SireneSuspectDB.code_postal.isnot(None),
+        ).first()
+        if s2 and s2.code_postal:
+            d = _dept_from_cp(s2.code_postal)
+            if d:
+                city_dept[city_l] = d
+                continue
+        # 3. Via ContactDB.notes (format "dept:XX")
+        c_row = db.query(_CDB).filter(
+            _CDB.city.ilike(ville_search),
+            _CDB.notes.isnot(None),
+        ).first()
+        if c_row and c_row.notes:
+            import re
+            m = re.search(r"dept:(\w+)", c_row.notes)
+            if m:
+                city_dept[city_l] = m.group(1)
+
+    missing_items = []
+    for city_l in sorted(contact_cities):
+        if city_l in img_cities:
+            continue
+        dept = city_dept.get(city_l, "")
+        pref = DEPT_PREFECTURE.get(dept, "").lower().replace(" ", "-") if dept else ""
+        if pref and pref in img_cities:
+            continue  # couverte par la préfecture
+        missing_items.append((city_l, dept, pref))
+
+    if missing_items:
+        missing_rows = "".join(
+            f'<tr>'
+            f'<td style="padding:6px 10px;font-size:12px;color:#fff">{c.replace("-"," ").title()}</td>'
+            f'<td style="padding:6px 10px;font-size:11px;color:#9ca3af">{d or "?"}</td>'
+            f'<td style="padding:6px 10px;font-size:11px;color:#f59e0b">'
+            f'{"→ ajouter " + p.replace("-"," ").title() + " (préfecture dept " + d + ")" if p else ("dept " + d + " — préfecture inconnue") if d else "code postal absent de la DB"}'
+            f'</td>'
+            f'<td style="padding:6px 10px">'
+            f'<button onclick="document.getElementById(\'h-city\').value=\'{c}\';document.getElementById(\'h-city\').focus()" '
+            f'style="background:#2a2a4e;color:#aaa;border:1px solid #3a3a5e;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer">'
+            f'Remplir ↑</button></td>'
+            f'</tr>'
+            for c, d, p in missing_items
+        )
+        missing_panel = f"""<div style="background:#1a1500;border:1px solid #f59e0b40;border-radius:8px;padding:16px;margin-bottom:24px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <span style="color:#f59e0b;font-weight:700;font-size:13px">⚠️ {len(missing_items)} ville(s) sans image</span>
+  <span style="color:#6b7280;font-size:11px">Ces contacts seront grisés dans la liste</span>
+</div>
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="text-align:left;color:#6b7280;font-size:10px;padding:4px 10px;border-bottom:1px solid #2a1a00">Ville</th>
+  <th style="text-align:left;color:#6b7280;font-size:10px;padding:4px 10px;border-bottom:1px solid #2a1a00">Dept</th>
+  <th style="text-align:left;color:#6b7280;font-size:10px;padding:4px 10px;border-bottom:1px solid #2a1a00">Fallback préfecture</th>
+  <th style="border-bottom:1px solid #2a1a00"></th>
+</tr></thead>
+<tbody>{missing_rows}</tbody>
+</table>
+</div>"""
+    else:
+        missing_panel = '<div style="background:#001a0a;border:1px solid #2ecc7140;border-radius:8px;padding:12px;margin-bottom:24px;color:#2ecc71;font-size:12px">✓ Toutes les villes de contacts ont une image</div>'
+
     cards = ""
     for h in headers:
         img_url = h.url if h.url.startswith("http") else h.url
@@ -158,6 +264,8 @@ input{{background:#0f0f1a;border:1px solid #2a2a4e;color:#e8e8f0;padding:8px 12p
 </head><body>
 {admin_nav(token, "headers")}
 <div style="max-width:960px;margin:0 auto;padding:24px">
+
+{missing_panel}
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:24px;flex-wrap:wrap">
   <div>
