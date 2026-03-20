@@ -59,8 +59,12 @@ def _image_readiness(db, contacts) -> tuple[set, dict]:
     - ready_cities : set de villes.lower() ayant une image (directe ou préfecture)
     - city_to_dept : {ville.lower(): dept_code}
     """
-    from ...models import V3CityImageDB, SireneSuspectDB
-    images = {img.id for img in db.query(V3CityImageDB).all()}
+    from ...models import CityHeaderDB, SireneSuspectDB
+    img_cities = {h.city for h in db.query(CityHeaderDB).all()}
+
+    def _city_has_image(city_l: str) -> bool:
+        return city_l in img_cities
+
     cities = {(c.city or "").lower() for c in contacts if c.city}
 
     # dept par ville via SireneSuspectDB
@@ -80,13 +84,13 @@ def _image_readiness(db, contacts) -> tuple[set, dict]:
 
     ready_cities: set = set()
     for city_l in cities:
-        if city_l in images:
+        if _city_has_image(city_l):
             ready_cities.add(city_l)
         else:
             dept = city_to_dept.get(city_l, "")
             if dept:
                 prefecture = DEPT_PREFECTURE.get(dept, "").lower()
-                if prefecture and prefecture in images:
+                if prefecture and _city_has_image(prefecture):
                     ready_cities.add(city_l)
     return ready_cities, city_to_dept
 
@@ -165,9 +169,9 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
             ts = val.strftime("%d/%m %H:%M")
             return f'<span title="{label} {ts}" style="color:#16a34a;font-size:13px">{emoji}</span>'
         trk_html = (
-            _trk_icon(trk.opened_at if trk else None, "👁", "Ouvert") + " " +
-            _trk_icon(trk.clicked_at if trk else None, "🔗", "Cliqué") + " " +
-            _trk_icon(trk.calendly_clicked_at if trk else None, "📅", "Calendly")
+            _trk_icon(trk.opened_at if trk else None, "👁", "Email ouvert") + " " +
+            _trk_icon(getattr(trk, "landing_visited_at", None) if trk else None, "🏠", "Landing visitée") + " " +
+            _trk_icon(getattr(trk, "calendly_clicked_at", None) if trk else None, "📅", "Calendly cliqué")
         ) if True else ""
         rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-img-ready="{img_attr}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
@@ -287,13 +291,27 @@ tr:hover td{{background:#fafafa}}
   </div>
 
   <!-- Mode test -->
-  <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:11px;color:#6b7280;font-weight:600">TEST :</span>
-    <input id="test-email" type="email" placeholder="email test" style="font-size:11px;padding:5px 8px;width:190px">
-    <input id="test-phone" type="text" placeholder="tel test (06…)" style="font-size:11px;padding:5px 8px;width:130px">
-    <button onclick="testSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Tester email</button>
-    <button onclick="testSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Tester SMS</button>
-    <span id="test-result" style="font-size:11px;color:#6b7280"></span>
+  <div style="margin-bottom:8px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+    <span style="font-size:11px;color:#6b7280;font-weight:600;padding-top:4px">TEST :</span>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span style="font-size:10px;color:#9ca3af">Emails (Ctrl+clic pour multi-sélection)</span>
+      <select id="test-emails" multiple size="4" style="font-size:11px;padding:3px;width:240px;background:#111;color:#e5e7eb;border:1px solid #333;border-radius:4px">
+        <option value="nathalie.brigitte@gmail.com" selected>nathalie.brigitte@gmail.com</option>
+        <option value="nathaliecbrigitte@gmail.com" selected>nathaliecbrigitte@gmail.com</option>
+        <option value="contact@nathaliebrigitte.com" selected>contact@nathaliebrigitte.com</option>
+        <option value="contact@presence-ia.com" selected>contact@presence-ia.com</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span style="font-size:10px;color:#9ca3af">SMS (1 seul numéro)</span>
+      <input id="test-phone" type="text" placeholder="06…" style="font-size:11px;padding:5px 8px;width:130px">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;padding-top:16px">
+      <button onclick="testSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer emails</button>
+      <button onclick="testSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Envoyer SMS</button>
+      <button onclick="testPreviewSMS()" class="btn" style="background:#374151;padding:5px 12px;font-size:11px">📋 Prévisualiser SMS</button>
+    </div>
+    <span id="test-result" style="font-size:11px;color:#6b7280;padding-top:16px;max-width:280px"></span>
   </div>
 
   <!-- Barre actions groupées -->
@@ -317,7 +335,7 @@ tr:hover td{{background:#fafafa}}
         <th style="padding:10px 10px">Entreprise</th>
         <th>Statut</th><th>Email</th><th>Téléphone</th>
         <th>Ville</th><th>Métier</th><th>Ajouté</th>
-        <th style="text-align:center" title="👁 Ouvert · 🔗 Cliqué · 📅 Calendly">Tracking</th><th></th>
+        <th style="text-align:center" title="👁 Email ouvert · 🏠 Landing visitée · 📅 Calendly cliqué">Tracking</th><th></th>
       </tr></thead>
       <tbody>
         {rows if rows else '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
@@ -415,30 +433,34 @@ async function _pollLeads() {{
 
 // ── Mode test ─────────────────────────────────────────────────────────────────
 (function() {{
-  const em = localStorage.getItem('test_email') || 'nathalie.brigitte@gmail.com';
   const ph = localStorage.getItem('test_phone') || '0660474292';
-  document.getElementById('test-email').value = em;
   document.getElementById('test-phone').value = ph;
 }})();
-document.getElementById('test-email').addEventListener('change', function() {{ localStorage.setItem('test_email', this.value); }});
 document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
 
 function _testProfession() {{
   const sel = document.getElementById('lr-prof');
   return sel ? sel.options[sel.selectedIndex].text : 'Pisciniste';
 }}
+function _testEmails() {{
+  return [...document.getElementById('test-emails').selectedOptions].map(o => o.value);
+}}
 async function testSendEmail() {{
-  const email = document.getElementById('test-email').value.trim();
-  if(!email) {{ alert('Saisir un email de test'); return; }}
+  const emails = _testEmails();
+  if(!emails.length) {{ alert('Sélectionner au moins un email'); return; }}
   const res = document.getElementById('test-result');
-  res.textContent = 'Envoi…'; res.style.color='#6b7280';
-  const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
-    method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{email: email, profession: _testProfession()}})
-  }});
-  const d = await r.json();
-  res.textContent = d.ok ? '✓ Email envoyé à '+email : '✗ '+(d.error||'erreur');
-  res.style.color = d.ok ? '#16a34a' : '#dc2626';
+  res.textContent = 'Envoi vers '+emails.length+' adresse(s)…'; res.style.color='#6b7280';
+  let ok=0, err=0;
+  for(const email of emails) {{
+    const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{email: email, profession: _testProfession()}})
+    }});
+    const d = await r.json();
+    if(d.ok) ok++; else err++;
+  }}
+  res.textContent = ok+'/'+emails.length+' emails envoyés' + (err ? ' — '+err+' erreur(s)' : '');
+  res.style.color = err ? '#f59e0b' : '#16a34a';
 }}
 async function testSendSMS() {{
   const phone = document.getElementById('test-phone').value.trim();
@@ -452,6 +474,20 @@ async function testSendSMS() {{
   const d = await r.json();
   res.textContent = d.ok ? '✓ SMS envoyé au '+phone : '✗ '+(d.error||'erreur');
   res.style.color = d.ok ? '#16a34a' : '#dc2626';
+}}
+async function testPreviewSMS() {{
+  const res = document.getElementById('test-result');
+  res.textContent = 'Chargement…'; res.style.color='#6b7280';
+  const r = await fetch('/admin/contacts/test/preview-sms?token='+T, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{profession: _testProfession()}})
+  }});
+  const d = await r.json();
+  if(d.preview) {{
+    res.innerHTML = '<strong style="color:#a78bfa">Aperçu SMS (' + d.chars + ' car.) :</strong><br><span style="color:#e5e7eb;white-space:pre-wrap">' + d.preview + '</span>';
+  }} else {{
+    res.textContent = '✗ '+(d.error||'erreur'); res.style.color='#dc2626';
+  }}
 }}
 
 // ── Checkboxes + sélection ────────────────────────────────────────────────────
@@ -635,6 +671,16 @@ async def contact_test_email(request: Request, db: Session = Depends(get_db)):
     msg  = _contact_message("Prospect Test", "Paris", profession, "", tpl)
     ok   = _send_brevo_email(email, "Test", subj, msg)
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
+
+
+@router.post("/admin/contacts/test/preview-sms")
+async def contact_preview_sms(request: Request, db: Session = Depends(get_db)):
+    _check_token(request)
+    data       = await request.json()
+    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
+    from .v3 import _contact_message_sms
+    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "")
+    return JSONResponse({"preview": msg, "chars": len(msg)})
 
 
 @router.post("/admin/contacts/test/send-sms")
