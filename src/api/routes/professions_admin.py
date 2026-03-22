@@ -39,12 +39,80 @@ def _bar(score, max_val=10, color="#e94560"):
     )
 
 
+@router.get("/admin/leads")
+def leads_redirect(token: str = "", request: Request = None):
+    from fastapi.responses import RedirectResponse
+    tok = token or (request.query_params.get("token", "") if request else "")
+    return RedirectResponse(f"/admin/professions?token={tok}", status_code=302)
+
+
+@router.post("/api/admin/enrich/config")
+async def save_enrich_config(request: Request):
+    data = await request.json()
+    _require_admin(data.get("token", ""))
+    from ...models import EnrichmentConfigDB
+    with SessionLocal() as db:
+        cfg = db.get(EnrichmentConfigDB, "default")
+        if not cfg:
+            cfg = EnrichmentConfigDB(id="default")
+            db.add(cfg)
+        cfg.active           = bool(data.get("active", False))
+        cfg.suspects_per_run = int(data.get("suspects_per_run", 20))
+        cfg.hour_utc         = int(data.get("hour_utc", 3))
+        cfg.days             = ",".join(str(d) for d in data.get("days", [0,1,2,3,4]))
+        db.commit()
+    return JSONResponse({"ok": True})
+
+
+@router.post("/api/admin/enrich/run-now")
+async def run_enrich_now(request: Request):
+    data = await request.json()
+    _require_admin(data.get("token", ""))
+    import threading
+    from ...scheduler import _job_auto_enrich
+    threading.Thread(target=lambda: _job_auto_enrich(force=True), daemon=True).start()
+    return JSONResponse({"ok": True, "msg": "Job auto_enrich lancé"})
+
+
+@router.post("/api/admin/leads/run-now")
+async def run_leads_now(request: Request):
+    """Déclenche la fourniture de leads immédiatement (ignore heure/jour config)."""
+    data = await request.json()
+    _require_admin(data.get("token", ""))
+    import threading
+    from ...scheduler import _job_provision_leads
+    threading.Thread(target=lambda: _job_provision_leads(force=True), daemon=True).start()
+    return JSONResponse({"ok": True, "msg": "Job provision_leads lancé"})
+
+
+@router.post("/api/admin/leads/config")
+async def save_leads_config(request: Request):
+    data = await request.json()
+    token = data.get("token", "")
+    _require_admin(token)
+    from ...models import LeadProvisioningConfigDB
+    with SessionLocal() as db:
+        cfg = db.get(LeadProvisioningConfigDB, "default")
+        if not cfg:
+            cfg = LeadProvisioningConfigDB(id="default")
+            db.add(cfg)
+        cfg.active        = bool(data.get("active", False))
+        cfg.leads_per_run = int(data.get("leads_per_run", 20))
+        cfg.hour_utc      = int(data.get("hour_utc", 7))
+        cfg.days          = ",".join(str(d) for d in data.get("days", [0,1,2,3,4]))
+        db.commit()
+    return JSONResponse({"ok": True})
+
+
 @router.get("/admin/professions", response_class=HTMLResponse)
 def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "", request: Request = None):
     _require_admin(token)
+    from ...models import LeadProvisioningConfigDB, EnrichmentConfigDB
     with SessionLocal() as db:
-        profs = db_list_professions(db)
-        cfg   = db_get_scoring_config(db)
+        profs      = db_list_professions(db)
+        cfg        = db_get_scoring_config(db)
+        prov_cfg   = db.get(LeadProvisioningConfigDB, "default")
+        enrich_cfg = db.get(EnrichmentConfigDB, "default")
 
     cats = sorted(set(p.categorie for p in profs))
     if cat:
@@ -134,9 +202,73 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
           <td style="padding:8px 6px;text-align:center"><button onclick="event.stopPropagation();editProf('{p.id}',{p.score_visibilite or 'null'},{p.score_conseil_ia or 'null'},{p.valeur_client or 'null'},'{p.label.replace("'", "\\'")}');" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;color:#6b7280;font-size:11px" title="Modifier les scores">Scores</button></td>
         </tr>"""
 
+    # Panneau config enrichissement
+    if not enrich_cfg:
+        enrich_cfg_active   = False
+        enrich_cfg_suspects = 20
+        enrich_cfg_hour     = 3
+        enrich_cfg_days     = "0,1,2,3,4"
+        enrich_cfg_last     = "jamais"
+        enrich_cfg_count    = 0
+    else:
+        enrich_cfg_active   = enrich_cfg.active
+        enrich_cfg_suspects = enrich_cfg.suspects_per_run
+        enrich_cfg_hour     = enrich_cfg.hour_utc
+        enrich_cfg_days     = enrich_cfg.days or "0,1,2,3,4"
+        enrich_cfg_last     = enrich_cfg.last_run.strftime("%d/%m %H:%M UTC") if enrich_cfg.last_run else "jamais"
+        enrich_cfg_count    = enrich_cfg.last_count or 0
+
+    enrich_day_checked = [d.strip() for d in enrich_cfg_days.split(",")]
+    enrich_days_checkboxes = "".join(
+        f'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px">'
+        f'<input type="checkbox" value="{i}" {"checked" if str(i) in enrich_day_checked else ""} '
+        f'onchange="saveEnrichConfig()" style="cursor:pointer"> {["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"][i]}</label>'
+        for i in range(7)
+    )
+    enrich_active_checked = "checked" if enrich_cfg_active else ""
+
+    # Panneau config provisioning
+    from ...models import ContactDB as _CDB
+    with SessionLocal() as db_prov:
+        last_lead_name = ""
+        if prov_cfg and prov_cfg.last_run:
+            last_lead = (
+                db_prov.query(_CDB)
+                .filter(_CDB.notes.like("SIRENE auto%"))
+                .order_by(_CDB.date_added.desc())
+                .first()
+            )
+            if last_lead:
+                last_lead_name = last_lead.company_name
+
+    if not prov_cfg:
+        prov_cfg_active = False
+        prov_cfg_leads  = 20
+        prov_cfg_hour   = 7
+        prov_cfg_days   = "0,1,2,3,4"
+        prov_cfg_last   = "—"
+        prov_cfg_count  = 0
+    else:
+        prov_cfg_active = prov_cfg.active
+        prov_cfg_leads  = prov_cfg.leads_per_run
+        prov_cfg_hour   = prov_cfg.hour_utc
+        prov_cfg_days   = prov_cfg.days or "0,1,2,3,4"
+        prov_cfg_last   = prov_cfg.last_run.strftime("%d/%m %H:%M UTC") if prov_cfg.last_run else "jamais"
+        prov_cfg_count  = prov_cfg.last_count or 0
+
+    day_labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+    day_checked_days = [d.strip() for d in prov_cfg_days.split(",")]
+    days_checkboxes = "".join(
+        f'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px">'
+        f'<input type="checkbox" value="{i}" {"checked" if str(i) in day_checked_days else ""} '
+        f'onchange="updateDays()" style="cursor:pointer"> {day_labels[i]}</label>'
+        for i in range(7)
+    )
+    prov_active_checked = "checked" if prov_cfg_active else ""
+
     nav = admin_nav(token, "professions")
     return HTMLResponse(f"""<!DOCTYPE html><html><head>
-<meta charset="utf-8"><title>Référentiel métiers</title>
+<meta charset="utf-8"><title>Leads & Métiers</title>
 {nav}
 <style>
 body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111}}
@@ -162,6 +294,199 @@ tr:hover{{background:#fafafa;cursor:pointer}}
 </style>
 </head><body>
 <div style="padding:24px">
+
+<!-- Panneau enrichissement automatique -->
+<div class="card" style="border-left:4px solid #0891b2;margin-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div>
+      <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;color:#111">Enrichissement automatique (Google Places)</h2>
+      <p style="font-size:12px;color:#6b7280;margin:0">Recherche tel/email pour X suspects non encore enrichis — professions actives par score décroissant</p>
+      <div style="font-size:11px;color:#9ca3af;margin-top:6px">
+        Dernier run : <strong>{enrich_cfg_last}</strong> — {enrich_cfg_count} contact(s) créés
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:#374151">Actif</span>
+      <label style="position:relative;display:inline-block;width:40px;height:22px">
+        <input type="checkbox" id="enrich-active" {enrich_active_checked} onchange="saveEnrichConfig()"
+          style="opacity:0;width:0;height:0">
+        <span onclick="document.getElementById('enrich-active').click()" style="position:absolute;cursor:pointer;inset:0;
+          background:#d1d5db;border-radius:22px;transition:.3s" id="enrich-toggle-bg"></span>
+      </label>
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:16px;align-items:flex-end">
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Suspects par run</label>
+      <input type="number" id="enrich-suspects" value="{enrich_cfg_suspects}" min="1" max="200"
+        onchange="saveEnrichConfig()" style="width:80px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Heure UTC (0-23)</label>
+      <input type="number" id="enrich-hour" value="{enrich_cfg_hour}" min="0" max="23"
+        onchange="saveEnrichConfig()" style="width:70px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Jours</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="enrich-days">
+        {enrich_days_checkboxes}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="runEnrichNow(this)" class="btn btn-sm" style="background:#0891b2">▶ Lancer maintenant</button>
+      <span id="enrich-status" style="font-size:11px;color:#16a34a"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){{
+  var toggle = document.getElementById('enrich-toggle-bg');
+  function refreshToggle(){{
+    var on = document.getElementById('enrich-active').checked;
+    toggle.style.background = on ? '#0891b2' : '#d1d5db';
+    if(!toggle.querySelector('span')){{
+      var dot = document.createElement('span');
+      dot.style.cssText='position:absolute;content:"";height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;pointer-events:none';
+      toggle.appendChild(dot);
+    }}
+    toggle.querySelector('span').style.transform = on ? 'translateX(18px)' : 'translateX(0)';
+  }}
+  document.getElementById('enrich-active').addEventListener('change', refreshToggle);
+  refreshToggle();
+}})();
+function saveEnrichConfig(){{
+  var days = [];
+  document.querySelectorAll('#enrich-days input[type=checkbox]').forEach(function(cb){{
+    if(cb.checked) days.push(parseInt(cb.value));
+  }});
+  var payload = {{
+    token: '{token}',
+    active: document.getElementById('enrich-active').checked,
+    suspects_per_run: parseInt(document.getElementById('enrich-suspects').value)||20,
+    hour_utc: parseInt(document.getElementById('enrich-hour').value)||3,
+    days: days
+  }};
+  var st = document.getElementById('enrich-status');
+  st.textContent = '…';
+  fetch('/api/admin/enrich/config', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+    .then(function(r){{ st.textContent = r.ok ? '✓ Enregistré' : '❌ Erreur'; setTimeout(function(){{st.textContent='';}}, 2000); }});
+}}
+async function runEnrichNow(btn){{
+  var st = document.getElementById('enrich-status');
+  btn.disabled = true; btn.textContent = '…';
+  st.style.color='#6b7280'; st.textContent = 'Lancement…';
+  var r = await fetch('/api/admin/enrich/run-now', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{token: '{token}'}})
+  }});
+  btn.disabled = false; btn.textContent = '▶ Lancer maintenant';
+  if(r.ok){{
+    st.style.color='#16a34a';
+    st.textContent = '✓ Enrichissement lancé — rechargez dans 30s';
+    setTimeout(function(){{location.reload();}}, 30000);
+  }} else {{
+    st.style.color='#dc2626'; st.textContent = '❌ Erreur';
+  }}
+}}
+</script>
+
+<!-- Panneau fourniture automatique leads -->
+<div class="card" style="border-left:4px solid #6366f1;margin-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div>
+      <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;color:#111">Fourniture automatique de leads</h2>
+      <p style="font-size:12px;color:#6b7280;margin:0">Alimente ContactDB chaque jour à HH:00 UTC — segments par score décroissant</p>
+      <div style="font-size:11px;color:#9ca3af;margin-top:6px">
+        Dernier run : <strong>{prov_cfg_last}</strong> — {prov_cfg_count} lead(s) fourni(s){f' &nbsp;❯ <strong style="color:#374151">{last_lead_name}</strong>' if last_lead_name else ''}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:#374151">Actif</span>
+      <label style="position:relative;display:inline-block;width:40px;height:22px">
+        <input type="checkbox" id="prov-active" {prov_active_checked} onchange="saveProvConfig()"
+          style="opacity:0;width:0;height:0">
+        <span onclick="document.getElementById('prov-active').click()" style="position:absolute;cursor:pointer;inset:0;
+          background:#d1d5db;border-radius:22px;transition:.3s" id="prov-toggle-bg"></span>
+      </label>
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:16px;align-items:flex-end">
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Leads par run</label>
+      <input type="number" id="prov-leads" value="{prov_cfg_leads}" min="1" max="500"
+        onchange="saveProvConfig()" style="width:80px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Heure UTC (0-23)</label>
+      <input type="number" id="prov-hour" value="{prov_cfg_hour}" min="0" max="23"
+        onchange="saveProvConfig()" style="width:70px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Jours</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="prov-days">
+        {days_checkboxes}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="runLeadsNow(this)" class="btn btn-sm btn-gray">▶ Tester maintenant</button>
+      <span id="prov-status" style="font-size:11px;color:#16a34a"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){{
+  var toggle = document.getElementById('prov-toggle-bg');
+  function refreshToggle(){{
+    var on = document.getElementById('prov-active').checked;
+    toggle.style.background = on ? '#6366f1' : '#d1d5db';
+    if(!toggle.querySelector('span')){{
+      var dot = document.createElement('span');
+      dot.style.cssText='position:absolute;content:"";height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;pointer-events:none';
+      toggle.appendChild(dot);
+    }}
+    toggle.querySelector('span').style.transform = on ? 'translateX(18px)' : 'translateX(0)';
+  }}
+  document.getElementById('prov-active').addEventListener('change', refreshToggle);
+  refreshToggle();
+}})();
+function updateDays(){{ saveProvConfig(); }}
+async function saveProvConfig(){{
+  var days = [];
+  document.querySelectorAll('#prov-days input[type=checkbox]').forEach(function(cb){{
+    if(cb.checked) days.push(parseInt(cb.value));
+  }});
+  var payload = {{
+    token: '{token}',
+    active: document.getElementById('prov-active').checked,
+    leads_per_run: parseInt(document.getElementById('prov-leads').value)||20,
+    hour_utc: parseInt(document.getElementById('prov-hour').value)||7,
+    days: days
+  }};
+  var st = document.getElementById('prov-status');
+  st.textContent = '…';
+  var r = await fetch('/api/admin/leads/config', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}});
+  st.textContent = r.ok ? '✓ Enregistré' : '❌ Erreur';
+  setTimeout(function(){{st.textContent='';}}, 2000);
+}}
+async function runLeadsNow(btn){{
+  var st = document.getElementById('prov-status');
+  btn.disabled = true; btn.textContent = '…';
+  st.style.color='#6b7280'; st.textContent = 'Lancement en cours…';
+  var r = await fetch('/api/admin/leads/run-now', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{token: '{token}'}})
+  }});
+  btn.disabled = false; btn.textContent = '▶ Tester maintenant';
+  if(r.ok){{
+    st.style.color='#16a34a';
+    st.textContent = '✓ Job lancé — vérifiez les logs ou rechargez dans 5s';
+    setTimeout(function(){{location.reload();}}, 5000);
+  }} else {{
+    st.style.color='#dc2626'; st.textContent = '❌ Erreur';
+  }}
+}}
+</script>
+
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h1 style="font-size:18px;font-weight:700;margin:0">Référentiel métiers

@@ -416,6 +416,7 @@ class SireneSuspectDB(Base):
     actif            : Mapped[bool]           = mapped_column(sa.Boolean, default=True)       # établissement ouvert
     enrichi_at       : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True) # date Google lookup
     contactable      : Mapped[bool]           = mapped_column(sa.Boolean, default=False)      # email ou tél trouvé
+    provisioned_at   : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True) # date mise en file leads
     created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
     updated_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -477,6 +478,32 @@ class SireneSegmentDB(Base):
     error_msg        : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
     created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
     updated_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LeadProvisioningConfigDB(Base):
+    """Configuration de la fourniture automatique de leads (X leads/jour à HH:00 UTC)."""
+    __tablename__ = "lead_provisioning_config"
+    id            : Mapped[str]            = mapped_column(sa.String, primary_key=True, default="default")
+    active        : Mapped[bool]           = mapped_column(sa.Boolean, default=False)
+    leads_per_run : Mapped[int]            = mapped_column(sa.Integer, default=20)    # X leads par exécution
+    hour_utc      : Mapped[int]            = mapped_column(sa.Integer, default=7)     # heure UTC (0-23)
+    days          : Mapped[str]            = mapped_column(sa.String, default="0,1,2,3,4")  # 0=Lun…6=Dim
+    last_run      : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    last_count    : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    updated_at    : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EnrichmentConfigDB(Base):
+    """Configuration de l'enrichissement automatique (Google Places) — X suspects/run à HH:00 UTC."""
+    __tablename__ = "enrichment_config"
+    id               : Mapped[str]  = mapped_column(sa.String, primary_key=True, default="default")
+    active           : Mapped[bool] = mapped_column(sa.Boolean, default=False)
+    suspects_per_run : Mapped[int]  = mapped_column(sa.Integer, default=20)   # suspects traités par run
+    hour_utc         : Mapped[int]  = mapped_column(sa.Integer, default=3)    # heure UTC (après SIRENE à 2h)
+    days             : Mapped[str]  = mapped_column(sa.String, default="0,1,2,3,4")  # 0=Lun…6=Dim
+    last_run         : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    last_count       : Mapped[int]  = mapped_column(sa.Integer, default=0)
+    updated_at       : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class JobDB(Base):

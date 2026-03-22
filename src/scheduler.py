@@ -58,6 +58,42 @@ def start_scheduler():
         misfire_grace_time=60,
     )
 
+    # Job 5 : warming email — toutes les 4h
+    _scheduler.add_job(
+        _job_warming,
+        trigger=IntervalTrigger(hours=4),
+        id="email_warming",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+    # Job 6 : qualification SIRENE automatique — Lun/Mer/Ven à 2h UTC
+    _scheduler.add_job(
+        _job_auto_qualify,
+        trigger=CronTrigger(day_of_week="mon,wed,fri", hour=2, timezone="UTC"),
+        id="auto_qualify",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    # Job 7 : enrichissement Google Places automatique — vérification toutes les heures
+    _scheduler.add_job(
+        _job_auto_enrich,
+        trigger=IntervalTrigger(hours=1),
+        id="auto_enrich",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+
+    # Job 8 : fourniture leads — vérification toutes les heures
+    _scheduler.add_job(
+        _job_provision_leads,
+        trigger=IntervalTrigger(hours=1),
+        id="provision_leads",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
@@ -439,6 +475,416 @@ def _job_run_due_targets():
             db.close()
     except Exception as e:
         log.error("_job_run_due_targets : %s", e)
+
+
+_WARMING_SENDERS = [
+    "contact@presence-ia.online", "hello@presence-ia.online", "bonjour@presence-ia.online",
+    "info@presence-ia.online", "equipe@presence-ia.online",
+    "contact@presence-ia.info", "hello@presence-ia.info", "bonjour@presence-ia.info",
+    "info@presence-ia.info", "equipe@presence-ia.info",
+    "contact@presence-ia.cloud", "hello@presence-ia.cloud", "bonjour@presence-ia.cloud",
+    "info@presence-ia.cloud", "equipe@presence-ia.cloud",
+    "contact@presence-ia.site", "hello@presence-ia.site", "bonjour@presence-ia.site",
+    "info@presence-ia.site", "equipe@presence-ia.site",
+    "contact@presence-ia.website", "hello@presence-ia.website", "bonjour@presence-ia.website",
+    "info@presence-ia.website", "equipe@presence-ia.website",
+]
+
+_WARMING_RECEIVERS = [
+    "bot-free@presence-ia.com",
+    "bot-paid@presence-ia.com",
+]
+
+_WARMING_SUBJECTS = [
+    "Bonjour, une question rapide",
+    "Retour sur notre échange",
+    "Quelques informations utiles",
+    "Suite à notre conversation",
+    "Point rapide",
+    "Question concernant votre activité",
+    "Votre présence en ligne",
+]
+
+_WARMING_BODIES = [
+    "Bonjour,\n\nJ'espère que vous allez bien. Je voulais vous contacter concernant votre visibilité en ligne.\n\nN'hésitez pas à me répondre si vous souhaitez en savoir plus.\n\nCordialement",
+    "Bonjour,\n\nFaisant suite à notre échange précédent, je me permets de vous recontacter.\n\nJe reste disponible pour toute question.\n\nBonne journée",
+    "Bonjour,\n\nJe vous fais parvenir quelques informations qui pourraient vous intéresser concernant votre activité.\n\nÀ votre disposition,\nCordialement",
+    "Bonjour,\n\nUne question rapide : avez-vous eu l'occasion de consulter les informations que je vous ai transmises ?\n\nJe reste à votre disposition.\n\nCordialement",
+    "Bonjour,\n\nJe me permets de revenir vers vous pour faire un point rapide sur nos échanges.\n\nBien à vous",
+]
+
+# Jour de démarrage warming pour calculer le ramp-up
+import datetime as _dt
+_WARMING_START = _dt.date(2026, 3, 20)
+
+
+def _warming_day_cap() -> int:
+    """Nombre d'emails par session selon le jour de warming (ramp-up progressif)."""
+    day = (datetime.utcnow().date() - _WARMING_START).days + 1
+    if day <= 3:   return 2
+    if day <= 7:   return 4
+    if day <= 14:  return 6
+    if day <= 21:  return 8
+    return 10  # plateau
+
+
+def _job_warming():
+    """
+    Warming email — toutes les 4h.
+    Envoie des emails depuis les 25 adresses Brevo vers les boîtes IMAP réelles,
+    puis marque les emails reçus comme lus.
+    Ramp-up progressif sur 21 jours.
+    """
+    import os, random, imaplib, smtplib, ssl
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from datetime import datetime
+
+    try:
+        brevo_key = os.getenv("BREVO_API_KEY", "")
+        if not brevo_key:
+            log.warning("warming: BREVO_API_KEY absent")
+            return
+
+        cap = _warming_day_cap()
+        log.info("warming: session démarrée — cap=%d emails/sender", cap)
+
+        # Sélectionner un sous-ensemble aléatoire de senders pour cette session
+        senders = random.sample(_WARMING_SENDERS, min(cap * 2, len(_WARMING_SENDERS)))
+        sent_total = 0
+
+        for sender in senders:
+            receiver = random.choice(_WARMING_RECEIVERS)
+            subject = random.choice(_WARMING_SUBJECTS)
+            body = random.choice(_WARMING_BODIES)
+
+            # Nom d'affichage depuis l'adresse
+            display = sender.split("@")[0].capitalize().replace("-", " ")
+            domain = sender.split("@")[1]
+
+            try:
+                import requests as _req
+                resp = _req.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                    json={
+                        "sender":      {"name": display, "email": sender},
+                        "to":          [{"email": receiver}],
+                        "subject":     subject,
+                        "textContent": body,
+                        "headers":     {"X-Warming": "1"},
+                    },
+                    timeout=10,
+                )
+                if resp.status_code in (200, 201, 202):
+                    sent_total += 1
+                    log.debug("warming: %s → %s ✓", sender, receiver)
+                else:
+                    log.warning("warming: %s → %s HTTP %s", sender, receiver, resp.status_code)
+            except Exception as e:
+                log.warning("warming send %s: %s", sender, e)
+
+        log.info("warming: %d emails envoyés", sent_total)
+
+        # Marquer les emails reçus comme lus dans les 2 boîtes IMAP
+        imap_host = os.getenv("WARMING_IMAP_HOST", "imap.ionos.fr")
+        imap_port = int(os.getenv("WARMING_IMAP_PORT", "993"))
+        mailboxes = [
+            (os.getenv("WARMING_MAILBOX_1", ""), os.getenv("WARMING_MAILBOX_1_PWD", "")),
+            (os.getenv("WARMING_MAILBOX_2", ""), os.getenv("WARMING_MAILBOX_2_PWD", "")),
+        ]
+
+        _WARMING_REPLIES = [
+            "Bonjour,\n\nMerci pour votre message, je l'ai bien reçu.\n\nJe vous recontacte dès que possible.\n\nCordialement",
+            "Bonjour,\n\nBien reçu, merci.\n\nJe reviendrai vers vous prochainement.\n\nBonne journée",
+            "Bonjour,\n\nMerci de votre retour. Je prends note et vous réponds dans les meilleurs délais.\n\nCordialement",
+            "Bonjour,\n\nMessage bien reçu. Je vous confirme que je traiterai votre demande très prochainement.\n\nBien à vous",
+            "Bonjour,\n\nMerci pour ces informations. Je reviens vers vous rapidement.\n\nCordialement",
+        ]
+
+        replied_total = 0
+        for email_addr, pwd in mailboxes:
+            if not email_addr or not pwd:
+                continue
+            try:
+                import email as _email_lib
+                from email.header import decode_header as _decode_header
+                conn = imaplib.IMAP4_SSL(imap_host, imap_port)
+                conn.login(email_addr, pwd)
+                conn.select("INBOX")
+                # Chercher les emails de warming non lus
+                _, data = conn.search(None, '(UNSEEN HEADER X-Warming 1)')
+                if data and data[0]:
+                    uids = data[0].split()
+                    for uid in uids:
+                        try:
+                            # Lire l'email pour récupérer From + Subject
+                            _, msg_data = conn.fetch(uid, "(RFC822)")
+                            raw = msg_data[0][1]
+                            msg = _email_lib.message_from_bytes(raw)
+                            from_addr = msg.get("From", "")
+                            # Extraire l'email brut
+                            import re as _re
+                            m = _re.search(r"<([^>]+)>", from_addr)
+                            reply_to = m.group(1) if m else from_addr.strip()
+                            orig_subject = msg.get("Subject", "Re: message")
+                            subject = orig_subject if orig_subject.startswith("Re:") else f"Re: {orig_subject}"
+
+                            if reply_to and "@" in reply_to and "warming" not in reply_to:
+                                reply_body = random.choice(_WARMING_REPLIES)
+                                import requests as _req2
+                                _req2.post(
+                                    "https://api.brevo.com/v3/smtp/email",
+                                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                                    json={
+                                        "sender":      {"name": "Équipe Présence IA", "email": email_addr},
+                                        "to":          [{"email": reply_to}],
+                                        "subject":     subject,
+                                        "textContent": reply_body,
+                                        "headers":     {"X-Warming-Reply": "1"},
+                                    },
+                                    timeout=8,
+                                )
+                                replied_total += 1
+                        except Exception as e:
+                            log.debug("warming reply uid=%s: %s", uid, e)
+
+                    # Marquer tous comme lus
+                    conn.store(",".join(u.decode() for u in uids), "+FLAGS", "\\Seen")
+                    log.info("warming: %d emails marqués lus + %d réponses envoyées depuis %s",
+                             len(uids), replied_total, email_addr)
+                conn.logout()
+            except Exception as e:
+                log.warning("warming IMAP %s: %s", email_addr, e)
+
+        if replied_total:
+            log.info("warming: %d réponses auto envoyées", replied_total)
+
+    except Exception as e:
+        log.error("_job_warming: %s", e)
+
+
+def _job_auto_qualify():
+    """Qualification SIRENE automatique — Lun/Mer/Ven à 2h UTC."""
+    try:
+        import threading
+        t = threading.Thread(target=run_sirene_qualify, daemon=True)
+        t.start()
+        log.info("_job_auto_qualify : thread SIRENE démarré")
+    except Exception as e:
+        log.error("_job_auto_qualify : %s", e)
+
+
+def _job_auto_enrich(force: bool = False):
+    """
+    Enrichissement automatique (Google Places) : traite N suspects non encore enrichis,
+    par ordre décroissant de score segment, pour toutes les professions actives.
+    Si force=True : ignore active/jour/heure.
+    """
+    try:
+        from datetime import datetime
+        from .database import SessionLocal
+        from .models import EnrichmentConfigDB, ProfessionDB, SireneSuspectDB, SireneSegmentDB
+
+        db = SessionLocal()
+        try:
+            cfg = db.get(EnrichmentConfigDB, "default")
+            if not cfg:
+                cfg = EnrichmentConfigDB(id="default")
+                db.add(cfg)
+                db.commit()
+                db.refresh(cfg)
+
+            if not force:
+                if not cfg.active:
+                    return
+                now = datetime.utcnow()
+                configured_days = [d.strip() for d in (cfg.days or "").split(",") if d.strip()]
+                if str(now.weekday()) not in configured_days:
+                    return
+                if now.hour != cfg.hour_utc:
+                    return
+                if cfg.last_run and (now - cfg.last_run).total_seconds() < 3600:
+                    return
+
+            now = datetime.utcnow()
+            remaining = cfg.suspects_per_run
+            log.info("auto_enrich: démarrage — %d suspects à enrichir", remaining)
+
+            # Professions actives, ordonnées par score moyen de leurs segments DESC
+            active_profs = db.query(ProfessionDB).filter_by(actif=True).all()
+            prof_ids = [p.id for p in active_profs]
+
+        finally:
+            db.close()
+
+        if not prof_ids:
+            log.info("auto_enrich: aucune profession active")
+            return
+
+        # Enrichir via le pipeline existant (phase 2 uniquement)
+        import os, json
+        from .api.routes.leads_runner import _phase2_enrich, _STATE, _LOCK
+
+        # Si un pipeline manuel tourne déjà, on ne démarre pas
+        with _LOCK:
+            if _STATE.get("running"):
+                log.info("auto_enrich: pipeline manuel en cours, skip")
+                return
+            _STATE.update({
+                "running": True, "phase": "auto_enrich", "stop_requested": False,
+                "profession_id": "auto", "qty": remaining,
+                "suspects": 0, "segments_done": 0, "segments_total": 0,
+                "processed": 0, "enriched": 0, "contacts": 0,
+                "results": [], "finished_at": None, "error": None,
+            })
+
+        total_enriched = 0
+        try:
+            db2 = SessionLocal()
+            try:
+                # Segments par score DESC pour prioriser les meilleures professions/depts
+                segs = (
+                    db2.query(SireneSegmentDB)
+                    .filter(
+                        SireneSegmentDB.profession_id.in_(prof_ids),
+                        SireneSegmentDB.status == "done",
+                    )
+                    .order_by(SireneSegmentDB.score.desc())
+                    .all()
+                )
+                ordered_prof_ids = list(dict.fromkeys(s.profession_id for s in segs))
+            finally:
+                db2.close()
+
+            for prof_id in ordered_prof_ids:
+                if remaining <= 0:
+                    break
+                with _LOCK:
+                    _STATE["profession_id"] = prof_id
+                    _STATE["qty"] = remaining
+                _phase2_enrich(prof_id, remaining, None)
+                with _LOCK:
+                    done = _STATE["contacts"]
+                if done > total_enriched:
+                    remaining -= (done - total_enriched)
+                    total_enriched = done
+
+        finally:
+            with _LOCK:
+                _STATE["running"]     = False
+                _STATE["phase"]       = "done"
+                _STATE["finished_at"] = now.isoformat()
+
+        # MAJ config
+        db3 = SessionLocal()
+        try:
+            cfg3 = db3.get(EnrichmentConfigDB, "default")
+            if cfg3:
+                cfg3.last_run   = now
+                cfg3.last_count = total_enriched
+                db3.commit()
+        finally:
+            db3.close()
+
+        log.info("auto_enrich: terminé — %d contact(s) créés", total_enriched)
+
+    except Exception as e:
+        log.error("_job_auto_enrich: %s", e)
+
+
+def _job_provision_leads(force: bool = False):
+    """
+    Fourniture automatique de X leads en file ContactDB.
+    Vérifie toutes les heures si la config (jour + heure UTC) correspond.
+    Si force=True : ignore active/jour/heure (pour test manuel).
+    Ordre : segments SireneSegmentDB par score DESC, suspects non encore provisionnés.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from .database import SessionLocal
+        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB
+
+        db = SessionLocal()
+        try:
+            cfg = db.get(LeadProvisioningConfigDB, "default")
+            if not cfg:
+                cfg = LeadProvisioningConfigDB(id="default")
+                db.add(cfg)
+                db.commit()
+                db.refresh(cfg)
+
+            if not force:
+                if not cfg.active:
+                    return
+
+                now = datetime.utcnow()
+                configured_days = [d.strip() for d in (cfg.days or "").split(",") if d.strip()]
+                if str(now.weekday()) not in configured_days:
+                    return
+                if now.hour != cfg.hour_utc:
+                    return
+                if cfg.last_run and (now - cfg.last_run).total_seconds() < 3600:
+                    return
+
+            now = datetime.utcnow()
+
+            log.info("provision_leads : démarrage (%d leads demandés)", cfg.leads_per_run)
+
+            # Segments ordonnés par score DESC
+            segments = (
+                db.query(SireneSegmentDB)
+                .filter(SireneSegmentDB.status == "done")
+                .order_by(SireneSegmentDB.score.desc())
+                .all()
+            )
+
+            remaining = cfg.leads_per_run
+            provisioned = 0
+
+            for seg in segments:
+                if remaining <= 0:
+                    break
+
+                suspects = (
+                    db.query(SireneSuspectDB)
+                    .filter(
+                        SireneSuspectDB.profession_id == seg.profession_id,
+                        SireneSuspectDB.departement == seg.departement,
+                        SireneSuspectDB.provisioned_at.is_(None),
+                        SireneSuspectDB.actif == True,
+                    )
+                    .order_by(
+                        SireneSuspectDB.contactable.desc(),   # contactables en premier
+                        SireneSuspectDB.created_at.asc(),     # FIFO
+                    )
+                    .limit(remaining)
+                    .all()
+                )
+
+                for s in suspects:
+                    contact = ContactDB(
+                        company_name=s.raison_sociale,
+                        city=s.ville,
+                        profession=s.profession_id,
+                        status="SUSPECT",
+                        notes=f"SIRENE auto — dept:{s.departement or ''} NAF:{s.code_naf or ''}",
+                    )
+                    db.add(contact)
+                    s.provisioned_at = now
+                    provisioned += 1
+                    remaining -= 1
+
+            cfg.last_run = now
+            cfg.last_count = provisioned
+            db.commit()
+            log.info("provision_leads : %d lead(s) ajoutés en ContactDB", provisioned)
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        log.error("_job_provision_leads : %s", e)
 
 
 _SIRENE_STATE: dict = {"running": False, "done": True, "pending": 0, "done_segs": 0, "total_segs": 0, "suspects": 0}
