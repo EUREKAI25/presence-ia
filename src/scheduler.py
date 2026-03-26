@@ -656,28 +656,32 @@ def _job_warming():
             (os.getenv("WARMING_MAILBOX_2", ""), os.getenv("WARMING_MAILBOX_2_PWD", "")),
         ]
 
-        # Réponse 1 — bot répond au sender (ton formel)
+        # Réponse 1 — bot répond au sender (ton formel, parfois emoji)
         _WARMING_REPLIES = [
             "Bonjour,\n\nMerci pour votre message, je l'ai bien reçu.\n\nJe vous recontacte dès que possible.\n\nCordialement",
-            "Bonjour,\n\nBien reçu, merci.\n\nJe reviendrai vers vous prochainement.\n\nBonne journée",
+            "Bonjour,\n\nBien reçu, merci. 👍\n\nJe reviendrai vers vous prochainement.\n\nBonne journée",
             "Bonjour,\n\nMerci de votre retour. Je prends note et vous réponds dans les meilleurs délais.\n\nCordialement",
-            "Bonjour,\n\nMessage bien reçu. Je vous confirme que je traiterai votre demande très prochainement.\n\nBien à vous",
-            "Bonjour,\n\nMerci pour ces informations. Je reviens vers vous rapidement.\n\nCordialement",
-            "Bonjour,\n\nBien noté, merci de votre message. Je vous tiens informé.\n\nBonne journée",
+            "Bonjour,\n\nMessage bien reçu ! Je vous confirme que je traiterai votre demande très prochainement.\n\nBien à vous",
+            "Bonjour,\n\nMerci pour ces informations. Je reviens vers vous rapidement. 🙂\n\nCordialement",
+            "Bonjour,\n\nBien noté, merci de votre message. Je vous tiens informé.\n\nBonne journée ☀️",
             "Bonjour,\n\nReçu 5/5. Je transfère votre message aux bonnes personnes.\n\nCordialement",
-            "Bonjour,\n\nMerci, c'est noté. On se recontacte très prochainement.\n\nBien à vous",
+            "Bonjour,\n\nMerci, c'est noté ! On se recontacte très prochainement.\n\nBien à vous 👋",
+            "Bonjour,\n\nMerci pour votre message. Je m'en occupe dès que possible.\n\nBonne journée",
+            "Bonjour,\n\nBien reçu ! Je vous réponds dans les meilleurs délais. ✅\n\nCordialement",
         ]
 
         # Réponse 2 — sender relance (ton plus court, ~40% des cas)
         _WARMING_FOLLOWUPS = [
             "Merci pour votre réponse rapide.\n\nJe reste disponible si vous avez des questions.\n\nBonne journée",
-            "Parfait, merci.\n\nN'hésitez pas à me contacter si besoin.\n\nCordialement",
-            "Très bien, j'attends de vos nouvelles.\n\nBonne continuation",
+            "Parfait, merci ! 👍\n\nN'hésitez pas à me contacter si besoin.\n\nCordialement",
+            "Très bien, j'attends de vos nouvelles.\n\nBonne continuation 🙂",
             "Merci ! À bientôt.",
-            "Super, on fait comme ça.\n\nBonne journée à vous",
+            "Super, on fait comme ça.\n\nBonne journée à vous ☀️",
             "D'accord, merci pour le retour.\n\nCordialement",
-            "OK, noté. Merci !",
+            "OK, noté. Merci ! 👋",
             "Bien reçu, à très vite.",
+            "Parfait ! Bonne journée.",
+            "Merci pour ce retour rapide. 🙏\n\nÀ bientôt",
         ]
 
         import re as _re
@@ -731,6 +735,9 @@ def _job_warming():
                             orig_subj = msg.get("Subject", "message")
                             subject   = orig_subj if orig_subj.startswith("Re:") else f"Re: {orig_subj}"
                             if reply_to and "@" in reply_to:
+                                # Délai humain : entre 2 et 18 min avant de répondre
+                                import time as _time
+                                _time.sleep(random.randint(120, 1080))
                                 ok = _send_warming_via_brevo(
                                     email_addr, reply_to, subject,
                                     random.choice(_WARMING_REPLIES),
@@ -755,7 +762,9 @@ def _job_warming():
                             subject   = orig_subj if orig_subj.startswith("Re:") else f"Re: {orig_subj}"
                             # 40% de chance de relancer (3e message de la chaîne)
                             if reply_to and "@" in reply_to and random.random() < 0.40:
-                                # Le sender qui répond est au hasard parmi les senders warming
+                                # Délai humain : entre 5 et 35 min avant la relance
+                                import time as _time
+                                _time.sleep(random.randint(300, 2100))
                                 sender_followup = random.choice(_WARMING_SENDERS)
                                 ok = _send_warming_via_brevo(
                                     sender_followup, reply_to, subject,
