@@ -15,6 +15,7 @@ jobs:
           sshpass -p '${{ secrets.VPS_PASSWORD }}' ssh -o StrictHostKeyChecking=no root@212.227.80.241 << 'EOF'
             set -e
             cd /opt/presence-ia
+            git stash || true
             git pull origin main
             # Installer dans le venv du service (.venv)
             .venv/bin/pip install -q "libsass>=0.23.0" "pillow>=10.0.0"
