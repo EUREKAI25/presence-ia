@@ -94,6 +94,16 @@ def start_scheduler():
         misfire_grace_time=300,
     )
 
+    # Job 9 : refresh tests IA — lun/jeu/dim à 9h30, 15h, 18h30 UTC
+    for _hour, _minute in [(9, 30), (15, 0), (18, 30)]:
+        _scheduler.add_job(
+            _job_refresh_ia,
+            trigger=CronTrigger(day_of_week="mon,thu,sun", hour=_hour, minute=_minute, timezone="UTC"),
+            id=f"refresh_ia_{_hour:02d}{_minute:02d}",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
@@ -142,6 +152,38 @@ def _job_monthly_retest():
             db.close()
     except Exception as e:
         log.error("_job_monthly_retest : %s", e)
+
+
+def _job_refresh_ia():
+    """Relance les tests IA (ChatGPT + Gemini + Claude) pour toutes les paires
+    ville/métier actives — lun/jeu/dim à 9h30, 15h, 18h30 UTC."""
+    try:
+        import time as _time, json as _json
+        from .database import SessionLocal
+        from .api.routes.v3 import _run_ia_test, V3ProspectDB
+        with SessionLocal() as db:
+            pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
+        log.info("refresh_ia : %d paires à tester", len(pairs))
+        for city, profession in pairs:
+            try:
+                ia_data = _run_ia_test(profession, city)
+                if not ia_data or not ia_data.get("results"):
+                    continue
+                ia_results_json = _json.dumps(ia_data["results"], ensure_ascii=False)
+                with SessionLocal() as db:
+                    for p in db.query(V3ProspectDB).filter_by(city=city, profession=profession).all():
+                        p.ia_prompt    = ia_data.get("prompt")
+                        p.ia_response  = ia_data.get("response")
+                        p.ia_model     = ia_data.get("model")
+                        p.ia_tested_at = ia_data.get("tested_at")
+                        p.ia_results   = ia_results_json
+                    db.commit()
+                log.info("refresh_ia OK: %s / %s", profession, city)
+            except Exception as e:
+                log.error("refresh_ia %s/%s: %s", profession, city, e)
+            _time.sleep(3)
+    except Exception as e:
+        log.error("_job_refresh_ia: %s", e)
 
 
 def _job_calendly_poll():
@@ -520,7 +562,7 @@ _WARMING_START = _dt.date(2026, 3, 20)
 
 def _warming_day_cap() -> int:
     """Nombre d'emails par session selon le jour de warming (ramp-up progressif)."""
-    day = (datetime.utcnow().date() - _WARMING_START).days + 1
+    day = (_dt.datetime.utcnow().date() - _WARMING_START).days + 1
     if day <= 3:   return 2
     if day <= 7:   return 4
     if day <= 14:  return 6
