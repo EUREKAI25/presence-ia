@@ -1121,8 +1121,10 @@ def landing_v3(token: str):
         if not p:
             from starlette.responses import RedirectResponse
             return RedirectResponse(url="https://presence-ia.com", status_code=302)
-        city_img = db.get(V3CityImageDB, _city_image_key(p.city))
-        if not city_img:
+        from ...database import db_get_header
+        city_slug = (p.city or "").lower().strip().replace(" ", "-")
+        header = db_get_header(db, city_slug)
+        if not header:
             # Fallback : image de la préfecture du département
             from ...models import SireneSuspectDB
             suspect = db.query(SireneSuspectDB).filter(
@@ -1132,8 +1134,9 @@ def landing_v3(token: str):
             if suspect and suspect.departement:
                 prefecture = DEPT_PREFECTURE.get(suspect.departement, "")
                 if prefecture:
-                    city_img = db.get(V3CityImageDB, _city_image_key(prefecture))
-        city_image_url = city_img.image_url if city_img else ""
+                    header = db_get_header(db, prefecture.lower().strip().replace(" ", "-"))
+        base_url = os.getenv("BASE_URL", "https://presence-ia.com")
+        city_image_url = (header.url if header.url.startswith("http") else base_url + header.url) if header else ""
         competitors    = json.loads(p.competitors) if p.competitors else []
         if not competitors:
             others = db.query(V3ProspectDB).filter(
