@@ -58,10 +58,10 @@ def start_scheduler():
         misfire_grace_time=60,
     )
 
-    # Job 5 : warming email — toutes les 4h
+    # Job 5 : warming email — ~4h avec jitter ±45min (base 3h15 + jitter 5400s → entre 3h15 et 4h45)
     _scheduler.add_job(
         _job_warming,
-        trigger=IntervalTrigger(hours=4),
+        trigger=IntervalTrigger(hours=3, minutes=15, jitter=5400),
         id="email_warming",
         replace_existing=True,
         misfire_grace_time=600,
@@ -545,6 +545,19 @@ _WARMING_SUBJECTS = [
     "Point rapide",
     "Question concernant votre activité",
     "Votre présence en ligne",
+    "Un point rapide",
+    "Suivi de notre discussion",
+    "Pour info",
+    "À votre attention",
+    "Juste un mot",
+    "Pensé à vous",
+    "Rapide question",
+    "En passant",
+    "Petite mise à jour",
+    "Votre dossier",
+    "Nouvelles informations",
+    "Pour faire suite",
+    "Confirmation rapide",
 ]
 
 _WARMING_BODIES = [
@@ -553,6 +566,13 @@ _WARMING_BODIES = [
     "Bonjour,\n\nJe vous fais parvenir quelques informations qui pourraient vous intéresser concernant votre activité.\n\nÀ votre disposition,\nCordialement",
     "Bonjour,\n\nUne question rapide : avez-vous eu l'occasion de consulter les informations que je vous ai transmises ?\n\nJe reste à votre disposition.\n\nCordialement",
     "Bonjour,\n\nJe me permets de revenir vers vous pour faire un point rapide sur nos échanges.\n\nBien à vous",
+    "Bonjour,\n\nJe souhaitais simplement prendre de vos nouvelles et voir si vous aviez des questions.\n\nBonne journée à vous",
+    "Bonjour,\n\nTout d'abord merci pour notre échange. Je voulais vous confirmer que j'ai bien pris note de votre situation.\n\nCordialement",
+    "Bonjour,\n\nJe reviens vers vous comme promis. N'hésitez pas si vous avez besoin d'un complément d'information.\n\nBien cordialement",
+    "Bonjour,\n\nJ'espère que cette semaine se passe bien pour vous. Juste un mot pour rester en contact.\n\nBonne continuation",
+    "Bonjour,\n\nPetite prise de contact pour faire suite à notre dernière discussion. Je reste joignable.\n\nBien à vous",
+    "Bonjour,\n\nJe me permets de vous envoyer ce message pour vous tenir informé de l'avancement de votre dossier.\n\nCordialement",
+    "Bonjour,\n\nAvez-vous eu le temps de réfléchir à notre proposition ? Je suis disponible pour en discuter.\n\nBien cordialement",
 ]
 
 # Jour de démarrage warming pour calculer le ramp-up
