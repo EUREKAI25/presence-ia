@@ -656,71 +656,126 @@ def _job_warming():
             (os.getenv("WARMING_MAILBOX_2", ""), os.getenv("WARMING_MAILBOX_2_PWD", "")),
         ]
 
+        # Réponse 1 — bot répond au sender (ton formel)
         _WARMING_REPLIES = [
             "Bonjour,\n\nMerci pour votre message, je l'ai bien reçu.\n\nJe vous recontacte dès que possible.\n\nCordialement",
             "Bonjour,\n\nBien reçu, merci.\n\nJe reviendrai vers vous prochainement.\n\nBonne journée",
             "Bonjour,\n\nMerci de votre retour. Je prends note et vous réponds dans les meilleurs délais.\n\nCordialement",
             "Bonjour,\n\nMessage bien reçu. Je vous confirme que je traiterai votre demande très prochainement.\n\nBien à vous",
             "Bonjour,\n\nMerci pour ces informations. Je reviens vers vous rapidement.\n\nCordialement",
+            "Bonjour,\n\nBien noté, merci de votre message. Je vous tiens informé.\n\nBonne journée",
+            "Bonjour,\n\nReçu 5/5. Je transfère votre message aux bonnes personnes.\n\nCordialement",
+            "Bonjour,\n\nMerci, c'est noté. On se recontacte très prochainement.\n\nBien à vous",
         ]
 
+        # Réponse 2 — sender relance (ton plus court, ~40% des cas)
+        _WARMING_FOLLOWUPS = [
+            "Merci pour votre réponse rapide.\n\nJe reste disponible si vous avez des questions.\n\nBonne journée",
+            "Parfait, merci.\n\nN'hésitez pas à me contacter si besoin.\n\nCordialement",
+            "Très bien, j'attends de vos nouvelles.\n\nBonne continuation",
+            "Merci ! À bientôt.",
+            "Super, on fait comme ça.\n\nBonne journée à vous",
+            "D'accord, merci pour le retour.\n\nCordialement",
+            "OK, noté. Merci !",
+            "Bien reçu, à très vite.",
+        ]
+
+        import re as _re
+        import email as _email_lib
+        import requests as _req2
+
+        def _extract_reply_addr(from_field: str) -> str:
+            m = _re.search(r"<([^>]+)>", from_field)
+            return m.group(1) if m else from_field.strip()
+
+        def _send_warming_via_brevo(sender_email: str, to_email: str, subject: str,
+                                    body: str, extra_headers: dict) -> bool:
+            display = sender_email.split("@")[0].capitalize().replace("-", " ")
+            try:
+                r = _req2.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                    json={
+                        "sender":      {"name": display, "email": sender_email},
+                        "to":          [{"email": to_email}],
+                        "subject":     subject,
+                        "textContent": body,
+                        "headers":     extra_headers,
+                    },
+                    timeout=8,
+                )
+                return r.status_code in (200, 201, 202)
+            except Exception:
+                return False
+
         replied_total = 0
+        followup_total = 0
+
         for email_addr, pwd in mailboxes:
             if not email_addr or not pwd:
                 continue
             try:
-                import email as _email_lib
-                from email.header import decode_header as _decode_header
                 conn = imaplib.IMAP4_SSL(imap_host, imap_port)
                 conn.login(email_addr, pwd)
                 conn.select("INBOX")
-                # Chercher les emails de warming non lus
+
+                # ── Passe 1 : bot répond aux emails X-Warming (envois initiaux) ──
                 _, data = conn.search(None, '(UNSEEN HEADER X-Warming 1)')
                 if data and data[0]:
                     uids = data[0].split()
                     for uid in uids:
                         try:
-                            # Lire l'email pour récupérer From + Subject
                             _, msg_data = conn.fetch(uid, "(RFC822)")
-                            raw = msg_data[0][1]
-                            msg = _email_lib.message_from_bytes(raw)
-                            from_addr = msg.get("From", "")
-                            # Extraire l'email brut
-                            import re as _re
-                            m = _re.search(r"<([^>]+)>", from_addr)
-                            reply_to = m.group(1) if m else from_addr.strip()
-                            orig_subject = msg.get("Subject", "Re: message")
-                            subject = orig_subject if orig_subject.startswith("Re:") else f"Re: {orig_subject}"
-
-                            if reply_to and "@" in reply_to and "warming" not in reply_to:
-                                reply_body = random.choice(_WARMING_REPLIES)
-                                import requests as _req2
-                                _req2.post(
-                                    "https://api.brevo.com/v3/smtp/email",
-                                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                                    json={
-                                        "sender":      {"name": "Équipe Présence IA", "email": email_addr},
-                                        "to":          [{"email": reply_to}],
-                                        "subject":     subject,
-                                        "textContent": reply_body,
-                                        "headers":     {"X-Warming-Reply": "1"},
-                                    },
-                                    timeout=8,
+                            msg = _email_lib.message_from_bytes(msg_data[0][1])
+                            reply_to = _extract_reply_addr(msg.get("From", ""))
+                            orig_subj = msg.get("Subject", "message")
+                            subject   = orig_subj if orig_subj.startswith("Re:") else f"Re: {orig_subj}"
+                            if reply_to and "@" in reply_to:
+                                ok = _send_warming_via_brevo(
+                                    email_addr, reply_to, subject,
+                                    random.choice(_WARMING_REPLIES),
+                                    {"X-Warming-Reply": "1"},
                                 )
-                                replied_total += 1
+                                if ok:
+                                    replied_total += 1
                         except Exception as e:
                             log.debug("warming reply uid=%s: %s", uid, e)
-
-                    # Marquer tous comme lus
                     conn.store(",".join(u.decode() for u in uids), "+FLAGS", "\\Seen")
-                    log.info("warming: %d emails marqués lus + %d réponses envoyées depuis %s",
-                             len(uids), replied_total, email_addr)
+
+                # ── Passe 2 : sender relance (40% des échanges, 2e aller-retour) ──
+                _, data2 = conn.search(None, '(UNSEEN HEADER X-Warming-Reply 1)')
+                if data2 and data2[0]:
+                    uids2 = data2[0].split()
+                    for uid in uids2:
+                        try:
+                            _, msg_data = conn.fetch(uid, "(RFC822)")
+                            msg = _email_lib.message_from_bytes(msg_data[0][1])
+                            reply_to = _extract_reply_addr(msg.get("From", ""))
+                            orig_subj = msg.get("Subject", "Re: message")
+                            subject   = orig_subj if orig_subj.startswith("Re:") else f"Re: {orig_subj}"
+                            # 40% de chance de relancer (3e message de la chaîne)
+                            if reply_to and "@" in reply_to and random.random() < 0.40:
+                                # Le sender qui répond est au hasard parmi les senders warming
+                                sender_followup = random.choice(_WARMING_SENDERS)
+                                ok = _send_warming_via_brevo(
+                                    sender_followup, reply_to, subject,
+                                    random.choice(_WARMING_FOLLOWUPS),
+                                    {"X-Warming-Followup": "1"},
+                                )
+                                if ok:
+                                    followup_total += 1
+                        except Exception as e:
+                            log.debug("warming followup uid=%s: %s", uid, e)
+                    conn.store(",".join(u.decode() for u in uids2), "+FLAGS", "\\Seen")
+
                 conn.logout()
+                log.info("warming IMAP %s — réponses: %d, relances: %d",
+                         email_addr, replied_total, followup_total)
             except Exception as e:
                 log.warning("warming IMAP %s: %s", email_addr, e)
 
-        if replied_total:
-            log.info("warming: %d réponses auto envoyées", replied_total)
+        if replied_total or followup_total:
+            log.info("warming: %d réponses + %d relances envoyées", replied_total, followup_total)
 
     except Exception as e:
         log.error("_job_warming: %s", e)
