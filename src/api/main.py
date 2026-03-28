@@ -131,6 +131,22 @@ async def upload_cgv(request: Request):
     return JSONResponse({"ok": True, "size": len(body)})
 
 
+# ── Ressources téléchargeables (/resources/<filename>) ──────────────────────
+_RESOURCES_DIR = Path(__file__).parent.parent.parent / "RESOURCES"
+
+@app.get("/resources/{filename}")
+def download_resource(filename: str):
+    from fastapi.responses import FileResponse, HTMLResponse
+    import re
+    if not re.match(r'^[\w\-\.]+$', filename):
+        from fastapi import HTTPException
+        raise HTTPException(400, "Nom de fichier invalide")
+    path = _RESOURCES_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Fichier non trouvé")
+    return FileResponse(str(path), filename=filename)
+
+
 _CHECKOUT_JS = """<script>
 async function startCheckout(offerId) {
   try {
@@ -625,10 +641,12 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public, professions_admin
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public, professions_admin, rdv_admin
 from .routes.theme_admin import router as theme_admin_router
+from .routes.admin_hub import router as admin_hub_router
 from offers_module import router as offers_router
 
+app.include_router(admin_hub_router)      # Hubs sections (leads-hub, marketing, closers-hub, finances)
 app.include_router(preview.router)
 app.include_router(campaign.router)
 app.include_router(ia_test.router)
@@ -664,6 +682,7 @@ app.include_router(sequences.router)
 app.include_router(mkt.router)
 app.include_router(crm_admin.router)
 app.include_router(professions_admin.router)
+app.include_router(rdv_admin.router)
 
 from .routes.enrich_admin import router as enrich_admin_router
 app.include_router(enrich_admin_router)

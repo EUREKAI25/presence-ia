@@ -2,6 +2,7 @@
 import json
 import os
 import uuid
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -268,4 +269,106 @@ async def run_scan(request: Request, db: Session = Depends(get_db)):
         "prospect_id": prospect.prospect_id,
         "landing_url": f"{base_url}/couvreur?t={prospect.landing_token}",
         "runs": runs_out,
+    })
+
+
+# ── Endpoints runner Playwright Mac ───────────────────────────────────────────
+
+@router.get("/api/ia-pairs")
+async def get_ia_pairs(token: str = "", db: Session = Depends(get_db)):
+    """Retourne les paires (profession, city) actives à tester — appelé par le runner Mac."""
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+        raise HTTPException(403, "Accès refusé")
+
+    from ...models import V3ProspectDB
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(days=30)
+
+    pairs_raw = (
+        db.query(V3ProspectDB.city, V3ProspectDB.profession)
+        .filter(V3ProspectDB.created_at >= cutoff)
+        .distinct()
+        .all()
+    )
+
+    from ...scan import get_queries
+    pairs = []
+    seen = set()
+    for city, profession in pairs_raw:
+        key = f"{profession}|{city}"
+        if key in seen or not city or not profession:
+            continue
+        seen.add(key)
+        queries = get_queries(profession, city)
+        pairs.append({"profession": profession, "city": city, "queries": queries})
+
+    return JSONResponse({"pairs": pairs, "count": len(pairs)})
+
+
+@router.post("/api/ia-results")
+async def post_ia_results(request: Request, db: Session = Depends(get_db)):
+    """
+    Reçoit les résultats Playwright du runner Mac et met à jour ia_results dans v3_prospects.
+    Format payload :
+    {
+      "results": [
+        {
+          "profession": "pisciniste", "city": "Paris", "query": "...", "tested_at": "...",
+          "models": [
+            {"platform": "chatgpt", "model": "GPT-4o", "text": "...", "competitors": [...], "ok": true}
+          ]
+        }
+      ]
+    }
+    """
+    data = await request.json()
+    token = request.query_params.get("token", "")
+    if token != os.getenv("ADMIN_TOKEN", "changeme"):
+        raise HTTPException(403, "Accès refusé")
+
+    from ...models import V3ProspectDB
+    from ...scheduler import _extract_cited_names, _upsert_cited_companies
+
+    results = data.get("results", [])
+    updated = 0
+    errors  = []
+
+    # Regrouper par (profession, city) pour construire ia_results agrégés
+    from collections import defaultdict
+    by_pair: dict = defaultdict(list)
+    for row in results:
+        key = (row.get("profession", ""), row.get("city", ""))
+        for m in row.get("models", []):
+            platform = m.get("platform", "")
+            model_label = {"chatgpt": "ChatGPT", "claude": "Claude", "gemini": "Gemini"}.get(platform, platform)
+            by_pair[key].append({
+                "model":    model_label,
+                "prompt":   row.get("query", ""),
+                "response": m.get("text", ""),
+            })
+
+    for (profession, city), ia_list in by_pair.items():
+        try:
+            ia_results_json = json.dumps(ia_list, ensure_ascii=False)
+            cited = _extract_cited_names(ia_list)
+
+            prospects = db.query(V3ProspectDB).filter_by(
+                city=city, profession=profession
+            ).all()
+
+            for p in prospects:
+                p.ia_results   = ia_results_json
+                p.ia_tested_at = datetime.utcnow()
+            db.commit()
+
+            _upsert_cited_companies(db, profession, city, cited)
+            updated += len(prospects)
+        except Exception as e:
+            errors.append(f"{profession}/{city}: {e}")
+
+    return JSONResponse({
+        "ok":      True,
+        "updated": updated,
+        "pairs":   len(by_pair),
+        "errors":  errors,
     })

@@ -9,8 +9,193 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl, db_dashboard_stats
-from ...models import ProspectStatus, ProspectDB
+from ...models import ProspectStatus, ProspectDB, V3ProspectDB, V3CityImageDB
 from ._nav import admin_nav
+
+
+import unicodedata as _uc
+
+def _norm_city(s):
+    s = s.lower().strip()
+    return ''.join(c for c in _uc.normalize('NFD', s) if _uc.category(c) != 'Mn')
+
+_PREFECTURES_NORM = {
+    'bourg-en-bresse','laon','moulins','digne-les-bains','gap','nice',
+    'privas','charleville-mezieres','foix','troyes','carcassonne','rodez',
+    'marseille','caen','aurillac','angouleme','la rochelle','bourges',
+    'tulle','ajaccio','bastia','dijon','saint-brieuc','gueret',
+    'perigueux','besancon','valence','evreux','chartres','quimper',
+    'nimes','toulouse','auch','bordeaux','montpellier','rennes',
+    'chateauroux','tours','grenoble','lons-le-saunier','mont-de-marsan',
+    'blois','saint-etienne','le puy-en-velay','nantes','orleans',
+    'cahors','agen','mende','angers','saint-lo','chalons-en-champagne',
+    'chaumont','laval','nancy','bar-le-duc','vannes','metz','nevers',
+    'lille','beauvais','alencon','arras','clermont-ferrand','pau',
+    'tarbes','perpignan','strasbourg','colmar','lyon','vesoul',
+    'macon','le mans','chambery','annecy','paris','rouen','melun',
+    'versailles','niort','amiens','albi','montauban','toulon',
+    'avignon','la roche-sur-yon','poitiers','limoges','epinal',
+    'auxerre','belfort','evry-courcouronnes','nanterre','bobigny',
+    'creteil','cergy','pontoise','basse-terre','fort-de-france',
+    'cayenne','saint-denis','mamoudzou',
+}
+
+def _build_alerts(db, token: str = "") -> str:
+    """Calcule les alertes prioritaires à afficher en haut du dashboard."""
+    items = []
+
+    # 1. Leads avec email non contactés
+    try:
+        non_contactes = db.query(V3ProspectDB).filter(
+            V3ProspectDB.email.isnot(None),
+            V3ProspectDB.contacted == False
+        ).count()
+        if non_contactes > 0:
+            items.append(("leads", f"{non_contactes} leads avec email non contactés", "/admin/contacts"))
+    except Exception:
+        pass
+
+    # 2. Villes sans visuel — uniquement leads qualifiés dispos (email + non contacté)
+    try:
+        from ...models import CityHeaderDB
+        cities_with_image = {h.city.lower() for h in db.query(CityHeaderDB).all()}
+        # Leads prêts à envoyer : email non null + non contacté
+        ready_leads = db.query(V3ProspectDB.city).filter(
+            V3ProspectDB.email.isnot(None),
+            V3ProspectDB.contacted == False,
+        ).distinct().all()
+        sans_visuel = sorted({
+            city for (city,) in ready_leads
+            if city and city.lower() not in cities_with_image
+            and _norm_city(city) in _PREFECTURES_NORM
+        })
+        if sans_visuel:
+            items.append(("visuel", f"{len(sans_visuel)} préfectures sans image (leads prêts)", "/admin/headers", sans_visuel))
+    except Exception:
+        pass
+
+    # 3. RDV non traités / non assignés (via marketing_module)
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB, MeetingStatus
+        from datetime import datetime as _dt
+        mdb = MktSession()
+        try:
+            now = _dt.utcnow()
+            non_traites = mdb.query(MeetingDB).filter(
+                MeetingDB.project_id == "presence-ia",
+                MeetingDB.status == MeetingStatus.scheduled,
+                MeetingDB.scheduled_at < now
+            ).count()
+            if non_traites > 0:
+                items.append(("rdv", f"{non_traites} RDV passés non traités", "/admin/crm"))
+        finally:
+            mdb.close()
+    except Exception:
+        pass
+
+    # 4. Pipeline bloqué (leads enrichis > 7 jours sans contact)
+    try:
+        from datetime import datetime as _dt2, timedelta as _td
+        seuil = _dt2.utcnow() - _td(days=7)
+        bloques = db.query(V3ProspectDB).filter(
+            V3ProspectDB.email.isnot(None),
+            V3ProspectDB.contacted == False,
+            V3ProspectDB.created_at < seuil
+        ).count()
+        if bloques > 0:
+            items.append(("pipeline", f"{bloques} leads enrichis bloqués depuis +7j", "/admin/leads-hub"))
+    except Exception:
+        pass
+
+    # 5. Clés API invalides (OpenAI / Gemini / Anthropic)
+    try:
+        import os as _os, requests as _req
+        _API_CHECKS = [
+            ("OpenAI",    _os.getenv("OPENAI_API_KEY", ""),
+             "https://api.openai.com/v1/models",
+             lambda k: {"Authorization": f"Bearer {k}"}),
+            ("Gemini",    _os.getenv("GEMINI_API_KEY", ""), None, None),
+            ("Anthropic", _os.getenv("ANTHROPIC_API_KEY", ""),
+             "https://api.anthropic.com/v1/models",
+             lambda k: {"x-api-key": k, "anthropic-version": "2023-06-01"}),
+        ]
+        bad_keys = []
+        for _name, _key, _url, _hfn in _API_CHECKS:
+            if not _key:
+                bad_keys.append(_name)
+                continue
+            try:
+                if _name == "Gemini":
+                    _url = f"https://generativelanguage.googleapis.com/v1beta/models?key={_key}"
+                    _r = _req.get(_url, timeout=4)
+                else:
+                    _r = _req.get(_url, headers=_hfn(_key), timeout=4)
+                if _r.status_code in (401, 403):
+                    bad_keys.append(_name)
+            except Exception:
+                pass
+        if bad_keys:
+            items.append(("apikey", f"Clés API invalides : {', '.join(bad_keys)}", "/admin/scheduler"))
+    except Exception:
+        pass
+
+    if not items:
+        return (
+            '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'
+            'padding:14px 18px;display:flex;align-items:center;gap:10px">'
+            '<span style="color:#16a34a;font-size:16px">✓</span>'
+            '<span style="color:#15803d;font-size:13px;font-weight:600">Aucune alerte — tout est à jour</span>'
+            '</div>'
+        )
+
+    color_map = {
+        "leads":    ("#fef3c7", "#92400e", "#f59e0b", "→"),
+        "visuel":   ("#fef2f2", "#991b1b", "#ef4444", "→"),
+        "rdv":      ("#fff7ed", "#9a3412", "#f97316", "→"),
+        "pipeline": ("#fef3c7", "#92400e", "#d97706", "→"),
+        "apikey":   ("#fef2f2", "#991b1b", "#dc2626", "→"),
+    }
+    rows = ""
+    for item in items:
+        kind, msg, href = item[0], item[1], item[2]
+        extra_list = item[3] if len(item) > 3 else None
+        bg, txt, dot_col, arrow = color_map.get(kind, ("#fef9c3", "#713f12", "#eab308", "→"))
+        uid = kind + "_detail"
+        if extra_list:
+            cities_html = "".join(
+                f'<span onclick="uploadCityHeader(\'{c}\',\'{token}\',this)"'
+                f' title="Uploader image pour {c}"'
+                f' style="display:inline-block;background:#fff;border:1px solid #fca5a5;'
+                f'border-radius:4px;padding:3px 10px;font-size:11px;color:#7f1d1d;'
+                f'margin:2px;cursor:pointer">&#128247; {c}</span>'
+                for c in extra_list
+            )
+            rows += (
+                f'<div style="background:{bg};border-radius:6px;margin-bottom:6px;overflow:hidden">'
+                f'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer" '
+                f'onclick="var d=document.getElementById(\'{uid}\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">'
+                f'<span style="width:8px;height:8px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
+                f'<span style="color:{txt};font-size:13px;font-weight:600;flex:1">{msg}</span>'
+                f'<a href="{href}?token={token}" style="color:{txt};font-size:11px;text-decoration:underline;margin-right:8px" onclick="event.stopPropagation()">Ajouter images →</a>'
+                f'<span style="color:{txt};font-size:12px">▾</span>'
+                f'</div>'
+                f'<div id="{uid}" style="display:none;padding:8px 14px 12px;border-top:1px solid rgba(0,0,0,.06)">'
+                f'{cities_html}'
+                f'</div>'
+                f'</div>'
+            )
+        else:
+            rows += (
+                f'<a href="{href}?token={token}" '
+                f'style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
+                f'background:{bg};border-radius:6px;text-decoration:none;margin-bottom:6px">'
+                f'<span style="width:8px;height:8px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
+                f'<span style="color:{txt};font-size:13px;font-weight:600;flex:1">{msg}</span>'
+                f'<span style="color:{txt};font-size:12px">{arrow}</span>'
+                f'</a>'
+            )
+    return rows
 
 router = APIRouter(tags=["Admin"])
 
@@ -114,6 +299,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
     sp = db_dashboard_stats(db, prev_from, prev_to)
 
     nav = admin_nav(token, "")
+    alerts_html = _build_alerts(db, token)
 
     # ── Funnel prospection ──
     funnel_items = [
@@ -184,7 +370,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
         f'<td style="padding:7px 10px;font-size:12px;color:#10b981">{r["contactes"]}</td>'
         f'<td style="padding:7px 10px;font-size:12px;color:#6b7280">{_pct(r["contactes"],r["contactables"])}</td>'
         f'</tr>'
-        for r in s["breakdown"]
+        for r in [r for r in s["breakdown"] if _norm_city(r["ville"]) in _PREFECTURES_NORM][:20]
     ) or '<tr><td colspan="5" style="padding:12px;color:#9ca3af;font-size:12px">Aucune donnée</td></tr>'
 
     breakdown_html = (
@@ -238,6 +424,12 @@ h2{{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter
       <span style="font-size:12px;color:#6b7280">{period_label} — vs période précédente</span>
     </div>
     {period_selector}
+  </div>
+
+  <!-- Alertes -->
+  <div class="card" style="margin-bottom:20px">
+    <h2 style="margin-bottom:12px">Alertes</h2>
+    {alerts_html}
   </div>
 
   <!-- Funnel prospection -->

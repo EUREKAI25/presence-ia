@@ -805,7 +805,7 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
         )
         .group_by(V3ProspectDB.profession, V3ProspectDB.city)
         .order_by(func.count(V3ProspectDB.token).desc())
-        .limit(20)
+        .limit(200)
         .all()
     )
 

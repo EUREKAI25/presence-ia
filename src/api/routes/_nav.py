@@ -12,33 +12,25 @@ def admin_token() -> str:
 
 def admin_nav(token: str, active: str = "") -> str:
     sections = [
-        ("PROSPECTION", [
-            ("contacts",     "Contacts"),
-            ("prospection",  "Campagnes"),
-            ("scan",         "Scan IA"),
-            ("professions",  "Métiers"),
-            ("send-queue",   "File d'envoi"),
-            ("analytics",    "Analytics"),
-            ("scheduler",    "Planificateur"),
+        ("LEADS", [
+            ("leads-hub",   "Accueil"),
+            ("contacts",    "Contacts"),
+            ("prospection", "Automation"),
+            ("suspects",    "Suspects"),
+            ("scheduler",   "Scheduler"),
         ]),
-        ("CRM", [
-            ("crm",                  "Pipeline CRM"),
-            ("crm/closers",          "Closers"),
-            ("crm/closer-messages",  "Messages recrutement"),
-            ("crm/closer-content",   "Contenu portail"),
-            ("crm/slots",            "Créneaux RDV"),
+        ("MARKETING", [
+            ("marketing",   "Stats globales"),
+            ("campaigns",   "Campagnes"),
         ]),
-        ("CONTENU", [
-            ("templates",   "Messages"),
-            ("sequences",   "Séquences"),
-            ("content",     "Textes pages"),
-            ("cms",         "Blocs CMS"),
-            ("offers",      "Offres"),
+        ("CLOSERS", [
+            ("closers-hub", "Accueil"),
+            ("crm",         "Pipeline"),
+            ("crm/closers", "Liste closers"),
         ]),
-        ("SITE", [
-            ("evidence",    "Preuves"),
-            ("headers",     "Headers"),
-            ("theme",       "Thème"),
+        ("FINANCES", [
+            ("finances",    "Revenus & Coûts"),
+            ("analytics",   "Stats ventes"),
         ]),
     ]
 
@@ -59,7 +51,6 @@ def admin_nav(token: str, active: str = "") -> str:
 
     sections_html = ""
     for i, (sec_label, tabs) in enumerate(sections):
-        # Ouvrir uniquement la section contenant la page active — toutes les autres fermées
         is_open = any(slug == active for slug, _ in tabs)
         open_attr = " open" if is_open else ""
         links = "".join(_link(slug, label) for slug, label in tabs)
@@ -77,7 +68,6 @@ def admin_nav(token: str, active: str = "") -> str:
         )
 
     return (
-        # Layout : sidebar fixe 180px desktop, drawer mobile
         f'<style>'
         f'body{{margin:0!important;padding-left:180px!important;box-sizing:border-box}}'
         f'.pres-sidebar details summary::-webkit-details-marker{{display:none}}'
@@ -94,20 +84,16 @@ def admin_nav(token: str, active: str = "") -> str:
         f'.pres-sidebar.open{{transform:translateX(0)}}'
         f'}}'
         f'</style>'
-        # Favicon injecté dynamiquement
         f'<script>(function(){{var l=document.createElement("link");l.rel="icon";'
         f'l.type="image/png";l.href="/assets/favicon.png";document.head.appendChild(l);}})();</script>'
-        # Hamburger (mobile)
         f'<button id="pres-hamburger" aria-label="Menu" onclick="'
         f'document.querySelector(\'.pres-sidebar\').classList.toggle(\'open\');'
         f'document.getElementById(\'pres-overlay\').classList.toggle(\'show\')'
         f'">☰</button>'
-        # Overlay (mobile)
         f'<div id="pres-overlay" onclick="'
         f'document.querySelector(\'.pres-sidebar\').classList.remove(\'open\');'
         f'this.classList.remove(\'show\')'
         f'"></div>'
-        # Sidebar
         f'<nav class="pres-sidebar" style="position:fixed;top:0;left:0;width:180px;height:100vh;'
         f'background:#fff;border-right:1px solid #e5e7eb;overflow-y:auto;z-index:1000;'
         f'padding-bottom:24px;display:flex;flex-direction:column">'
@@ -119,14 +105,13 @@ def admin_nav(token: str, active: str = "") -> str:
         f'{sections_html}'
         f'</div>'
         f'</nav>'
-        # Accordéon exclusif : un seul ouvert à la fois
         f'<script>'
         f'(function(){{'
         f'  function initAcc(){{'
         f'    document.querySelectorAll(".pres-acc summary").forEach(function(s){{'
         f'      s.addEventListener("click",function(e){{'
         f'        var me=s.closest("details");'
-        f'        if(me.hasAttribute("open")) return;'  # va se fermer, laisser faire
+        f'        if(me.hasAttribute("open")) return;'
         f'        document.querySelectorAll(".pres-acc[open]").forEach(function(d){{'
         f'          if(d!==me) d.removeAttribute("open");'
         f'        }});'

@@ -247,18 +247,6 @@ tr:hover td{{background:#fafafa}}
     </div>
   </div>
 
-  <!-- Images manquantes -->
-  {'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 16px;margin-bottom:10px">' +
-   '<div style="display:flex;justify-content:space-between;align-items:center">' +
-   f'<span style="font-size:12px;font-weight:700;color:#92400e">⚠ {len(missing_cities)} ville(s) sans image — landing sans visuel</span>' +
-   '<div style="display:flex;gap:8px;align-items:center">' +
-   '<label style="font-size:11px;color:#92400e;cursor:pointer"><input type="checkbox" id="hide-no-img" onchange="toggleNoImg()" style="margin-right:4px">Masquer</label>' +
-   '<button onclick="this.parentElement.parentElement.parentElement.style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:14px;color:#92400e">✕</button>' +
-   '</div></div>' +
-   '<div style="font-size:11px;color:#78350f;margin-top:6px;columns:2;gap:16px">' +
-   ''.join(f'<div>· {m}</div>' for m in sorted(missing_cities)) +
-   '</div></div>'
-   if missing_cities else ''}
 
   <!-- Filtres -->
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
