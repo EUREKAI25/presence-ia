@@ -50,10 +50,10 @@ a{text-decoration:none}
 </head><body>
 
 <!-- HEADER -->
-<header style="position:sticky;top:0;z-index:100;background:#0f0f1aee;
-  backdrop-filter:blur(12px);border-bottom:1px solid #1a1a2e;padding:0 24px">
-  <div style="max-width:1000px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:32px">
+<header style="position:sticky;top:0;z-index:100;background:#fff;
+  border-bottom:1px solid #e5e7eb;padding:0 24px">
+  <div style="max-width:1000px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
     <a href="/closer/recruit" class="btn-primary" style="padding:10px 28px;font-size:.9rem">Postuler →</a>
   </div>
 </header>
@@ -64,36 +64,36 @@ a{text-decoration:none}
   <div style="max-width:760px;margin:0 auto;position:relative">
     <span style="display:inline-block;background:#6366f115;border:1px solid #6366f130;
       color:#a5b4fc;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-      padding:6px 16px;border-radius:20px;margin-bottom:24px">Opportunité de revenus · 100% télétravail</span>
+      padding:6px 16px;border-radius:20px;margin-bottom:24px">Programme closer · 100% télétravail · Zéro prospection</span>
     <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
       Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
-      -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
+      -webkit-text-fill-color:transparent">jusqu'à 20% de commission</span><br>sur chaque deal que vous signez
     </h1>
     <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
-      Les rendez-vous sont déjà pris et qualifiés.<br>
-      Votre seul job : closer. On s'occupe de tout le reste.
+      Les prospects ont réservé leur créneau. Vous choisissez ceux que vous voulez prendre.<br>
+      Zéro prospection. Votre seul job : closer.
     </p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <a href="/closer/recruit" class="btn-primary">Je postule maintenant →</a>
       <a href="#comment" class="btn-sec">Comment ça marche</a>
     </div>
     <!-- Chiffres -->
-    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-top:52px">
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#a78bfa">18%</div>
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">jusqu'à 20%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#2ecc71">~89€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">75€ · 630€ · 1 800€</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">selon l'offre signée</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#f59e0b">100%</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">à distance</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#527FB3">0</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#527FB3">0</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">prospection de votre côté</div>
       </div>
     </div>
@@ -108,9 +108,9 @@ a{text-decoration:none}
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px;position:relative">
       <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
         display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">1</div>
-      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">On vous envoie un RDV</h3>
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous choisissez vos créneaux</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
-        Nous gérons la prospection, les emails, les relances. Vous recevez un RDV avec un prospect qui a déjà montré son intérêt.
+        Des prospects qualifiés ont réservé un créneau. Vous accédez à la liste et choisissez librement ceux que vous voulez prendre. Aucune obligation de volume.
       </p>
     </div>
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
@@ -126,7 +126,7 @@ a{text-decoration:none}
         display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">3</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous êtes payé</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
-        18% du deal viré le 10 du mois suivant. Pas de plafond. Plus vous signez, plus vous gagnez.
+        Votre commission est calculée automatiquement sur chaque deal signé. Versement déclenché rapidement selon le montant cumulé. Pas de plafond.
       </p>
     </div>
   </div>
@@ -148,13 +148,13 @@ a{text-decoration:none}
     </div>
     <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
       <span style="font-size:1.3rem">📅</span>
-      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">RDV qualifiés</div>
-      <div style="color:#555;font-size:.85rem">Prospects chauds, déjà sensibilisés</div></div>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Créneaux à choisir</div>
+      <div style="color:#555;font-size:.85rem">Prospects chauds, avec contexte complet</div></div>
     </div>
     <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
       <span style="font-size:1.3rem">📊</span>
       <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Portail de suivi</div>
-      <div style="color:#555;font-size:.85rem">Vos RDV, stats et commissions en temps réel</div></div>
+      <div style="color:#555;font-size:.85rem">Vos créneaux, stats et commissions en temps réel</div></div>
     </div>
   </div>
 </section>
@@ -165,7 +165,7 @@ a{text-decoration:none}
     border:1px solid #2a2a4e;border-radius:20px;padding:48px 40px;text-align:center">
     <h2 style="color:#fff;font-size:1.6rem;font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
     <p style="color:#9ca3af;margin-bottom:32px;line-height:1.6">
-      Candidature en 2 minutes. Réponse sous 48h.
+      Candidature rapide. Pas de SIRET ni de statut requis à cette étape.<br>Réponse sous 48h.
     </p>
     <a href="/closer/recruit" class="btn-primary">Envoyer ma candidature →</a>
   </div>
@@ -199,21 +199,21 @@ textarea{resize:vertical;min-height:120px}
 .btn{width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;
      padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px}
 .btn:hover{background:#5254cc}
-.section-title{color:#fff;font-size:14px;font-weight:600;margin:28px 0 16px;
+.section-title{color:#fff;font-size:14px;font-weight:600;margin:40px 0 18px;padding-top:20px;border-top:1px solid #2a2a4e;
                padding-bottom:8px;border-bottom:1px solid #2a2a4e}
 .hint{color:#555;font-size:11px;margin-top:4px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 </style>
 </head><body>
-<header style="background:#0f0f1a;border-bottom:1px solid #1a1a2e;padding:0 24px;margin-bottom:0">
-  <div style="max-width:680px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:28px">
-    <a href="/closer" style="color:#9ca3af;font-size:12px">← Programme closer</a>
+<header style="position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px">
+  <div style="max-width:680px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
+    <a href="/closer" style="color:#6b7280;font-size:13px;font-weight:500">← Programme closer</a>
   </div>
 </header>
-<div class="wrap" style="padding-top:36px">
-  <h1>Candidature Closer</h1>
-  <p class="sub">Remplissez ce formulaire. Nous vous répondrons sous 48h.</p>
+<div class="wrap" style="padding-top:48px;padding-bottom:60px">
+  <h1 style="margin-bottom:8px">Candidature Closer</h1>
+  <p class="sub" style="margin-bottom:36px">Réponse et démarrage sous 48h.</p>
 
   <form id="form" method="post" action="/closer/recruit" enctype="multipart/form-data">
 
@@ -240,15 +240,9 @@ textarea{resize:vertical;min-height:120px}
       <input type="tel" name="phone" placeholder="Numéro de téléphone">
     </div>
 
-    <div class="row">
-      <div class="field">
-        <label>Date de naissance *</label>
-        <input type="date" name="date_of_birth" required>
-      </div>
-      <div class="field">
-        <label>Ville</label>
-        <input type="text" name="city" placeholder="Ville">
-      </div>
+    <div class="field">
+      <label>Ville</label>
+      <input type="text" name="city" placeholder="Ville">
     </div>
 
     <div class="row">
@@ -261,24 +255,33 @@ textarea{resize:vertical;min-height:120px}
     <div class="section-title">Votre présentation</div>
 
     <div class="field">
-      <label>Message de présentation *</label>
-      <textarea name="message" required placeholder="Présentez-vous, votre expérience en vente/closing, pourquoi ce programme vous intéresse..."></textarea>
-    </div>
+      <span id="media-req" style="display:none"></span>
+      <p style="color:#d1d5db;font-size:.95rem;font-weight:400;line-height:1.7;margin-bottom:20px">Merci de vous présenter à travers un message vidéo ou audio de 2 à 3 minutes maximum en abordant les points suivants&nbsp;:</p><ul style="color:#d1d5db;font-size:.95rem;font-weight:400;line-height:1.8;margin:0 0 20px 24px;list-style:disc"><li>Votre expérience en closing (contexte, type d&rsquo;offres, résultats si possible)</li><li>Votre niveau de connaissance en webmarketing (SEO, IA, acquisition&hellip;)</li><li>Vos disponibilités (date de démarrage et nombre d&rsquo;heures par semaine)</li><li>Votre motivation pour rejoindre ce projet</li></ul>
 
-    <div class="field" id="field-video">
-      <label>Lien vidéo de présentation (YouTube, Loom, Drive…) <span id="media-req" style="color:#e94560">*</span></label>
-      <input type="url" name="video_url" id="video_url" placeholder="https://loom.com/share/...">
-      <p class="hint">2-3 minutes max. Présentez-vous et expliquez votre motivation.</p>
-    </div>
+      <!-- Option A : upload fichier -->
+      <div style="background:#0d0d1a;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px;margin-bottom:10px">
+        <div style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Uploader un fichier</div>
+        <input type="file" name="audio_file" id="audio_file" accept="audio/*,video/*" style="padding:6px;width:100%">
+        <p class="hint" style="margin-top:6px">Audio ou vidéo — .mp3, .m4a, .mp4, .mov — 50 Mo max</p>
+      </div>
 
-    <div class="field">
-      <label>Message audio <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(ou à la place de la vidéo)</span></label>
-      <input type="file" name="audio_file" id="audio_file" accept="audio/*" style="padding:8px">
-      <p class="hint">Fichier .mp3 ou .m4a — 5 Mo max</p>
+      <!-- Séparateur -->
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0 10px">
+        <div style="flex:1;height:1px;background:#2a2a4e"></div>
+        <span style="color:#555;font-size:12px">ou</span>
+        <div style="flex:1;height:1px;background:#2a2a4e"></div>
+      </div>
+
+      <!-- Option B : lien URL -->
+      <div style="background:#0d0d1a;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px">
+        <div style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Coller un lien</div>
+        <input type="url" name="video_url" id="video_url" placeholder="YouTube, Loom, Drive, Dropbox…" style="width:100%">
+        <p class="hint" style="margin-top:6px">Lien public ou partageable</p>
+      </div>
     </div>
 
     <p id="media-error" style="color:#e94560;font-size:12px;margin-bottom:12px;display:none">
-      Merci de fournir au moins une vidéo ou un message audio.
+      Merci de fournir au moins un fichier ou un lien de présentation.
     </p>
 
     <button type="submit" class="btn">Envoyer ma candidature →</button>
@@ -917,13 +920,65 @@ async def closer_recruit_submit(request: Request):
             "message":       form.get("message", "").strip() or None,
             "video_url":     video_url,
             "audio_url":     audio_url,
-            "date_of_birth": date_of_birth,
+            "meta":         {"date_of_birth": str(date_of_birth) if date_of_birth else None},
         }
 
         from marketing_module.database import SessionLocal as MktSession, db_create_application
+        from marketing_module.models import CloserApplicationDB
         with MktSession() as mdb:
             app = db_create_application(mdb, data)
+            total = mdb.query(CloserApplicationDB).filter_by(project_id=PROJECT_ID).count()
 
+        # SMS de notification
+        try:
+            import os as _os, requests as _req
+            _brevo_key = _os.getenv("BREVO_API_KEY", "")
+            if _brevo_key:
+                _prenom = data.get("first_name") or ""
+                _nom    = data.get("last_name") or ""
+                _name   = f"{_prenom} {_nom}".strip() or "Anonyme"
+                _token  = _os.getenv("ADMIN_TOKEN", "")
+                _msg = (
+                    f"Nouvelle candidature closer recue - {total} au total\n"
+                    f"Candidat : {_name}\n"
+                    f"https://presence-ia.com/admin/closers-hub?token={_token}"
+                )
+                _req.post(
+                    "https://api.brevo.com/v3/transactionalSMS/sms",
+                    headers={"api-key": _brevo_key, "Content-Type": "application/json"},
+                    json={"sender": "PresenceIA", "recipient": "+393514459617",
+                          "content": _msg, "type": "transactional"},
+                    timeout=8,
+                )
+        except Exception:
+            pass
+
+        # Email de confirmation au candidat
+        try:
+            import os as _oc, requests as _rq
+            _bkey = _oc.getenv("BREVO_API_KEY", "")
+            _prenom = data.get("first_name") or ""
+            _email_c = data.get("email") or ""
+            _name_c = f"{_prenom} {data.get('last_name') or ''}".strip() or "Closer"
+            if _bkey and _email_c:
+                _rq.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": _bkey, "Content-Type": "application/json"},
+                    json={
+                        "sender": {"name": "Présence IA", "email": "contact@presence-ia.com"},
+                        "to": [{"email": _email_c, "name": _name_c}],
+                        "subject": "Candidature bien reçue — Présence IA",
+                        "htmlContent": f"""<p>Bonjour {_prenom or _name_c},</p>
+                        <p>Nous avons bien reçu votre candidature au programme Closer Présence IA.</p>
+                        <p>Nous l'étudions avec attention et vous répondrons <strong>sous 48h</strong>.</p>
+                        <p>En attendant, vous pouvez consulter la page du programme : 
+                        <a href="https://presence-ia.com/closer">presence-ia.com/closer</a></p>
+                        <p style="color:#999;font-size:12px">— L'équipe Présence IA</p>""",
+                    },
+                    timeout=8,
+                )
+        except Exception:
+            pass
         return JSONResponse({"ok": True, "id": app.id})
 
     except Exception as e:
