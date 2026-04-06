@@ -801,3 +801,125 @@ td{{padding:10px;border-bottom:1px solid #e5e7eb;color:#1a1a2e}}a{{color:#e94560
 <p class="sub">Jobs APScheduler actifs — prospections automatiques et tâches récurrentes</p>
 <table><tr><th>ID</th><th>Prochain run</th><th>Trigger</th></tr>{rows}</table>
 </div></body></html>""")
+
+
+# ── Outbound Stats ─────────────────────────────────────────────────────────────
+
+@router.get("/admin/outbound-stats", response_class=HTMLResponse)
+def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
+    if (r := _check_token(request)) is not None: return r
+    token = _admin_token()
+
+    from datetime import date as _date, timedelta as _td
+    from sqlalchemy import func, case
+
+    # ── Totaux globaux ─────────────────────────────────────────────────────────
+    rows = db.query(V3ProspectDB).filter(V3ProspectDB.email_status.isnot(None)).all()
+    total_sent      = sum(1 for r in rows if r.email_status in ("sent","delivered","opened","bounced"))
+    total_delivered = sum(1 for r in rows if r.email_status in ("delivered","opened"))
+    total_opened    = sum(1 for r in rows if r.email_status == "opened")
+    total_bounced   = sum(1 for r in rows if r.email_status == "bounced")
+
+    open_rate   = round(total_opened   / total_delivered * 100, 1) if total_delivered else 0
+    bounce_rate = round(total_bounced  / total_sent      * 100, 1) if total_sent      else 0
+
+    # ── Breakdown 7 derniers jours ─────────────────────────────────────────────
+    today = _date.today()
+    days  = [(today - _td(days=i)) for i in range(6, -1, -1)]
+
+    day_rows = []
+    for d in days:
+        d_start = datetime(d.year, d.month, d.day)
+        d_end   = d_start + _td(days=1)
+        day_sent     = sum(1 for r in rows if r.email_sent_at   and d_start <= r.email_sent_at   < d_end)
+        day_opened   = sum(1 for r in rows if r.email_opened_at and d_start <= r.email_opened_at < d_end)
+        day_bounced  = sum(1 for r in rows if r.email_bounced_at and d_start <= r.email_bounced_at < d_end)
+        day_rows.append((d.strftime("%d/%m"), day_sent, day_opened, day_bounced))
+
+    # ── Breakdown par sender ───────────────────────────────────────────────────
+    sender_map: dict = {}
+    for r in rows:
+        if not r.email_sent_at:
+            continue
+        sender = getattr(r, "sent_method", None) or "?"
+        # sent_method = 'brevo' pour tous — on utilise le domaine sender si dispo
+        # Pas de sender stocké par prospect : on montre la distribution par statut
+    # (sender non stocké par prospect — bloc remplacé par distribution statuts)
+    status_dist = {}
+    for r in rows:
+        s = r.email_status or "unknown"
+        status_dist[s] = status_dist.get(s, 0) + 1
+
+    # ── HTML ───────────────────────────────────────────────────────────────────
+    def _kpi_card(label, value, sub="", color="#4f46e5"):
+        return f"""<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;min-width:130px">
+<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">{label}</div>
+<div style="font-size:28px;font-weight:700;color:{color}">{value}</div>
+{"<div style='font-size:12px;color:#9ca3af;margin-top:2px'>"+sub+"</div>" if sub else ""}
+</div>"""
+
+    kpis = (
+        _kpi_card("Envoyés",    total_sent,      "",              "#1e3a5f") +
+        _kpi_card("Delivered",  total_delivered, f"{round(total_delivered/total_sent*100,1) if total_sent else 0}% des envoyés", "#0ea5e9") +
+        _kpi_card("Ouverts",    total_opened,    f"{open_rate}% des delivered", "#10b981") +
+        _kpi_card("Bounced",    total_bounced,   f"{bounce_rate}% des envoyés", "#ef4444")
+    )
+
+    day_table_rows = "".join(
+        f"<tr><td>{d}</td><td>{s}</td><td>{o}</td><td>{b}</td></tr>"
+        for d, s, o, b in day_rows
+    )
+
+    status_dist_rows = "".join(
+        f"<tr><td>{st}</td><td>{cnt}</td></tr>"
+        for st, cnt in sorted(status_dist.items(), key=lambda x: -x[1])
+    )
+
+    eligible_total = db.query(V3ProspectDB).filter(
+        V3ProspectDB.ia_results.isnot(None),
+        V3ProspectDB.email.isnot(None),
+    ).count()
+
+    nav = admin_nav(token, "outbound")
+    return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Outbound — Présence IA</title>
+<style>
+body{{font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0;color:#1a1a2e}}
+.wrap{{max-width:900px;margin:0 auto;padding:24px}}
+h1{{font-size:22px;font-weight:700;margin:0 0 4px}}
+.sub{{color:#6b7280;font-size:13px;margin:0 0 24px}}
+.kpis{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;
+       box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid #e5e7eb;margin-bottom:24px}}
+th{{background:#f9fafb;color:#6b7280;padding:10px 12px;text-align:left;font-size:12px;font-weight:600}}
+td{{padding:9px 12px;border-bottom:1px solid #f3f4f6;color:#374151;font-size:14px}}
+tr:last-child td{{border-bottom:none}}
+h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
+.badge{{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}}
+</style></head><body>
+{nav}
+<div class="wrap">
+<h1>Outbound — Performance</h1>
+<p class="sub">Emails envoyés depuis job_outbound — tracking Brevo &nbsp;·&nbsp;
+  <span style="color:#6366f1">{eligible_total:,} prospects éligibles en DB</span></p>
+
+<div class="kpis">{kpis}</div>
+
+<h2>7 derniers jours</h2>
+<table>
+<tr><th>Date</th><th>Envoyés</th><th>Ouverts</th><th>Bounced</th></tr>
+{day_table_rows}
+</table>
+
+<h2>Distribution statuts</h2>
+<table>
+<tr><th>Statut</th><th>Nombre</th></tr>
+{status_dist_rows if status_dist_rows else '<tr><td colspan="2" style="color:#9ca3af;text-align:center">Aucun envoi pour l\'instant</td></tr>'}
+</table>
+
+<p style="font-size:12px;color:#9ca3af;margin-top:8px">
+  Webhook Brevo : <code>POST /webhooks/brevo</code> &nbsp;·&nbsp;
+  Sender rotation : 25 adresses &nbsp;·&nbsp;
+  <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
+</p>
+</div></body></html>""")

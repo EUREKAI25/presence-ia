@@ -20,8 +20,9 @@ def admin_nav(token: str, active: str = "") -> str:
             ("scheduler",   "Scheduler"),
         ]),
         ("MARKETING", [
-            ("marketing",   "Stats globales"),
-            ("campaigns",   "Campagnes"),
+            ("marketing",       "Stats globales"),
+            ("campaigns",       "Campagnes"),
+            ("outbound-stats",  "Outbound"),
         ]),
         ("CLOSERS", [
             ("closers-hub", "Accueil"),
