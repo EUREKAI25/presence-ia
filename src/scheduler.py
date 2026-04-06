@@ -1355,6 +1355,52 @@ presence-ia.com
 """
 
 
+_EMAIL_RE = None  # compilé une fois à la première utilisation
+
+_EMAIL_BAD_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".ico", ".bmp", ".pdf")
+_EMAIL_BAD_KEYWORDS   = ("sentry", "wixpress", "example", "test@", "noreply", "no-reply",
+                          "donotreply", "do-not-reply", "mailer-daemon", "postmaster",
+                          "bounce", "cropped-", "favicon", "logo-", "icon_")
+_EMAIL_VALID_TLDS     = {
+    "fr", "com", "net", "org", "io", "co", "eu", "biz", "info", "pro",
+    "fr", "be", "ch", "ca", "de", "es", "it", "nl", "uk", "us", "me",
+    "agency", "studio", "digital", "media", "shop", "store", "tech",
+    "email", "mail", "online", "site", "web", "app", "dev",
+}
+
+
+def _outbound_is_valid_email(email: str) -> bool:
+    """Retourne True si l'email est vraisemblablement valide pour un envoi outbound."""
+    global _EMAIL_RE
+    import re
+
+    if not email or not isinstance(email, str):
+        return False
+
+    email = email.strip().lower()
+
+    # Regex RFC-5322 simplifiée : local@domain.tld
+    if _EMAIL_RE is None:
+        _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+    if not _EMAIL_RE.match(email):
+        return False
+
+    # Extensions image/fichier dans l'adresse
+    if any(email.endswith(ext) or f"{ext}." in email for ext in _EMAIL_BAD_EXTENSIONS):
+        return False
+
+    # Mots-clés techniques / bots
+    if any(kw in email for kw in _EMAIL_BAD_KEYWORDS):
+        return False
+
+    # TLD doit être connu (facultatif mais protège des inventions)
+    tld = email.rsplit(".", 1)[-1]
+    if len(tld) < 2 or len(tld) > 10:
+        return False
+
+    return True
+
+
 def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
     """Retourne True si l'entreprise semble citée dans les réponses IA.
     Méthode : recherche de mots-clés significatifs du nom dans le texte des réponses.
@@ -1429,30 +1475,37 @@ def _job_outbound(force: bool = False):
         )
 
     total_with_results = len(all_with_results)
-    with_email    = [p for p in all_with_results if p.email]
-    without_email = [p for p in all_with_results if not p.email]
+    no_email   = [p for p in all_with_results if not p.email]
+    has_email  = [p for p in all_with_results if p.email]
 
-    log.info("[OUTBOUND] stats sélection brute — ia_results+non_envoyés=%d  avec_email=%d  sans_email=%d",
-             total_with_results, len(with_email), len(without_email))
+    # ── Filtre email valide ────────────────────────────────────────────────────
+    valid_email   = [p for p in has_email if _outbound_is_valid_email(p.email)]
+    invalid_email = [p for p in has_email if not _outbound_is_valid_email(p.email)]
+
+    log.info("[OUTBOUND] sélection — total=%d  sans_email=%d  email_invalide=%d  email_valide=%d",
+             total_with_results, len(no_email), len(invalid_email), len(valid_email))
+
+    if dry_run and invalid_email:
+        for p in invalid_email:
+            log.info("[OUTBOUND][DRY_RUN] EMAIL_INVALIDE — %-40s  %s", p.name[:40], p.email)
 
     # ── Scoring comparatif (dry_run uniquement) ────────────────────────────────
     if dry_run:
-        cited_count     = sum(1 for p in with_email if _outbound_is_cited(p.name, p.ia_results or "[]"))
-        not_cited_count = len(with_email) - cited_count
-        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d prospects avec email :", len(with_email))
+        cited_count     = sum(1 for p in valid_email if _outbound_is_cited(p.name, p.ia_results or "[]"))
+        not_cited_count = len(valid_email) - cited_count
+        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d emails valides :", len(valid_email))
         log.info("[OUTBOUND][DRY_RUN]   avec scoring  — would_send=%d  would_skip=%d",
                  not_cited_count, cited_count)
-        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d  (tous les non-envoyés avec email)",
-                 len(with_email))
+        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d", len(valid_email))
 
-    # ── Boucle principale ──────────────────────────────────────────────────────
+    # ── Boucle principale (emails valides uniquement) ──────────────────────────
     selected    = 0
     skipped     = 0
     would_send  = 0
     sent        = 0
     errors      = 0
 
-    for prospect in with_email:
+    for prospect in valid_email:
         if (sent if not dry_run else would_send) >= cap:
             break
 
