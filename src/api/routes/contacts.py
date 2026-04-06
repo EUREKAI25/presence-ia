@@ -667,7 +667,10 @@ async def contact_preview_sms(request: Request, db: Session = Depends(get_db)):
     data       = await request.json()
     profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
     from .v3 import _contact_message_sms
-    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "")
+    from ...models import V3LandingTextDB
+    lt  = db.query(V3LandingTextDB).filter_by(id="__global__").first()
+    tpl = lt.sms_template if lt and lt.sms_template else None
+    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "", tpl)
     return JSONResponse({"preview": msg, "chars": len(msg)})
 
 
@@ -680,7 +683,10 @@ async def contact_test_sms(request: Request, db: Session = Depends(get_db)):
     if not phone:
         return JSONResponse({"ok": False, "error": "phone requis"})
     from .v3 import _send_brevo_sms, _contact_message_sms
-    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "")
+    from ...models import V3LandingTextDB
+    lt  = db.query(V3LandingTextDB).filter_by(id="__global__").first()
+    tpl = lt.sms_template if lt and lt.sms_template else None
+    msg = "[TEST] " + _contact_message_sms("Prospect Test", "Paris", profession, "", tpl)
     ok  = _send_brevo_sms(phone, msg)
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})
 

@@ -160,7 +160,9 @@ def new_session() -> Session:
 
 # ── Contacts ──
 def db_list_contacts(db: Session) -> list:
-    return db.query(ContactDB).order_by(ContactDB.date_added.desc()).all()
+    contacts = db.query(ContactDB).order_by(ContactDB.date_added.desc()).all()
+    contacts.sort(key=lambda c: 0 if (c.company_name or "").startswith("[TEST]") else 1)
+    return contacts
 
 def db_get_contact(db: Session, cid: str) -> Optional[ContactDB]:
     return db.query(ContactDB).filter_by(id=cid).first()

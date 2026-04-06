@@ -1,8 +1,828 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — Pipeline leads unifié opérationnel
+**Statut** : 🟢 actif — Pipeline leads entièrement automatisé
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-03-17
+**Dernière MAJ** : 2026-03-28 16h55
+
+---
+
+## 🔌 SESSION 2026-03-28 (suite) — IA callers + Préfectures + Upload images
+
+### Réalisé
+
+| Fichier / Composant | Action | Statut |
+|---|---|---|
+| `src/ia_test.py` | ChatGPT : modèle `chatgpt-4o-latest` → `gpt-4o` (Responses API) | ✅ |
+| `src/ia_test.py` | Gemini : `google.generativeai` → `google.genai` (nouveau package installé) + modèle `gemini-2.0-flash` | ✅ |
+| `src/ia_test.py` | Gemini : fallback modèle `gemini-2.5-flash-preview-04-17` → `gemini-2.0-flash` | ✅ |
+| VPS | `google-genai` installé dans `.venv` | ✅ |
+| `src/api/routes/admin.py` | Alerte "sans image" filtrée aux **préfectures** uniquement (102 villes) + badges cliquables pour upload direct | ✅ |
+| `src/api/routes/admin.py` | Table PAR MÉTIER × VILLE filtrée aux préfectures uniquement | ✅ |
+| `src/database.py` | Limit breakdown SQL : 20 → 200 (pour avoir assez de préfectures après filtrage) | ✅ |
+
+### IA callers — état final
+
+| Modèle | Statut | Notes |
+|---|---|---|
+| ChatGPT (`gpt-4o`) | ✅ | Responses API + web_search_preview + instructions système |
+| Claude (`claude-3-5-sonnet`) | ✅ | Multi-turn web_search_20250305 (tour 1 → tool_use → tour 2) |
+| Gemini (`gemini-2.0-flash`) | ✅ | `google.genai` + Google Search grounding |
+
+- Prochaine exécution `_job_refresh_ia` : **dimanche 30 mars à 9h30 UTC** (11h30 Paris)
+
+### Admin — préfectures
+
+- Alerte accueil : liste filtrée aux 102 préfectures uniquement (plus les 640 petites villes)
+- Clic sur une préfecture → sélecteur de fichier → upload → badge supprimé si succès
+- Table PAR MÉTIER × VILLE : idem, filtrée préfectures (Puget-sur-Argens, Boulogne-Billancourt, etc. supprimés)
+
+### Playwright — décision finale
+
+- **Abandonné définitivement** : Cloudflare bloque systématiquement (headless, headed, Chrome natif, profil réel)
+- **Architecture retenue** : API uniquement (ChatGPT Responses API + Claude SDK + Gemini genai)
+- `~/presence-ia-runner/scrape.py` et `launchd plist` → inutiles, peuvent être supprimés
+
+---
+
+## 🔌 SESSION 2026-03-28 — Enrichissement Gemini + Playwright + Alertes admin
+
+### Réalisé
+
+| Fichier / Composant | Action | Statut |
+|---|---|---|
+| `src/gemini_places.py` | Nouveau module — enrichissement entreprise via Gemini + Search Grounding (remplace Google Places API expirée) | ✅ |
+| `src/api/routes/leads_runner.py` | `_phase2_enrich` migré de Google Places → `fetch_company_info` (Gemini) | ✅ |
+| `src/scheduler.py` | `_job_auto_enrich` : conditions heure/jour assouplies (hour_utc=-1 = toutes heures) | ✅ |
+| `data/presence_ia.db` | `enrichment_config` : `active=1`, `suspects_per_run=100`, `days=0-6`, `hour_utc=-1` | ✅ |
+| `src/api/routes/admin.py` | Alerte accueil : villes sans image filtrées aux leads qualifiés dispos uniquement, liste dépliable avec badge par ville | ✅ |
+| `src/api/routes/contacts.py` | Suppression warning "620 villes sans image" (déplacé sur accueil) | ✅ |
+| `src/api/routes/scan_admin.py` | Endpoints `/api/ia-pairs` + `/api/ia-results` créés (925 paires actives) | ✅ |
+
+### Enrichissement Gemini — résultats
+
+- Test sur SMAC / Issy-les-Moulineaux → `{'website': 'https://www.smac-sa.com', 'phone': '01 55 95 48 00'}` ✅
+- Pipeline : 100 suspects/run × toutes les heures = ~2 400/jour
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 7) — Objections structurées
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `data/closer_content.json` | 10 objections restructurées (logique + exemple + variante) | ✅ |
+| VPS | Déployé + service redémarré (active) | ✅ |
+
+### Objections couvertes
+
+| # | Objection | Logique |
+|---|---|---|
+| 1 | C'est trop cher | Faire parler de la valeur client, pas défendre le prix |
+| 2 | Je dois réfléchir | Isoler le vrai frein, ne pas remplir le vide |
+| 3 | J'ai déjà une agence | Canal différent — complémentarité, pas concurrence |
+| 4 | Pas le temps | Retourner : manque de temps = raison de déléguer |
+| 5 | Pas convaincu | Faire tester ChatGPT en direct |
+| 6 | Envoyer des infos | Identifier le frein + verrouiller la relance avant de raccrocher |
+| 7 | Préfère attendre | Rendre l'attente coûteuse + exclusivité zone |
+| 8 | Ne connaît pas l'IA | Recadrer : rien à comprendre techniquement |
+| 9 | Si ça ne marche pas | Transformer en garantie concrète 6 mois |
+| 10 | Zone encore disponible ? | Factuel, pas de pression artificielle |
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 6) — Arguments de vente + Trame de vente
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `data/closer_content.json` | Ajout `arguments_vente` (3 offres × arguments/limites/upgrade) | ✅ |
+| `data/closer_content.json` | Ajout `trame_vente` (6 étapes — intention + exemples + points clés) | ✅ |
+| `src/api/routes/closer_public.py` | 2 nouveaux onglets dans fiche RDV : Arguments + Trame de vente | ✅ |
+| VPS | Déployé + service redémarré (active) | ✅ |
+
+### Livrables
+
+**Arguments de vente** → onglet "Arguments" dans la fiche RDV closer
+- OFFRE 500 : 4 arguments + pour qui + 4 limites (à dire clairement) + pitch upgrade 3500€
+- OFFRE 3500 : 5 arguments + pour qui + 4 limites + pitch upgrade 9000€
+- OFFRE 9000 : 5 arguments + différenciation + notion de domination
+
+**Trame de vente** → onglet "Trame de vente" dans la fiche RDV
+- 6 étapes : Ouverture / Compréhension / Diagnostic / Valeur / Offres / Closing
+- Chaque étape : intention + exemples de phrases + points clés
+- Cadre (pas un script rigid) — adaptatble au style de chaque closer
+
+### Fiche RDV — onglets ressources (état final)
+
+| Onglet | Contenu |
+|---|---|
+| Les offres | Accordéon 3 offres (texte + bouton lien paiement) |
+| Arguments | Arguments / limites / upgrade par offre |
+| Trame de vente | 6 étapes + exemples |
+| Objections | 9 réponses aux objections |
+| Commissions | Taux + montants par offre |
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 5) — Portail Closer + Offres refondues
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `src/api/routes/closer_public.py` | Fiche RDV entièrement refondue | ✅ |
+| `src/api/routes/closer_public.py` | 3 nouveaux endpoints (notes, complete, payment-link) | ✅ |
+| `src/api/routes/closer_public.py` | Panel commissions : header mois + versé/à verser | ✅ |
+| `data/closer_content.json` | Offres refondues + script + objections réécrits | ✅ |
+| `data/marketing.db` | Closer test Thomas Leroy créé + 2 meetings assignés | ✅ |
+| VPS | Déployé + service redémarré (active) | ✅ |
+
+### Portail closer `/closer/{token}`
+
+- **Panel Commissions** : en-tête "Ventes & Commissions — Mars 2026" + 4 KPIs (ventes ce mois / commission ce mois / taux / cumulé) + bloc Versé / À verser / En attente
+- Stats mois filtrées sur `scheduled_at.month == now.month`
+- Commissions versées depuis table `commissions` (status=paid vs pending)
+
+### Fiche RDV `/closer/{token}/meeting/{id}`
+
+**Bloc Score IA** :
+- Score /10 (barre colorée rouge/orange/vert)
+- "Cité X fois sur N requêtes IA"
+- Panier moyen estimé par secteur (dict hardcodé : pisciniste 15-35k€, couvreur 8-15k€, etc.)
+- Liste des concurrents cités par les IA (extraits du ia_results JSON)
+
+**En-tête prospect** :
+- Bouton 📞 tel: si téléphone disponible
+- Bouton 🔗 Landing (lien vers landing page)
+- Bouton "Clôturer ce RDV" → modal
+
+**Modal clôture** :
+- Select résultat : Signé / No-show / Annulé / À relancer
+- Si Signé → select offre (500/3500/9000) + montant auto
+- Si À relancer → champ date de relance
+- Notes de clôture
+- Submit → PATCH `meeting.status` + `deal_value` + notes en DB
+
+**Notes auto-save** : textarea avec debounce 1s, PATCH `/notes` sans rechargement
+
+**Onglets ressources** :
+- "Les offres" → accordéon vertical, ouvert sur Exécution Complète (3 500€), prix en grand, bouton "Envoyer lien →"
+- "Script & conseils" → guide déroulé + script fusionnés (aide-mémoire supprimé)
+- "Objections" → 9 réponses dont objection exclusivité zone
+- "Commissions" → taux + montants par offre
+
+**3 nouveaux endpoints** :
+- `PATCH /closer/{token}/meeting/{id}/notes` → auto-save notes
+- `POST /closer/{token}/meeting/{id}/complete` → clôturer RDV
+- `POST /closer/{token}/meeting/{id}/payment-link` → stub Stripe (à câbler quand Price IDs configurés)
+
+### Offres refondues (`closer_content.json`)
+
+| Offre | Ancien nom | Nouveau nom | Prix |
+|---|---|---|---|
+| 1 | Kit Autonome | Audit Complet | 500 € |
+| 2 | Tout Inclus | Exécution Complète | 3 500 € |
+| 3 | Domination IA Locale | Domination IA Locale + exclusivité territoriale | 9 000 € |
+
+- Perplexity supprimé (remplacé par "les IA")
+- "Cibles principales couvreurs/piscinistes..." supprimé
+- Exclusivité territoriale ~100 km ajoutée sur offre 9000€
+- Script de vente : guide déroulé intégré (plus d'aide-mémoire séparé)
+- Objections : 9 réponses dont exclusivité zone
+
+### Données test
+
+- Closer test : Thomas Leroy, token `65d42e7629ec906b70d8063f88b6dcdd`, commission 15%
+- 2 RDV assignés : 27/03 11h00 + 15h20 (prospect [TEST] Nathalie / Pisciniste / Paris)
+
+### Reste à faire
+
+- [ ] Configurer Stripe Price IDs (3 offres) → activer bouton "Envoyer lien"
+- [ ] Job auto-scoring TESTED → SCORED
+- [ ] Rapport hebdo automatique (offre 3500€)
+- [ ] Boucle mensuelle auto (offre 9000€)
+- [ ] `mots_cles_sirene` pour toutes les professions (actuellement seulement pisciniste)
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 4) — Refonte page Prospection
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `src/api/routes/prospection_admin.py` | Refonte complète de `prospection_page()` | ✅ |
+| VPS | Déployé + service redémarré (active) | ✅ |
+
+### Nouvelle UX `/admin/prospection`
+
+**En haut (visible)** :
+- Formulaire rapide : Métier + Ville + Problématique (opt) + Mission (opt)
+- Touche Entrée ou bouton "Ajouter au panier"
+- `<datalist>` avec les métiers existants pour autocomplétion
+- Panier JS (en mémoire) : liste des paires avec tags colorés, suppression unitaire
+- Bouton "Lancer tout" : pour chaque paire → crée le métier (upsert) → crée le ciblage → lance le run
+
+**En accordéons `<details>` fermés** :
+- Ciblages existants (avec boutons Lancer / Activer / Supprimer)
+- Métiers configurés (édition inline + ajout manuel)
+- Requêtes IA (édition inline + ajout)
+- Import CSV
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 3) — Monitoring clés API
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `src/scheduler.py` | Job 10 ajouté — `_job_check_api_keys()` toutes les 6h | ✅ |
+| `src/api/routes/admin.py` | Alerte "Clés API invalides" ajoutée dans `_build_alerts()` | ✅ |
+| VPS | 2 fichiers déployés + service redémarré | ✅ |
+
+### Comportement
+
+- Toutes les 6h : test HTTP sur OpenAI / Gemini / Anthropic
+- Si 401 ou 403 → email Brevo envoyé à `ADMIN_ALERT_EMAIL` avec liens de renouvellement
+- Dashboard : badge rouge "Clés API invalides : X, Y" si détecté à l'ouverture
+
+### Contexte
+
+- Déclencheur : OpenAI (401) + Gemini (403) redétectés invalides pendant les tests pipeline
+- Clés remises à jour manuellement depuis secrets.env → VPS : toutes les 3 valides (200)
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite 2) — Tests pipeline complet
+
+### Réalisé
+
+| Test | Résultat |
+|---|---|
+| 19 steps testés automatiquement via script Python | 19/19 OK |
+| Health, SIRENE, enrichissement, contacts, campagnes, SMS, tracking, RDV, closers, finances, dashboard | tous verts |
+
+### Incohérences détectées
+
+| Sévérité | Problème | Action |
+|---|---|---|
+| 🔴 | OpenAI 401 + Gemini 403 — clés expirées | Clés remplacées + monitoring ajouté |
+| 🟡 | Stats marketing hub affiche "?" | marketing.db retourne 0 — normal si pipeline pas encore actif |
+| 🟡 | CA closers hub affiche "?" | 0 deal signé en base — normal |
+
+---
+
+## 🔌 SESSION 2026-03-26 (suite) — Refonte interface admin
+
+### Réalisé
+
+| Fichier | Action | Statut |
+|---|---|---|
+| `src/api/routes/_nav.py` | Navigation refaite en 4 sections : LEADS / MARKETING / CLOSERS / FINANCES | ✅ |
+| `src/api/routes/admin.py` | Bloc **Alertes** ajouté en tête du dashboard (leads non contactés, villes sans visuel, RDV non traités, pipeline bloqué) | ✅ |
+| `src/api/routes/admin_hub.py` | Nouveau fichier — 4 pages hub sectorielles | ✅ |
+| `src/api/main.py` | `admin_hub_router` enregistré | ✅ |
+| VPS | 4 fichiers déployés + service redémarré | ✅ |
+
+### Nouvelles pages
+
+| Route | Contenu |
+|---|---|
+| `/admin/leads-hub` | KPIs funnel complet, taux de conversion par étape, liens rapides |
+| `/admin/marketing` | Stats email/SMS (8 KPIs), ouverture/clic/RDV/ventes, détail complet |
+| `/admin/closers-hub` | CA total, marge 82%, commissions, ventilation par offre, top closers |
+| `/admin/finances` | CA par offre, IA cost tracking, form coûts (récurrent/ponctuel/type), résultat net estimé |
+
+### Structure navigation
+
+```
+LEADS      → leads-hub, contacts, prospection, suspects, scheduler
+MARKETING  → marketing, campaigns
+CLOSERS    → closers-hub, crm, crm/closers
+FINANCES   → finances, analytics
+```
+
+### À faire
+
+- [ ] Configurer les Stripe Price IDs (payment bloqué sur les 3 offres)
+- [ ] Câbler le scheduler rapport hebdo (Tout Inclus 3500€)
+- [ ] Câbler la boucle mensuelle automatique (Domination 9000€)
+- [ ] Vérifier rendu landing après refresh IA (29 paires ChatGPT + Gemini + Claude)
+- [ ] `wp_jsonld_code.png` — capture manquante dans guide WP
+
+---
+
+## 🔌 SESSION 2026-03-26 — Landing page + Warming email + Scheduler IA
+
+### Réalisé
+
+| Fichier / Composant | Action | Statut |
+|---|---|---|
+| `src/api/routes/v3.py` | Fix `city_image_url` — évite double URL quand `header.url` déjà absolu | ✅ |
+| `data/presence_ia.db` (VPS) | Fix URLs relatives city_headers → absolues pour 10 villes (Paris, Colmar, Bordeaux, Avignon, Toulon, Versailles, Cayenne, Bar-le-Duc, Bourg-en-Bresse, Mont-de-Marsan) | ✅ |
+| `src/scheduler.py` | Ajout job `refresh_ia` — lun/jeu/dim à 9h30, 15h, 18h30 UTC | ✅ |
+| `src/scheduler.py` | Warming : jitter ±45min (3h15–4h45 au lieu de 4h pile) | ✅ |
+| `src/scheduler.py` | Warming : 20 sujets + 12 corps (vs 7+5 avant) | ✅ |
+| `src/scheduler.py` | Warming : double aller-retour — bot répond (passe 1) + sender relance à 40% (passe 2) | ✅ |
+| `src/scheduler.py` | Warming : emojis dans les réponses + délai humain avant réponse (2–18 min) et relance (5–35 min) | ✅ |
+| Clés API VPS | OPENAI_API_KEY + GEMINI_API_KEY + ANTHROPIC_API_KEY mises à jour | ✅ |
+| `/api/v3/refresh-ia` | Refresh manuel déclenché — 29 paires ville/métier en cours (ChatGPT + Gemini + Claude) | ✅ |
+
+### Problèmes identifiés et résolus
+
+- **Background landing absent** : `header.url` passé de relatif → absolu en DB, mais le code préfixait encore `base_url` → URL double cassée → fix dans v3.py
+- **Clés API invalides sur VPS** : ChatGPT (401) + Gemini (403) + Anthropic (401) → toutes remplacées
+- **Résultats IA = Claude × 3** : conséquence des clés invalides, le refresh corrige progressivement
+- **Job refresh_ia manquant** : documenté dans les commentaires v3.py mais jamais ajouté au scheduler → ajouté
+- **Warming trop régulier** : 4h pile détectable par les providers → jitter + délais humains
+
+### À faire
+
+- [ ] Vérifier après le refresh (29 paires, ~22 min) que ChatGPT + Gemini + Claude apparaissent bien sur la landing
+- [ ] Captures Wix + Shopify pour le guide PREMIUM (`GUIDE_VISIBILITE_IA_PREMIUM.html`)
+- [ ] Configurer les Stripe Price IDs (payment bloqué sur les 3 offres)
+- [ ] Câbler le scheduler rapport hebdo (Tout Inclus 3500€)
+- [ ] Câbler la boucle mensuelle automatique (Domination 9000€)
+- [ ] `wp_jsonld_code.png` — capture Insert Headers and Footers avec JSON-LD (manquante dans guide WP)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 15) — ZIP livrable Kit Autonome
+
+### Réalisé
+
+| Fichier | Contenu | Statut |
+|---|---|---|
+| `RESOURCES/KIT_AUTONOME_GUIDES_CMS.zip` | 3 guides (WP + Wix + Shopify), 36 Ko | ✅ créé |
+
+### Contenu du ZIP
+
+- `GUIDE_WORDPRESS_VISIBILITE_IA.html` — 25 items checklist, 11 sections
+- `GUIDE_WIX_VISIBILITE_IA.html` — 27 items checklist, spécificités Wix
+- `GUIDE_SHOPIFY_VISIBILITE_IA.html` — 30 items checklist, spécificités Shopify
+
+### À faire
+
+- [ ] Déployer le ZIP sur le VPS (accessible en téléchargement depuis /resources/)
+- [ ] Configurer les Stripe Price IDs (payment bloqué sur les 3 offres)
+- [ ] Câbler le scheduler rapport hebdo (Tout Inclus 3500€)
+- [ ] Câbler la boucle mensuelle automatique (Domination 9000€)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 14) — Guide Shopify Kit Autonome
+
+### Réalisé
+
+| Fichier | Statut |
+|---|---|
+| `RESOURCES/GUIDE_SHOPIFY_VISIBILITE_IA.html` | ✅ créé |
+
+### Spécificités Shopify couvertes
+
+- Mode mot de passe (point bloquant n°1)
+- Domaine .myshopify.com → personnalisé obligatoire
+- Thème dupliqué avant modification code
+- Boutique en ligne → Préférences (SEO global)
+- Section "Référencement" par produit/collection/page
+- Blog FAQ avec questions en H2
+- JSON-LD dans theme.liquid avant `</head>`
+- Google Search Console via Préférences
+- Collections : descriptions souvent vides par défaut
+
+### Sidebar checklist : 30 items, progression sauvegardée (localStorage)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 13) — Guide Wix Kit Autonome
+
+### Réalisé
+
+| Fichier | Statut |
+|---|---|
+| `RESOURCES/GUIDE_WIX_VISIBILITE_IA.html` | ✅ créé |
+
+### Spécificités Wix couvertes
+
+- Domaine personnalisé obligatoire (point bloquant expliqué)
+- Wix Editor vs Wix Studio
+- Widget Accordéon + Wix App Market FAQ
+- Paramètres SEO page par page (3 points → Paramètres SEO)
+- SEO Wiz + connexion Google Search Console
+- Custom Code (Head) pour JSON-LD
+- Historique du site pour sauvegarde
+- Piège "Heading 2 utilisé comme H1 visuel"
+
+### Sidebar checklist : 27 items, progression sauvegardée (localStorage)
+
+### À faire
+
+- [ ] Créer le guide Shopify (dernière plateforme manquante)
+- [ ] Packager les 3 guides dans le ZIP livrable Kit Autonome
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 12) — Guide WordPress Kit Autonome
+
+### Réalisé
+
+| Fichier | Contenu | Statut |
+|---|---|---|
+| `RESOURCES/GUIDE_WORDPRESS_VISIBILITE_IA.html` | Guide complet 11 sections, HTML premium | ✅ |
+
+### Contenu du guide
+
+| Section | Détail |
+|---|---|
+| Introduction | Objectif + résultat attendu |
+| Pré-requis | Admin WP, plugins (Yoast/Rank Math, Insert Headers) |
+| Page d'accueil | H1 + premier paragraphe optimisés, captures définies |
+| Pages services | Structure 7 blocs, texte copiable, captures |
+| Page FAQ | 8 Q/R copiables, formulation orientée IA |
+| JSON-LD | Code complet copiable avec tous les champs clés |
+| Balises H1/H2 | Règles + comparatif avant/après |
+| Page À propos | Structure factuellement riche |
+| Exemples avant/après | 5 comparatifs (accueil, service, FAQ, méta) |
+| Erreurs à éviter | 10 erreurs fréquentes |
+| Checklist finale | 30 items à cocher avec captures requises |
+
+### Compte-rendu : ce bloc _SUIVI.md
+
+### À faire
+
+- [ ] Créer le même guide pour Wix
+- [ ] Créer le même guide pour Shopify
+- [ ] Intégrer les guides dans le livrable Kit Autonome (ZIP ou page dédiée)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 11) — Pipeline offres → modules EURKAI
+
+### Réalisé
+
+| Livrable | Statut |
+|---|---|
+| Inventaire des modules réels (13 endpoints) | ✅ |
+| Pipeline 500€ — 6 étapes, exécution once | ✅ |
+| Pipeline 3 500€ — phase initiale + suivi mensuel | ✅ |
+| Pipeline 9 000€ — phase 1 + boucle mensuelle ×12 + logique amélioration | ✅ |
+| Tableau modules × offres | ✅ |
+| Gaps identifiés (5) avec effort + solution | ✅ |
+
+### Gaps prioritaires
+
+| Gap | Offre | Priorité |
+|---|---|---|
+| Rapport hebdo automatique | 3 500€ | Moyen |
+| Guides CMS statiques dans /RESOURCES/ | 500€ | Faible |
+| Boucle mensuelle automatique (jobs.py) | 9 000€ | Moyen |
+| Export rapport mensuel HTML/PDF | 9 000€ | Moyen |
+| Citations locales | 3 500€ + 9 000€ | Manuel |
+
+### Compte-rendu : `PIPELINE_OFFRES_2026-03-22.md`
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 10) — Catalogue offres structuré
+
+### Réalisé
+
+| Livrable | Statut |
+|---|---|
+| 3 fiches offres (cible / problème / résultat / contenu / non inclus / effort / argumentaire) | ✅ |
+| Tableau comparatif 10 critères | ✅ |
+| Argumentaire closer simplifié (qualifier → orienter → fermer) | ✅ |
+| 3 résumés checkout | ✅ |
+| 3 versions home ultra-synthétiques | ✅ |
+
+### Compte-rendu : `CATALOGUE_OFFRES_2026-03-22.md`
+
+### À faire
+
+- [ ] Injecter les résumés checkout dans `/admin/offers` → champ `Résumé checkout`
+- [ ] Injecter les versions home dans la section pricing de la landing
+- [ ] Vérifier cohérence avec les meta déjà en DB
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 9) — Recrutement closer t13/t14/t15
+
+### Réalisé
+
+| Tâche | Contenu | Statut |
+|---|---|---|
+| t13 — Post Facebook | Prêt à copier-coller | ✅ |
+| t14 — Réponse commentaire | "Reçu 👌 Je t'envoie le lien en MP." | ✅ |
+| t15 — Message MP | Prêt à copier-coller avec lien `/closer/recruit` | ✅ |
+
+### Compte-rendu : `RECRUTEMENT_CLOSER_2026-03-22.md` (existant)
+
+### À faire
+
+- [ ] Publier le post Facebook
+- [ ] Répondre aux commentaires "CLOSER" avec la réponse courte
+- [ ] Envoyer le MP à chaque commentateur
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 8) — Meta offres finalisées
+
+### Réalisé
+
+| Offre | Champs corrigés | Statut |
+|---|---|---|
+| Kit Autonome 500€ | `description_closer`, `description_checkout`, `result_promised` | ✅ |
+| Tout Inclus 3 500€ | `description_closer` (timeline + "de A à Z") | ✅ |
+| Domination IA Locale 9 000€ | `result_promised` (reformulé outcome-first) | ✅ |
+
+### Cohérence montée en gamme
+
+| | 500€ | 3 500€ | 9 000€ |
+|---|---|---|---|
+| Positionnement | Autonomie + outils | Délégation totale | Domination + durée |
+| Effort client | Appliquer soi-même | Zéro | Zéro |
+| Timeline résultats | Dès application | Mois 2-3 | Mois 1-2 + 12 mois |
+| Upgrade | → Tout Inclus | → Domination | Reconduction |
+
+### Compte-rendu : `META_OFFRES_2026-03-22.md`
+
+### À faire
+
+- [ ] Configurer les Stripe Price IDs (sans eux : paiement impossible)
+- [ ] Vérifier rendu portail closer + landing page (descriptions visibles)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 7) — Source de vérité unique offres
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `OFFERS_MODULE/offers_module/models.py` | Ajout colonne `meta TEXT DEFAULT "{}"` dans `OfferDB` | ✅ |
+| `OFFERS_MODULE/offers_module/schemas.py` | Ajout `meta: Optional[str]` dans OfferCreate / OfferUpdate / OfferOut | ✅ |
+| DB VPS `data/presence_ia.db` | `ALTER TABLE offers ADD COLUMN meta TEXT` + seed 3 offres (500/3500/9000€) avec meta complète | ✅ |
+| `src/api/routes/offers.py` | Admin — affichage/édition de tous les champs meta (closer, checkout, cible, EURKAI, etc.) | ✅ |
+| `src/api/routes/closer_public.py` | Onglet "L'offre" branché sur OfferDB (3 cartes dynamiques avec meta.description_closer) | ✅ |
+| `src/api/routes/generate.py` | Landing page — ajout `description_checkout` sous les features de chaque plan | ✅ |
+| Déploiement VPS | 5 fichiers copiés + service redémarré — tests OK (3 offres visibles dans portail demo) | ✅ |
+
+### Structure meta OfferDB
+
+```json
+{
+  "description_closer": "Pitch vendeur pour l'onglet 'L'offre' du portail closer",
+  "description_checkout": "Résumé affiché sur la landing page au-dessus du bouton 'Choisir ce plan'",
+  "target": "Pour qui",
+  "result_promised": "Résultat visé",
+  "duration_months": 3,
+  "execution_frequency": "once|monthly|quarterly",
+  "execution_qty": 1,
+  "not_included": ["liste", "de", "ce", "qui", "n'est", "pas", "inclus"],
+  "upgrade_pitch": "Argumentaire pour monter de gamme",
+  "eurkai_modules": [{"module": "AI_INQUIRY_MODULE", ...}]
+}
+```
+
+### Compte-rendu : `SOURCE_VERITE_OFFRES_2026-03-22.md`
+
+### À faire
+
+- [ ] Remplir les champs meta dans `/admin/offers` (description_closer + description_checkout pour chaque offre)
+- [ ] Configurer les Stripe Price IDs
+- [ ] Vérifier rendu landing page avec descriptions checkout
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 6) — Recrutement closer t24
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/api/routes/closer_public.py` | Fix contenu : `~89€` → `90–1620€ par deal signé` (valeur démo remplacée par fourchette réelle) | ✅ |
+
+### Contenu produit
+
+- Message Facebook prêt à poster (mot-clé "CLOSER" → MP)
+- Message MP avec lien `/closer/recruit` + consigne audio/vidéo
+- Pages `/closer/` et `/closer/recruit` vérifiées et opérationnelles
+
+### Compte-rendu : `RECRUTEMENT_CLOSER_2026-03-22.md`
+
+### À faire
+
+- [ ] Poster le message Facebook
+- [ ] Gérer les commentaires → envoyer le MP
+- [ ] Suivre les candidatures dans `/admin/crm/closers`
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 5) — Tests closer t16 + t17
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/api/routes/closer_public.py` | Fix bug : suppression `date_of_birth` du dict data (champ absent du modèle ORM) | ✅ |
+| DB VPS `data/marketing.db` | Création tables `closer_applications` + `closers` (jamais initialisées sur cette DB) | ✅ |
+| DB VPS `closers` | Table recrée avec schéma complet (colonne `token` manquante — désynchronisation) | ✅ |
+
+### Résultats tests
+
+| Tâche | Résultat |
+|---|---|
+| t16 — Candidature complète | ✅ soumise + visible en admin (id `ae685ce9`) |
+| t17 — Portail closer | ✅ accessible + onglets L'offre / Script / Objections + contenu `closer_content.json` chargé |
+
+### Compte-rendu : `CLOSER_TESTS_2026-03-22.md`
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 4) — Socle commercial closers
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `data/closer_content.json` | Créé — script 7 étapes, 8 objections, offres brief, commission, guide RDV | ✅ |
+| `RESOURCES/FICHE_PRODUIT_PRESENCE_IA.html` | Amélioré — section Positionnement + bloc détails par offre (pour qui, pas inclus, résultat, délai, argumentaire) | ✅ |
+
+### Contenu produit
+
+- **Positionnement** : ce que c'est / à qui / problème / résultat / ce que ce n'est pas
+- **Script** : 7 étapes orales (ouverture → closing → suite)
+- **Objections** : 8 traitées (trop cher / réfléchir / agence / IA / temps / garanties / infos / attendre)
+- **Fiches offres** : 3 offres avec pour qui / pas inclus / résultat / délai / argumentaire closer
+
+### Commissions rappel
+
+| Offre | Prix | Commission |
+|---|---|---|
+| Kit Autonome | 500 € | ~90 € |
+| Tout Inclus | 3 500 € | ~630 € |
+| Domination IA Locale | 9 000 € | ~1 620 € |
+
+Bonus +5 % pour les 2 meilleurs closers du mois.
+
+### Source principale
+
+`data/closer_content.json` → portail closer (`/closer/{token}`) — onglets Script, Objections, L'offre.
+Compte-rendu : `CLOSER_SOCLE_2026-03-22.md`
+
+### À faire
+
+- [ ] Configurer Stripe Price IDs sur `/admin/offers` → activer le paiement
+- [ ] Recruter 1 closer minimum (0 en base — bloquant commercial)
+- [ ] Mettre à jour `ANTHROPIC_API_KEY` sur VPS
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 3) — mots_cles_sirene toutes professions
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| DB VPS `professions` | `mots_cles_sirene` ajoutés pour les 11 professions actives sans mots-clés | ✅ |
+
+### Détail
+
+- **11/11 professions** mises à jour — plus aucune profession active sans mots-clés
+- Workaround : clé `ANTHROPIC_API_KEY` sur le VPS révoquée (401) → mots-clés générés en local selon les mêmes règles que le prompt `sirene_keywords.py`, poussés directement via `sqlite3` Python sur SSH
+- Compte-rendu : `KEYWORDS_SIRENE_2026-03-22.md`
+
+### À faire
+
+- [ ] Mettre à jour `ANTHROPIC_API_KEY` sur le VPS (clé actuelle révoquée — bloque l'endpoint `/admin/sirene/generate-keywords`)
+- [ ] Relancer enrichissement → vérifier filtrage mots-clés OK + 0 doublon créé
+- [ ] Lancer campagne sur les 72 prospects uniques — **pas encore, décision à prendre**
+- [ ] Surveiller réponses IMAP (8 entreprises contactées ce jour)
+- [ ] Vérifier warming au prochain run (~18h UTC) : logs `warming: X emails envoyés`
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite 2) — Campagne test + fix doublons v3_prospects
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/api/routes/leads_runner.py` | Fix bug critique : vérification email existant avant insert dans `V3ProspectDB` | ✅ |
+| DB VPS `v3_prospects` | Dédoublonnage : 574 → 73 entrées (501 supprimées), 0 doublon restant | ✅ |
+
+### Campagne test email — 2026-03-22 14h26
+
+- 20 emails envoyés via Brevo (0 erreur technique)
+- Bug découvert : seulement **8 adresses uniques** touchées — doublons en base
+- `contact@belles-piscines.com` a reçu **7 fois** le même email
+- Bug corrigé → plus aucun doublon possible à l'enrichissement
+
+### Preview SMS — 2026-03-22
+
+- Template `__global__` utilisé correctement
+- Message : `Les IA citent vos concurrents, pas vous. Voyez pourquoi en 20 min : {landing_url}` — 120 chars
+- Résultat : ✅ OK
+
+### État DB après corrections
+
+- `v3_prospects` : **73 entrées uniques**, 72 non contactées, prêtes pour campagne
+- Doublons : **0**
+- Fix anti-doublon déployé sur VPS
+
+### À faire
+
+- [ ] Relancer enrichissement → vérifier 0 doublon créé
+- [ ] Surveiller réponses IMAP (8 entreprises contactées ce jour)
+
+---
+
+## 🔌 SESSION 2026-03-22 (suite) — Templates, tests envoi, fix warming
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| DB VPS `v3_landing_texts` | Templates `__global__` corrigés : `{Calendly}` invalide → `{landing_url}` + accents restaurés | ✅ |
+| `src/api/routes/contacts.py` | Fix `preview-sms` et `send-sms` test : chargent maintenant le template `__global__` depuis la DB | ✅ |
+| `src/scheduler.py` | Fix bug critique `_warming_day_cap()` : `datetime.utcnow()` → `_dt.datetime.utcnow()` | ✅ |
+
+### Test envoi email — 2026-03-22
+
+- 4 emails envoyés via Brevo depuis `contact@presence-ia.online`
+- **3/4 reçus** : contact@presence-ia.com ✓ · contact@nathaliebrigitte.com ✓ · nathaliecbrigitte@gmail.com ✓
+- **nathalie.brigitte@gmail.com** : non reçu — probablement filtré spam/promotions Gmail (domaine en warmup)
+- **À surveiller** : retesters nathalie.brigitte@gmail.com dans ~1 semaine quand le warming aura progressé
+
+### Bug warming (critique, corrigé)
+
+- Le job `_job_warming` s'exécutait toutes les 4h depuis le 20/03 mais crashait immédiatement
+- Erreur : `name 'datetime' is not defined` dans `_warming_day_cap()`
+- **Zéro email de warming envoyé depuis le démarrage**
+- Fix : `datetime.utcnow()` → `_dt.datetime.utcnow()` (le module était importé comme `_dt`)
+- Déployé et redémarré — prochain run dans ~4h
+
+### État pipeline au 2026-03-22
+
+| Job | Statut |
+|---|---|
+| SIRENE scan (Lun/Mer/Ven 2h UTC) | ✅ actif |
+| Enrichissement Google Places (toutes les heures) | ✅ actif — 20 suspects/run — 1er batch : 12 contacts créés |
+| Provisioning leads (7h UTC Lun-Ven) | ✅ actif — 20 leads/run |
+| Email warming (toutes les 4h) | ✅ **fixé** — était cassé depuis le 20/03 |
+
+### À surveiller
+
+- [ ] **nathalie.brigitte@gmail.com** : rétester dans ~1 semaine (délivrabilité Gmail)
+- [ ] Confirmer que le warming envoie bien des emails au prochain run (~18h UTC)
+- [ ] Générer `mots_cles_sirene` pour les 11 professions sans mots-clés (enrichissement ne les traite pas encore)
+
+---
+
+## 🔌 SESSION 2026-03-20/22 — Enrichissement auto + test multi-emails + fix villes
+
+### Réalisé
+
+| Fichier | Description | Statut |
+|---|---|---|
+| `src/models.py` | Nouveau modèle `EnrichmentConfigDB` (active, suspects_per_run, hour_utc, days, last_run, last_count) | ✅ |
+| `src/scheduler.py` | Job `_job_auto_enrich()` — enrichissement Google Places automatique, toutes les heures, respecte config admin | ✅ |
+| `src/api/routes/professions_admin.py` | `POST /api/admin/enrich/config` + `POST /api/admin/enrich/run-now` | ✅ |
+| `src/api/routes/professions_admin.py` | Panneau UI "Enrichissement automatique" (toggle actif, suspects/run, heure UTC, jours, "Lancer maintenant") | ✅ |
+| `src/api/routes/contacts.py` | Test email : 4 adresses pré-cochées (nathalie.brigitte, nathaliecbrigitte, contact@nathaliebrigitte, contact@presence-ia) multi-select | ✅ |
+| `src/api/routes/contacts.py` | Bouton "Prévisualiser SMS" (dry run — affiche le message sans envoyer, avec nb caractères) | ✅ |
+| `src/api/routes/contacts.py` | Endpoint `POST /admin/contacts/test/preview-sms` | ✅ |
+| `src/api/routes/headers.py` | Fix matching ville : cherche `aspach michelbach` ET `aspach-michelbach` (or_ SQLAlchemy) | ✅ |
+| DB VPS | Codes postaux manquants ajoutés : Aspach-Michelbach (68700), Bénesse-Maremne (40230), Puget-sur-Argens (83480) | ✅ |
+
+### Chaîne d'automatisation complète (après activation depuis Admin)
+
+```
+Lun/Mer/Ven 2h UTC  → _job_auto_qualify    : récupération suspects SIRENE (671K en DB)
+             3h UTC  → _job_auto_enrich     : enrichissement Google Places (tel/email) — NOUVEAU
+             7h UTC  → _job_provision_leads : push contactables → ContactDB
+```
+
+### État DB au 2026-03-22
+- Suspects : **671 140** (tous `enrichi_at=NULL` — à enrichir)
+- Contacts : **15** (3 provisionnés auto)
+- Segments : **1 718/1 719 done** (SIRENE quasi-complet)
+- Enrichissement config : **active=False** (à activer depuis Admin/Leads)
+- Provisioning config : **active=False** (à activer après 1er batch enrichissement)
+
+### À faire avant activation
+- [ ] Admin/Leads → activer "Enrichissement Google Places" (régler quantité + heure)
+- [ ] Tester avec "Lancer maintenant" → vérifier 1er batch (contacts avec tel/email)
+- [ ] Activer "Fourniture leads" après validation enrichissement
+- [ ] Tester envoi email depuis page Contacts (4 adresses test) + prévisualisation SMS
+- [ ] `mots_cles_sirene` : générer à la volée par profession au moment de l'enrichissement
+
+### Décisions
+- `mots_cles_sirene` générés à la demande (par profession, au moment de l'enrichissement) — pas en masse
+- SMS : pas de 2e numéro → dry run "Prévisualiser" pour valider le contenu
 
 ---
 

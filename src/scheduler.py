@@ -1393,96 +1393,133 @@ def _job_outbound(force: bool = False):
     Outbound v3_prospects — tous les jours à 9h UTC.
     Sélectionne les prospects avec ia_results IS NOT NULL et sent_at IS NULL.
     Score : skip si l'entreprise est déjà citée par l'IA, envoyer sinon.
-    Cap configurable via env OUTBOUND_CAP (défaut : 10).
+
+    Variables d'env :
+      OUTBOUND_CAP     — nombre max d'envois par run (défaut : 10)
+      OUTBOUND_DRY_RUN — si "true" : aucun envoi, aucune écriture DB, logs only
     """
-    import os, json, random, requests as _req
+    import os, random, requests as _req
     from datetime import datetime
     from .database import SessionLocal
     from .models import V3ProspectDB
 
-    cap = int(os.getenv("OUTBOUND_CAP", "10"))
+    dry_run = os.getenv("OUTBOUND_DRY_RUN", "false").lower() == "true"
+    cap     = int(os.getenv("OUTBOUND_CAP", "10"))
+    if dry_run:
+        cap = min(cap, 20)   # sécurité : cap 20 max en dry_run
+
     brevo_key = os.getenv("BREVO_API_KEY", "")
-    if not brevo_key:
+    if not brevo_key and not dry_run:
         log.warning("[OUTBOUND] BREVO_API_KEY absent — job annulé")
         return
 
+    mode_label = "DRY_RUN" if dry_run else "LIVE"
+    log.info("[OUTBOUND] démarrage — mode=%s cap=%d", mode_label, cap)
+
+    # ── Sélection brute (avec et sans email, pour stats) ──────────────────────
     with SessionLocal() as db:
-        candidates = (
+        all_with_results = (
             db.query(V3ProspectDB)
             .filter(
                 V3ProspectDB.ia_results.isnot(None),
                 V3ProspectDB.sent_at.is_(None),
-                V3ProspectDB.email.isnot(None),
             )
-            .limit(cap * 5)   # sur-sélection pour absorber les skips
+            .limit(cap * 10)
             .all()
         )
 
-    log.info("[OUTBOUND] %d candidats récupérés (cap=%d)", len(candidates), cap)
+    total_with_results = len(all_with_results)
+    with_email    = [p for p in all_with_results if p.email]
+    without_email = [p for p in all_with_results if not p.email]
 
-    selected = 0
-    skipped  = 0
-    sent     = 0
-    errors   = 0
+    log.info("[OUTBOUND] stats sélection brute — ia_results+non_envoyés=%d  avec_email=%d  sans_email=%d",
+             total_with_results, len(with_email), len(without_email))
 
-    for prospect in candidates:
-        if sent >= cap:
+    # ── Scoring comparatif (dry_run uniquement) ────────────────────────────────
+    if dry_run:
+        cited_count     = sum(1 for p in with_email if _outbound_is_cited(p.name, p.ia_results or "[]"))
+        not_cited_count = len(with_email) - cited_count
+        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d prospects avec email :", len(with_email))
+        log.info("[OUTBOUND][DRY_RUN]   avec scoring  — would_send=%d  would_skip=%d",
+                 not_cited_count, cited_count)
+        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d  (tous les non-envoyés avec email)",
+                 len(with_email))
+
+    # ── Boucle principale ──────────────────────────────────────────────────────
+    selected    = 0
+    skipped     = 0
+    would_send  = 0
+    sent        = 0
+    errors      = 0
+
+    for prospect in with_email:
+        if (sent if not dry_run else would_send) >= cap:
             break
 
         selected += 1
 
-        # Scoring : skip si déjà cité par l'IA
-        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
+        # Scoring
+        cited = _outbound_is_cited(prospect.name, prospect.ia_results or "[]")
+        if cited:
             skipped += 1
-            log.debug("[OUTBOUND] skip (cité) — %s / %s", prospect.name, prospect.city)
+            log.info("[OUTBOUND] SKIP cité — %-40s  %-20s  %s",
+                     prospect.name[:40], prospect.city or "", prospect.email)
             continue
 
-        # Rotation senders
-        sender = _WARMING_SENDERS[sent % len(_WARMING_SENDERS)]
-        sender_name = sender.split("@")[0].replace("-", " ").capitalize()
-        city_display = prospect.city.title() if prospect.city else ""
+        # Préparer l'envoi
+        idx    = (sent + would_send) % len(_WARMING_SENDERS)
+        sender = _WARMING_SENDERS[idx]
+        city_display      = (prospect.city or "").title()
         profession_display = (prospect.profession or "professionnel").lower()
 
         subject = random.choice(_OUTBOUND_SUBJECTS).format(
-            profession=profession_display,
-            city=city_display,
-        )
-        body = _OUTBOUND_BODY.format(
-            profession=profession_display,
-            city=city_display,
-            sender_name=sender_name,
+            profession=profession_display, city=city_display,
         )
 
-        try:
-            resp = _req.post(
-                "https://api.brevo.com/v3/smtp/email",
-                headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                json={
-                    "sender":      {"name": "Présence IA", "email": sender},
-                    "to":          [{"email": prospect.email, "name": prospect.name}],
-                    "subject":     subject,
-                    "textContent": body,
-                },
-                timeout=15,
+        if dry_run:
+            would_send += 1
+            log.info("[OUTBOUND][DRY_RUN] WOULD_SEND #%d — %-40s  %-25s  from=%s  subject=%s",
+                     would_send, prospect.name[:40], prospect.email, sender, subject)
+        else:
+            sender_name = sender.split("@")[0].replace("-", " ").capitalize()
+            body = _OUTBOUND_BODY.format(
+                profession=profession_display,
+                city=city_display,
+                sender_name=sender_name,
             )
-            if resp.status_code in (200, 201, 202):
-                # Mettre à jour sent_at + sent_method
-                with SessionLocal() as db:
-                    p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
-                    if p:
-                        p.sent_at     = datetime.utcnow()
-                        p.sent_method = "brevo"
-                        db.commit()
-                sent += 1
-                log.info("[OUTBOUND] envoyé — %s <%s> (%s / %s)",
-                         prospect.name, prospect.email, prospect.profession, prospect.city)
-            else:
+            try:
+                resp = _req.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                    json={
+                        "sender":      {"name": "Présence IA", "email": sender},
+                        "to":          [{"email": prospect.email, "name": prospect.name}],
+                        "subject":     subject,
+                        "textContent": body,
+                    },
+                    timeout=15,
+                )
+                if resp.status_code in (200, 201, 202):
+                    with SessionLocal() as db:
+                        p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
+                        if p:
+                            p.sent_at     = datetime.utcnow()
+                            p.sent_method = "brevo"
+                            db.commit()
+                    sent += 1
+                    log.info("[OUTBOUND] envoyé — %s <%s> (%s / %s)",
+                             prospect.name, prospect.email, prospect.profession, prospect.city)
+                else:
+                    errors += 1
+                    log.warning("[OUTBOUND] HTTP %s — %s <%s>",
+                                resp.status_code, prospect.name, prospect.email)
+            except Exception as e:
                 errors += 1
-                log.warning("[OUTBOUND] HTTP %s — %s <%s>",
-                            resp.status_code, prospect.name, prospect.email)
-        except Exception as e:
-            errors += 1
-            log.warning("[OUTBOUND] erreur envoi %s : %s", prospect.email, e)
+                log.warning("[OUTBOUND] erreur envoi %s : %s", prospect.email, e)
 
-    log.info("[OUTBOUND] terminé — sélectionnés=%d skipped=%d envoyés=%d erreurs=%d",
-             selected, skipped, sent, errors)
+    if dry_run:
+        log.info("[OUTBOUND][DRY_RUN] terminé — sélectionnés=%d  skipped(cités)=%d  would_send=%d  (0 envoi réel, 0 écriture DB)",
+                 selected, skipped, would_send)
+    else:
+        log.info("[OUTBOUND] terminé — sélectionnés=%d  skipped=%d  envoyés=%d  erreurs=%d",
+                 selected, skipped, sent, errors)

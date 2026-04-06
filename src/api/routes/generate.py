@@ -116,6 +116,8 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
     plans_html = ""
     for i, o in enumerate(pricing):
         features = _json.loads(o.features or "[]") if isinstance(o.features, str) else (o.features or [])
+        meta_offer = _json.loads(o.meta or "{}") if isinstance(o.meta, str) else (o.meta or {})
+        desc_checkout = meta_offer.get("description_checkout", "")
         # Détecter si la première feature est une mention de mensualités (ex: "puis 5 × 100€/mois")
         monthly_note = ""
         display_feats = features
@@ -126,6 +128,7 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
         price_int = int(round(o.price))
         is_best = i == 1
         badge = '<span class="badge">Le plus choisi</span>' if is_best else ""
+        desc_html = f'<p class="plan-desc">{desc_checkout}</p>' if desc_checkout else ""
         plans_html += f"""<div class="plan{'  plan--best' if is_best else ''}">
 {badge}
 <div class="plan-name">{o.name}</div>
@@ -133,6 +136,7 @@ def landing(profession: str, t: str = "", db: Session = Depends(get_db)):
 {monthly_note}
 <div class="plan-divider"></div>
 <ul class="plan-feats">{li}</ul>
+{desc_html}
 <button class="plan-btn" onclick="checkout(this,'{o.id}')">Choisir ce plan &rarr;</button>
 </div>"""
 
@@ -389,6 +393,7 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);
 .plan--best .plan-btn:hover{{box-shadow:0 6px 22px rgba(232,53,90,.5);transform:translateY(-1px)}}
 .plans-note{{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}}
 .plan-monthly{{font-size:13px;color:var(--muted);margin-top:-8px;margin-bottom:4px}}
+.plan-desc{{font-size:12px;color:var(--muted);font-style:italic;margin-bottom:16px;line-height:1.5}}
 
 /* STICKY HEADER */
 .sticky-nav{{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.96);

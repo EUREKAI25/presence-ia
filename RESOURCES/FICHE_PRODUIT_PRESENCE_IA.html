@@ -116,6 +116,30 @@ section > h2 {
 .profil-card ul li { font-size: 13px; color: #374151; padding: 4px 0 4px 16px; position: relative; }
 .profil-card ul li::before { content: "·"; position: absolute; left: 0; color: var(--acc); font-weight: 700; font-size: 18px; line-height: 1; top: 3px; }
 
+/* POSITIONNEMENT */
+.posit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
+@media(max-width:600px) { .posit-grid { grid-template-columns: 1fr; } }
+.posit-card { background: var(--light); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.posit-card h4 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; }
+.posit-card p { font-size: 13px; color: #374151; line-height: 1.65; }
+.posit-card ul { list-style: none; padding: 0; }
+.posit-card ul li { font-size: 13px; color: #374151; padding: 3px 0 3px 16px; position: relative; }
+.posit-card ul li::before { content: "·"; position: absolute; left: 0; color: var(--acc); font-weight: 700; font-size: 18px; line-height: 1; top: 3px; }
+.posit-not { background: #fff5f7; border: 1px solid #fecdd3; border-radius: 10px; padding: 16px 18px; grid-column: 1 / -1; }
+.posit-not h4 { font-size: 11px; font-weight: 700; color: var(--acc); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+.posit-not ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 28px; }
+.posit-not ul li { font-size: 13px; color: #374151; padding-left: 18px; position: relative; }
+.posit-not ul li::before { content: "×"; position: absolute; left: 0; color: var(--acc); font-weight: 700; }
+
+/* OFFER DETAIL (pour closer) */
+.offer-detail { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--border); }
+.offer-detail-row { display: flex; gap: 8px; font-size: 12px; margin-bottom: 7px; line-height: 1.5; }
+.offer-detail-label { color: var(--muted); font-weight: 700; white-space: nowrap; min-width: 108px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding-top: 1px; }
+.offer-detail-value { color: #374151; }
+.offer-not-included { color: #ef4444; }
+.offer-pitch-block { background: var(--dark); color: #e5e7eb; border-radius: 8px; padding: 11px 14px; margin-top: 14px; font-size: 12px; font-style: italic; line-height: 1.65; }
+.offer-pitch-block strong { color: #f9a8d4; font-style: normal; }
+
 /* FOOTER */
 .fiche-footer { border-top: 2px solid var(--border); padding-top: 28px; text-align: center; color: var(--muted); font-size: 12px; }
 .fiche-footer strong { color: var(--dark); }
@@ -134,6 +158,44 @@ section > h2 {
       lorsque des prospects recherchent un professionnel dans leur secteur.
     </div>
   </div>
+
+  <!-- POSITIONNEMENT -->
+  <section>
+    <h2>Positionnement</h2>
+    <div class="posit-grid">
+      <div class="posit-card">
+        <h4>Ce que vend Présence IA</h4>
+        <p>Un service qui rend les entreprises locales visibles dans les réponses de ChatGPT, Gemini et Perplexity lorsqu'un client potentiel cherche un professionnel dans leur secteur.</p>
+      </div>
+      <div class="posit-card">
+        <h4>À qui</h4>
+        <ul>
+          <li>Artisans et PME locales avec site web</li>
+          <li>Panier client moyen &gt; 3 000 €</li>
+          <li>Couvreurs, piscinistes, menuisiers, rénovateurs, installateurs énergie</li>
+          <li>Activité à fort volume de demande locale</li>
+        </ul>
+      </div>
+      <div class="posit-card">
+        <h4>Problème principal</h4>
+        <p>Les IA recommandent déjà des entreprises. Les prospects voient les concurrents — pas vous. Ce n'est pas un problème de qualité, c'est un problème de signaux techniques. Corrigeable.</p>
+      </div>
+      <div class="posit-card">
+        <h4>Résultat promis</h4>
+        <p>Être cité dans les réponses IA pour les requêtes locales du secteur. Avantage concurrentiel sur un canal en forte croissance, avant que les concurrents ne le fassent.</p>
+      </div>
+      <div class="posit-not">
+        <h4>Ce que ce n'est pas</h4>
+        <ul>
+          <li>Pas du SEO Google</li>
+          <li>Pas de publicité payante</li>
+          <li>Pas un abonnement mensuel</li>
+          <li>Pas du social media</li>
+          <li>Pas de la création de site</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <!-- PRINCIPE -->
   <section>
@@ -185,6 +247,14 @@ section > h2 {
           <li class="sub">Dashboard client</li>
           <li class="sub">Rapports d'évolution</li>
         </ul>
+        <div class="offer-detail">
+          <div class="offer-detail-row"><span class="offer-detail-label">Pour qui</span><span class="offer-detail-value">Entreprise avec fort panier (3 000 €+), concurrence forte, objectif domination durable.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pas inclus</span><span class="offer-detail-value offer-not-included">Publicité payante · Création de site · Gestion de campagnes paid</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Résultat visé</span><span class="offer-detail-value">Être la référence citée par les IA dans sa zone géographique sur 12 mois.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Délai</span><span class="offer-detail-value">Démarrage 5 jours · Résultats mois 1–2 · Consolidation mois 6</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pourquoi cette offre</span><span class="offer-detail-value">30–50 citations + 12 mois de suivi = avantage très difficile à copier rapidement par les concurrents.</span></div>
+          <div class="offer-pitch-block"><strong>Closer :</strong> « L'offre pour dominer, pas juste être là. 9 000 € = 2–3 nouveaux clients sur l'année. Chaque mois sans agir vous coûte. »</div>
+        </div>
       </div>
 
       <!-- TOUT INCLUS -->
@@ -213,6 +283,14 @@ section > h2 {
           <li>Dashboard client</li>
           <li>Garantie de suivi 6 mois</li>
         </ul>
+        <div class="offer-detail">
+          <div class="offer-detail-row"><span class="offer-detail-label">Pour qui</span><span class="offer-detail-value">PME locale qui veut déléguer et ne pas toucher à la technique.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pas inclus</span><span class="offer-detail-value offer-not-included">Contenus longs · Campagnes paid · Renouvellement auto après 6 mois</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Résultat visé</span><span class="offer-detail-value">Apparaître dans les réponses IA pour les requêtes locales principales du secteur.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Délai</span><span class="offer-detail-value">Démarrage 7 jours · Résultats visibles mois 2–3</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pourquoi monter</span><span class="offer-detail-value">Si concurrence très forte + objectif domination durable → Domination IA Locale.</span></div>
+          <div class="offer-pitch-block"><strong>Closer :</strong> « C'est l'offre que la plupart choisissent. On gère tout. 3 500 € pour être là quand vos clients cherchent sur ChatGPT. »</div>
+        </div>
       </div>
 
       <!-- KIT -->
@@ -233,6 +311,14 @@ section > h2 {
           <li>Monitoring IA</li>
           <li>Dashboard client</li>
         </ul>
+        <div class="offer-detail">
+          <div class="offer-detail-row"><span class="offer-detail-label">Pour qui</span><span class="offer-detail-value">Client à l'aise avec le digital, veut comprendre et implémenter lui-même.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pas inclus</span><span class="offer-detail-value offer-not-included">Intervention technique de notre part · Citations locales · Suivi actif · Garantie résultats</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Résultat visé</span><span class="offer-detail-value">Le client sait quoi faire et dispose de tous les outils pour l'implémenter.</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Délai</span><span class="offer-detail-value">Livraison sous 5 jours ouvrés</span></div>
+          <div class="offer-detail-row"><span class="offer-detail-label">Pourquoi monter</span><span class="offer-detail-value">Si le client n'a pas le temps de faire lui-même → Tout Inclus.</span></div>
+          <div class="offer-pitch-block"><strong>Closer :</strong> « On vous donne tout — vous exécutez. Si dans 3 mois vous n'avancez pas seul, on bascule sur le Tout Inclus. »</div>
+        </div>
       </div>
 
     </div>

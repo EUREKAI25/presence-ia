@@ -1077,24 +1077,35 @@ def _gcal_sync(project_id: str) -> tuple[int, str]:
     """
     Synchronise les créneaux depuis Google Calendar.
     Crée un SlotDB de 20 min par event trouvé sur les 14 prochains jours.
-    Variables d'env requises :
+    Variables d'env requises (OAuth2) :
       GOOGLE_CALENDAR_ID           ex: nathalie@presence-ia.com
-      GOOGLE_SERVICE_ACCOUNT_JSON  chemin vers le fichier JSON du compte de service
+      GOOGLE_CALENDAR_CLIENT_ID
+      GOOGLE_CALENDAR_CLIENT_SECRET
+      GOOGLE_CALENDAR_REFRESH_TOKEN
     Retourne (nb créneaux créés/mis à jour, message).
     """
     import datetime as _dt
-    cal_id  = os.getenv("GOOGLE_CALENDAR_ID", "")
-    sa_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-    if not cal_id or not sa_file:
-        return 0, "Variables GOOGLE_CALENDAR_ID ou GOOGLE_SERVICE_ACCOUNT_JSON non configurées."
+    cal_id        = os.getenv("GOOGLE_CALENDAR_ID", "")
+    client_id     = os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "")
+    client_secret = os.getenv("GOOGLE_CALENDAR_CLIENT_SECRET", "")
+    refresh_token = os.getenv("GOOGLE_CALENDAR_REFRESH_TOKEN", "")
+    if not cal_id or not client_id or not client_secret or not refresh_token:
+        return 0, "Variables GOOGLE_CALENDAR_ID / CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN non configurées."
 
     try:
-        from google.oauth2 import service_account
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request as GRequest
         from googleapiclient.discovery import build
 
-        creds   = service_account.Credentials.from_service_account_file(
-            sa_file, scopes=["https://www.googleapis.com/auth/calendar.readonly"]
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         )
+        creds.refresh(GRequest())
         service = build("calendar", "v3", credentials=creds)
 
         now       = _dt.datetime.utcnow()
@@ -1212,11 +1223,11 @@ def admin_slots(request: Request):
     if not rows:
         rows = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Aucun créneau sur les 14 prochains jours</td></tr>'
 
-    gcal_configured = bool(os.getenv("GOOGLE_CALENDAR_ID") and os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
+    gcal_configured = bool(os.getenv("GOOGLE_CALENDAR_ID") and os.getenv("GOOGLE_CALENDAR_REFRESH_TOKEN"))
     gcal_badge = (
         f'<span style="background:#2ecc7120;color:#2ecc71;font-size:10px;padding:2px 7px;border-radius:10px">Google Calendar configuré</span>'
         if gcal_configured else
-        f'<span style="background:#e9456020;color:#e94560;font-size:10px;padding:2px 7px;border-radius:10px">Google Calendar non configuré (GOOGLE_CALENDAR_ID + GOOGLE_SERVICE_ACCOUNT_JSON requis)</span>'
+        f'<span style="background:#e9456020;color:#e94560;font-size:10px;padding:2px 7px;border-radius:10px">Google Calendar non configuré (GOOGLE_CALENDAR_ID + GOOGLE_CALENDAR_REFRESH_TOKEN requis)</span>'
     )
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>

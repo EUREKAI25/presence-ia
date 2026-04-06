@@ -175,6 +175,29 @@ def record_click(delivery_id: str):
         db.close()
 
 
+def _resolve_prospect_id(v3_token: str) -> str:
+    """
+    Les deliveries sont créées avec prospect_id = ContactDB.id.
+    Résout le token V3 → contact_id via presence.db.
+    Retourne le token tel quel si non trouvé (fallback).
+    """
+    try:
+        from ...database import SessionLocal as MainSession
+        from ...models import V3ProspectDB, ContactDB
+        with MainSession() as mdb:
+            v3 = mdb.get(V3ProspectDB, v3_token)
+            if not v3:
+                return v3_token
+            c = mdb.query(ContactDB).filter(
+                (ContactDB.company_name == v3.name) |
+                (ContactDB.phone == (v3.phone or "___"))
+            ).first()
+            return c.id if c else v3_token
+    except Exception as e:
+        log.debug("_resolve_prospect_id: %s", e)
+        return v3_token
+
+
 def record_landing_visit(prospect_token: str):
     """Enregistre la visite de la landing personnalisée."""
     db = _mkt_db()
@@ -184,15 +207,16 @@ def record_landing_visit(prospect_token: str):
         from marketing_module.database import db_update_delivery
         from marketing_module.models import ProspectDeliveryDB
         from datetime import datetime
-        # Met à jour la livraison la plus récente du prospect
+        contact_id = _resolve_prospect_id(prospect_token)
         delivery = (
             db.query(ProspectDeliveryDB)
-            .filter_by(project_id=PROJECT_ID, prospect_id=prospect_token)
+            .filter_by(project_id=PROJECT_ID, prospect_id=contact_id)
             .order_by(ProspectDeliveryDB.created_at.desc())
             .first()
         )
         if delivery and not delivery.landing_visited_at:
             db_update_delivery(db, delivery.id, {"landing_visited_at": datetime.utcnow()})
+            log.info("record_landing_visit: token=%s contact=%s delivery=%s", prospect_token[:8], contact_id[:8], delivery.id[:8])
     except Exception as e:
         log.warning("record_landing_visit: %s", e)
     finally:
@@ -208,14 +232,16 @@ def record_calendly_click(prospect_token: str):
         from marketing_module.database import db_update_delivery
         from marketing_module.models import ProspectDeliveryDB
         from datetime import datetime
+        contact_id = _resolve_prospect_id(prospect_token)
         delivery = (
             db.query(ProspectDeliveryDB)
-            .filter_by(project_id=PROJECT_ID, prospect_id=prospect_token)
+            .filter_by(project_id=PROJECT_ID, prospect_id=contact_id)
             .order_by(ProspectDeliveryDB.created_at.desc())
             .first()
         )
         if delivery and not delivery.calendly_clicked_at:
             db_update_delivery(db, delivery.id, {"calendly_clicked_at": datetime.utcnow()})
+            log.info("record_calendly_click: token=%s contact=%s delivery=%s", prospect_token[:8], contact_id[:8], delivery.id[:8])
     except Exception as e:
         log.warning("record_calendly_click: %s", e)
     finally:
