@@ -641,11 +641,12 @@ async function startCheckout(offerId) {{
 
 
 # ── Routes ──
-from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public, professions_admin, rdv_admin
+from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public, professions_admin, rdv_admin, brevo_webhook
 from .routes.theme_admin import router as theme_admin_router
 from .routes.admin_hub import router as admin_hub_router
 from offers_module import router as offers_router
 
+app.include_router(brevo_webhook.router)  # Tracking emails outbound
 app.include_router(admin_hub_router)      # Hubs sections (leads-hub, marketing, closers-hub, finances)
 app.include_router(preview.router)
 app.include_router(campaign.router)

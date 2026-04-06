@@ -358,6 +358,11 @@ class V3ProspectDB(Base):
     notes:         Mapped[Optional[str]] = mapped_column(sa.Text, nullable=True)
     cms:           Mapped[Optional[str]] = mapped_column(sa.String, nullable=True)
     created_at:    Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
+    # Tracking email outbound
+    email_status:     Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)   # pending/sent/delivered/bounced/opened/replied
+    email_sent_at:    Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    email_opened_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    email_bounced_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
 
 
 class V3CityImageDB(Base):

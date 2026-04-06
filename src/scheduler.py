@@ -1556,8 +1556,10 @@ def _job_outbound(force: bool = False):
                     with SessionLocal() as db:
                         p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
                         if p:
-                            p.sent_at     = datetime.utcnow()
-                            p.sent_method = "brevo"
+                            p.sent_at      = datetime.utcnow()
+                            p.sent_method  = "brevo"
+                            p.email_status = "sent"
+                            p.email_sent_at = datetime.utcnow()
                             db.commit()
                     sent += 1
                     log.info("[OUTBOUND] envoyé — %s <%s> (%s / %s)",
