@@ -124,13 +124,14 @@ _DEFAULT_EMAIL_SUBJECT = "Votre visibilité IA à {ville} — résultat personna
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
-    "Je travaille sur la visibilité des {profession}s dans les intelligences artificielles "
-    "(ChatGPT, Gemini, Claude).\n\n"
-    "J'ai effectué un test pour votre entreprise à {city} — "
-    "le résultat vous concerne directement.\n\n"
-    "Accès à votre rapport personnalisé : {landing_url}\n\n"
-    "Cordialement,\n"
-    "Présence IA — contact@presence-ia.com"
+    "Lorsque vos éventuels clients demandent à leur IA préférée quel {metier} choisir à {ville}, "
+    "plusieurs entreprises apparaissent.\n\n"
+    "Pas la vôtre.\n\n"
+    "Nous avons analysé votre visibilité réelle dans les réponses des IA, "
+    "ainsi que celle de vos concurrents.\n\n"
+    "Le résultat est assez parlant...\n\n"
+    "👉 Voir l'analyse :\n"
+    "{landing_url}"
 )
 
 _DEFAULT_SMS_TEMPLATE = (
@@ -952,7 +953,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
       <h3 class="ia-insight__title">Votre entreprise n'apparaît dans aucune réponse.</h3>
       <p class="ia-insight__text">Lorsque vos prospects demandent un {pro_label} à {city_cap} à leur IA, ce sont vos concurrents qui sont recommandés.</p>
       <p class="ia-insight__text" style="margin-top:10px">Une partie de la demande se dirige donc naturellement vers eux — sans que vous en ayez conscience.</p>
-      {'<p class="ia-insight__text" style="margin-top:10px">Il arrive même que les intelligences artificielles ne sachent pas encore quelles entreprises recommander. Cela signifie simplement que les signaux nécessaires ne sont pas encore suffisamment clairs — et que le marché est encore largement ouvert !</p>' if _any_empty else ''}
+      {'<p class="ia-insight__text" style="margin-top:10px">Lorsque les intelligences artificielles ne savent même pas quelles entreprises recommander, cela signifie simplement que les signaux nécessaires ne sont pas encore suffisamment clairs... et que le marché est encore largement ouvert !</p>' if _any_empty else ''}
     </div>
     <div class="ia-explain">
       <p>Les IA recommandent les entreprises pour lesquelles elles trouvent des informations fiables et structurées sur Internet et c'est précisément ce que nous analysons lors de l'audit.</p>
@@ -2297,14 +2298,17 @@ async def send_email_prospect(tok: str, request: Request):
         lt_global = db.get(V3LandingTextDB, "__global__")
         tpl       = lt_global.email_template if lt_global and lt_global.email_template else None
         subj_tpl  = lt_global.email_subject  if lt_global and lt_global.email_subject  else _DEFAULT_EMAIL_SUBJECT
-        msg   = _contact_message(p.name, p.city, p.profession, p.landing_url, tpl)
+        abs_url   = (p.landing_url or "")
+        if abs_url and abs_url.startswith("/"):
+            abs_url = BASE_URL + abs_url
+        msg   = _contact_message(p.name, p.city, p.profession, abs_url, tpl)
         metier = p.profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
         subj  = subj_tpl.format(ville=p.city, metier=metier, metiers=metiers,
                                 city=p.city, profession=p.profession, name=p.name)
         delivery_id = _mkt.create_delivery(p.token)
         ok    = _send_brevo_email(p.email, p.name, subj, msg,
                                   delivery_id=delivery_id or "",
-                                  landing_url=p.landing_url or "")
+                                  landing_url=abs_url)
         _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo API error")
         if ok:
             p.sent_at     = datetime.utcnow()
@@ -2373,9 +2377,11 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
 
     def _do_bulk():
         for i, (tok, name, city, profession, email, phone, landing_url) in enumerate(tokens):
+            abs_lu = landing_url or ""
+            if abs_lu.startswith("/"): abs_lu = BASE_URL + abs_lu
             if req.method == "email":
                 dest   = req.test_email if test_mode else email
-                msg    = _contact_message(name, city, profession, landing_url, email_tpl)
+                msg    = _contact_message(name, city, profession, abs_lu, email_tpl)
                 metier = profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
                 subj_real = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
                                             city=city, profession=profession, name=name)
@@ -2383,11 +2389,11 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                 delivery_id = _mkt.create_delivery(tok) if not test_mode else None
                 ok     = _send_brevo_email(dest, name, subj, msg,
                                            delivery_id=delivery_id or "",
-                                           landing_url=landing_url or "") if dest else False
+                                           landing_url=abs_lu) if dest else False
                 _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo error")
             elif req.method == "sms":
                 dest   = req.test_phone if test_mode else phone
-                msg    = _contact_message_sms(name, city, profession, landing_url, sms_tpl)
+                msg    = _contact_message_sms(name, city, profession, abs_lu, sms_tpl)
                 delivery_id = _mkt.create_sms_delivery(tok) if not test_mode else None
                 ok     = _send_brevo_sms(dest, msg) if dest else False
                 _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo SMS error")

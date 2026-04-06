@@ -521,3 +521,18 @@ class JobDB(Base):
     created_at:   Mapped[datetime]      = mapped_column(sa.DateTime, default=datetime.utcnow)
     started_at:   Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     finished_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+
+
+class IaCitedCompanyDB(Base):
+    """Entreprises citées par les IA (ChatGPT/Claude/Gemini) pour une paire métier×ville.
+    Alimente : exclusion du pipeline leads + réutilisable pour d'autres projets.
+    """
+    __tablename__ = "ia_cited_companies"
+    id             : Mapped[str]      = mapped_column(sa.String, primary_key=True)   # "{profession}|{city}|{name_norm}"
+    profession     : Mapped[str]      = mapped_column(sa.String, nullable=False, index=True)
+    city           : Mapped[str]      = mapped_column(sa.String, nullable=False, index=True)
+    name_raw       : Mapped[str]      = mapped_column(sa.String, nullable=False)     # nom original tel que sorti de l'IA
+    name_norm      : Mapped[str]      = mapped_column(sa.String, nullable=False)     # nom normalisé pour matching (lower, sans accents, sans ponctuation)
+    models         : Mapped[str]      = mapped_column(sa.Text,   default="[]")       # JSON list des modèles qui l'ont citée
+    first_seen     : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow)
+    last_seen      : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

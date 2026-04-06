@@ -1036,9 +1036,9 @@ def _job_auto_enrich(force: bool = False):
                     return
                 now = datetime.utcnow()
                 configured_days = [d.strip() for d in (cfg.days or "").split(",") if d.strip()]
-                if str(now.weekday()) not in configured_days:
+                if configured_days and str(now.weekday()) not in configured_days:
                     return
-                if now.hour != cfg.hour_utc:
+                if cfg.hour_utc is not None and cfg.hour_utc >= 0 and now.hour != cfg.hour_utc:
                     return
                 if cfg.last_run and (now - cfg.last_run).total_seconds() < 3600:
                     return
@@ -1139,7 +1139,7 @@ def _job_provision_leads(force: bool = False):
     try:
         from datetime import datetime, timedelta
         from .database import SessionLocal
-        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB, IaCitedCompanyDB
+        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB, IaCitedCompanyDB, V3ProspectDB
         import unicodedata, re as _re
 
         _LEGAL_SUFFIXES = _re.compile(
@@ -1179,13 +1179,15 @@ def _job_provision_leads(force: bool = False):
             if not force:
                 if not cfg.active:
                     return
-
                 now = datetime.utcnow()
+                # Si days configurés, respecter la contrainte jour
                 configured_days = [d.strip() for d in (cfg.days or "").split(",") if d.strip()]
-                if str(now.weekday()) not in configured_days:
+                if configured_days and str(now.weekday()) not in configured_days:
                     return
-                if now.hour != cfg.hour_utc:
+                # Si hour_utc configuré (≥0), respecter l'heure exacte
+                if cfg.hour_utc is not None and cfg.hour_utc >= 0 and now.hour != cfg.hour_utc:
                     return
+                # Anti-rebond : pas deux fois dans la même heure
                 if cfg.last_run and (now - cfg.last_run).total_seconds() < 3600:
                     return
 
@@ -1239,14 +1241,26 @@ def _job_provision_leads(force: bool = False):
                     if cited_norms and _is_cited(s.raison_sociale, cited_norms):
                         log.debug("provision_leads : exclu (cité IA) — %s", s.raison_sociale)
                         continue
-                    contact = ContactDB(
-                        company_name=s.raison_sociale,
+                    # Éviter les doublons v3_prospects sur même nom+ville+métier
+                    existing_v3 = db.query(V3ProspectDB).filter_by(
+                        name=s.raison_sociale, city=s.ville, profession=seg.profession_id
+                    ).first()
+                    if existing_v3:
+                        s.provisioned_at = now  # marquer quand même pour ne pas retraiter
+                        continue
+                    import secrets as _sec
+                    v3 = V3ProspectDB(
+                        token=_sec.token_hex(16),
+                        name=s.raison_sociale,
                         city=s.ville,
-                        profession=s.profession_id,
-                        status="SUSPECT",
+                        profession=seg.profession_id,
+                        phone=getattr(s, "telephone", None) or getattr(s, "phone", None),
+                        email=getattr(s, "email", None),
+                        website=getattr(s, "site_web", None) or getattr(s, "website", None),
+                        contacted=False,
                         notes=f"SIRENE auto — dept:{s.departement or ''} NAF:{s.code_naf or ''}",
                     )
-                    db.add(contact)
+                    db.add(v3)
                     s.provisioned_at = now
                     provisioned += 1
                     remaining -= 1
@@ -1254,7 +1268,7 @@ def _job_provision_leads(force: bool = False):
             cfg.last_run = now
             cfg.last_count = provisioned
             db.commit()
-            log.info("provision_leads : %d lead(s) ajoutés en ContactDB", provisioned)
+            log.info("provision_leads : %d lead(s) ajoutés en V3ProspectDB", provisioned)
 
         finally:
             db.close()

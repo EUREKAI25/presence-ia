@@ -32,3 +32,6 @@ htmlcov/
 # DB SQLite
 *.db
 *.sqlite3
+.env.secrets
+sessions/
+*.bak

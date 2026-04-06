@@ -196,7 +196,7 @@ USE_PLAYWRIGHT = os.getenv("USE_PLAYWRIGHT", "0") == "1"  # désactivé — APIs
 
 def _resolve_openai_model() -> str:
     """Retourne le modèle OpenAI actif : env var si définie, sinon chatgpt-4o-latest (alias officiel → toujours le plus récent)."""
-    return os.getenv("OPENAI_MODEL") or "chatgpt-4o-latest"
+    return os.getenv("OPENAI_MODEL") or "gpt-4o"
 
 def _resolve_anthropic_model() -> str:
     """Retourne le modèle Anthropic actif : env var si définie, sinon détecte le dernier claude-sonnet dispo."""
@@ -212,14 +212,24 @@ def _resolve_anthropic_model() -> str:
 
 def _resolve_gemini_model() -> str:
     """Retourne le modèle Gemini actif : env var si définie, sinon gemini-2.0-flash."""
-    return os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-preview-04-17"
+    return os.getenv("GEMINI_MODEL") or "gemini-2.0-flash"
 
 
 def _openai_api(q: str) -> str:
     import openai
     model = _resolve_openai_model()
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    r = client.responses.create(model=model, tools=[{"type": "web_search_preview"}], input=q)
+    r = client.responses.create(
+        model=model,
+        tools=[{"type": "web_search_preview"}],
+        instructions=(
+            "Tu es un assistant qui aide à trouver des prestataires locaux en France. "
+            "Quand on te demande des piscinistes, couvreurs, plombiers ou autres artisans "
+            "dans une ville, tu DOIS donner une liste à puces de vrais noms d'entreprises "
+            "locales avec leurs sites web si disponibles. Ne refuse jamais de citer des noms."
+        ),
+        input=q,
+    )
     log.info("openai api: %s", model)
     return r.output_text or ""
 
@@ -227,25 +237,68 @@ def _anthropic_api(q: str) -> str:
     import anthropic
     model = _resolve_anthropic_model()
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    r = client.messages.create(
-        model=model, max_tokens=1024,
-        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+
+    # Tour 1 : Claude lance la recherche web
+    r1 = client.messages.create(
+        model=model, max_tokens=2048,
+        system=(
+            "Tu es un assistant qui aide à trouver des prestataires locaux en France. "
+            "Quand on te demande des piscinistes, couvreurs ou artisans dans une ville, "
+            "utilise web_search pour trouver de vraies entreprises locales, puis liste-les "
+            "avec leurs noms et sites web. Cite toujours des noms réels."
+        ),
+        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
         messages=[{"role": "user", "content": q}],
     )
-    log.info("anthropic api: %s", model)
-    return "".join(b.text for b in r.content if hasattr(b, "text")) or ""
+    log.info("anthropic api: %s stop=%s", model, r1.stop_reason)
+
+    # Si Claude a utilisé le tool → continuer pour obtenir la réponse finale
+    if r1.stop_reason == "tool_use":
+        # Construire le message de continuation avec les résultats du tool
+        tool_results = []
+        for block in r1.content:
+            if block.type == "tool_use":
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": "Recherche effectuée.",
+                })
+        if tool_results:
+            r2 = client.messages.create(
+                model=model, max_tokens=2048,
+                system=(
+                    "Tu es un assistant qui aide à trouver des prestataires locaux en France. "
+                    "Liste les entreprises trouvées avec leurs noms et sites web."
+                ),
+                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+                messages=[
+                    {"role": "user", "content": q},
+                    {"role": "assistant", "content": r1.content},
+                    {"role": "user", "content": tool_results},
+                ],
+            )
+            return "".join(b.text for b in r2.content if hasattr(b, "text")) or ""
+
+    return "".join(b.text for b in r1.content if hasattr(b, "text")) or ""
 
 def _gemini_api(q: str) -> str:
     from google import genai
     from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
-    model = _resolve_gemini_model()
+    model_name = _resolve_gemini_model()
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     r = client.models.generate_content(
-        model=model,
+        model=model_name,
         contents=q,
-        config=GenerateContentConfig(tools=[Tool(google_search=GoogleSearch())]),
+        config=GenerateContentConfig(
+            system_instruction=(
+                "Tu es un assistant qui aide à trouver des prestataires locaux en France. "
+                "Quand on te demande des piscinistes, couvreurs ou artisans dans une ville, "
+                "recherche et liste de vraies entreprises locales avec leurs noms et sites web."
+            ),
+            tools=[Tool(google_search=GoogleSearch())],
+        ),
     )
-    log.info("gemini api: %s", model)
+    log.info("gemini api: %s", model_name)
     return r.text or ""
 
 def _openai(q: str) -> str:

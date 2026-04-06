@@ -202,12 +202,12 @@ def _phase1_qualify(profession_id: str, qty_wanted: int, dept: Optional[str] = N
 
 def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
     """Enrichit les suspects enrichi_at IS NULL jusqu'à qty contacts créés."""
-    from ...google_places import fetch_text_search, fetch_place_details
+    from ...gemini_places import fetch_company_info
     from ...enrich import enrich_website
     from ...models import V3ProspectDB, ContactDB, ProfessionDB, SireneSuspectDB
     from ...api.routes.enrich_admin import _valid_email, _is_mobile
 
-    api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
 
     with _LOCK:
         _STATE["phase"] = "enrichissement"
@@ -267,57 +267,52 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
             entry = {"name": raison_sociale, "city": ville_str,
                      "contact": False, "email": None, "mobile": None}
             try:
-                places = fetch_text_search(
-                    f"{raison_sociale} {ville_str}".strip(), "", api_key, max_results=1
-                ) if api_key else []
+                details = fetch_company_info(raison_sociale, ville_str, gemini_key) if gemini_key else {}
+                website = details.get("website") or ""
+                phone   = details.get("formatted_phone_number") or ""
 
-                if places:
-                    details = fetch_place_details(places[0].get("place_id", ""), api_key) if api_key else {}
-                    website = details.get("website") or ""
-                    phone   = details.get("formatted_phone_number") or ""
+                if website:
+                    scraped     = enrich_website(website, timeout=5)
+                    email       = _valid_email(scraped.get("email"))
+                    scraped_mob = scraped.get("mobile") or ""
+                    if scraped_mob and _is_mobile(scraped_mob):
+                        mobile = scraped_mob
+                    elif phone and _is_mobile(phone):
+                        mobile = phone
+                    else:
+                        mobile = None
+                    fixe = phone if phone and not _is_mobile(phone) else None
 
-                    if website:
-                        scraped     = enrich_website(website, timeout=5)
-                        email       = _valid_email(scraped.get("email"))
-                        scraped_mob = scraped.get("mobile") or ""
-                        if scraped_mob and _is_mobile(scraped_mob):
-                            mobile = scraped_mob
-                        elif phone and _is_mobile(phone):
-                            mobile = phone
-                        else:
-                            mobile = None
-                        fixe = phone if phone and not _is_mobile(phone) else None
+                    has_contact = bool(email or mobile)
+                    entry.update({"email": email, "mobile": mobile, "contact": has_contact})
 
-                        has_contact = bool(email or mobile)
-                        entry.update({"email": email, "mobile": mobile, "contact": has_contact})
-
-                        if has_contact:
-                            tok = secrets.token_hex(16)
-                            with SessionLocal() as db2:
-                                db2.add(V3ProspectDB(
-                                    token=tok, name=raison_sociale, city=ville_str,
-                                    profession=prof_label, phone=mobile or fixe,
-                                    website=website, email=email,
-                                    rating=details.get("rating"),
-                                    reviews_count=details.get("user_ratings_total"),
-                                    landing_url=f"/l/{tok}", scrape_status="done",
-                                ))
-                                db2.add(ContactDB(
-                                    company_name=raison_sociale, email=email,
-                                    phone=mobile or fixe, city=ville_str,
-                                    profession=prof_label, status="PROSPECT",
-                                    notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website}"
-                                          + (f" | mobile:{mobile}" if mobile else "")
-                                          + (f" | fixe:{fixe}" if fixe else ""),
-                                ))
-                                db2.commit()
-                            contacts_created += 1
-                            with _LOCK:
-                                _STATE["contacts"] = contacts_created
-                                _STATE["enriched"] += 1
-                        else:
-                            with _LOCK:
-                                _STATE["enriched"] += 1
+                    if has_contact:
+                        tok = secrets.token_hex(16)
+                        with SessionLocal() as db2:
+                            db2.add(V3ProspectDB(
+                                token=tok, name=raison_sociale, city=ville_str,
+                                profession=prof_label, phone=mobile or fixe,
+                                website=website, email=email,
+                                rating=details.get("rating"),
+                                reviews_count=details.get("user_ratings_total"),
+                                landing_url=f"/l/{tok}", scrape_status="done",
+                            ))
+                            db2.add(ContactDB(
+                                company_name=raison_sociale, email=email,
+                                phone=mobile or fixe, city=ville_str,
+                                profession=prof_label, status="PROSPECT",
+                                notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website}"
+                                      + (f" | mobile:{mobile}" if mobile else "")
+                                      + (f" | fixe:{fixe}" if fixe else ""),
+                            ))
+                            db2.commit()
+                        contacts_created += 1
+                        with _LOCK:
+                            _STATE["contacts"] = contacts_created
+                            _STATE["enriched"] += 1
+                    else:
+                        with _LOCK:
+                            _STATE["enriched"] += 1
 
             except Exception as e:
                 log.warning("[LEADS] %s: %s", raison_sociale, e)

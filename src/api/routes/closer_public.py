@@ -50,10 +50,10 @@ a{text-decoration:none}
 </head><body>
 
 <!-- HEADER -->
-<header style="position:sticky;top:0;z-index:100;background:#0f0f1aee;
-  backdrop-filter:blur(12px);border-bottom:1px solid #1a1a2e;padding:0 24px">
-  <div style="max-width:1000px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:32px">
+<header style="position:sticky;top:0;z-index:100;background:#fff;
+  border-bottom:1px solid #e5e7eb;padding:0 24px">
+  <div style="max-width:1000px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
     <a href="/closer/recruit" class="btn-primary" style="padding:10px 28px;font-size:.9rem">Postuler →</a>
   </div>
 </header>
@@ -64,36 +64,36 @@ a{text-decoration:none}
   <div style="max-width:760px;margin:0 auto;position:relative">
     <span style="display:inline-block;background:#6366f115;border:1px solid #6366f130;
       color:#a5b4fc;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-      padding:6px 16px;border-radius:20px;margin-bottom:24px">Opportunité de revenus · 100% télétravail</span>
+      padding:6px 16px;border-radius:20px;margin-bottom:24px">Programme closer · 100% télétravail · Zéro prospection</span>
     <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
       Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
-      -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
+      -webkit-text-fill-color:transparent">jusqu'à 20% de commission</span><br>sur chaque deal que vous signez
     </h1>
     <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
-      Les rendez-vous sont déjà pris et qualifiés.<br>
-      Votre seul job : closer. On s'occupe de tout le reste.
+      Les prospects ont réservé leur créneau. Vous choisissez ceux que vous voulez prendre.<br>
+      Zéro prospection. Votre seul job : closer.
     </p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <a href="/closer/recruit" class="btn-primary">Je postule maintenant →</a>
       <a href="#comment" class="btn-sec">Comment ça marche</a>
     </div>
     <!-- Chiffres -->
-    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-top:52px">
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#a78bfa">18%</div>
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">jusqu'à 20%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#2ecc71">~89€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">75€ · 630€ · 1 800€</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">selon l'offre signée</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#f59e0b">100%</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">à distance</div>
       </div>
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 28px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:#527FB3">0</div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#527FB3">0</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">prospection de votre côté</div>
       </div>
     </div>
@@ -108,9 +108,9 @@ a{text-decoration:none}
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px;position:relative">
       <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
         display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">1</div>
-      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">On vous envoie un RDV</h3>
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous choisissez vos créneaux</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
-        Nous gérons la prospection, les emails, les relances. Vous recevez un RDV avec un prospect qui a déjà montré son intérêt.
+        Des prospects qualifiés ont réservé un créneau. Vous accédez à la liste et choisissez librement ceux que vous voulez prendre. Aucune obligation de volume.
       </p>
     </div>
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
@@ -126,7 +126,7 @@ a{text-decoration:none}
         display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">3</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous êtes payé</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
-        18% du deal viré le 10 du mois suivant. Pas de plafond. Plus vous signez, plus vous gagnez.
+        Votre commission est calculée automatiquement sur chaque deal signé. Versement déclenché rapidement selon le montant cumulé. Pas de plafond.
       </p>
     </div>
   </div>
@@ -148,13 +148,13 @@ a{text-decoration:none}
     </div>
     <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
       <span style="font-size:1.3rem">📅</span>
-      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">RDV qualifiés</div>
-      <div style="color:#555;font-size:.85rem">Prospects chauds, déjà sensibilisés</div></div>
+      <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Créneaux à choisir</div>
+      <div style="color:#555;font-size:.85rem">Prospects chauds, avec contexte complet</div></div>
     </div>
     <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
       <span style="font-size:1.3rem">📊</span>
       <div><div style="color:#fff;font-weight:600;font-size:.95rem;margin-bottom:4px">Portail de suivi</div>
-      <div style="color:#555;font-size:.85rem">Vos RDV, stats et commissions en temps réel</div></div>
+      <div style="color:#555;font-size:.85rem">Vos créneaux, stats et commissions en temps réel</div></div>
     </div>
   </div>
 </section>
@@ -165,7 +165,7 @@ a{text-decoration:none}
     border:1px solid #2a2a4e;border-radius:20px;padding:48px 40px;text-align:center">
     <h2 style="color:#fff;font-size:1.6rem;font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
     <p style="color:#9ca3af;margin-bottom:32px;line-height:1.6">
-      Candidature en 2 minutes. Réponse sous 48h.
+      Candidature rapide. Pas de SIRET ni de statut requis à cette étape.<br>Réponse sous 48h.
     </p>
     <a href="/closer/recruit" class="btn-primary">Envoyer ma candidature →</a>
   </div>
@@ -199,21 +199,21 @@ textarea{resize:vertical;min-height:120px}
 .btn{width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;
      padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px}
 .btn:hover{background:#5254cc}
-.section-title{color:#fff;font-size:14px;font-weight:600;margin:28px 0 16px;
+.section-title{color:#fff;font-size:14px;font-weight:600;margin:40px 0 18px;padding-top:20px;border-top:1px solid #2a2a4e;
                padding-bottom:8px;border-bottom:1px solid #2a2a4e}
 .hint{color:#555;font-size:11px;margin-top:4px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 </style>
 </head><body>
-<header style="background:#0f0f1a;border-bottom:1px solid #1a1a2e;padding:0 24px;margin-bottom:0">
-  <div style="max-width:680px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:28px">
-    <a href="/closer" style="color:#9ca3af;font-size:12px">← Programme closer</a>
+<header style="position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px">
+  <div style="max-width:680px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
+    <a href="/closer" style="color:#6b7280;font-size:13px;font-weight:500">← Programme closer</a>
   </div>
 </header>
-<div class="wrap" style="padding-top:36px">
-  <h1>Candidature Closer</h1>
-  <p class="sub">Remplissez ce formulaire. Nous vous répondrons sous 48h.</p>
+<div class="wrap" style="padding-top:48px;padding-bottom:60px">
+  <h1 style="margin-bottom:8px">Candidature Closer</h1>
+  <p class="sub" style="margin-bottom:36px">Réponse et démarrage sous 48h.</p>
 
   <form id="form" method="post" action="/closer/recruit" enctype="multipart/form-data">
 
@@ -240,15 +240,9 @@ textarea{resize:vertical;min-height:120px}
       <input type="tel" name="phone" placeholder="Numéro de téléphone">
     </div>
 
-    <div class="row">
-      <div class="field">
-        <label>Date de naissance *</label>
-        <input type="date" name="date_of_birth" required>
-      </div>
-      <div class="field">
-        <label>Ville</label>
-        <input type="text" name="city" placeholder="Ville">
-      </div>
+    <div class="field">
+      <label>Ville</label>
+      <input type="text" name="city" placeholder="Ville">
     </div>
 
     <div class="row">
@@ -261,24 +255,33 @@ textarea{resize:vertical;min-height:120px}
     <div class="section-title">Votre présentation</div>
 
     <div class="field">
-      <label>Message de présentation *</label>
-      <textarea name="message" required placeholder="Présentez-vous, votre expérience en vente/closing, pourquoi ce programme vous intéresse..."></textarea>
-    </div>
+      <span id="media-req" style="display:none"></span>
+      <p style="color:#d1d5db;font-size:.95rem;font-weight:400;line-height:1.7;margin-bottom:20px">Merci de vous présenter à travers un message vidéo ou audio de 2 à 3 minutes maximum en abordant les points suivants&nbsp;:</p><ul style="color:#d1d5db;font-size:.95rem;font-weight:400;line-height:1.8;margin:0 0 20px 24px;list-style:disc"><li>Votre expérience en closing (contexte, type d&rsquo;offres, résultats si possible)</li><li>Votre niveau de connaissance en webmarketing (SEO, IA, acquisition&hellip;)</li><li>Vos disponibilités (date de démarrage et nombre d&rsquo;heures par semaine)</li><li>Votre motivation pour rejoindre ce projet</li></ul>
 
-    <div class="field" id="field-video">
-      <label>Lien vidéo de présentation (YouTube, Loom, Drive…) <span id="media-req" style="color:#e94560">*</span></label>
-      <input type="url" name="video_url" id="video_url" placeholder="https://loom.com/share/...">
-      <p class="hint">2-3 minutes max. Présentez-vous et expliquez votre motivation.</p>
-    </div>
+      <!-- Option A : upload fichier -->
+      <div style="background:#0d0d1a;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px;margin-bottom:10px">
+        <div style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Uploader un fichier</div>
+        <input type="file" name="audio_file" id="audio_file" accept="audio/*,video/*" style="padding:6px;width:100%">
+        <p class="hint" style="margin-top:6px">Audio ou vidéo — .mp3, .m4a, .mp4, .mov — 50 Mo max</p>
+      </div>
 
-    <div class="field">
-      <label>Message audio <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(ou à la place de la vidéo)</span></label>
-      <input type="file" name="audio_file" id="audio_file" accept="audio/*" style="padding:8px">
-      <p class="hint">Fichier .mp3 ou .m4a — 5 Mo max</p>
+      <!-- Séparateur -->
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0 10px">
+        <div style="flex:1;height:1px;background:#2a2a4e"></div>
+        <span style="color:#555;font-size:12px">ou</span>
+        <div style="flex:1;height:1px;background:#2a2a4e"></div>
+      </div>
+
+      <!-- Option B : lien URL -->
+      <div style="background:#0d0d1a;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px">
+        <div style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Coller un lien</div>
+        <input type="url" name="video_url" id="video_url" placeholder="YouTube, Loom, Drive, Dropbox…" style="width:100%">
+        <p class="hint" style="margin-top:6px">Lien public ou partageable</p>
+      </div>
     </div>
 
     <p id="media-error" style="color:#e94560;font-size:12px;margin-bottom:12px;display:none">
-      Merci de fournir au moins une vidéo ou un message audio.
+      Merci de fournir au moins un fichier ou un lien de présentation.
     </p>
 
     <button type="submit" class="btn">Envoyer ma candidature →</button>
@@ -917,13 +920,65 @@ async def closer_recruit_submit(request: Request):
             "message":       form.get("message", "").strip() or None,
             "video_url":     video_url,
             "audio_url":     audio_url,
-            "date_of_birth": date_of_birth,
+            "meta":         {"date_of_birth": str(date_of_birth) if date_of_birth else None},
         }
 
         from marketing_module.database import SessionLocal as MktSession, db_create_application
+        from marketing_module.models import CloserApplicationDB
         with MktSession() as mdb:
             app = db_create_application(mdb, data)
+            total = mdb.query(CloserApplicationDB).filter_by(project_id=PROJECT_ID).count()
 
+        # SMS de notification
+        try:
+            import os as _os, requests as _req
+            _brevo_key = _os.getenv("BREVO_API_KEY", "")
+            if _brevo_key:
+                _prenom = data.get("first_name") or ""
+                _nom    = data.get("last_name") or ""
+                _name   = f"{_prenom} {_nom}".strip() or "Anonyme"
+                _token  = _os.getenv("ADMIN_TOKEN", "")
+                _msg = (
+                    f"Nouvelle candidature closer recue - {total} au total\n"
+                    f"Candidat : {_name}\n"
+                    f"https://presence-ia.com/admin/closers-hub?token={_token}"
+                )
+                _req.post(
+                    "https://api.brevo.com/v3/transactionalSMS/sms",
+                    headers={"api-key": _brevo_key, "Content-Type": "application/json"},
+                    json={"sender": "PresenceIA", "recipient": "+393514459617",
+                          "content": _msg, "type": "transactional"},
+                    timeout=8,
+                )
+        except Exception:
+            pass
+
+        # Email de confirmation au candidat
+        try:
+            import os as _oc, requests as _rq
+            _bkey = _oc.getenv("BREVO_API_KEY", "")
+            _prenom = data.get("first_name") or ""
+            _email_c = data.get("email") or ""
+            _name_c = f"{_prenom} {data.get('last_name') or ''}".strip() or "Closer"
+            if _bkey and _email_c:
+                _rq.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": _bkey, "Content-Type": "application/json"},
+                    json={
+                        "sender": {"name": "Présence IA", "email": "contact@presence-ia.com"},
+                        "to": [{"email": _email_c, "name": _name_c}],
+                        "subject": "Candidature bien reçue — Présence IA",
+                        "htmlContent": f"""<p>Bonjour {_prenom or _name_c},</p>
+                        <p>Nous avons bien reçu votre candidature au programme Closer Présence IA.</p>
+                        <p>Nous l'étudions avec attention et vous répondrons <strong>sous 48h</strong>.</p>
+                        <p>En attendant, vous pouvez consulter la page du programme : 
+                        <a href="https://presence-ia.com/closer">presence-ia.com/closer</a></p>
+                        <p style="color:#999;font-size:12px">— L'équipe Présence IA</p>""",
+                    },
+                    timeout=8,
+                )
+        except Exception:
+            pass
         return JSONResponse({"ok": True, "id": app.id})
 
     except Exception as e:
@@ -987,6 +1042,7 @@ def closer_portal(token: str, request: Request):
              "earned": 0.0, "pending": 0.0}
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
+    stats_month = {"signed": 0, "earned": 0.0}
 
     try:
         from marketing_module.database import SessionLocal as MktSession
@@ -1021,6 +1077,9 @@ def closer_portal(token: str, request: Request):
                         stats["completed"] += 1
                         if m.deal_value:
                             stats["earned"] += m.deal_value * commission_rate
+                            if m.scheduled_at and m.scheduled_at.month == now.month and m.scheduled_at.year == now.year:
+                                stats_month["signed"] += 1
+                                stats_month["earned"] += m.deal_value * commission_rate
                     elif m.status == MeetingStatus.no_show:
                         stats["no_show"] += 1
                     elif m.status == MeetingStatus.scheduled:
@@ -1037,6 +1096,23 @@ def closer_portal(token: str, request: Request):
 
     meetings_past.sort(key=lambda x: x["scheduled_at"] or datetime.min, reverse=True)
     conv_rate = f"{stats['completed']/stats['total']*100:.0f}%" if stats["total"] else "—"
+
+    # ── Commissions versé / à verser ─────────────────────────────────────────
+    comm_verse    = 0.0
+    comm_a_verser = stats["earned"]
+    try:
+        from marketing_module.database import SessionLocal as MktSession3
+        from marketing_module.models import CommissionDB
+        with MktSession3() as mdb3:
+            q_c = mdb3.query(CommissionDB).filter_by(project_id=PROJECT_ID)
+            if closer:
+                q_c = q_c.filter_by(closer_id=closer.id)
+            all_comms = q_c.all()
+            if all_comms:
+                comm_verse    = sum(c.amount or 0 for c in all_comms if getattr(c, "status", "") == "paid")
+                comm_a_verser = sum(c.amount or 0 for c in all_comms if getattr(c, "status", "") != "paid")
+    except Exception:
+        pass
 
     # ── Stats bar ─────────────────────────────────────────────────────────────
     stats_html = "".join(
@@ -1181,24 +1257,57 @@ def closer_portal(token: str, request: Request):
 </tr></thead>
 <tbody>{past_rows}</tbody></table></div>"""
 
+    _months_fr = ["janvier","février","mars","avril","mai","juin","juillet",
+                  "août","septembre","octobre","novembre","décembre"]
+    _month_label = f"{_months_fr[now.month - 1].capitalize()} {now.year}"
     panel_commissions = f"""
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
-  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
-    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{stats["earned"]:.0f}€</div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Gagné (tous temps)</div>
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:baseline">
+  <h2 style="color:#fff;font-size:16px;font-weight:700">Ventes &amp; Commissions</h2>
+  <span style="color:#6366f1;font-size:12px;font-weight:600">{_month_label}</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">
+  <div style="background:#1a1a2e;border:1px solid #2ecc7140;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{stats_month["signed"]}</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">Ventes ce mois</div>
   </div>
-  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
-    <div style="font-size:2rem;font-weight:700;color:#6366f1">{stats["pending"]:.0f}€</div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:4px">En attente (RDV à venir)</div>
+  <div style="background:#1a1a2e;border:1px solid #2ecc7140;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{stats_month["earned"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">Commission ce mois</div>
   </div>
   <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
     <div style="font-size:2rem;font-weight:700;color:#e9a020">{commission_rate*100:.0f}%</div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Taux de commission</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">Taux commission</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#527FB3">{stats["earned"]:.0f}€</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">Cumulé total</div>
   </div>
 </div>
+
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:20px">
+  <p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Historique versements</p>
+  <div style="display:flex;gap:24px;align-items:center">
+    <div>
+      <div style="font-size:1.5rem;font-weight:700;color:#2ecc71">{comm_verse:.0f}€</div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Versé</div>
+    </div>
+    <div style="width:1px;height:40px;background:#2a2a4e"></div>
+    <div>
+      <div style="font-size:1.5rem;font-weight:700;color:#f59e0b">{comm_a_verser:.0f}€</div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">À verser</div>
+    </div>
+    <div style="width:1px;height:40px;background:#2a2a4e"></div>
+    <div>
+      <div style="font-size:1.5rem;font-weight:700;color:#9ca3af">{stats["pending"]:.0f}€</div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">En attente (RDV)</div>
+    </div>
+  </div>
+</div>
+
 <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
-<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Détail</p>
-<div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html}</div>
+  <p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Règles &amp; détail</p>
+  <div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html or '<span style="color:#555">Aucune règle définie — voir avec l\'équipe.</span>'}</div>
 </div>"""
 
     def _resource_block(title, text, color="#6366f1"):
@@ -1295,8 +1404,12 @@ def _meeting_badge(status: str) -> str:
 @router.get("/closer/{closer_token}/meeting/{meeting_id}", response_class=HTMLResponse)
 def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     """Fiche RDV détaillée pour le closer."""
+    import json as _json
+    import re as _re
+
     meeting = None
     prospect = None
+    deliveries = []
 
     try:
         from marketing_module.database import SessionLocal as MktSession
@@ -1306,7 +1419,6 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
 
         with MktSession() as mdb:
             meeting = mdb.query(MeetingDB).filter_by(id=meeting_id).first()
-            deliveries = []
             if meeting:
                 deliveries = mdb.query(ProspectDeliveryDB).filter_by(
                     project_id=PROJECT_ID, prospect_id=meeting.prospect_id
@@ -1330,36 +1442,105 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     city  = prospect.city if prospect else "—"
     prof  = prospect.profession if prospect else "—"
     email = prospect.email if prospect else "—"
-    phone = prospect.phone if prospect else ""
+    phone = (prospect.phone or "") if prospect else ""
+    land  = getattr(prospect, "landing_url", "") or ""
 
-    # Timeline comportementale
-    timeline = ""
+    # ── Score IA + concurrents ─────────────────────────────────────────────
+    ia_score = 0.0
+    cited_names: list = []
+    total_queries = 0
+    prospect_cit = 0
     try:
-        for d in deliveries:
-            items = []
-            if d.sent_at:    items.append(f'<li>📧 Envoyé {_fmt(d.sent_at)}</li>')
-            if d.opened_at:  items.append(f'<li style="color:#f59e0b">👁 Ouvert {_fmt(d.opened_at)}</li>')
-            if d.clicked_at: items.append(f'<li style="color:#2ecc71">🖱 Clic landing {_fmt(d.clicked_at)}</li>')
-            lv = getattr(d, "landing_visited_at", None)
-            if lv:           items.append(f'<li style="color:#2ecc71">🌐 Landing visitée {_fmt(lv)}</li>')
-            cc = getattr(d, "calendly_clicked_at", None)
-            if cc:           items.append(f'<li style="color:#6366f1">📅 Calendly cliqué {_fmt(cc)}</li>')
-            timeline += "".join(items)
+        raw = getattr(prospect, "ia_results", None)
+        if raw:
+            results = _json.loads(raw) if isinstance(raw, str) else (raw or [])
+            total_queries = len(results)
+            norm_name = _re.sub(r'[^a-z0-9 ]', '', (name or "").lower().replace("[test]", "").strip())
+            for r in results:
+                resp = r.get("response", "")
+                for m in _re.finditer(r'\[([^\]]{3,60})\]\(', resp):
+                    n = m.group(1).strip()
+                    if n and n not in cited_names and not n.startswith("http"):
+                        cited_names.append(n)
+                if norm_name and len(norm_name) > 3 and norm_name in resp.lower():
+                    prospect_cit += 1
+            if total_queries:
+                ia_score = round(prospect_cit / total_queries * 10, 1)
     except Exception:
         pass
 
-    # Guide RDV
-    rdv_guide_lines = "".join(
-        f'<div style="padding:6px 0;border-bottom:1px solid #1a1a2e;color:{"#6366f1" if ln.startswith(("AVANT","PENDANT","FIN","1.","2.","3.","4.","5.","6.","7.","8.","9.")) else "#ccc"};font-size:12px;line-height:1.5">{ln}</div>'
-        if ln.strip() else '<div style="height:6px"></div>'
-        for ln in content.get("rdv_guide", "").split("\n")
-    )
+    score_color = "#2ecc71" if ia_score >= 6 else ("#f59e0b" if ia_score >= 3 else "#e94560")
+    score_pct = int(ia_score / 10 * 100)
+
+    _PANIERS = {
+        "couvreur": "8 000 – 15 000 €", "pisciniste": "15 000 – 35 000 €",
+        "menuisier": "5 000 – 20 000 €", "plombier": "2 000 – 8 000 €",
+        "electricien": "1 500 – 6 000 €", "macon": "10 000 – 50 000 €",
+        "peintre": "2 000 – 10 000 €", "carreleur": "3 000 – 15 000 €",
+        "installateur": "5 000 – 25 000 €", "renovateur": "15 000 – 80 000 €",
+        "toiture": "8 000 – 20 000 €", "isolation": "5 000 – 20 000 €",
+    }
+    prof_norm = _re.sub(r'[^a-z]', '', (prof or "").lower()
+                        .replace("é","e").replace("è","e").replace("ê","e")
+                        .replace("à","a").replace("â","a").replace("ô","o"))
+    panier = next((v for k, v in _PANIERS.items() if k in prof_norm), "Non renseigné")
+
+    cited_html = "".join(
+        f'<span style="background:#2a2a4e;color:#ccc;font-size:10px;padding:2px 8px;'
+        f'border-radius:10px;margin:2px;display:inline-block">{n[:45]}</span>'
+        for n in cited_names[:12]
+    ) or '<span style="color:#555;font-size:12px">Aucune donnée IA disponible</span>'
+
+    # ── Timeline comportementale ───────────────────────────────────────────
+    timeline = ""
+    try:
+        for dv in deliveries:
+            if dv.sent_at:    timeline += f'<li>📧 Envoyé {_fmt(dv.sent_at)}</li>'
+            if dv.opened_at:  timeline += f'<li style="color:#f59e0b">👁 Ouvert {_fmt(dv.opened_at)}</li>'
+            if dv.clicked_at: timeline += f'<li style="color:#2ecc71">🖱 Clic landing {_fmt(dv.clicked_at)}</li>'
+            lv = getattr(dv, "landing_visited_at", None)
+            if lv:            timeline += f'<li style="color:#2ecc71">🌐 Landing visitée {_fmt(lv)}</li>'
+            cc = getattr(dv, "calendly_clicked_at", None)
+            if cc:            timeline += f'<li style="color:#6366f1">📅 Calendly cliqué {_fmt(cc)}</li>'
+    except Exception:
+        pass
 
     phone_btn = (
-        f'<a href="tel:{phone}" style="display:inline-block;margin-top:6px;padding:6px 14px;'
-        f'background:#6366f120;border:1px solid #6366f140;border-radius:4px;'
-        f'color:#6366f1;font-size:12px;text-decoration:none">📞 Appeler {phone}</a>'
+        f'<a href="tel:{phone}" style="padding:6px 12px;background:#6366f120;border:1px solid #6366f140;'
+        f'border-radius:4px;color:#6366f1;font-size:12px;text-decoration:none">📞 {phone}</a>'
     ) if phone else ""
+    land_btn = (
+        f'<a href="https://presence-ia.com{land}" target="_blank" '
+        f'style="padding:6px 12px;background:#2ecc7120;border:1px solid #2ecc7140;'
+        f'border-radius:4px;color:#2ecc71;font-size:12px;text-decoration:none">🔗 Landing</a>'
+    ) if land else ""
+
+    # ── Accordéon offres ──────────────────────────────────────────────────
+    pitch = content.get("offer_pitch", "")
+    import re as _re2
+    offer_blocks = _re2.split(r'─{5,}', pitch)
+    offer_texts = {str(i+1): offer_blocks[i+1].strip() if i+1 < len(offer_blocks) else "" for i in range(3)}
+    offer_accordeon = ""
+    for i, (num, oname, price) in enumerate([("1","Audit Complet","500 €"),
+                                              ("2","Exécution Complète","3 500 €"),
+                                              ("3","Domination IA Locale","9 000 €")]):
+        open_attr = " open" if i == 1 else ""
+        offer_accordeon += (
+            f'<details{open_attr} style="margin-bottom:10px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:8px">'
+            f'<summary style="padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;list-style:none">'
+            f'<div><span style="color:#9ca3af;font-size:10px">Offre {num}</span>'
+            f'<div style="color:#fff;font-size:15px;font-weight:700;margin-top:2px">{oname}</div></div>'
+            f'<div style="text-align:right">'
+            f'<div style="color:#2ecc71;font-size:1.8rem;font-weight:900">{price}</div>'
+            f'<button onclick="sendPaymentLink(event,\'{num}\')" style="margin-top:4px;padding:4px 10px;'
+            f'background:#6366f1;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer">'
+            f'Envoyer lien →</button></div></summary>'
+            f'<div style="padding:0 16px 16px">'
+            f'<pre id="ob{num}" style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7"></pre>'
+            f'</div></details>'
+        )
+
+    script_text = content.get("pitch_script", "")
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1367,8 +1548,18 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
-.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px}}
-.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}
+.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:14px}}
+.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:block}}
+.rtab{{padding:7px 14px;border:1px solid #2a2a4e;border-radius:6px;background:#1a1a2e;color:#9ca3af;font-size:11px;cursor:pointer}}
+.active-rtab{{background:#6366f1;color:#fff;border-color:#6366f1}}
+details>summary::-webkit-details-marker{{display:none}}
+textarea{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc;font-size:13px;
+  padding:10px;width:100%;resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}}
+textarea:focus{{outline:none;border-color:#6366f1}}
+.modal-bg{{display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center}}
+.modal-bg.open{{display:flex}}
+.modal{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:24px;max-width:480px;width:90%}}
+select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc;padding:8px 10px;width:100%;font-size:13px}}
 </style></head><body>
 
 <div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
@@ -1377,60 +1568,285 @@ body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
   <a href="/closer/{closer_token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
 </div>
 
-<div style="max-width:780px;margin:0 auto;padding:28px 20px">
+<div style="max-width:820px;margin:0 auto;padding:24px 20px">
 
-<!-- En-tête prospect -->
-<div style="margin-bottom:20px">
-  <h1 style="color:#fff;font-size:20px;margin-bottom:4px">{name}</h1>
-  <p style="color:#9ca3af;font-size:13px">{city} · {prof}</p>
-  <p style="color:#555;font-size:12px;margin-top:2px">{email}</p>
-  {phone_btn}
-</div>
-
-<!-- Bloc RDV -->
-<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;text-align:center">
+<!-- EN-TÊTE PROSPECT -->
+<div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
   <div>
-    <div style="color:#f59e0b;font-size:1.2rem;font-weight:700">{_fmt(meeting.scheduled_at)}</div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Date RDV</div>
+    <h1 style="color:#fff;font-size:18px;font-weight:700">{name}</h1>
+    <p style="color:#9ca3af;font-size:12px;margin-top:3px">{city} · {prof}
+      <span style="color:#555"> · {email}</span></p>
   </div>
-  <div>
-    {_meeting_badge(meeting.status)}
-    <div style="color:#9ca3af;font-size:11px;margin-top:6px">Statut</div>
-  </div>
-  <div>
-    <div style="color:#2ecc71;font-size:1.2rem;font-weight:700">
-      {"{}€".format(int(meeting.deal_value)) if meeting.deal_value else "—"}
-    </div>
-    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Deal</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    {phone_btn}
+    {land_btn}
+    <button onclick="document.getElementById('modal-complete').classList.add('open')"
+      style="padding:7px 14px;background:#6366f1;color:#fff;border:none;border-radius:6px;
+             font-size:12px;cursor:pointer;font-weight:600">
+      ✓ Clôturer ce RDV</button>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
-<!-- Historique prospect -->
+<!-- SCORE IA -->
 <div class="card">
-  <p class="sec">Comportement du prospect</p>
-  <ul style="list-style:none;display:flex;flex-direction:column;gap:3px;font-size:12px">
-    {timeline or '<li style="color:#555">Aucun historique</li>'}
+  <span class="sec">Visibilité IA actuelle</span>
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+    <div style="text-align:center;min-width:56px">
+      <div style="font-size:2.2rem;font-weight:900;color:{score_color}">{ia_score}</div>
+      <div style="color:#555;font-size:10px">/10</div>
+    </div>
+    <div style="flex:1">
+      <div style="background:#0f0f1a;border-radius:4px;height:8px;overflow:hidden">
+        <div style="background:{score_color};width:{score_pct}%;height:100%;border-radius:4px;
+                    transition:width .5s"></div>
+      </div>
+      <div style="color:#9ca3af;font-size:11px;margin-top:5px">
+        Cité <strong>{prospect_cit}</strong> fois sur <strong>{total_queries}</strong> requêtes
+        &nbsp;·&nbsp; Panier moyen estimé :
+        <strong style="color:#fff">{panier}</strong>
+      </div>
+    </div>
+  </div>
+  <span class="sec" style="margin-bottom:6px">Concurrents cités par les IA</span>
+  <div style="display:flex;flex-wrap:wrap;gap:4px">{cited_html}</div>
+</div>
+
+<!-- RDV + STATUT -->
+<div class="card" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+  <div>
+    <div style="color:#f59e0b;font-size:1.1rem;font-weight:700">{_fmt(meeting.scheduled_at)}</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:2px">Date RDV</div>
+  </div>
+  <div>{_meeting_badge(meeting.status)}</div>
+  {"<div><div style='color:#2ecc71;font-size:1.1rem;font-weight:700'>{}€</div><div style='color:#9ca3af;font-size:10px;margin-top:2px'>Deal signé</div></div>".format(int(meeting.deal_value)) if meeting.deal_value else ""}
+</div>
+
+<!-- NOTES ÉDITABLES -->
+<div class="card">
+  <span class="sec">Notes
+    <span id="note-status" style="font-size:9px;color:#555;font-weight:400;text-transform:none;margin-left:8px"></span>
+  </span>
+  <textarea id="notes-area" placeholder="Points clés du prospect, objections soulevées, décision...">{meeting.notes or ""}</textarea>
+</div>
+
+<!-- COMPORTEMENT -->
+<div class="card">
+  <span class="sec">Comportement du prospect</span>
+  <ul style="list-style:none;display:flex;flex-direction:column;gap:4px;font-size:12px">
+    {timeline or '<li style="color:#555">Aucun historique disponible</li>'}
   </ul>
 </div>
 
-<!-- Notes -->
-<div class="card">
-  <p class="sec">Notes</p>
-  <p style="color:#ccc;font-size:13px;line-height:1.5">{meeting.notes or "Aucune note"}</p>
-  {f'<p style="color:#9ca3af;font-size:12px;margin-top:8px">{meeting.outcome}</p>' if getattr(meeting,"outcome","") else ""}
+<!-- RESSOURCES CLOSER -->
+<div style="margin-top:4px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <button onclick="showRes('offres')" id="rtab-offres" class="rtab active-rtab">Les offres</button>
+    <button onclick="showRes('args')" id="rtab-args" class="rtab">Arguments</button>
+    <button onclick="showRes('trame')" id="rtab-trame" class="rtab">Trame de vente</button>
+    <button onclick="showRes('objections')" id="rtab-objections" class="rtab">Objections</button>
+    <button onclick="showRes('commissions')" id="rtab-commissions" class="rtab">Commissions</button>
+  </div>
+
+  <div id="res-offres" class="res-panel">
+    <p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
+              margin-bottom:12px">Ordre de présentation : Domination → Exécution → Audit</p>
+    {offer_accordeon}
+  </div>
+  <div id="res-args" class="res-panel card" style="display:none">
+    <span class="sec">Arguments de vente par offre</span>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7">{content.get("arguments_vente","")}</pre>
+  </div>
+  <div id="res-trame" class="res-panel card" style="display:none">
+    <span class="sec">Trame de vente — 6 étapes</span>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7">{content.get("trame_vente", content.get("pitch_script",""))}</pre>
+  </div>
+  <div id="res-objections" class="res-panel card" style="display:none">
+    <span class="sec">Réponses aux objections</span>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7">{content.get("objections","")}</pre>
+  </div>
+  <div id="res-commissions" class="res-panel card" style="display:none">
+    <span class="sec">Conditions de rémunération</span>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7">{content.get("commission_info","")}</pre>
+  </div>
 </div>
 
 </div>
 
-<!-- Guide RDV -->
-<div class="card">
-  <p class="sec">Fiche RDV — Aide-mémoire</p>
-  <div>{rdv_guide_lines or '<p style="color:#555;font-size:12px">Guide non configuré — rendez-vous dans l\'admin → Contenu portail</p>'}</div>
+<!-- MODAL CLÔTURE RDV -->
+<div class="modal-bg" id="modal-complete">
+  <div class="modal">
+    <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:20px">Clôturer ce RDV</h2>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:6px">Résultat</label>
+        <select id="cl-status" onchange="onStatusChange()">
+          <option value="completed">Signé ✓</option>
+          <option value="no_show">No-show</option>
+          <option value="cancelled">Annulé</option>
+          <option value="relance">À relancer</option>
+        </select>
+      </div>
+      <div id="cl-offer-block">
+        <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:6px">Offre signée</label>
+        <select id="cl-offer">
+          <option value="500">Audit Complet — 500 €</option>
+          <option value="3500" selected>Exécution Complète — 3 500 €</option>
+          <option value="9000">Domination IA Locale — 9 000 €</option>
+        </select>
+      </div>
+      <div id="cl-date-block" style="display:none">
+        <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:6px">Date de relance</label>
+        <input type="date" id="cl-date" style="background:#0f0f1a;border:1px solid #2a2a4e;
+               border-radius:6px;color:#ccc;padding:8px;width:100%;font-size:13px">
+      </div>
+      <div>
+        <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:6px">Notes de clôture</label>
+        <textarea id="cl-notes" placeholder="Résumé du call, décision, prochaine étape..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-complete').classList.remove('open')"
+          style="padding:8px 16px;background:#1a1a2e;border:1px solid #2a2a4e;color:#9ca3af;
+                 border-radius:6px;cursor:pointer;font-size:12px">Annuler</button>
+        <button onclick="submitComplete()"
+          style="padding:8px 16px;background:#6366f1;border:none;color:#fff;
+                 border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Enregistrer</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-</div></body></html>""")
+<script>
+// ── Injecter textes offres ──
+const _ot = {_json.dumps(offer_texts)};
+Object.keys(_ot).forEach(k => {{
+  const el = document.getElementById('ob'+k);
+  if (el) el.textContent = _ot[k];
+}});
+
+// ── Onglets ressources ──
+function showRes(key) {{
+  document.querySelectorAll('.res-panel').forEach(p => p.style.display='none');
+  document.querySelectorAll('.rtab').forEach(b => b.classList.remove('active-rtab'));
+  document.getElementById('res-'+key).style.display='block';
+  document.getElementById('rtab-'+key).classList.add('active-rtab');
+}}
+
+// ── Notes auto-save (debounce 1s) ──
+let _nt;
+document.getElementById('notes-area').addEventListener('input', function() {{
+  clearTimeout(_nt);
+  document.getElementById('note-status').textContent = '…';
+  _nt = setTimeout(async () => {{
+    const r = await fetch('/closer/{closer_token}/meeting/{meeting_id}/notes', {{
+      method:'PATCH', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{notes: this.value}})
+    }});
+    const ns = document.getElementById('note-status');
+    ns.textContent = r.ok ? 'sauvegardé ✓' : 'erreur';
+    setTimeout(() => ns.textContent='', 2000);
+  }}, 1000);
+}});
+
+// ── Modal clôture ──
+function onStatusChange() {{
+  const s = document.getElementById('cl-status').value;
+  document.getElementById('cl-offer-block').style.display = s==='completed' ? 'block' : 'none';
+  document.getElementById('cl-date-block').style.display  = s==='relance'   ? 'block' : 'none';
+}}
+
+async function submitComplete() {{
+  const status  = document.getElementById('cl-status').value;
+  const offerV  = document.getElementById('cl-offer').value;
+  const notes   = document.getElementById('cl-notes').value;
+  const relDate = document.getElementById('cl-date').value;
+  const r = await fetch('/closer/{closer_token}/meeting/{meeting_id}/complete', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{status, deal_value:status==='completed'?parseFloat(offerV):null,
+                           notes, relance_date:relDate}})
+  }});
+  const d = await r.json();
+  if (r.ok) {{ document.getElementById('modal-complete').classList.remove('open'); location.reload(); }}
+  else alert(d.error || 'Erreur');
+}}
+
+async function sendPaymentLink(e, offerNum) {{
+  e.stopPropagation(); e.preventDefault();
+  const r = await fetch('/closer/{closer_token}/meeting/{meeting_id}/payment-link', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{offer_num: offerNum}})
+  }});
+  const d = await r.json();
+  alert(d.message || 'Lien envoyé !');
+}}
+</script>
+</body></html>""")
+
+
+@router.patch("/closer/{closer_token}/meeting/{meeting_id}/notes", response_class=JSONResponse)
+async def closer_save_notes(closer_token: str, meeting_id: str, request: Request):
+    """Auto-save des notes sur un RDV."""
+    body = await request.json()
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB
+        with MktSession() as mdb:
+            m = mdb.query(MeetingDB).filter_by(id=meeting_id).first()
+            if m:
+                m.notes = body.get("notes", "")
+                mdb.commit()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/closer/{closer_token}/meeting/{meeting_id}/complete", response_class=JSONResponse)
+async def closer_complete_meeting(closer_token: str, meeting_id: str, request: Request):
+    """Clôturer un RDV : statut + deal + notes."""
+    from datetime import datetime
+    body = await request.json()
+    status   = body.get("status", "completed")
+    deal_val = body.get("deal_value")
+    notes    = body.get("notes", "")
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB, MeetingStatus
+        status_map = {
+            "completed": MeetingStatus.completed,
+            "no_show":   MeetingStatus.no_show,
+            "cancelled": MeetingStatus.cancelled,
+            "relance":   MeetingStatus.scheduled,
+        }
+        with MktSession() as mdb:
+            m = mdb.query(MeetingDB).filter_by(id=meeting_id).first()
+            if not m:
+                return JSONResponse({"error": "RDV introuvable"}, status_code=404)
+            m.status = status_map.get(status, MeetingStatus.completed)
+            if deal_val:
+                m.deal_value = float(deal_val)
+            if notes:
+                existing = m.notes or ""
+                m.notes = (existing + f"\n[Clôture] {notes}").strip()
+            if status == "completed":
+                m.completed_at = datetime.utcnow()
+            mdb.commit()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/closer/{closer_token}/meeting/{meeting_id}/payment-link", response_class=JSONResponse)
+async def closer_send_payment_link(closer_token: str, meeting_id: str, request: Request):
+    """Envoyer le lien de paiement Stripe au prospect (stub — configurer Stripe Price IDs)."""
+    body = await request.json()
+    offer_num = str(body.get("offer_num", "2"))
+    offers = {"1": ("Audit Complet", "500"), "2": ("Exécution Complète", "3500"),
+              "3": ("Domination IA Locale", "9000")}
+    o_name, o_price = offers.get(offer_num, ("Offre", ""))
+    # TODO: créer session Stripe + envoyer email quand stripe_price_id configuré
+    return JSONResponse({
+        "message": f"⚠️ Stripe non configuré — Prix ID manquant pour '{o_name} ({o_price}€)'. "
+                   f"Configurez dans /admin puis réessayez."
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
