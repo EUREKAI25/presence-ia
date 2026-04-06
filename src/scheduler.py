@@ -1325,33 +1325,17 @@ def run_sirene_qualify(profession_ids: list = None, max_per_naf: int = 200):
 # ── OUTBOUND ─────────────────────────────────────────────────────────────────
 
 _OUTBOUND_SUBJECTS = [
-    "Votre visibilité sur ChatGPT, Gemini et Claude",
-    "Testé : votre entreprise sur les IA",
-    "Les IA locales ne vous recommandent pas encore",
-    "Résultat de notre test IA — {profession} à {city}",
-    "Vos clients cherchent sur l'IA — êtes-vous visible ?",
+    "Votre nom n'est pas sorti",
 ]
 
 _OUTBOUND_BODY = """\
 Bonjour,
 
-Nous avons testé ce que répondent ChatGPT, Gemini et Claude quand quelqu'un cherche \
-un(e) {profession} à {city}.
+On a testé ce que répond ChatGPT quand on cherche un {profession} à {ville}. Votre entreprise n'apparaît pas.
 
-Votre entreprise n'apparaît pas dans leurs réponses.
+Aujourd'hui, beaucoup de gens passent par là avant d'appeler.
 
-C'est un problème de plus en plus courant : les IA recommandent des entreprises \
-en fonction de leur présence en ligne, et les professionnels non référencés \
-n'existent tout simplement pas pour elles.
-
-Nous aidons les artisans et professionnels à apparaître dans ces résultats IA.
-
-Si vous souhaitez voir le résultat du test ou en savoir plus, répondez à cet email \
-— c'est sans engagement.
-
-Bonne journée,
-{sender_name}
-presence-ia.com
+Vous avez déjà regardé ce que ça donne de votre côté ?
 """
 
 
@@ -1525,21 +1509,32 @@ def _job_outbound(force: bool = False):
         city_display      = (prospect.city or "").title()
         profession_display = (prospect.profession or "professionnel").lower()
 
+        sender_name = sender.split("@")[0].replace("-", " ").capitalize()
+
         subject = random.choice(_OUTBOUND_SUBJECTS).format(
-            profession=profession_display, city=city_display,
+            profession=profession_display, ville=city_display,
+        )
+        body = _OUTBOUND_BODY.format(
+            profession=profession_display,
+            ville=city_display,
         )
 
         if dry_run:
             would_send += 1
-            log.info("[OUTBOUND][DRY_RUN] WOULD_SEND #%d — %-40s  %-25s  from=%s  subject=%s",
-                     would_send, prospect.name[:40], prospect.email, sender, subject)
-        else:
-            sender_name = sender.split("@")[0].replace("-", " ").capitalize()
-            body = _OUTBOUND_BODY.format(
-                profession=profession_display,
-                city=city_display,
-                sender_name=sender_name,
+            log.info(
+                "[OUTBOUND][DRY_RUN] ══════════════════════════════════════\n"
+                "  #%d\n"
+                "  To      : %s <%s>\n"
+                "  From    : %s\n"
+                "  Subject : %s\n"
+                "  Body    :\n%s",
+                would_send,
+                prospect.name, prospect.email,
+                sender,
+                subject,
+                "\n".join("  " + l for l in body.splitlines()),
             )
+        else:
             try:
                 resp = _req.post(
                     "https://api.brevo.com/v3/smtp/email",
