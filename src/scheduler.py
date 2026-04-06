@@ -104,8 +104,128 @@ def start_scheduler():
             misfire_grace_time=1800,
         )
 
+    # Job 10 : monitoring clés API — toutes les 6h
+    _scheduler.add_job(
+        _job_check_api_keys,
+        trigger=IntervalTrigger(hours=6),
+        id="check_api_keys",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+    # Job 11 : outbound v3_prospects — tous les jours à 9h UTC
+    _scheduler.add_job(
+        _job_outbound,
+        trigger=CronTrigger(hour=9, minute=0, timezone="UTC"),
+        id="outbound",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
+
+
+def _job_check_api_keys():
+    """Vérifie que les clés OpenAI, Gemini et Anthropic sont valides.
+    Envoie une alerte email via Brevo si l'une d'elles retourne 401/403.
+    """
+    import os
+    import requests as _req
+
+    CHECKS = [
+        ("OpenAI",    "OPENAI_API_KEY",    "https://api.openai.com/v1/models",
+         lambda k: {"Authorization": f"Bearer {k}"}),
+        ("Gemini",    "GEMINI_API_KEY",    None,  None),   # URL construite dynamiquement
+        ("Anthropic", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/models",
+         lambda k: {"x-api-key": k, "anthropic-version": "2023-06-01"}),
+    ]
+
+    failed = []
+    for name, env_var, url, headers_fn in CHECKS:
+        key = os.getenv(env_var, "")
+        if not key:
+            failed.append((name, "clé absente dans .env"))
+            continue
+        try:
+            if name == "Gemini":
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+                headers = {}
+            else:
+                headers = headers_fn(key)
+            r = _req.get(url, headers=headers, timeout=8)
+            if r.status_code in (401, 403):
+                failed.append((name, f"HTTP {r.status_code} — clé invalide ou expirée"))
+            else:
+                log.debug("check_api_keys: %s OK (%d)", name, r.status_code)
+        except Exception as e:
+            failed.append((name, f"erreur réseau : {e}"))
+
+    if not failed:
+        log.info("check_api_keys: toutes les clés sont valides")
+        return
+
+    # ── Envoi alerte Brevo ────────────────────────────────────────────────────
+    brevo_key   = os.getenv("BREVO_API_KEY", "")
+    admin_email = os.getenv("ADMIN_ALERT_EMAIL") or os.getenv("ADMIN_EMAIL", "contact@presence-ia.com")
+    admin_token = os.getenv("ADMIN_TOKEN", "changeme")
+
+    names_str = ", ".join(n for n, _ in failed)
+    log.warning("check_api_keys: clés invalides — %s", names_str)
+
+    rows_html = "".join(
+        f'<tr><td style="padding:8px 12px;font-weight:600;color:#dc2626">{n}</td>'
+        f'<td style="padding:8px 12px;color:#555">{msg}</td></tr>'
+        for n, msg in failed
+    )
+    links_html = (
+        '<ul style="margin:12px 0;padding-left:20px;line-height:2">'
+        '<li><a href="https://platform.openai.com/api-keys">Renouveler clé OpenAI</a></li>'
+        '<li><a href="https://aistudio.google.com/app/apikey">Renouveler clé Gemini</a></li>'
+        '<li><a href="https://console.anthropic.com/account/keys">Renouveler clé Anthropic</a></li>'
+        '</ul>'
+    )
+    body = f"""
+    <div style="font-family:sans-serif;max-width:600px">
+      <h2 style="color:#dc2626">🔴 Clés API invalides — PRESENCE IA</h2>
+      <p>Les clés suivantes ne fonctionnent plus et bloquent le refresh IA de la landing :</p>
+      <table style="border-collapse:collapse;width:100%;margin:12px 0">
+        <thead><tr style="background:#fef2f2">
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#9ca3af">SERVICE</th>
+          <th style="text-align:left;padding:8px 12px;font-size:12px;color:#9ca3af">PROBLÈME</th>
+        </tr></thead>
+        <tbody>{rows_html}</tbody>
+      </table>
+      <p>Renouvelle les clés ici :</p>
+      {links_html}
+      <p style="margin-top:20px">
+        <a href="https://presence-ia.com/admin?token={admin_token}"
+           style="background:#e94560;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
+          Ouvrir l'admin →
+        </a>
+      </p>
+    </div>
+    """
+
+    if not brevo_key:
+        log.warning("check_api_keys: BREVO_API_KEY absent — alerte email non envoyée")
+        return
+
+    try:
+        _req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": brevo_key, "Content-Type": "application/json"},
+            json={
+                "sender":      {"name": "Présence IA — Monitoring", "email": "contact@presence-ia.com"},
+                "to":          [{"email": admin_email}],
+                "subject":     f"🔴 Clés API invalides : {names_str}",
+                "htmlContent": body,
+            },
+            timeout=8,
+        )
+        log.info("check_api_keys: alerte envoyée à %s", admin_email)
+    except Exception as e:
+        log.warning("check_api_keys: échec envoi alerte — %s", e)
 
 
 def stop_scheduler():
@@ -154,22 +274,111 @@ def _job_monthly_retest():
         log.error("_job_monthly_retest : %s", e)
 
 
+_LEGAL_SFX = None  # initialisé ci-dessous pour éviter la recompilation
+
+
+def _norm_cited(s: str) -> str:
+    import re, unicodedata
+    global _LEGAL_SFX
+    if _LEGAL_SFX is None:
+        _LEGAL_SFX = re.compile(
+            r'\b(sarl|sas|sasu|sa|sci|snc|eurl|scp|scop|scic|gie|ei|auto[- ]entrepreneur|'
+            r'and co|et (cie|fils|freres?|associes?)|groupe|holding)\b'
+        )
+    s = s.lower().strip()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    s = _LEGAL_SFX.sub(" ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _extract_cited_names(ia_results: list) -> dict:
+    """Extrait les noms d'entreprises cités dans les réponses IA.
+    Retourne {name_raw: [model1, model2, ...]}
+    """
+    import re
+
+    cited = {}  # name_raw → set(models)
+    for entry in (ia_results or []):
+        model    = entry.get("model", "?")
+        response = entry.get("response", "")
+        # Markdown links : [Nom](url)
+        for m in re.finditer(r'\[([^\]]{3,60})\]\(http', response):
+            raw = m.group(1).strip()
+            if raw and not raw.startswith("http"):
+                cited.setdefault(raw, set()).add(model)
+        # Lignes débutant par - ou * ou chiffre. (listes)
+        for m in re.finditer(r'^[-*\d\.]+\s+\*{0,2}([A-ZÀÂÉÈÊËÏÎÔÙÛÜ][^:\n*]{2,60})\*{0,2}', response, re.MULTILINE):
+            raw = m.group(1).strip().rstrip(".,:")
+            if len(raw) > 3:
+                cited.setdefault(raw, set()).add(model)
+    return {k: list(v) for k, v in cited.items()}
+
+
+def _upsert_cited_companies(db, profession: str, city: str, cited: dict):
+    """Upsert des entreprises citées dans ia_cited_companies."""
+    import json
+    from .models import IaCitedCompanyDB
+
+    prof_norm = profession.lower().strip()
+    city_norm = city.lower().strip()
+    for name_raw, models in cited.items():
+        name_norm = _norm_cited(name_raw)
+        if not name_norm:
+            continue
+        pk = f"{prof_norm}|{city_norm}|{name_norm}"
+        existing = db.get(IaCitedCompanyDB, pk)
+        if existing:
+            existing_models = set(json.loads(existing.models))
+            existing.models   = json.dumps(sorted(existing_models | set(models)), ensure_ascii=False)
+            existing.last_seen = datetime.utcnow()
+        else:
+            db.add(IaCitedCompanyDB(
+                id         = pk,
+                profession = prof_norm,
+                city       = city_norm,
+                name_raw   = name_raw,
+                name_norm  = name_norm,
+                models     = json.dumps(sorted(models), ensure_ascii=False),
+                first_seen = datetime.utcnow(),
+                last_seen  = datetime.utcnow(),
+            ))
+    db.commit()
+
+
 def _job_refresh_ia():
     """Relance les tests IA (ChatGPT + Gemini + Claude) pour toutes les paires
-    ville/métier actives — lun/jeu/dim à 9h30, 15h, 18h30 UTC."""
+    ville/métier actives — lun/jeu/dim à 9h30, 15h, 18h30 UTC.
+    Skip les paires sans prospect actif depuis >30 jours.
+    Alimente ia_cited_companies après chaque refresh.
+    """
     try:
         import time as _time, json as _json
+        from datetime import timedelta
         from .database import SessionLocal
         from .api.routes.v3 import _run_ia_test, V3ProspectDB
+        cutoff = datetime.utcnow() - timedelta(days=30)
         with SessionLocal() as db:
-            pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
-        log.info("refresh_ia : %d paires à tester", len(pairs))
-        for city, profession in pairs:
+            # Paires avec au moins un prospect récent (créé ou contacté dans les 30j)
+            all_pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
+            active_pairs = []
+            for city, profession in all_pairs:
+                has_recent = db.query(V3ProspectDB).filter_by(
+                    city=city, profession=profession
+                ).filter(V3ProspectDB.created_at >= cutoff).first()
+                if has_recent:
+                    active_pairs.append((city, profession))
+                else:
+                    log.info("refresh_ia : paire morte skippée — %s / %s", profession, city)
+        log.info("refresh_ia : %d/%d paires actives à tester", len(active_pairs), len(all_pairs))
+        for city, profession in active_pairs:
             try:
                 ia_data = _run_ia_test(profession, city)
                 if not ia_data or not ia_data.get("results"):
                     continue
                 ia_results_json = _json.dumps(ia_data["results"], ensure_ascii=False)
+                cited = _extract_cited_names(ia_data["results"])
                 with SessionLocal() as db:
                     for p in db.query(V3ProspectDB).filter_by(city=city, profession=profession).all():
                         p.ia_prompt    = ia_data.get("prompt")
@@ -178,7 +387,8 @@ def _job_refresh_ia():
                         p.ia_tested_at = ia_data.get("tested_at")
                         p.ia_results   = ia_results_json
                     db.commit()
-                log.info("refresh_ia OK: %s / %s", profession, city)
+                    _upsert_cited_companies(db, profession, city, cited)
+                log.info("refresh_ia OK: %s / %s — %d cités extraits", profession, city, len(cited))
             except Exception as e:
                 log.error("refresh_ia %s/%s: %s", profession, city, e)
             _time.sleep(3)
@@ -929,7 +1139,33 @@ def _job_provision_leads(force: bool = False):
     try:
         from datetime import datetime, timedelta
         from .database import SessionLocal
-        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB
+        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB, IaCitedCompanyDB
+        import unicodedata, re as _re
+
+        _LEGAL_SUFFIXES = _re.compile(
+            r'\b(sarl|sas|sasu|sa|sci|snc|eurl|scp|scop|scic|gie|ei|ei|auto[- ]entrepreneur|'
+            r'and co|et (cie|fils|freres?|associes?)|groupe|holding)\b'
+        )
+        def _norm_name(s):
+            s = s.lower().strip()
+            s = unicodedata.normalize("NFD", s)
+            s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+            s = _re.sub(r"[^a-z0-9 ]", " ", s)
+            s = _LEGAL_SUFFIXES.sub(" ", s)
+            return _re.sub(r"\s+", " ", s).strip()
+
+        def _is_cited(name: str, cited_norms: set) -> bool:
+            """True si le nom matche un cité — exact ou sous-chaîne (min 5 chars)."""
+            n = _norm_name(name)
+            if not n or len(n) < 5:
+                return False
+            if n in cited_norms:
+                return True
+            # sous-chaîne : le nom IA est contenu dans le nom SIRENE ou l'inverse
+            for cited in cited_norms:
+                if len(cited) >= 5 and (cited in n or n in cited):
+                    return True
+            return False
 
         db = SessionLocal()
         try:
@@ -972,6 +1208,14 @@ def _job_provision_leads(force: bool = False):
                 if remaining <= 0:
                     break
 
+                # Noms cités par IA pour ce métier (tous départements — on filtre sur nom)
+                cited_norms = set(
+                    row.name_norm for row in
+                    db.query(IaCitedCompanyDB.name_norm)
+                    .filter(IaCitedCompanyDB.profession == seg.profession_id.lower().strip())
+                    .all()
+                )
+
                 suspects = (
                     db.query(SireneSuspectDB)
                     .filter(
@@ -984,11 +1228,17 @@ def _job_provision_leads(force: bool = False):
                         SireneSuspectDB.contactable.desc(),   # contactables en premier
                         SireneSuspectDB.created_at.asc(),     # FIFO
                     )
-                    .limit(remaining)
+                    .limit(remaining * 3)  # marge pour les exclusions
                     .all()
                 )
 
                 for s in suspects:
+                    if remaining <= 0:
+                        break
+                    # Exclure les entreprises déjà citées par les IA
+                    if cited_norms and _is_cited(s.raison_sociale, cited_norms):
+                        log.debug("provision_leads : exclu (cité IA) — %s", s.raison_sociale)
+                        continue
                     contact = ContactDB(
                         company_name=s.raison_sociale,
                         city=s.ville,
@@ -1056,3 +1306,169 @@ def run_sirene_qualify(profession_ids: list = None, max_per_naf: int = 200):
     finally:
         _SIRENE_STATE["running"] = False
         _SIRENE_STATE["done"]    = True
+
+
+# ── OUTBOUND ─────────────────────────────────────────────────────────────────
+
+_OUTBOUND_SUBJECTS = [
+    "Votre visibilité sur ChatGPT, Gemini et Claude",
+    "Testé : votre entreprise sur les IA",
+    "Les IA locales ne vous recommandent pas encore",
+    "Résultat de notre test IA — {profession} à {city}",
+    "Vos clients cherchent sur l'IA — êtes-vous visible ?",
+]
+
+_OUTBOUND_BODY = """\
+Bonjour,
+
+Nous avons testé ce que répondent ChatGPT, Gemini et Claude quand quelqu'un cherche \
+un(e) {profession} à {city}.
+
+Votre entreprise n'apparaît pas dans leurs réponses.
+
+C'est un problème de plus en plus courant : les IA recommandent des entreprises \
+en fonction de leur présence en ligne, et les professionnels non référencés \
+n'existent tout simplement pas pour elles.
+
+Nous aidons les artisans et professionnels à apparaître dans ces résultats IA.
+
+Si vous souhaitez voir le résultat du test ou en savoir plus, répondez à cet email \
+— c'est sans engagement.
+
+Bonne journée,
+{sender_name}
+presence-ia.com
+"""
+
+
+def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
+    """Retourne True si l'entreprise semble citée dans les réponses IA.
+    Méthode : recherche de mots-clés significatifs du nom dans le texte des réponses.
+    """
+    import json, re
+
+    # Mots génériques à ignorer pour le matching
+    IGNORE = {"sarl", "sas", "sasu", "eurl", "sa", "snc", "sci", "ei",
+               "et", "de", "du", "la", "le", "les", "des", "au", "aux",
+               "en", "par", "sur", "pour", "avec", "chez"}
+
+    try:
+        results = json.loads(ia_results_json) if isinstance(ia_results_json, str) else ia_results_json
+    except Exception:
+        return False
+
+    # Texte combiné de toutes les réponses IA
+    combined = " ".join(
+        r.get("response", "") for r in results if isinstance(r, dict)
+    ).lower()
+
+    # Nettoyer le nom : enlever contenu entre parenthèses, ponctuation
+    clean_name = re.sub(r"\(.*?\)", "", name)
+    clean_name = re.sub(r"[^a-zA-ZÀ-ÿ0-9 ]", " ", clean_name)
+    keywords = [w.lower() for w in clean_name.split() if len(w) > 3 and w.lower() not in IGNORE]
+
+    if not keywords:
+        return False
+
+    # Cité si au moins 1 mot-clé significatif trouvé dans les réponses
+    return any(kw in combined for kw in keywords)
+
+
+def _job_outbound(force: bool = False):
+    """
+    Outbound v3_prospects — tous les jours à 9h UTC.
+    Sélectionne les prospects avec ia_results IS NOT NULL et sent_at IS NULL.
+    Score : skip si l'entreprise est déjà citée par l'IA, envoyer sinon.
+    Cap configurable via env OUTBOUND_CAP (défaut : 10).
+    """
+    import os, json, random, requests as _req
+    from datetime import datetime
+    from .database import SessionLocal
+    from .models import V3ProspectDB
+
+    cap = int(os.getenv("OUTBOUND_CAP", "10"))
+    brevo_key = os.getenv("BREVO_API_KEY", "")
+    if not brevo_key:
+        log.warning("[OUTBOUND] BREVO_API_KEY absent — job annulé")
+        return
+
+    with SessionLocal() as db:
+        candidates = (
+            db.query(V3ProspectDB)
+            .filter(
+                V3ProspectDB.ia_results.isnot(None),
+                V3ProspectDB.sent_at.is_(None),
+                V3ProspectDB.email.isnot(None),
+            )
+            .limit(cap * 5)   # sur-sélection pour absorber les skips
+            .all()
+        )
+
+    log.info("[OUTBOUND] %d candidats récupérés (cap=%d)", len(candidates), cap)
+
+    selected = 0
+    skipped  = 0
+    sent     = 0
+    errors   = 0
+
+    for prospect in candidates:
+        if sent >= cap:
+            break
+
+        selected += 1
+
+        # Scoring : skip si déjà cité par l'IA
+        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
+            skipped += 1
+            log.debug("[OUTBOUND] skip (cité) — %s / %s", prospect.name, prospect.city)
+            continue
+
+        # Rotation senders
+        sender = _WARMING_SENDERS[sent % len(_WARMING_SENDERS)]
+        sender_name = sender.split("@")[0].replace("-", " ").capitalize()
+        city_display = prospect.city.title() if prospect.city else ""
+        profession_display = (prospect.profession or "professionnel").lower()
+
+        subject = random.choice(_OUTBOUND_SUBJECTS).format(
+            profession=profession_display,
+            city=city_display,
+        )
+        body = _OUTBOUND_BODY.format(
+            profession=profession_display,
+            city=city_display,
+            sender_name=sender_name,
+        )
+
+        try:
+            resp = _req.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                json={
+                    "sender":      {"name": "Présence IA", "email": sender},
+                    "to":          [{"email": prospect.email, "name": prospect.name}],
+                    "subject":     subject,
+                    "textContent": body,
+                },
+                timeout=15,
+            )
+            if resp.status_code in (200, 201, 202):
+                # Mettre à jour sent_at + sent_method
+                with SessionLocal() as db:
+                    p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
+                    if p:
+                        p.sent_at     = datetime.utcnow()
+                        p.sent_method = "brevo"
+                        db.commit()
+                sent += 1
+                log.info("[OUTBOUND] envoyé — %s <%s> (%s / %s)",
+                         prospect.name, prospect.email, prospect.profession, prospect.city)
+            else:
+                errors += 1
+                log.warning("[OUTBOUND] HTTP %s — %s <%s>",
+                            resp.status_code, prospect.name, prospect.email)
+        except Exception as e:
+            errors += 1
+            log.warning("[OUTBOUND] erreur envoi %s : %s", prospect.email, e)
+
+    log.info("[OUTBOUND] terminé — sélectionnés=%d skipped=%d envoyés=%d erreurs=%d",
+             selected, skipped, sent, errors)
