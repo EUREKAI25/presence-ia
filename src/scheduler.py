@@ -1446,25 +1446,25 @@ def _job_outbound(force: bool = False):
     mode_label = "DRY_RUN" if dry_run else "LIVE"
     log.info("[OUTBOUND] démarrage — mode=%s cap=%d", mode_label, cap)
 
-    # ── Sélection brute (avec et sans email, pour stats) ──────────────────────
+    # ── Sélection : ia_results + email non null + non encore envoyés ──────────
     with SessionLocal() as db:
-        all_with_results = (
+        has_email = (
             db.query(V3ProspectDB)
             .filter(
                 V3ProspectDB.ia_results.isnot(None),
                 V3ProspectDB.sent_at.is_(None),
+                V3ProspectDB.email.isnot(None),
             )
-            .limit(cap * 10)
+            .limit(cap * 20)   # sur-sélection pour absorber invalides + cités
             .all()
         )
-
-    total_with_results = len(all_with_results)
-    no_email   = [p for p in all_with_results if not p.email]
-    has_email  = [p for p in all_with_results if p.email]
 
     # ── Filtre email valide ────────────────────────────────────────────────────
     valid_email   = [p for p in has_email if _outbound_is_valid_email(p.email)]
     invalid_email = [p for p in has_email if not _outbound_is_valid_email(p.email)]
+
+    total_with_results = len(has_email)
+    no_email           = []   # filtrés en amont par la requête
 
     log.info("[OUTBOUND] sélection — total=%d  sans_email=%d  email_invalide=%d  email_valide=%d",
              total_with_results, len(no_email), len(invalid_email), len(valid_email))
