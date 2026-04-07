@@ -1,8 +1,341 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — Pipeline leads entièrement automatisé
+**Statut** : 🟢 actif — Pipeline complet opérationnel
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-03-28 16h55
+**Dernière MAJ** : 2026-04-07
+
+---
+
+## 🔌 SESSION 2026-04-07 — Maillage interne discret (ajout)
+
+### Réalisé
+
+#### 7. Module de maillage interne
+
+**Objectif** : relier intelligemment les pages générées sans exposer dans la navigation.
+
+| Fichier | Rôle |
+|---|---|
+| `src/publisher/page_index.py` | `PublishedPageDB` (table `published_pages`) + `register_published_page()` + `list_generated_pages_for_prospect()` + `find_related_pages()` + `update_internal_links()` |
+| `src/publisher/link_builder.py` | `build_internal_link_suggestions(page, related, max=3)` — ancres naturelles, 5 types de page, règle "jamais vers soi-même" |
+| `src/content_engine/link_injector.py` | `build_link_block(links)` + `inject_internal_links(html, links)` — bloc "À lire aussi" sobrement injecté avant `</body>` |
+| `src/publisher/mesh_service.py` | `refresh_internal_links_for_prospect(id, db)` + `refresh_internal_links_for_all(db)` — calcul + sauvegarde DB + patch HTML |
+
+**Modifications :**
+- `publisher/service.py` : appel `register_published_page()` après chaque publication (WP ou manuelle)
+- `publisher/__init__.py` : exports `refresh_internal_links_for_prospect`, `refresh_internal_links_for_all`
+- `content_engine/page_generator.py` : param `internal_links` optionnel → bloc injecté dans la page
+- `api/routes/livrables.py` : `POST /api/ia-reports/{token}/mesh`
+- `api/routes/crm_admin.py` : bouton `🔗 Maillage interne` + JS `iaMesh()` avec affichage liens + patch HTML dépliable
+
+**Logique de priorité (find_related_pages) :**
+- +10 : même profession · +5 : même ville · filtre : URL non vide, visibility discreet/integrated
+- jamais de lien vers le même prospect (exclut par token) ni vers la même URL
+
+**Résultats fixture :**
+```
+Plombier Lyon → 3 liens :
+  → Plombier à Villeurbanne (même métier, autre ville)
+  → Chauffagiste à Lyon (même ville, autre métier)
+  → FAQ Plombier Lyon (même métier et même ville)
+Page avec links : 6 152 chars · bloc "À lire aussi" ✓
+```
+
+**TODO V2 :** WordPress auto-update via GET /wp-json/wp/v2/pages/{id} + injection + PUT (commenté dans mesh_service.py)
+
+---
+
+## 🔌 SESSION 2026-04-07 — Pipeline complet branché + publisher
+
+### Réalisé
+
+#### 1. Endpoints API ia_reports (branchement)
+
+| Endpoint | Action |
+|---|---|
+| `POST /api/ia-reports/{token}/audit` | Audit initial → fichier + snapshot DB |
+| `POST /api/ia-reports/{token}/monthly` | Rapport mensuel + delta auto depuis snapshot |
+| `POST /api/ia-reports/{token}/bundle` | Audit + monthly + contenus en un appel |
+| `POST /api/ia-reports/{token}/content` | FAQ + page service + JSON-LD |
+| `POST /api/ia-reports/{token}/publish` | Publication page sur le site du client |
+
+#### 2. Boutons fiche CRM (`/admin/crm/prospect/{token}`)
+
+Section "Rapports IA" avec 6 actions inline (résultat sans rechargement) :
+- 📊 Générer audit · 📅 Rapport mensuel · 📦 Bundle complet
+- ✍ Générer contenus · 🚀 Publier sur le site · 👁 Voir audit HTML
+- Champs WP credentials (identifiant + Application Password) révélés au clic sur Publier
+- Instructions publication manuelle dépliables dans le résultat
+
+#### 3. Module `src/content_engine/`
+
+| Fichier | Rôle |
+|---|---|
+| `faq_generator.py` | Requêtes IA → questions naturelles + réponses courtes. 5 questions essentielles systématiques. |
+| `page_generator.py` | Page `{profession} à {ville}` HTML complète (intro, services, confiance, FAQ). CSS inline, copier-coller CMS. |
+| `schema_generator.py` | JSON-LD `LocalBusiness` (mapping @type par secteur) + `FAQPage`. Snippet prêt + instructions WP/Wix/Shopify. |
+| `service.py` | `generate_content_bundle(token, db)` → charge depuis snapshot ou ia_results, sauvegarde dans `deliverables/generated/content/{slug}/` |
+
+**Résultats fixture validés :**
+```
+8 questions FAQ · Plumber @type auto · page 8 423 chars · snippet JSON-LD 2 540 chars
+```
+
+#### 4. Module `src/publisher/`
+
+| Fichier | Rôle |
+|---|---|
+| `wordpress.py` | `publish_page()` — POST `/wp-json/wp/v2/pages` + Application Password. `update_page()` pour re-pub. |
+| `fallback_manual.py` | Instructions pas-à-pas par CMS (WP / Wix / Shopify / Squarespace / Webflow / inconnu). |
+| `service.py` | `publish_content()` — détecte CMS, publie auto WP ou fallback manuel. `publish_for_prospect()` charge depuis disque ou génère à la volée. |
+
+**Logique :**
+- WordPress + credentials → API REST, URL publique retournée
+- WordPress sans credentials → instructions manuelles WP
+- Wix / Shopify / Squarespace / Webflow → instructions spécifiques
+- CMS inconnu → instructions génériques (FTP ou copier-coller)
+
+#### 5. Fix arrondi delta
+
+`round(..., 1)` sur `delta_val` dans `generator.py` et `service.py` — élimine les `+3.5999...` en affichage.
+
+#### 6. Contrôle de visibilité des pages publiées
+
+Problème : risque d'exposition non voulue dans la navigation du site client.
+
+**Solution implémentée :**
+- `visibility = "discreet"` (défaut) — page publiée, accessible par URL directe, absente des menus
+- `visibility = "integrated"` — TODO V2 (nécessite plugin WP REST API Menus)
+- Renommage `public_nav` → `integrated` dans tous les fichiers publisher
+- `publish_date` ajouté dans tous les retours (ISO format)
+- `menu_note` explicite dans chaque retour (ex: "Page publiée sans intégration au menu")
+- Instructions manuelles : "⚠️ NE PAS ajouter au menu" dans chaque CMS (WP, Wix, Shopify, Squarespace, Webflow)
+- TODO V2 dans `wordpress.py` : `POST /wp-json/wp/v2/menus/{menu_id}/items` (plugin requis)
+
+**Badges CRM :**
+- 🟢 `Page publiée (discrète)` — fond vert sombre
+- 🔵 `Page publiée (intégrée)` — fond bleu sombre
+- Affichage de `menu_note` (ℹ) et `publish_date` dans le résultat inline
+
+### État actuel du pipeline
+
+```
+Prospect V3 (ia_results)
+  → ia_reports : audit HTML + snapshot DB
+  → ia_reports : rapport mensuel + delta
+  → content_engine : FAQ + page service + JSON-LD
+  → publisher : publication WP auto OU package manuel CMS
+  → fiche CRM : boutons inline pour déclencher chaque étape
+```
+
+### Prochaines actions
+
+| Priorité | Action |
+|---|---|
+| 🔴 | Déployer sur VPS (git push + restart) |
+| 🔴 | Tester sur un prospect réel avec ia_results |
+| 🟠 | Activer outbound LIVE (`OUTBOUND_DRY_RUN=false`) |
+| 🟡 | Configurer webhook Brevo |
+| 🟡 | Ajouter Stripe Price IDs (en attente SIRET) |
+
+---
+
+## 🔌 SESSION 2026-04-06 — Job outbound + DRY_RUN diagnostic
+
+### Réalisé
+
+| Fichier / Composant | Action | Statut |
+|---|---|---|
+| `src/scheduler.py` | `_job_outbound()` créé — sélection/scoring/envoi v3_prospects | ✅ |
+| `src/scheduler.py` | Job 11 enregistré dans scheduler (cron 9h UTC) | ✅ |
+| `src/scheduler.py` | Mode `OUTBOUND_DRY_RUN=true` ajouté — logs détaillés, 0 envoi, 0 écriture DB | ✅ |
+| VPS `.env` | `OUTBOUND_DRY_RUN=true` + `OUTBOUND_CAP=20` configurés | ✅ |
+| VPS | Déployé + service redémarré — 13 jobs actifs | ✅ |
+| GitHub | Pushé sur main | ✅ |
+
+### Résultats DRY_RUN (exécuté 2026-04-06 21h26)
+
+```
+Batch analysé           : 200 prospects (ia_results + non envoyés)
+  → avec email          : 109
+  → sans email          :  91
+
+Scoring comparatif :
+  avec scoring   → would_send =  29  /  would_skip = 80  (73% skippés car déjà cités IA)
+  sans scoring   → would_send = 109
+
+Run cap=20 :
+  sélectionnés   = 58
+  skippés (cités)= 38
+  would_send     = 20  ✅  (0 envoi réel, 0 écriture DB)
+```
+
+### Problèmes identifiés
+
+| Problème | Exemple | Impact |
+|---|---|---|
+| Faux emails (noms de fichiers scrapés) | `cropped-favicon@2x-32x32.jpg`, `icon_close@2x.png` | Envoi rejeté par Brevo ou bounce |
+| Placeholder email | `name@company.com` | Idem |
+| Adresse technique Sentry | `...@sentry-next.wixpress.com` | Pas un vrai destinataire |
+
+### Logique job_outbound (état final)
+
+- Sélection : `ia_results IS NOT NULL` + `sent_at IS NULL` + `email IS NOT NULL`
+- Scoring : matching mots-clés nom entreprise vs réponses IA → cité = skip
+- Envoi via Brevo API, rotation 25 senders warmés
+- Update `sent_at` + `sent_method = 'brevo'` après envoi réussi
+- Cap : `OUTBOUND_CAP` env (actuel : 20) — remettre à 10 pour prod
+- Prochain run LIVE : dès que `OUTBOUND_DRY_RUN` repassé à `false`
+
+### État VPS au 2026-04-06
+
+| Élément | Valeur |
+|---|---|
+| v3_prospects total | 2 833 |
+| v3_prospects testés IA | 1 752 |
+| v3_prospects avec email | 1 147 (dont ~X% faux emails à filtrer) |
+| Envoyés à ce jour | 1 |
+| city_headers | 14 villes |
+| Enrichissement Gemini | actif (100/run, toutes heures) |
+| Warming | actif — J18 — cap 8/sender — plateau J22 (11 avril) |
+
+### Filtre email — ajouté (2026-04-06 21h32)
+
+`_outbound_is_valid_email()` — règles :
+- Regex email standard
+- Exclusion extensions image/fichier (`.jpg`, `.png`, `.webp`, `.svg`...)
+- Exclusion mots-clés techniques (`sentry`, `wixpress`, `noreply`, `cropped-`, `favicon`...)
+
+**Résultats DRY_RUN avec filtre :**
+```
+Batch 200 :  sans_email=91  email_invalide=9  email_valide=100
+Scoring  :   would_send=27 / would_skip=73 (sur 100 valides)
+Run cap20:   sélectionnés=66  skipped=46  would_send=20  ✅
+```
+Les 9 emails invalides détectés et exclus : noms de fichiers image, adresses Sentry/Wixpress.
+
+### Tracking email outbound — ajouté (2026-04-06 21h39)
+
+| Fichier | Action |
+|---|---|
+| `src/models.py` | `V3ProspectDB` : +`email_status` / `email_sent_at` / `email_opened_at` / `email_bounced_at` |
+| `src/database.py` | Migration `init_db()` : 4 colonnes via ALTER TABLE (idempotent) |
+| `src/scheduler.py` | `job_outbound` : `email_status='sent'` + `email_sent_at=now()` à l'envoi |
+| `src/api/routes/brevo_webhook.py` | `POST /webhooks/brevo` — traite delivered/open/click/bounce/spam |
+| `src/api/main.py` | Route webhook enregistrée |
+
+**Statuts tracking :** `pending → sent → delivered → opened → bounced`
+
+**Config Brevo à faire** (côté dashboard Brevo) :
+- Paramètres → Webhooks → Ajouter URL : `https://presence-ia.com/webhooks/brevo`
+- Événements à cocher : Delivered, Opened, Clicked, Bounced, Spam, Unsubscribed
+
+### Page outbound-stats — ajoutée (2026-04-06 21h46)
+
+- `GET /admin/outbound-stats` : KPIs sent / delivered / opened / bounced + taux
+- Breakdown 7 derniers jours
+- Distribution statuts
+- Lien "Outbound" dans sidebar nav section MARKETING
+
+### Message final v1 + simulation cap=5 (2026-04-07)
+
+| Fichier | Action |
+|---|---|
+| `src/scheduler.py` | `_OUTBOUND_SUBJECTS` → `"Votre nom n'est pas sorti"` |
+| `src/scheduler.py` | `_OUTBOUND_BODY` → 4 lignes, ton direct, `{profession}/{ville}` |
+| `src/scheduler.py` | DRY_RUN : affiche To / From / Subject / Body rendu complet |
+| `src/scheduler.py` | Fix requête SQL : `email NOT NULL` filtré en amont |
+
+**Résultats simulation :**
+```
+total avec email : 100   invalides : 9   valides : 91
+scoring          : would_send=24  would_skip=67
+run cap=5        : sélectionnés=7  skipped=2  would_send=5 ✅
+0 envoi réel — 0 écriture DB
+```
+
+### Moteur ia_reports — modules propres (2026-04-07)
+
+Architecture séparée en 5 modules dans `src/ia_reports/` :
+
+| Module | Rôle |
+|---|---|
+| `parser.py` | Parse ia_results — tolère formats A (V3) et B (legacy), JSON string ou list |
+| `scoring.py` | Score /10, extraction concurrents, checklist dynamique (3 niveaux) |
+| `generator.py` | HTML audit + monthly, sélection guide CMS, sauvegarde fichier |
+| `storage.py` | Snapshots DB — save/load/count, migration idempotente |
+| `service.py` | API haut niveau : `create_initial_audit_for_prospect()`, `create_monthly_report_for_prospect()`, `create_full_deliverable_bundle()` |
+
+**Outputs générés dans :** `deliverables/generated/audits/` et `deliverables/generated/reports/`
+
+**Script de test :**
+```bash
+python tests/test_ia_reports_manual.py --fixture    # test sans DB (données synthétiques)
+python tests/test_ia_reports_manual.py              # test avec 1er prospect DB
+python tests/test_ia_reports_manual.py --token <t>  # test par token
+python tests/test_ia_reports_manual.py --list       # liste prospects disponibles
+```
+
+**Résultats fixture (2026-04-07) :**
+```
+3 requêtes / 9 tests — Score 5.6/10 — 5/9 citations
+Audit    : deliverables/generated/audits/fixture_audit.html (6 954 chars) ✅
+Rapport  : deliverables/generated/reports/fixture_report_m1.html (9 139 chars) ✅
+```
+
+### Pipeline complet prospect → audit → rapport mensuel (2026-04-07)
+
+| Composant | Fichier | Rôle |
+|---|---|---|
+| `IaSnapshotDB` | `src/models.py` | Table persistance (score, matrix, competitors, HTML) |
+| Migration | `src/database.py` | `ia_snapshots` créée via `Base.metadata.create_all` |
+| `_build_dynamic_checklist(score)` | `report_generator.py` | Fondations / Contenu / Optimisation selon score |
+| `_save_snapshot(db, ...)` | `report_generator.py` | Sauvegarde après chaque rapport |
+| `_load_last_snapshot(db, token)` | `report_generator.py` | Charge le snapshot précédent pour le delta |
+| `generate_audit_report(prospect, db)` | `report_generator.py` | Checklist dynamique + snapshot auto |
+| `generate_monthly_report(prospect, db)` | `report_generator.py` | Charge snapshot précédent auto depuis DB |
+| `run_monthly(db)` | `report_generator.py` | Boucle sur tous les clients avec audit |
+| Routes pipeline | `livrables.py` | GET/POST audit, monthly, snapshot, history + POST run-monthly |
+
+**Résultats tests** (DB SQLite mémoire) :
+```
+[1] Audit: score=5 / snapshot sauvegardé OK
+[2] _load_last_snapshot: score=5 OK
+[3] Monthly: 2 snapshots, delta calculé OK
+[4] run_monthly: 'Dupont Plomberie' score=5 OK — 3 snapshots en DB
+```
+
+### Génération automatique rapports (2026-04-07)
+
+| Fichier | Contenu |
+|---|---|
+| `src/livrables/report_generator.py` | `generate_audit_report()` + `generate_monthly_report()` + `build_snapshot()` |
+| `src/api/routes/livrables.py` | Routes `/api/reports/v3/{token}/audit` (GET) + `/monthly` (GET/POST) + `/snapshot` (GET) |
+
+**Logique principale :**
+- `_is_cited(name, response)` : majorité stricte des mots significatifs — évite faux positifs sur mots génériques
+- `_build_query_matrix()` : groupe les 9 résultats IA par prompt → 3 colonnes ChatGPT/Gemini/Claude
+- `_score()` : `(citations / total_tests) × 10`
+- `_extract_competitors()` : regex markdown links + listes → Counter → dédoublonnage
+- `build_snapshot()` : exporte le JSON à passer en `previous_data` au rapport suivant
+- Tous les placeholders `{{VAR}}` remplacés — testé sur 9 ia_results simulés ✓
+
+### Livrables clients — structure créée (2026-04-07)
+
+| Fichier | Contenu | Offres |
+|---|---|---|
+| `deliverables/audit/audit_template.html` | Rapport d'audit IA — variables `{{NOM_ENTREPRISE}}`, score, 5 requêtes × 3 modèles, concurrents, checklist 8 points | 97€ / 500€ / 3500€ / 9000€ |
+| `deliverables/reports/report_template.html` | Rapport de suivi mensuel — évolution score, re-test, actions réalisées, prochaines étapes | 3500€ / 9000€ |
+| `deliverables/guides/` | Symlinks → RESOURCES/GUIDE_WORDPRESS/WIX/SHOPIFY/PREMIUM | 500€ / 3500€ / 9000€ |
+| `deliverables/README.md` | Mapping offre → livrables + variables template | — |
+
+### Reste à faire
+
+- [ ] Configurer webhook Brevo : `https://presence-ia.com/webhooks/brevo` (Delivered/Opened/Bounced/Spam)
+- [ ] **Lancer LIVE** : `OUTBOUND_DRY_RUN=false` + `OUTBOUND_CAP=10` sur VPS
+- [ ] Fix IMAP timeout warming (bot-free + bot-paid)
+- [ ] Stripe Price IDs (dès réception SIRET)
+- [ ] Augmenter `OUTBOUND_CAP` progressivement après premiers retours
 
 ---
 

@@ -484,6 +484,188 @@ th{{padding:8px 12px;text-align:left;color:#9ca3af;font-size:10px;
 <p style="color:#9ca3af;font-size:13px">{p.city} · {p.profession} · {p.email}</p>
 {f'<p style="color:#9ca3af;font-size:12px;margin-top:4px">📞 {p.phone}</p>' if p.phone else ""}
 
+<div style="margin:24px 0 16px">
+  <div style="color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Rapports IA</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <button onclick="iaAction('{p.token}','audit',this)"
+      style="background:#e94560;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      📊 Générer audit
+    </button>
+    <button onclick="iaAction('{p.token}','monthly',this)"
+      style="background:#1e3a5f;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      📅 Rapport mensuel
+    </button>
+    <button onclick="iaAction('{p.token}','bundle',this)"
+      style="background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      📦 Bundle complet
+    </button>
+    <button onclick="iaAction('{p.token}','content',this)"
+      style="background:#7c3aed;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      ✍ Générer contenus
+    </button>
+    <button onclick="togglePublish('{p.token}')"
+      style="background:#0e7490;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      🚀 Publier sur le site
+    </button>
+    <a href="/api/reports/v3/{p.token}/audit" target="_blank"
+      style="background:#2a2a4e;color:#9ca3af;border:1px solid #3a3a6e;padding:10px 18px;border-radius:6px;text-decoration:none;font-size:13px">
+      👁 Voir audit HTML
+    </a>
+    <button onclick="iaMesh('{p.token}',this)"
+      style="background:#78350f;color:#fde68a;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      🔗 Maillage interne
+    </button>
+  </div>
+  <div id="ia-result-{p.token}" style="margin-top:12px;display:none;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;padding:12px;font-size:13px"></div>
+
+  <!-- Credentials WP — visibles uniquement pour la publication -->
+  <div id="wp-creds-{p.token}" style="margin-top:10px;display:none;flex-wrap:wrap;gap:8px;align-items:center">
+    <input id="wp-user-{p.token}" placeholder="Identifiant WP"
+      style="padding:8px 12px;border-radius:6px;border:1px solid #3a3a6e;background:#0f0f1a;color:#e8e8f0;font-size:13px;width:160px">
+    <input id="wp-pass-{p.token}" placeholder="Application Password"
+      style="padding:8px 12px;border-radius:6px;border:1px solid #3a3a6e;background:#0f0f1a;color:#e8e8f0;font-size:13px;width:240px">
+    <button onclick="iaPublish('{p.token}',this)"
+      style="background:#0e7490;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Publier</button>
+    <span style="color:#6b7280;font-size:11px">WP → Profil → Application Passwords · Laisser vide pour package manuel</span>
+  </div>
+</div>
+
+<script>
+async function iaAction(token, action, btn) {{
+  const resultEl = document.getElementById('ia-result-' + token);
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours…';
+  resultEl.style.display = 'none';
+  try {{
+    const r = await fetch('/api/ia-reports/' + token + '/' + action, {{method:'POST', headers:{{'Content-Type':'application/json'}}}});
+    const data = await r.json();
+    resultEl.style.display = 'block';
+    if (data.success) {{
+      const res = data.result;
+      let html = '<span style="color:#16a34a;font-weight:700">✓ ' + data.message + '</span><br>';
+      if (res.score !== undefined) html += '<span style="color:#9ca3af">Score : <strong style="color:#fff">' + res.score + '/10</strong>';
+      if (res.delta !== undefined) html += ' &nbsp;Δ <strong style="color:' + (res.delta>=0?'#16a34a':'#ef4444') + '">' + (res.delta>=0?'+':'') + res.delta + '</strong>';
+      if (res.score !== undefined) html += '</span><br>';
+      if (res.audit_path) html += '<span style="color:#527FB3;font-size:12px">📄 ' + res.audit_path.split('/').slice(-1)[0] + '</span><br>';
+      if (res.report_path) html += '<span style="color:#527FB3;font-size:12px">📄 ' + res.report_path.split('/').slice(-1)[0] + '</span><br>';
+      if (res.errors && res.errors.length) html += '<span style="color:#f87171;font-size:12px">⚠ ' + res.errors.join(' / ') + '</span>';
+      resultEl.innerHTML = html;
+    }} else {{
+      resultEl.innerHTML = '<span style="color:#ef4444">✗ Erreur : ' + (data.error?.detail || data.error?.code || 'inconnue') + '</span>';
+    }}
+  }} catch(e) {{
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+  }}
+  btn.disabled = false;
+  btn.textContent = origText;
+}}
+
+function togglePublish(token) {{
+  const el = document.getElementById('wp-creds-' + token);
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}}
+
+async function iaPublish(token, btn) {{
+  const resultEl  = document.getElementById('ia-result-' + token);
+  const origText  = btn.textContent;
+  const username  = document.getElementById('wp-user-' + token).value;
+  const appPass   = document.getElementById('wp-pass-' + token).value;
+  btn.disabled    = true;
+  btn.textContent = '⏳ Publication…';
+  resultEl.style.display = 'none';
+  const body = {{}};
+  if (username) body.username = username;
+  if (appPass)  body.app_password = appPass;
+  try {{
+    const r = await fetch('/api/ia-reports/' + token + '/publish', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify(body)
+    }});
+    const data = await r.json();
+    resultEl.style.display = 'block';
+    if (data.success) {{
+      const res = data.result;
+      let html = '<span style="color:#16a34a;font-weight:700">✓ ' + data.message + '</span><br>';
+      if (res.url) html += '<a href="' + res.url + '" target="_blank" style="color:#38bdf8">' + res.url + '</a><br>';
+      if (res.edit_url) html += '<a href="' + res.edit_url + '" target="_blank" style="color:#9ca3af;font-size:12px">✏ Modifier dans WP</a><br>';
+      if (res.visibility) {{
+        const badge = res.visibility === 'discreet'
+          ? '<span style="background:#14532d;color:#4ade80;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700">🟢 Page publiée (discrète)</span>'
+          : '<span style="background:#1e3a5f;color:#60a5fa;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700">🔵 Page publiée (intégrée)</span>';
+        html += badge + '<br>';
+      }}
+      if (res.menu_note) html += '<span style="color:#fbbf24;font-size:12px">ℹ ' + res.menu_note + '</span><br>';
+      if (res.publish_date) html += '<span style="color:#6b7280;font-size:11px">Publié le ' + res.publish_date + '</span><br>';
+      if (res.score !== undefined) html += '<span style="color:#9ca3af">Score : <strong style="color:#fff">' + res.score + '/10</strong>';
+      if (res.delta !== undefined) html += ' &nbsp;Δ <strong style="color:' + (res.delta>=0?'#16a34a':'#ef4444') + '">' + (res.delta>=0?'+':'') + res.delta + '</strong>';
+      if (res.score !== undefined) html += '</span><br>';
+      if (res.audit_path) html += '<span style="color:#527FB3;font-size:12px">📄 ' + res.audit_path.split('/').slice(-1)[0] + '</span><br>';
+      if (res.report_path) html += '<span style="color:#527FB3;font-size:12px">📄 ' + res.report_path.split('/').slice(-1)[0] + '</span><br>';
+      if (res.method === 'manual' && res.instructions) {{
+        html += '<details style="margin-top:8px"><summary style="color:#fbbf24;cursor:pointer;font-size:12px">📋 Instructions publication manuelle</summary>';
+        html += '<pre style="white-space:pre-wrap;font-size:11px;color:#9ca3af;margin-top:8px">' + res.instructions + '</pre></details>';
+      }}
+      if (res.errors && res.errors.length) html += '<span style="color:#f87171;font-size:12px">⚠ ' + res.errors.join(' / ') + '</span>';
+      resultEl.innerHTML = html;
+    }} else {{
+      resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + (data.error?.detail || 'Erreur inconnue') + '</span>';
+    }}
+  }} catch(e) {{
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+  }}
+  btn.disabled = false;
+  btn.textContent = origText;
+}}
+
+async function iaMesh(token, btn) {{
+  const resultEl = document.getElementById('ia-result-' + token);
+  const origText = btn.textContent;
+  btn.disabled   = true;
+  btn.textContent = '⏳ Calcul…';
+  resultEl.style.display = 'none';
+  try {{
+    const r   = await fetch('/api/ia-reports/' + token + '/mesh', {{method:'POST', headers:{{'Content-Type':'application/json'}}}});
+    const res = await r.json();
+    resultEl.style.display = 'block';
+    if (res.success) {{
+      let html = '<span style="color:#4ade80">🔗 ' + (res.message || 'Maillage mis à jour') + '</span>';
+      if (res.result && res.result.pages && res.result.pages.length > 0) {{
+        html += '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">';
+        for (const pg of res.result.pages) {{
+          if (pg.links_count === 0) continue;
+          html += '<div style="background:#0f0f1a;border:1px solid #2a2a4e;border-radius:4px;padding:8px 12px">';
+          html += '<div style="color:#e8e8f0;font-weight:600;font-size:12px;margin-bottom:6px">' + (pg.title || pg.url || 'Page #' + pg.id) + '</div>';
+          for (const lk of pg.links) {{
+            html += '<div style="color:#9ca3af;font-size:12px;padding:2px 0">→ <a href="' + lk.url + '" target="_blank" style="color:#60a5fa;text-decoration:none">' + lk.anchor + '</a>';
+            html += ' <span style="color:#4b5563;font-style:italic">(' + lk.reason + ')</span></div>';
+          }}
+          if (pg.patch_html) {{
+            html += '<details style="margin-top:6px"><summary style="color:#fde68a;font-size:11px;cursor:pointer">HTML du bloc à injecter</summary>';
+            html += '<pre style="color:#9ca3af;font-size:10px;overflow-x:auto;margin:4px 0;white-space:pre-wrap">' + pg.patch_html.replace(/</g,'&lt;') + '</pre></details>';
+          }}
+          html += '</div>';
+        }}
+        html += '</div>';
+      }} else if (res.result && res.result.pages_updated === 0) {{
+        html += '<div style="color:#9ca3af;font-size:12px;margin-top:6px">Aucune page publiée dans l\'index pour ce prospect.<br>Publiez d\'abord une page via 🚀 Publier sur le site.</div>';
+      }}
+      resultEl.innerHTML = html;
+    }} else {{
+      const err = res.error ? (res.error.detail || JSON.stringify(res.error)) : 'Erreur inconnue';
+      resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + err + '</span>';
+    }}
+  }} catch(e) {{
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+  }}
+  btn.disabled = false;
+  btn.textContent = origText;
+}}
+</script>
+
 <div style="margin:24px 0 12px;color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">Livraisons emails</div>
 <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:24px">
 <table><thead><tr><th>Date</th><th>Statut</th><th>Ouverture</th><th>Clic</th><th>Landing</th></tr></thead>
