@@ -55,42 +55,38 @@ def _tracking_map(contact_ids: list) -> dict:
 
 def _image_readiness(db, contacts) -> tuple[set, dict]:
     """
-    Retourne (ready_cities, city_to_dept) :
-    - ready_cities : set de villes.lower() ayant une image (directe ou préfecture)
-    - city_to_dept : {ville.lower(): dept_code}
+    Retourne (ready_cities, city_to_dept).
+    Une seule requête IN pour toutes les villes — évite le N+1 sur SireneSuspectDB.
     """
     from ...models import CityHeaderDB, SireneSuspectDB
     img_cities = {h.city for h in db.query(CityHeaderDB).all()}
 
-    def _city_has_image(city_l: str) -> bool:
-        return city_l in img_cities
-
     cities = {(c.city or "").lower() for c in contacts if c.city}
+    if not cities:
+        return set(), {}
 
-    # dept par ville via SireneSuspectDB
-    city_to_dept: dict = {}
-    for city_l in cities:
-        s = db.query(SireneSuspectDB).filter(
-            SireneSuspectDB.ville == city_l.title(),
+    # Une seule requête pour récupérer dept de toutes les villes d'un coup
+    city_titles = [c.title() for c in cities]
+    rows = (
+        db.query(SireneSuspectDB.ville, SireneSuspectDB.departement)
+        .filter(
+            SireneSuspectDB.ville.in_(city_titles),
             SireneSuspectDB.departement.isnot(None),
-        ).first()
-        if not s:
-            s = db.query(SireneSuspectDB).filter(
-                SireneSuspectDB.ville.ilike(city_l),
-                SireneSuspectDB.departement.isnot(None),
-            ).first()
-        if s and s.departement:
-            city_to_dept[city_l] = s.departement
+        )
+        .distinct(SireneSuspectDB.ville)
+        .all()
+    )
+    city_to_dept: dict = {r.ville.lower(): r.departement for r in rows if r.departement}
 
     ready_cities: set = set()
     for city_l in cities:
-        if _city_has_image(city_l):
+        if city_l in img_cities:
             ready_cities.add(city_l)
         else:
             dept = city_to_dept.get(city_l, "")
             if dept:
                 prefecture = DEPT_PREFECTURE.get(dept, "").lower()
-                if prefecture and _city_has_image(prefecture):
+                if prefecture and prefecture in img_cities:
                     ready_cities.add(city_l)
     return ready_cities, city_to_dept
 
