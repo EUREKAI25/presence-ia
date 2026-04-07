@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, SessionLocal
-from ...models import V3ProspectDB, V3CityImageDB
+from ...models import V3ProspectDB, V3CityImageDB, LeadProvisioningConfigDB, SireneSegmentDB
 from ._nav import admin_nav, admin_token
 
 router = APIRouter(tags=["Admin Hub"])
@@ -632,3 +632,130 @@ async def finances_delete_cost(request: Request):
     except Exception as e:
         log.warning("finances/costs/delete error: %s", e)
     return RedirectResponse(f"/admin/finances?token={token}", status_code=303)
+
+
+# ── Pipeline health ──────────────────────────────────────────────────────────
+
+@router.get("/admin/pipeline-health", response_class=HTMLResponse)
+async def pipeline_health(request: Request):
+    token, redir = _check(request)
+    if redir:
+        return redir
+
+    from sqlalchemy import func
+    from datetime import timedelta
+
+    db = SessionLocal()
+    now = datetime.utcnow()
+
+    cfg = db.get(LeadProvisioningConfigDB, "default")
+    stuck_segs = db.query(SireneSegmentDB).filter(SireneSegmentDB.status == "running").all()
+
+    from ...models import SireneSuspectDB
+    available = (
+        db.query(SireneSuspectDB.profession_id, func.count().label("n"))
+        .filter(SireneSuspectDB.provisioned_at.is_(None), SireneSuspectDB.actif == True)
+        .group_by(SireneSuspectDB.profession_id)
+        .order_by(func.count().desc())
+        .limit(20)
+        .all()
+    )
+
+    v3_history = []
+    for d in range(7, 0, -1):
+        day_start = (now - timedelta(days=d)).replace(hour=0, minute=0, second=0)
+        day_end = day_start + timedelta(days=1)
+        count = db.query(func.count(V3ProspectDB.token)).filter(
+            V3ProspectDB.created_at >= day_start,
+            V3ProspectDB.created_at < day_end,
+        ).scalar()
+        v3_history.append((day_start.strftime("%d/%m"), count))
+
+    db.close()
+
+    alerts = []
+    if cfg and cfg.last_run:
+        age_h = (now - cfg.last_run).total_seconds() / 3600
+        if age_h > 26:
+            alerts.append(f"⚠️ provision_leads n'a pas tourné depuis {age_h:.0f}h")
+    if stuck_segs:
+        alerts.append(f"⚠️ {len(stuck_segs)} segment(s) bloqué(s) en status=running")
+    if not available:
+        alerts.append("⚠️ Aucun suspect disponible à provisionner")
+
+    alert_html = "".join(
+        f'<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:10px;color:#b91c1c">{a}</div>'
+        for a in alerts
+    ) or '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;color:#166534">✅ Aucune alerte — pipeline opérationnel</div>'
+
+    if cfg:
+        last_run_str = cfg.last_run.strftime("%Y-%m-%d %H:%M UTC") if cfg.last_run else "jamais"
+        age_str = f"{(now - cfg.last_run).total_seconds() / 3600:.1f}h" if cfg.last_run else "—"
+        cfg_html = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr><td style="padding:8px;color:#6b7280">Active</td><td style="padding:8px;font-weight:600">{'✅ oui' if cfg.active else '❌ non'}</td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Jours</td><td style="padding:8px">{cfg.days or '(tous)'}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280">hour_utc</td><td style="padding:8px">{cfg.hour_utc} {'— toutes les heures éligibles' if cfg.hour_utc == -1 else ''}</td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Leads/run</td><td style="padding:8px">{cfg.leads_per_run}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280">Dernier run</td><td style="padding:8px">{last_run_str} <span style="color:#9ca3af">({age_str})</span></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Dernière production</td><td style="padding:8px">{cfg.last_count} leads</td></tr>
+        </table>"""
+    else:
+        cfg_html = "<p style='color:#ef4444'>Config introuvable</p>"
+
+    stuck_html = "".join(
+        f'<div style="font-family:monospace;font-size:13px;padding:4px 0;color:#b91c1c">{s.profession_id}|{s.code_naf}|{s.departement}</div>'
+        for s in stuck_segs
+    ) or '<span style="color:#6b7280;font-size:13px">Aucun</span>'
+
+    avail_rows = "".join(
+        f'<tr style="{"" if i%2 else "background:#f9fafb"}"><td style="padding:6px 12px">{r.profession_id}</td><td style="padding:6px 12px;text-align:right;font-weight:600">{r.n:,}</td></tr>'
+        for i, r in enumerate(available)
+    )
+    avail_html = f'<table style="width:100%;border-collapse:collapse;font-size:13px">{avail_rows}</table>'
+
+    max_v = max((c for _, c in v3_history), default=1) or 1
+    bars = "".join(
+        f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+        f'<span style="width:40px;font-size:12px;color:#6b7280">{d}</span>'
+        f'<div style="background:#1e3a5f;height:20px;width:{max(1, int(c/max_v*200))}px;border-radius:3px"></div>'
+        f'<span style="font-size:13px;color:#374151">{c}</span>'
+        f'</div>'
+        for d, c in v3_history
+    )
+
+    body = f"""
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:24px">Pipeline Health</h1>
+    <div style="margin-bottom:24px">{alert_html}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <div class="card"><h2>Config provision_leads</h2>{cfg_html}</div>
+        <div class="card" style="margin-top:24px"><h2>Segments bloqués</h2>{stuck_html}</div>
+      </div>
+      <div>
+        <div class="card"><h2>V3 créés / 7 jours</h2>{bars}</div>
+        <div class="card" style="margin-top:24px"><h2>Suspects disponibles (top 20)</h2>{avail_html}</div>
+      </div>
+    </div>
+    <div style="margin-top:24px">
+      <form method="post" action="/admin/pipeline-health/force-provision" style="display:inline">
+        <input type="hidden" name="token" value="{token}">
+        <button type="submit" style="background:#1e3a5f;color:#fff;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px">
+          ▶ Force-run provision_leads maintenant
+        </button>
+      </form>
+    </div>"""
+
+    return _page("Pipeline Health", "", token, body)
+
+
+@router.post("/admin/pipeline-health/force-provision")
+async def pipeline_force_provision(request: Request):
+    form = await request.form()
+    token = form.get("token", "")
+    if token != admin_token():
+        return RedirectResponse("/admin/login", status_code=302)
+    from ... import scheduler as sched_mod
+    import threading
+    threading.Thread(target=sched_mod._job_provision_leads, kwargs={"force": True}, daemon=True).start()
+    return RedirectResponse(f"/admin/pipeline-health?token={token}", status_code=303)
