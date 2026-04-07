@@ -961,7 +961,8 @@ def _run_prospection(db: Session, target: ProspectionTargetDB) -> dict:
 
     api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
     if not api_key:
-        raise HTTPException(500, "GOOGLE_MAPS_API_KEY non configurée dans le .env")
+        # Google Places désactivé — pipeline V1 obsolète (remplacé par SIRENE + Gemini)
+        raise HTTPException(503, "Prospection V1 Google Places désactivée (GOOGLE_MAPS_API_KEY absente)")
 
     from ...google_places import search_prospects_enriched
     prospects_data, reasons = search_prospects_enriched(
@@ -1022,4 +1023,7 @@ def run_due_targets(db: Session):
             res = _run_prospection(db, t)
             log.info("Prospection auto '%s' : %d prospects importés", t.name, res["imported"])
         except Exception as e:
-            log.error("Prospection auto '%s' erreur : %s", t.name, e)
+            # 503 = pipeline V1 désactivé volontairement → warning seulement
+            msg = str(e)
+            lvl = log.warning if "503" in msg or "désactivée" in msg else log.error
+            lvl("Prospection auto '%s' : %s", t.name, msg)

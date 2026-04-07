@@ -528,6 +528,21 @@ class JobDB(Base):
     finished_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
 
 
+class IaSnapshotDB(Base):
+    """Snapshot d'un rapport IA pour un prospect V3 — utilisé pour comparaison mensuelle."""
+    __tablename__ = "ia_snapshots"
+    id               : Mapped[int]            = mapped_column(sa.Integer, primary_key=True, autoincrement=True)
+    prospect_token   : Mapped[str]            = mapped_column(sa.String, nullable=False, index=True)
+    created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    report_type      : Mapped[str]            = mapped_column(sa.String, default="audit")   # "audit" | "monthly"
+    score            : Mapped[int]            = mapped_column(sa.Integer, nullable=False)
+    nb_mentions      : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    nb_total         : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    matrix_json      : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)        # JSON list[dict]
+    competitors_json : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)        # JSON list[name, count]
+    report_html      : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)        # HTML complet
+
+
 class IaCitedCompanyDB(Base):
     """Entreprises citées par les IA (ChatGPT/Claude/Gemini) pour une paire métier×ville.
     Alimente : exclusion du pipeline leads + réutilisable pour d'autres projets.

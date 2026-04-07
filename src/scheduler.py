@@ -1249,14 +1249,16 @@ def _job_provision_leads(force: bool = False):
                         s.provisioned_at = now  # marquer quand même pour ne pas retraiter
                         continue
                     import secrets as _sec
+                    _tok = _sec.token_hex(16)
                     v3 = V3ProspectDB(
-                        token=_sec.token_hex(16),
+                        token=_tok,
                         name=s.raison_sociale,
                         city=s.ville,
                         profession=seg.profession_id,
                         phone=getattr(s, "telephone", None) or getattr(s, "phone", None),
                         email=getattr(s, "email", None),
                         website=getattr(s, "site_web", None) or getattr(s, "website", None),
+                        landing_url=f"/ia-reports/{_tok}",
                         contacted=False,
                         notes=f"SIRENE auto — dept:{s.departement or ''} NAF:{s.code_naf or ''}",
                     )
