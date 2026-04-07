@@ -750,11 +750,17 @@ async def pipeline_health(request: Request):
         <div class="card" style="margin-top:24px"><h2>Suspects disponibles (top 20)</h2>{avail_html}</div>
       </div>
     </div>
-    <div style="margin-top:24px">
+    <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
       <form method="post" action="/admin/pipeline-health/force-provision" style="display:inline">
         <input type="hidden" name="token" value="{token}">
         <button type="submit" style="background:#1e3a5f;color:#fff;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px">
-          ▶ Force-run provision_leads maintenant
+          ▶ Force provision_leads
+        </button>
+      </form>
+      <form method="post" action="/admin/pipeline-health/force-refresh-ia" style="display:inline">
+        <input type="hidden" name="token" value="{token}">
+        <button type="submit" style="background:#7c3aed;color:#fff;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px">
+          🤖 Force refresh IA (ChatGPT + Gemini + Claude)
         </button>
       </form>
     </div>"""
@@ -771,4 +777,16 @@ async def pipeline_force_provision(request: Request):
     from ... import scheduler as sched_mod
     import threading
     threading.Thread(target=sched_mod._job_provision_leads, kwargs={"force": True}, daemon=True).start()
+    return RedirectResponse(f"/admin/pipeline-health?token={token}", status_code=303)
+
+
+@router.post("/admin/pipeline-health/force-refresh-ia")
+async def pipeline_force_refresh_ia(request: Request):
+    form = await request.form()
+    token = form.get("token", "")
+    if token != admin_token():
+        return RedirectResponse("/admin/login", status_code=302)
+    from ... import scheduler as sched_mod
+    import threading
+    threading.Thread(target=sched_mod._job_refresh_ia, daemon=True).start()
     return RedirectResponse(f"/admin/pipeline-health?token={token}", status_code=303)
