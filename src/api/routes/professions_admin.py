@@ -1356,16 +1356,27 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
         if total_p == 0 and not segs:
             continue
 
-        # Statut global de la profession
+        # Statut SIRENE (scan)
         seg_statuses = {s.status for s in segs}
         if "running" in seg_statuses:
-            status_badge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⚙ EN COURS</span>'
+            scan_badge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⚙ SCAN EN COURS</span>'
         elif "pending" in seg_statuses:
-            status_badge = '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⏳ À TRAITER</span>'
+            scan_badge = '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⏳ SCAN À FAIRE</span>'
         elif total_p > 0:
-            status_badge = '<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">✓ TRAITÉ</span>'
+            scan_badge = '<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">✓ SCANNÉ</span>'
         else:
-            status_badge = '<span style="background:#f9fafb;color:#9ca3af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">— VIDE</span>'
+            scan_badge = '<span style="background:#f9fafb;color:#9ca3af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">— VIDE</span>'
+
+        # Statut enrichissement Gemini
+        if enriched == 0:
+            enrich_badge = '<span style="background:#f9fafb;color:#9ca3af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Gemini : pas encore</span>'
+        elif enriched < total_p:
+            pct_e = int(enriched / total_p * 100)
+            enrich_badge = f'<span style="background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Gemini : {pct_e}%</span>'
+        else:
+            enrich_badge = '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Gemini : 100%</span>'
+
+        status_badge = scan_badge + ' ' + enrich_badge
 
         actif_dot = '<span style="color:#16a34a;margin-right:4px">●</span>' if prof.actif else '<span style="color:#d1d5db;margin-right:4px">●</span>'
         score_str = f'<span style="color:#9ca3af;font-size:12px">score {prof.score_visibilite or 0}</span>'
