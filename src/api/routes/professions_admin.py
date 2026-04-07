@@ -1304,16 +1304,6 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
             .filter(SireneSuspectDB.provisioned_at.isnot(None))
             .group_by(SireneSuspectDB.profession_id).all()
         )
-        has_email_counts = dict(
-            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
-            .filter(SireneSuspectDB.email.isnot(None))
-            .group_by(SireneSuspectDB.profession_id).all()
-        )
-        has_phone_counts = dict(
-            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
-            .filter(SireneSuspectDB.telephone.isnot(None) if hasattr(SireneSuspectDB, 'telephone') else SireneSuspectDB.phone.isnot(None))
-            .group_by(SireneSuspectDB.profession_id).all()
-        )
 
         # Segments par profession
         all_segments = db.query(SireneSegmentDB).all()
@@ -1359,7 +1349,6 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
         actif_dot = '<span style="color:#16a34a;margin-right:4px">●</span>' if prof.actif else '<span style="color:#d1d5db;margin-right:4px">●</span>'
         score_str = f'<span style="color:#9ca3af;font-size:12px">score {prof.score_visibilite or 0}</span>'
 
-        # Header accordéon
         header = (f'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
                   f'<div style="display:flex;align-items:center;gap:8px">{actif_dot}'
                   f'<span style="font-weight:600;font-size:14px">{prof.label or pid}</span>'
@@ -1371,13 +1360,10 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
                   f'<span><b style="color:#7c3aed">{provisioned:,}</b> provisionnés</span>'
                   f'</div></div>')
 
-        # Stats détail
         detail_rows = (
-            f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:16px;background:#f9fafb;border-bottom:1px solid #e5e7eb">'
+            f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px;background:#f9fafb;border-bottom:1px solid #e5e7eb">'
             f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Enrichis</div>{_bar(enriched, total_p, "#1e3a5f")}</div>'
             f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Contactables</div>{_bar(contactable, total_p, "#16a34a")}</div>'
-            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avec email</div>{_bar(has_email, total_p, "#7c3aed")}</div>'
-            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avec téléphone</div>{_bar(has_phone, total_p, "#ea580c")}</div>'
             f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Provisionnés en V3</div>{_bar(provisioned, total_p, "#e94560")}</div>'
             f'</div>'
         )
