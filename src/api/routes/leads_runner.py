@@ -305,6 +305,10 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                                       + (f" | mobile:{mobile}" if mobile else "")
                                       + (f" | fixe:{fixe}" if fixe else ""),
                             ))
+                            # Cocher contactable sur le suspect source
+                            s_src = db2.get(SireneSuspectDB, s_id)
+                            if s_src:
+                                s_src.contactable = True
                             db2.commit()
                         contacts_created += 1
                         with _LOCK:

@@ -1265,20 +1265,43 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
         enrich_cfg = db.get(EnrichmentConfigDB, "default")
         now = datetime.utcnow()
 
-        def _next_run_str(cfg, label):
+        def _next_run_paris(cfg):
+            """Calcule le prochain run en heure de Paris (UTC+1 hiver / UTC+2 été)."""
             if not cfg or not cfg.active:
-                return f"{label} : inactif"
-            days_map = {"0":"Lun","1":"Mar","2":"Mer","3":"Jeu","4":"Ven","5":"Sam","6":"Dim"}
-            day_names = [days_map.get(d.strip(),"?") for d in (cfg.days or "0,1,2,3,4").split(",") if d.strip()]
+                return "inactif"
+            from datetime import timedelta
+            import time as _time
+            # Décalage Paris (approximatif : +1 en hiver, +2 en été)
+            # On utilise un calcul simple sans pytz
+            paris_offset = 2 if 3 <= now.month <= 10 else 1
+            paris_now = now + timedelta(hours=paris_offset)
+
+            configured_days = [int(d.strip()) for d in (cfg.days or "0,1,2,3,4").split(",") if d.strip().isdigit()]
             h = getattr(cfg, "hour_utc", -1)
-            schedule = f"{'/'.join(day_names)}" + (f" à {h:02d}:00 UTC" if h >= 0 else " — toutes les heures éligibles")
-            last = cfg.last_run.strftime("%d/%m %H:%M") if cfg.last_run else "jamais"
-            return f"{label} : dernier run {last} UTC · {schedule}"
 
-        prov_info = _next_run_str(prov_cfg, "Provision leads")
-        enrich_info = _next_run_str(enrich_cfg, "Enrichissement")
+            # Anti-rebond : dernier run < 1h → prochain = last_run + 1h
+            if cfg.last_run:
+                earliest = cfg.last_run + timedelta(hours=1)
+            else:
+                earliest = now
 
-        prov_last = prov_cfg.last_run.strftime("%d/%m à %H:%M UTC") if prov_cfg and prov_cfg.last_run else "jamais"
+            # Chercher le prochain slot éligible (max 7 jours)
+            candidate = earliest.replace(minute=0, second=0, microsecond=0)
+            if candidate <= now:
+                candidate = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+
+            for _ in range(7 * 24):
+                day_ok = not configured_days or candidate.weekday() in configured_days
+                hour_ok = h < 0 or candidate.hour == h
+                if day_ok and hour_ok and candidate >= earliest:
+                    paris_candidate = candidate + timedelta(hours=paris_offset)
+                    return paris_candidate.strftime("%A %d/%m à %Hh").capitalize()
+                candidate += timedelta(hours=1)
+            return "non planifié"
+
+        prov_next = _next_run_paris(prov_cfg)
+        enrich_next = _next_run_paris(enrich_cfg)
+        prov_last = prov_cfg.last_run.strftime("%d/%m à %Hh UTC") if prov_cfg and prov_cfg.last_run else "jamais"
         prov_count = prov_cfg.last_count if prov_cfg else 0
 
         # Professions avec leurs segments
@@ -1352,17 +1375,17 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
                   f'<span style="font-weight:600;font-size:14px">{prof.label or pid}</span>'
                   f'{score_str}{status_badge}</div>'
                   f'<div style="display:flex;gap:16px;font-size:12px;color:#6b7280">'
-                  f'<span><b style="color:#1a1a2e">{total_p:,}</b> suspects</span>'
-                  f'<span><b style="color:#1e3a5f">{enriched:,}</b> enrichis</span>'
-                  f'<span><b style="color:#16a34a">{contactable:,}</b> contactables</span>'
-                  f'<span><b style="color:#7c3aed">{provisioned:,}</b> provisionnés</span>'
+                  f'<span><b style="color:#1a1a2e">{total_p:,}</b> scannés</span>'
+                  f'<span><b style="color:#1e3a5f">{enriched:,}</b> recherchés</span>'
+                  f'<span><b style="color:#16a34a">{contactable:,}</b> avec contact</span>'
+                  f'<span><b style="color:#7c3aed">{provisioned:,}</b> en pipeline</span>'
                   f'</div></div>')
 
         detail_rows = (
             f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px;background:#f9fafb;border-bottom:1px solid #e5e7eb">'
-            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Enrichis</div>{_bar(enriched, total_p, "#1e3a5f")}</div>'
-            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Contactables</div>{_bar(contactable, total_p, "#16a34a")}</div>'
-            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Provisionnés en V3</div>{_bar(provisioned, total_p, "#e94560")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Recherchés (Gemini)</div>{_bar(enriched, total_p, "#1e3a5f")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avec contact trouvé</div>{_bar(contactable, total_p, "#16a34a")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">En pipeline contacts</div>{_bar(provisioned, total_p, "#e94560")}</div>'
             f'</div>'
         )
 
@@ -1398,13 +1421,16 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
                          f'</tr></thead><tbody>{"".join(seg_rows)}</tbody></table></div>')
 
         prof_blocks.append(
-            f'<details style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">'
-            f'<summary style="padding:14px 16px;cursor:pointer;list-style:none;user-select:none" '
-            f'onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'transparent\'">'
-            f'{header}</summary>'
+            f'<div class="acc-item" style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">'
+            f'<div class="acc-head" style="padding:14px 16px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between">'
+            f'<div style="flex:1">{header}</div>'
+            f'<span class="acc-arrow" style="color:#9ca3af;font-size:12px;margin-left:12px;flex-shrink:0">▶</span>'
+            f'</div>'
+            f'<div class="acc-body" style="display:none">'
             f'{detail_rows}'
             f'{segs_html}'
-            f'</details>'
+            f'</div>'
+            f'</div>'
         )
 
     nav = admin_nav(token, "suspects")
@@ -1413,7 +1439,8 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
 <title>Suspects SIRENE</title>{nav}
 <style>
 body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111;margin:0}}
-details summary::-webkit-details-marker{{display:none}}
+.acc-head:hover{{background:#f9fafb}}
+.acc-item.open .acc-arrow{{transform:rotate(90deg)}}
 </style></head><body>
 <div style="padding:20px 24px 40px">
   <h1 style="font-size:22px;font-weight:700;margin:0 0 6px">Suspects SIRENE</h1>
@@ -1421,23 +1448,44 @@ details summary::-webkit-details-marker{{display:none}}
 
   <!-- Bande opérations autonomes -->
   <div style="background:#1e3a5f;color:#fff;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
-    <div style="flex:1;min-width:200px">
-      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dernier run provision</div>
-      <div style="font-weight:600">{prov_last} · {prov_count} leads ajoutés</div>
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dernier run</div>
+      <div style="font-weight:600">{prov_last} · {prov_count} leads</div>
     </div>
-    <div style="flex:1;min-width:200px">
-      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Provision schedule</div>
-      <div style="font-size:13px">{prov_info.split("·",1)[-1].strip() if "·" in prov_info else prov_info}</div>
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Prochain run (Paris)</div>
+      <div style="font-weight:600">{prov_next}</div>
     </div>
-    <div style="flex:1;min-width:200px">
-      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Enrichissement schedule</div>
-      <div style="font-size:13px">{enrich_info.split("·",1)[-1].strip() if "·" in enrich_info else enrich_info}</div>
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Prochain enrichissement</div>
+      <div style="font-size:13px">{enrich_next}</div>
     </div>
   </div>
 
   <!-- Accordéons professions -->
+  <div id="acc-container">
   {''.join(prof_blocks) if prof_blocks else '<p style="color:#9ca3af">Aucune profession avec suspects.</p>'}
+  </div>
 </div>
+<script>
+document.querySelectorAll('.acc-head').forEach(function(head) {{
+  head.addEventListener('click', function() {{
+    var item = head.closest('.acc-item');
+    var body = item.querySelector('.acc-body');
+    var isOpen = item.classList.contains('open');
+    // Fermer tous
+    document.querySelectorAll('.acc-item.open').forEach(function(i) {{
+      i.classList.remove('open');
+      i.querySelector('.acc-body').style.display = 'none';
+    }});
+    // Ouvrir celui-ci si était fermé
+    if (!isOpen) {{
+      item.classList.add('open');
+      body.style.display = 'block';
+    }}
+  }});
+}});
+</script>
 </body></html>""")
 
     # ── (code mort — conservé pour pagination drill-down) ─────────────────────
