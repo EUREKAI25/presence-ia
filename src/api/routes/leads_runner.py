@@ -271,6 +271,10 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                 website = details.get("website") or ""
                 phone   = details.get("formatted_phone_number") or ""
 
+                email = None
+                mobile = None
+                fixe = None
+
                 if website:
                     scraped     = enrich_website(website, timeout=5)
                     email       = _valid_email(scraped.get("email"))
@@ -282,41 +286,47 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                     else:
                         mobile = None
                     fixe = phone if phone and not _is_mobile(phone) else None
-
-                    has_contact = bool(email or mobile)
-                    entry.update({"email": email, "mobile": mobile, "contact": has_contact})
-
-                    if has_contact:
-                        tok = secrets.token_hex(16)
-                        with SessionLocal() as db2:
-                            db2.add(V3ProspectDB(
-                                token=tok, name=raison_sociale, city=ville_str,
-                                profession=prof_label, phone=mobile or fixe,
-                                website=website, email=email,
-                                rating=details.get("rating"),
-                                reviews_count=details.get("user_ratings_total"),
-                                landing_url=f"/l/{tok}", scrape_status="done",
-                            ))
-                            db2.add(ContactDB(
-                                company_name=raison_sociale, email=email,
-                                phone=mobile or fixe, city=ville_str,
-                                profession=prof_label, status="PROSPECT",
-                                notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website}"
-                                      + (f" | mobile:{mobile}" if mobile else "")
-                                      + (f" | fixe:{fixe}" if fixe else ""),
-                            ))
-                            # Cocher contactable sur le suspect source
-                            s_src = db2.get(SireneSuspectDB, s_id)
-                            if s_src:
-                                s_src.contactable = True
-                            db2.commit()
-                        contacts_created += 1
-                        with _LOCK:
-                            _STATE["contacts"] = contacts_created
-                            _STATE["enriched"] += 1
+                elif phone:
+                    # Pas de site web mais Gemini a trouvé un téléphone → on prend quand même
+                    if _is_mobile(phone):
+                        mobile = phone
                     else:
-                        with _LOCK:
-                            _STATE["enriched"] += 1
+                        fixe = phone
+
+                # Contact valide = email OU mobile OU fixe (on ne perd plus les landlines)
+                has_contact = bool(email or mobile or fixe)
+                entry.update({"email": email, "mobile": mobile or fixe, "contact": has_contact})
+
+                if has_contact:
+                    tok = secrets.token_hex(16)
+                    with SessionLocal() as db2:
+                        db2.add(V3ProspectDB(
+                            token=tok, name=raison_sociale, city=ville_str,
+                            profession=prof_label, phone=mobile or fixe,
+                            website=website or None, email=email,
+                            rating=details.get("rating"),
+                            reviews_count=details.get("user_ratings_total"),
+                            landing_url=f"/l/{tok}", scrape_status="done",
+                        ))
+                        db2.add(ContactDB(
+                            company_name=raison_sociale, email=email,
+                            phone=mobile or fixe, city=ville_str,
+                            profession=prof_label, status="PROSPECT",
+                            notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website or ''}"
+                                  + (f" | mobile:{mobile}" if mobile else "")
+                                  + (f" | fixe:{fixe}" if fixe else ""),
+                        ))
+                        s_src = db2.get(SireneSuspectDB, s_id)
+                        if s_src:
+                            s_src.contactable = True
+                        db2.commit()
+                    contacts_created += 1
+                    with _LOCK:
+                        _STATE["contacts"] = contacts_created
+                        _STATE["enriched"] += 1
+                else:
+                    with _LOCK:
+                        _STATE["enriched"] += 1
 
             except Exception as e:
                 log.warning("[LEADS] %s: %s", raison_sociale, e)
