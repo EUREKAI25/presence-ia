@@ -1184,106 +1184,279 @@ NJ_LABEL = {
 def suspects_page(token: str = "", profession_id: str = "", dept: str = "",
                   search: str = "", page: int = 1):
     _require_admin(token)
-    per_page = 100
+
+    # ── Si drill-down entreprises demandé ────────────────────────────────────
+    if profession_id or search or dept:
+        per_page = 100
+        with SessionLocal() as db:
+            total, items = db_suspects_list(
+                db, profession_id=profession_id or None,
+                dept=dept or None, search=search or None,
+                page=page, per_page=per_page
+            )
+            if profession_id:
+                from ...models import ProfessionDB
+                prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
+                prof_label = prof.label if prof else profession_id
+            else:
+                prof_label = "Tous métiers"
+
+        total_pages = max(1, (total + per_page - 1) // per_page)
+
+        def page_link(p, label=None):
+            label = label or str(p)
+            active = "font-weight:700;color:#1d4ed8;" if p == page else "color:#6b7280;"
+            return f'<a href="/admin/suspects?token={token}&profession_id={profession_id}&dept={dept}&search={search}&page={p}" style="text-decoration:none;padding:4px 8px;{active}">{label}</a>'
+
+        pages_html = page_link(max(1, page-1), "‹")
+        for p in range(max(1, page-2), min(total_pages+1, page+3)):
+            pages_html += page_link(p)
+        pages_html += page_link(min(total_pages, page+1), "›")
+
+        rows = []
+        for s in items:
+            enrichi = '<span style="color:#16a34a">✓</span>' if s.enrichi_at else '<span style="color:#d1d5db">—</span>'
+            contactable = '<span style="color:#16a34a">✓</span>' if s.contactable else '<span style="color:#d1d5db">—</span>'
+            rows.append(f'<tr><td style="padding:6px 8px;font-size:12px;font-weight:500">{s.raison_sociale}</td>'
+                        f'<td style="padding:6px 8px;font-size:12px">{s.ville or "—"}</td>'
+                        f'<td style="padding:6px 8px;font-size:12px;text-align:center">{s.departement or "—"}</td>'
+                        f'<td style="padding:6px 8px;text-align:center">{enrichi}</td>'
+                        f'<td style="padding:6px 8px;text-align:center">{contactable}</td></tr>')
+
+        rows_html = "\n".join(rows) if rows else '<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af">Aucun suspect trouvé</td></tr>'
+        nav = admin_nav(token, "suspects")
+
+        return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Suspects — {prof_label}</title>{nav}
+<style>body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111;margin:0}}
+.card{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:0;margin:16px 24px;overflow:hidden}}
+table{{width:100%;border-collapse:collapse}}
+th{{background:#f1f5f9;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:8px;text-align:left;color:#64748b}}
+tr:hover td{{background:#f8fafc}}</style></head><body>
+<div style="padding:20px 24px 0">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <a href="/admin/suspects?token={token}" style="color:#6b7280;text-decoration:none;font-size:13px">← Suspects</a>
+    <h2 style="margin:0;font-size:18px">{prof_label} <span style="font-size:13px;font-weight:400;color:#6b7280">{total:,} entreprises</span></h2>
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto;max-height:72vh;overflow-y:auto">
+    <table><thead><tr>
+      <th>Raison sociale</th><th>Ville</th><th style="text-align:center">Dept</th>
+      <th style="text-align:center">Enrichi</th><th style="text-align:center">Contactable</th>
+    </tr></thead><tbody>{rows_html}</tbody></table></div>
+    <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280">
+      <span>Page {page}/{total_pages} · {total:,} résultats</span><div>{pages_html}</div>
+    </div>
+  </div>
+</div></body></html>""")
+
+    # ── Vue principale : dashboard par profession ─────────────────────────────
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+    from ...models import (ProfessionDB, SireneSegmentDB, SireneSuspectDB,
+                           LeadProvisioningConfigDB, EnrichmentConfigDB)
 
     with SessionLocal() as db:
-        total, items = db_suspects_list(
-            db, profession_id=profession_id or None,
-            dept=dept or None, search=search or None,
-            page=page, per_page=per_page
+        # Totaux globaux
+        total_suspects = db.query(func.count(SireneSuspectDB.id)).scalar() or 0
+
+        # Config jobs
+        prov_cfg = db.get(LeadProvisioningConfigDB, "default")
+        enrich_cfg = db.get(EnrichmentConfigDB, "default")
+        now = datetime.utcnow()
+
+        def _next_run_str(cfg, label):
+            if not cfg or not cfg.active:
+                return f"{label} : inactif"
+            days_map = {"0":"Lun","1":"Mar","2":"Mer","3":"Jeu","4":"Ven","5":"Sam","6":"Dim"}
+            day_names = [days_map.get(d.strip(),"?") for d in (cfg.days or "0,1,2,3,4").split(",") if d.strip()]
+            h = getattr(cfg, "hour_utc", -1)
+            schedule = f"{'/'.join(day_names)}" + (f" à {h:02d}:00 UTC" if h >= 0 else " — toutes les heures éligibles")
+            last = cfg.last_run.strftime("%d/%m %H:%M") if cfg.last_run else "jamais"
+            return f"{label} : dernier run {last} UTC · {schedule}"
+
+        prov_info = _next_run_str(prov_cfg, "Provision leads")
+        enrich_info = _next_run_str(enrich_cfg, "Enrichissement")
+
+        prov_last = prov_cfg.last_run.strftime("%d/%m à %H:%M UTC") if prov_cfg and prov_cfg.last_run else "jamais"
+        prov_count = prov_cfg.last_count if prov_cfg else 0
+
+        # Professions avec leurs segments
+        professions = db.query(ProfessionDB).order_by(ProfessionDB.score_visibilite.desc().nullslast()).all()
+
+        # Stats suspects par profession
+        suspect_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .group_by(SireneSuspectDB.profession_id).all()
         )
-        # Label de la profession
-        if profession_id:
-            from ...models import ProfessionDB
-            prof = db.query(ProfessionDB).filter_by(id=profession_id).first()
-            prof_label = prof.label if prof else profession_id
+        enriched_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .filter(SireneSuspectDB.enrichi_at.isnot(None))
+            .group_by(SireneSuspectDB.profession_id).all()
+        )
+        contactable_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .filter(SireneSuspectDB.contactable == True)
+            .group_by(SireneSuspectDB.profession_id).all()
+        )
+        provisioned_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .filter(SireneSuspectDB.provisioned_at.isnot(None))
+            .group_by(SireneSuspectDB.profession_id).all()
+        )
+        has_email_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .filter(SireneSuspectDB.email.isnot(None))
+            .group_by(SireneSuspectDB.profession_id).all()
+        )
+        has_phone_counts = dict(
+            db.query(SireneSuspectDB.profession_id, func.count(SireneSuspectDB.id))
+            .filter(SireneSuspectDB.telephone.isnot(None) if hasattr(SireneSuspectDB, 'telephone') else SireneSuspectDB.phone.isnot(None))
+            .group_by(SireneSuspectDB.profession_id).all()
+        )
+
+        # Segments par profession
+        all_segments = db.query(SireneSegmentDB).all()
+        segs_by_prof: dict = {}
+        for s in all_segments:
+            segs_by_prof.setdefault(s.profession_id, []).append(s)
+
+    # ── Build accordéons ──────────────────────────────────────────────────────
+    def _bar(val, total, color="#1e3a5f", width=80):
+        if not total: return '<span style="color:#d1d5db;font-size:12px">—</span>'
+        pct = min(100, int(val / total * 100))
+        return (f'<div style="display:flex;align-items:center;gap:6px">'
+                f'<div style="width:{width}px;background:#f3f4f6;border-radius:4px;height:8px">'
+                f'<div style="width:{pct}%;background:{color};border-radius:4px;height:8px"></div></div>'
+                f'<span style="font-size:12px;color:#374151">{val:,} <span style="color:#9ca3af">({pct}%)</span></span>'
+                f'</div>')
+
+    prof_blocks = []
+    for prof in professions:
+        pid = prof.id
+        total_p = suspect_counts.get(pid, 0)
+        enriched = enriched_counts.get(pid, 0)
+        contactable = contactable_counts.get(pid, 0)
+        provisioned = provisioned_counts.get(pid, 0)
+        has_email = has_email_counts.get(pid, 0)
+        has_phone = has_phone_counts.get(pid, 0)
+        segs = segs_by_prof.get(pid, [])
+
+        if total_p == 0 and not segs:
+            continue
+
+        # Statut global de la profession
+        seg_statuses = {s.status for s in segs}
+        if "running" in seg_statuses:
+            status_badge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⚙ EN COURS</span>'
+        elif "pending" in seg_statuses:
+            status_badge = '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">⏳ À TRAITER</span>'
+        elif total_p > 0:
+            status_badge = '<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">✓ TRAITÉ</span>'
         else:
-            prof_label = "Tous métiers"
+            status_badge = '<span style="background:#f9fafb;color:#9ca3af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">— VIDE</span>'
 
-    total_pages = max(1, (total + per_page - 1) // per_page)
+        actif_dot = '<span style="color:#16a34a;margin-right:4px">●</span>' if prof.actif else '<span style="color:#d1d5db;margin-right:4px">●</span>'
+        score_str = f'<span style="color:#9ca3af;font-size:12px">score {prof.score_visibilite or 0}</span>'
 
-    def page_link(p, label=None):
-        label = label or str(p)
-        active = "font-weight:700;color:#1d4ed8;" if p == page else "color:#6b7280;"
-        return f'<a href="/admin/suspects?token={token}&profession_id={profession_id}&dept={dept}&search={search}&page={p}" style="text-decoration:none;padding:4px 8px;{active}">{label}</a>'
+        # Header accordéon
+        header = (f'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+                  f'<div style="display:flex;align-items:center;gap:8px">{actif_dot}'
+                  f'<span style="font-weight:600;font-size:14px">{prof.label or pid}</span>'
+                  f'{score_str}{status_badge}</div>'
+                  f'<div style="display:flex;gap:16px;font-size:12px;color:#6b7280">'
+                  f'<span><b style="color:#1a1a2e">{total_p:,}</b> suspects</span>'
+                  f'<span><b style="color:#1e3a5f">{enriched:,}</b> enrichis</span>'
+                  f'<span><b style="color:#16a34a">{contactable:,}</b> contactables</span>'
+                  f'<span><b style="color:#7c3aed">{provisioned:,}</b> provisionnés</span>'
+                  f'</div></div>')
 
-    pages_html = page_link(max(1, page-1), "‹")
-    for p in range(max(1, page-2), min(total_pages+1, page+3)):
-        pages_html += page_link(p)
-    pages_html += page_link(min(total_pages, page+1), "›")
+        # Stats détail
+        detail_rows = (
+            f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:16px;background:#f9fafb;border-bottom:1px solid #e5e7eb">'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Enrichis</div>{_bar(enriched, total_p, "#1e3a5f")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Contactables</div>{_bar(contactable, total_p, "#16a34a")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avec email</div>{_bar(has_email, total_p, "#7c3aed")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avec téléphone</div>{_bar(has_phone, total_p, "#ea580c")}</div>'
+            f'<div><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Provisionnés en V3</div>{_bar(provisioned, total_p, "#e94560")}</div>'
+            f'</div>'
+        )
 
-    rows = []
-    for s in items:
-        nj = NJ_LABEL.get(s.nature_juridique or "", s.nature_juridique or "—")
-        enrichi = '<span style="color:#16a34a">✓</span>' if s.enrichi_at else '<span style="color:#d1d5db">—</span>'
-        contactable = '<span style="color:#16a34a">✓</span>' if s.contactable else '<span style="color:#d1d5db">—</span>'
-        rows.append(f"""<tr>
-          <td style="padding:6px 8px;font-size:11px;color:#9ca3af;font-family:monospace">{s.id}</td>
-          <td style="padding:6px 8px;font-size:12px;font-weight:500">{s.raison_sociale}</td>
-          <td style="padding:6px 8px;font-size:12px">{s.ville or "—"}</td>
-          <td style="padding:6px 8px;font-size:12px;text-align:center">{s.departement or "—"}</td>
-          <td style="padding:6px 8px;font-size:11px;color:#6b7280">{nj}</td>
-          <td style="padding:6px 8px;font-size:11px;color:#6b7280">{s.date_creation or "—"}</td>
-          <td style="padding:6px 8px;text-align:center">{enrichi}</td>
-          <td style="padding:6px 8px;text-align:center">{contactable}</td>
-        </tr>""")
+        # Segments
+        segs_sorted = sorted(segs, key=lambda s: -s.score)
+        seg_rows = []
+        for seg in segs_sorted:
+            st_color = {"done": "#16a34a", "pending": "#1d4ed8", "running": "#92400e", "error": "#dc2626"}.get(seg.status, "#6b7280")
+            st_label = {"done": "✓", "pending": "⏳", "running": "⚙", "error": "✗"}.get(seg.status, "?")
+            fetched = seg.last_fetched_at.strftime("%d/%m %H:%M") if seg.last_fetched_at else "—"
+            seg_rows.append(
+                f'<tr style="border-bottom:1px solid #f3f4f6">'
+                f'<td style="padding:6px 12px;font-size:12px;font-family:monospace;color:#6b7280">{seg.code_naf}</td>'
+                f'<td style="padding:6px 12px;font-size:12px;text-align:center;font-weight:600">{seg.departement}</td>'
+                f'<td style="padding:6px 12px;text-align:center"><span style="color:{st_color};font-weight:700;font-size:13px">{st_label}</span></td>'
+                f'<td style="padding:6px 12px;font-size:12px;text-align:right">{seg.nb_inserted:,}</td>'
+                f'<td style="padding:6px 12px;font-size:12px;color:#9ca3af">{fetched}</td>'
+                f'<td style="padding:6px 12px"><a href="/admin/suspects?token={token}&profession_id={pid}&dept={seg.departement}" style="font-size:11px;color:#e94560;text-decoration:none">voir →</a></td>'
+                f'</tr>'
+            )
 
-    rows_html = "\n".join(rows) if rows else '<tr><td colspan="8" style="padding:24px;text-align:center;color:#9ca3af">Aucun suspect trouvé</td></tr>'
-    nav = admin_nav(token, "professions")
+        segs_html = ""
+        if seg_rows:
+            segs_html = (f'<div style="overflow-x:auto">'
+                         f'<table style="width:100%;border-collapse:collapse">'
+                         f'<thead><tr style="background:#f9fafb">'
+                         f'<th style="padding:6px 12px;font-size:10px;font-weight:700;color:#9ca3af;text-align:left">NAF</th>'
+                         f'<th style="padding:6px 12px;font-size:10px;font-weight:700;color:#9ca3af;text-align:center">DEPT</th>'
+                         f'<th style="padding:6px 12px;font-size:10px;font-weight:700;color:#9ca3af;text-align:center">STATUT</th>'
+                         f'<th style="padding:6px 12px;font-size:10px;font-weight:700;color:#9ca3af;text-align:right">SUSPECTS</th>'
+                         f'<th style="padding:6px 12px;font-size:10px;font-weight:700;color:#9ca3af">DERNIER SCAN</th>'
+                         f'<th></th>'
+                         f'</tr></thead><tbody>{"".join(seg_rows)}</tbody></table></div>')
 
-    qualify_btn = ""
-    if profession_id and total == 0:
-        qualify_btn = f'<a href="/admin/professions?token={token}" onclick="..." style="background:#e94560;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none">▶ Lancer la qualification</a>'
+        prof_blocks.append(
+            f'<details style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">'
+            f'<summary style="padding:14px 16px;cursor:pointer;list-style:none;user-select:none" '
+            f'onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'transparent\'">'
+            f'{header}</summary>'
+            f'{detail_rows}'
+            f'{segs_html}'
+            f'</details>'
+        )
+
+    nav = admin_nav(token, "suspects")
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-<title>Suspects — {prof_label}</title>
-{nav}
+<title>Suspects SIRENE</title>{nav}
 <style>
 body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111;margin:0}}
-.card{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 24px}}
-table{{width:100%;border-collapse:collapse}}
-th{{background:#f1f5f9;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:8px;text-align:left;color:#64748b;position:sticky;top:0}}
-tr:hover td{{background:#f8fafc}}
-input[type=text],select{{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;outline:none}}
-input:focus,select:focus{{border-color:#e94560}}
+details summary::-webkit-details-marker{{display:none}}
 </style></head><body>
-<div style="padding:20px 24px 0">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-    <a href="/admin/professions?token={token}" style="color:#6b7280;text-decoration:none;font-size:13px">← Référentiel</a>
-    <h2 style="margin:0;font-size:18px">{prof_label}
-      <span style="font-size:13px;font-weight:400;color:#6b7280;margin-left:8px">{total:,} suspects</span>
-    </h2>
-    {qualify_btn}
-  </div>
+<div style="padding:20px 24px 40px">
+  <h1 style="font-size:22px;font-weight:700;margin:0 0 6px">Suspects SIRENE</h1>
+  <p style="color:#6b7280;font-size:14px;margin:0 0 20px">{total_suspects:,} entreprises au total</p>
 
-  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-    <input type="hidden" name="token" value="{token}">
-    <input type="hidden" name="profession_id" value="{profession_id}">
-    <input type="text" name="search" value="{search}" placeholder="Rechercher (nom, ville)..." style="width:220px">
-    <input type="text" name="dept" value="{dept}" placeholder="Département (ex: 75)" style="width:120px">
-    <button type="submit" style="background:#e94560;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Filtrer</button>
-    {"" if not (search or dept) else f'<a href="/admin/suspects?token={token}&profession_id={profession_id}" style="padding:7px 12px;font-size:13px;color:#6b7280;text-decoration:none;border:1px solid #d1d5db;border-radius:6px">Réinitialiser</a>'}
-  </form>
-
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto;max-height:70vh;overflow-y:auto">
-    <table>
-      <thead><tr>
-        <th>SIRET</th><th>Raison sociale</th><th>Ville</th>
-        <th style="text-align:center">Dept</th><th>Forme jur.</th>
-        <th>Date création</th><th style="text-align:center">Enrichi</th>
-        <th style="text-align:center">Contactable</th>
-      </tr></thead>
-      <tbody>{rows_html}</tbody>
-    </table>
+  <!-- Bande opérations autonomes -->
+  <div style="background:#1e3a5f;color:#fff;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dernier run provision</div>
+      <div style="font-weight:600">{prov_last} · {prov_count} leads ajoutés</div>
     </div>
-    <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280">
-      <span>Page {page} / {total_pages} · {total:,} résultats</span>
-      <div>{pages_html}</div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Provision schedule</div>
+      <div style="font-size:13px">{prov_info.split("·",1)[-1].strip() if "·" in prov_info else prov_info}</div>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Enrichissement schedule</div>
+      <div style="font-size:13px">{enrich_info.split("·",1)[-1].strip() if "·" in enrich_info else enrich_info}</div>
     </div>
   </div>
+
+  <!-- Accordéons professions -->
+  {''.join(prof_blocks) if prof_blocks else '<p style="color:#9ca3af">Aucune profession avec suspects.</p>'}
 </div>
 </body></html>""")
+
+    # ── (code mort — conservé pour pagination drill-down) ─────────────────────
 
 
 @router.post("/admin/professions/{prof_id}")
