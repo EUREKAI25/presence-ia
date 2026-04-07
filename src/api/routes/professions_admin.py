@@ -1328,8 +1328,6 @@ tr:hover td{{background:#f8fafc}}</style></head><body>
         enriched = enriched_counts.get(pid, 0)
         contactable = contactable_counts.get(pid, 0)
         provisioned = provisioned_counts.get(pid, 0)
-        has_email = has_email_counts.get(pid, 0)
-        has_phone = has_phone_counts.get(pid, 0)
         segs = segs_by_prof.get(pid, [])
 
         if total_p == 0 and not segs:
