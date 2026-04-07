@@ -157,6 +157,16 @@ def leads_hub(request: Request, db: Session = Depends(get_db)):
     token, redir = _check(request)
     if redir: return redir
 
+    from sqlalchemy import func as _func
+    from ...models import SireneSuspectDB
+
+    # ── SIRENE (entonnoir amont) ──────────────────────────────────────────────
+    sirene_total      = db.query(_func.count(SireneSuspectDB.id)).scalar() or 0
+    sirene_recherches = db.query(_func.count(SireneSuspectDB.id)).filter(SireneSuspectDB.enrichi_at.isnot(None)).scalar() or 0
+    sirene_contacts   = db.query(_func.count(SireneSuspectDB.id)).filter(SireneSuspectDB.contactable == True).scalar() or 0
+    sirene_pipeline   = db.query(_func.count(SireneSuspectDB.id)).filter(SireneSuspectDB.provisioned_at.isnot(None)).scalar() or 0
+
+    # ── V3 (entonnoir aval) ───────────────────────────────────────────────────
     prospects = db.query(V3ProspectDB).all()
     total      = len(prospects)
     enrichis   = sum(1 for p in prospects if p.email)
@@ -170,20 +180,23 @@ def leads_hub(request: Request, db: Session = Depends(get_db)):
 
     kpis = (
         f'<div class="grid-4">'
-        + _kpi("Suspects", f"{total:,}", "dans la base", "#6366f1")
-        + _kpi("Enrichis (email)", f"{enrichis:,}", _pct(enrichis, total) + " des suspects", "#8b5cf6")
-        + _kpi("Contactés", f"{contactes:,}", _pct(contactes, enrichis) + " des enrichis", "#10b981")
-        + _kpi("Non contactés", f"{non_cont:,}", "avec email — à traiter", "#e94560" if non_cont > 0 else "#9ca3af")
+        + _kpi("SIRENE scannés", f"{sirene_total:,}", "entreprises en base", "#6366f1")
+        + _kpi("Recherchés Gemini", f"{sirene_recherches:,}", _pct(sirene_recherches, sirene_total) + " du total", "#8b5cf6")
+        + _kpi("Avec contact", f"{sirene_contacts:,}", _pct(sirene_contacts, sirene_recherches) + " des recherchés", "#10b981")
+        + _kpi("En pipeline V3", f"{total:,}", _pct(total, sirene_contacts or 1) + " des contactables", "#e94560")
         + f'</div>'
     )
 
     funnel_rows = (
-        _stat_row("Suspects scannés",  f"{total:,}")
-        + _stat_row("Avec email",       f"{enrichis:,}", _pct(enrichis, total))
-        + _stat_row("IA testés",        f"{ia_tested:,}", _pct(ia_tested, total))
-        + _stat_row("Landing envoyée",  f"{contactes:,}", _pct(contactes, enrichis))
-        + _stat_row("RDV pris",         f"{rdv:,}", _pct(rdv, contactes))
-        + _stat_row("Deals signés",     f"{deals:,}", _pct(deals, rdv), "#e94560")
+        _stat_row("Entreprises SIRENE",     f"{sirene_total:,}")
+        + _stat_row("Recherchées (Gemini)", f"{sirene_recherches:,}", _pct(sirene_recherches, sirene_total))
+        + _stat_row("Avec contact trouvé",  f"{sirene_contacts:,}",   _pct(sirene_contacts, sirene_recherches))
+        + _stat_row("En pipeline contacts", f"{total:,}",             _pct(total, sirene_contacts or 1))
+        + _stat_row("Avec email",           f"{enrichis:,}",          _pct(enrichis, total))
+        + _stat_row("IA testés",            f"{ia_tested:,}",         _pct(ia_tested, total))
+        + _stat_row("Contactés",            f"{contactes:,}",         _pct(contactes, enrichis))
+        + _stat_row("RDV pris",             f"{rdv:,}",               _pct(rdv, contactes))
+        + _stat_row("Deals signés",         f"{deals:,}",             _pct(deals, rdv), "#e94560")
     )
 
     links = (
