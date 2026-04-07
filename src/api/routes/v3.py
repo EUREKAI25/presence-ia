@@ -642,8 +642,13 @@ def _render_landing(
             n = m.group(1).strip().rstrip(":")
             if n and n.lower() not in seen and _is_company_name(n):
                 names.append(n); seen.add(n.lower())
-        # Gemini format: "   CompanyName : description" (2-4 espaces d'indentation)
+        # Gemini format: "   CompanyName : description" (2-4 espaces d'indentation + colon)
         for m in re.finditer(r'^\s{2,4}([A-Za-z\u00C0-\u024F][^\n:]{1,60}?)\s*:', response, re.MULTILINE):
+            n = m.group(1).strip()
+            if 1 <= len(n.split()) <= 6 and n.lower() not in seen and _is_company_name(n):
+                names.append(n); seen.add(n.lower())
+        # Gemini plain bullet: "   Aqua by - Charonne\n" (sans colon après le nom)
+        for m in re.finditer(r'^\s{2,4}([A-Z\u00C0-\u024F][^\n:]{2,60}?)\s*$', response, re.MULTILINE):
             n = m.group(1).strip()
             if 1 <= len(n.split()) <= 6 and n.lower() not in seen and _is_company_name(n):
                 names.append(n); seen.add(n.lower())
