@@ -456,6 +456,11 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 resp = http_req.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
                     json={
+                        "systemInstruction": {"parts": [{"text": (
+                            "Tu es un assistant qui aide à trouver des prestataires locaux en France. "
+                            "Quand on te demande des artisans ou professionnels dans une ville, "
+                            "recherche et liste de vraies entreprises locales avec leurs noms."
+                        )}]},
                         "contents": [{"parts": [{"text": gemini_query}]}],
                         "tools": [{"googleSearch": {}}],
                     },
