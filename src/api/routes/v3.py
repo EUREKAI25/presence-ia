@@ -544,8 +544,13 @@ def _validate_companies_batch(results: list, profession: str, city: str, anthrop
                 r["competitors"] = []
             else:
                 names = [line.strip().lstrip("•-– ") for line in raw.split("\n") if line.strip()]
-                # Filtrer les lignes qui sont clairement des phrases (> 5 mots)
-                r["competitors"] = [n for n in names if n and len(n.split()) <= 5][:7]
+                # Filtrer phrases (> 5 mots) et plateformes connues
+                _bad = {"habitatpresto", "trustup", "travaux.com", "houzz", "pages jaunes",
+                        "habitatpresto.com", "google maps", "yelp", "annuaire"}
+                r["competitors"] = [
+                    n for n in names
+                    if n and len(n.split()) <= 5 and n.lower() not in _bad
+                ][:7]
         except Exception as e:
             log.warning("Haiku validation échouée pour %s: %s", r.get("model"), e)
             # Pas de competitors field → fallback regex au rendu
