@@ -1124,12 +1124,13 @@ _DEFAULT_CONTENT: dict = {
         "- Si non : noter la raison dans les notes du RDV"
     ),
     "commission_info": (
-        "Taux de base : 18% du deal HT\n"
-        "Bonus mensuel : +5% si ≥ 3 deals signés dans le mois\n\n"
+        "Taux : 15% du deal HT\n\n"
+        "Commissions par offre :\n"
+        "Offre 1 — Audit Complet (500€) → 75€\n"
+        "Offre 2 — Exécution Complète (3 500€) → 525€\n"
+        "Offre 3 — Domination IA Locale (9 000€) → 1 350€\n\n"
         "Paiement : versé le 10 du mois suivant la signature du client\n"
-        "Condition : client non remboursé dans les 14 jours\n\n"
-        "Deal moyen : 497€ → commission = 89,46€\n"
-        "Objectif mensuel suggéré : 5 deals → 497€ de commission"
+        "Condition : client non remboursé dans les 14 jours"
     ),
 }
 

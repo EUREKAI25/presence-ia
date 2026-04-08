@@ -68,7 +68,7 @@ a{text-decoration:none}
     <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
       Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
-      -webkit-text-fill-color:transparent">jusqu'à 20% de commission</span><br>sur chaque deal que vous signez
+      -webkit-text-fill-color:transparent">15% de commission</span><br>sur chaque deal que vous signez
     </h1>
     <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
       Les prospects ont réservé leur créneau. Vous choisissez ceux que vous voulez prendre.<br>
@@ -81,12 +81,12 @@ a{text-decoration:none}
     <!-- Chiffres -->
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">jusqu'à 20%</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">15%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">75€ · 630€ · 1 800€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">selon l'offre signée</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à 1 350€</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
@@ -434,9 +434,9 @@ _DEMO_SLOTS = [
 ]
 
 _DEMO_LEADERBOARD = [
-    {"rank": 1, "name": "Kévin R.",    "signed": 4, "commission": 357.84, "bonus": True,  "rate": 23},
-    {"rank": 2, "name": "Marie Martin","signed": 3, "commission": 268.38, "bonus": True,  "rate": 23},
-    {"rank": 3, "name": "David L.",    "signed": 1, "commission": 89.46,  "bonus": False, "rate": 18},
+    {"rank": 1, "name": "Kévin R.",    "signed": 4, "commission": 2100.0, "bonus": False, "rate": 15},
+    {"rank": 2, "name": "Marie Martin","signed": 2, "commission": 1050.0, "bonus": False, "rate": 15},
+    {"rank": 3, "name": "David L.",    "signed": 1, "commission": 525.0,  "bonus": False, "rate": 15},
 ]
 
 
@@ -446,18 +446,15 @@ def closer_demo_slots(request: Request):
     leaderboard_rows = ""
     for r in _DEMO_LEADERBOARD:
         is_me = r["name"] == "Marie Martin"
-        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
-                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5% bonus</span>'
-                       ) if r["bonus"] else ""
         rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
         leaderboard_rows += (
             f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
             f'border-bottom:1px solid #1a1a2e">'
-            f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};'
+            f'<td style="padding:10px 14px;color:#9ca3af;'
             f'font-size:13px;font-weight:{"700" if is_me else "400"}">'
             f'{rank_icon}</td>'
             f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
-            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
+            f'{r["name"]}{" (moi)" if is_me else ""}</td>'
             f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;text-align:right">{r["signed"]} deals</td>'
             f'</tr>'
         )
@@ -580,7 +577,7 @@ def closer_demo_slots(request: Request):
     <tbody>{leaderboard_rows}</tbody>
     </table></div>
     <p style="color:#555;font-size:11px;line-height:1.5">
-      Les 2 premiers du mois reçoivent +5% de commission.
+      Commission versée le 10 du mois suivant la signature.
     </p>
   </div>
 </div>
@@ -598,12 +595,12 @@ function claimSlot(id){{
 def closer_portal_demo(request: Request):
     """Portail closer — aperçu avec données de démonstration."""
     content  = _load_portal_content()
-    commission_rate = 0.18
+    commission_rate = 0.15
     name = "Marie Martin"
 
     stats = {
         "scheduled": 2, "completed": 1, "no_show": 1,
-        "earned": 497 * commission_rate, "pending": 0.0,
+        "earned": 3500 * commission_rate, "pending": 0.0,
     }
     conv_rate = "33%"
 
@@ -733,9 +730,6 @@ def closer_portal_demo(request: Request):
     leaderboard_rows_demo = ""
     for r in _DEMO_LEADERBOARD:
         is_me = r["name"] == "Marie Martin"
-        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
-                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
-                       ) if r["bonus"] else ""
     # panel_rdv avec bouton Agenda
     panel_rdv = (
         f'<div style="margin-bottom:20px">'
@@ -1016,7 +1010,7 @@ def _load_portal_content() -> dict:
         "pitch_script": "Script non encore configuré — rendez-vous dans l'admin → Contenu portail.",
         "objections": "Objections non encore configurées.",
         "rdv_guide": "Guide RDV non encore configuré.",
-        "commission_info": "18% par deal signé.",
+        "commission_info": "15% du deal · jusqu'à 1 350€ par deal signé (offre Domination IA Locale).",
     }
 
 
