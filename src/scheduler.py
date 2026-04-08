@@ -95,15 +95,7 @@ def start_scheduler():
         misfire_grace_time=300,
     )
 
-    # Job 9 : refresh tests IA — lun/jeu/dim à 9h30, 15h, 18h30 UTC
-    for _hour, _minute in [(9, 30), (15, 0), (18, 30)]:
-        _scheduler.add_job(
-            _job_refresh_ia,
-            trigger=CronTrigger(day_of_week="mon,thu,sun", hour=_hour, minute=_minute, timezone="UTC"),
-            id=f"refresh_ia_{_hour:02d}{_minute:02d}",
-            replace_existing=True,
-            misfire_grace_time=1800,
-        )
+    # Job 9 : refresh IA désactivé — les tests IA sont lancés à la génération de leads (generate_v3)
 
     # Job 10 : monitoring clés API — toutes les 6h
     _scheduler.add_job(

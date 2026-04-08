@@ -2694,38 +2694,39 @@ def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couv
 
 
 @router.post("/api/v3/refresh-ia")
-def refresh_ia(token: str = ""):
-    """Relance les tests IA pour toutes les paires ville/métier (background).
-    Appelé automatiquement par cron lun/jeu/dim à 9:30, 15h, 18h30."""
+def refresh_ia(token: str = "", city: str = "", profession: str = ""):
+    """Relance les tests IA pour une paire ciblée (city+profession) ou toutes les paires.
+    Usage normal : appelé à la génération de leads — city+profession obligatoires."""
     _require_admin(token)
 
-    def _do_refresh():
-        with SessionLocal() as db:
-            pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
-        for city, profession in pairs:
+    def _do_refresh(pairs):
+        for _city, _profession in pairs:
             try:
-                ia_data = _run_ia_test(profession, city)
+                ia_data = _run_ia_test(_profession, _city)
                 if not ia_data:
                     continue
                 ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) if ia_data.get("results") else None
                 with SessionLocal() as db:
-                    for p in db.query(V3ProspectDB).filter_by(city=city, profession=profession).all():
+                    for p in db.query(V3ProspectDB).filter_by(city=_city, profession=_profession).all():
                         p.ia_prompt    = ia_data.get("prompt")
                         p.ia_response  = ia_data.get("response")
                         p.ia_model     = ia_data.get("model")
                         p.ia_tested_at = ia_data.get("tested_at")
                         p.ia_results   = ia_results_json
                     db.commit()
-                log.info("refresh-ia OK: %s %s", profession, city)
+                log.info("refresh-ia OK: %s %s", _profession, _city)
             except Exception as exc:
-                log.error("refresh-ia %s %s: %s", profession, city, exc)
-            time.sleep(3)  # Pause entre les appels IA pour éviter le rate-limit
+                log.error("refresh-ia %s %s: %s", _city, _profession, exc)
 
-    threading.Thread(target=_do_refresh, daemon=True).start()
-    with SessionLocal() as db:
-        n_pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().count()
-    return {"ok": True, "pairs": n_pairs,
-            "note": f"Refresh IA lancé pour {n_pairs} paires ville/métier en background (~{n_pairs*45}s)"}
+    if city and profession:
+        pairs = [(city, profession)]
+    else:
+        with SessionLocal() as db:
+            pairs = db.query(V3ProspectDB.city, V3ProspectDB.profession).distinct().all()
+
+    threading.Thread(target=_do_refresh, args=(list(pairs),), daemon=True).start()
+    return {"ok": True, "pairs": len(pairs),
+            "note": f"Refresh IA lancé pour {len(pairs)} paire(s) en background"}
 
 
 @router.post("/api/v3/prospect/{tok}/contacted")
