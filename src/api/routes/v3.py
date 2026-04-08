@@ -135,7 +135,7 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "{metiers} \u00e0 {ville}, ChatGPT cite vos concurrents, pas vous. "
+    "{metiers} a {ville} : les IA ne vous citent pas, vos concurrents si. "
     "Voir : {landing_url} STOP"
 )
 
