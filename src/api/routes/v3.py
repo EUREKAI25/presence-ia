@@ -135,8 +135,8 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "{metiers} a {ville} : les IA ne vous citent pas, vos concurrents si. "
-    "Voir : {landing_url} STOP"
+    "les IA recommandent d'autres {metiers} que vous a {ville} : "
+    "regardez plutot {landing_url} STOP"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
