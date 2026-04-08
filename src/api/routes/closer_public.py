@@ -655,7 +655,7 @@ def closer_portal_demo(request: Request):
         f'<td style="padding:10px 16px;color:#fff;font-size:12px">'
         f'{m["name"]}<div style="color:#6b7280;font-size:10px">{m["city"]}</div></td>'
         f'<td style="padding:10px 16px;color:#9ca3af;font-size:11px">{m["scheduled_str"]}</td>'
-        f'<td style="padding:10px 16px">{_meeting_badge(m["status"])}</td>'
+        f'<td style="padding:10px 16px">{_meeting_badge(m["status"], m.get("scheduled_at"))}</td>'
         f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:12px">'
         f'{"{}€".format(int(m["deal_value"])) if m["deal_value"] else "—"}</td>'
         f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:11px">'
@@ -835,7 +835,7 @@ def closer_meeting_demo(demo_id: str, request: Request):
     <div style="color:#9ca3af;font-size:11px;margin-top:4px">Date RDV</div>
   </div>
   <div>
-    {_meeting_badge(meeting["status"])}
+    {_meeting_badge(meeting["status"], meeting.get("scheduled_at"))}
     <div style="color:#9ca3af;font-size:11px;margin-top:6px">Statut</div>
   </div>
   <div>
@@ -1163,7 +1163,7 @@ def closer_portal(token: str, request: Request):
         f'<td style="padding:10px 16px;color:#fff;font-size:12px">'
         f'{m["name"]}<div style="color:#6b7280;font-size:10px">{m["city"]}</div></td>'
         f'<td style="padding:10px 16px;color:#9ca3af;font-size:11px">{m["scheduled_str"]}</td>'
-        f'<td style="padding:10px 16px">{_meeting_badge(m["status"])}</td>'
+        f'<td style="padding:10px 16px">{_meeting_badge(m["status"], m.get("scheduled_at"))}</td>'
         f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:12px">'
         f'{"{}€".format(int(m["deal_value"])) if m["deal_value"] else "—"}</td>'
         f'<td style="padding:10px 16px;color:{"#2ecc71" if m["deal_value"] else "#555"};font-size:11px">'
@@ -1383,7 +1383,15 @@ function switchTab(slug) {{
 </body></html>""")
 
 
-def _meeting_badge(status: str) -> str:
+def _meeting_badge(status: str, scheduled_at=None) -> str:
+    from datetime import datetime, timezone as _tz
+    # Si RDV "scheduled" mais date passée → afficher "Passé" au lieu de "À venir"
+    if status == "scheduled" and scheduled_at:
+        _now = datetime.now(_tz.utc)
+        _sat = scheduled_at if scheduled_at.tzinfo else scheduled_at.replace(tzinfo=_tz.utc)
+        if _sat < _now:
+            return (f'<span style="background:#9ca3af20;color:#9ca3af;font-size:10px;font-weight:600;'
+                    f'padding:2px 7px;border-radius:10px">Passé</span>')
     m = {
         "scheduled": ("#f59e0b", "À venir"),
         "completed": ("#2ecc71", "Signé"),
@@ -1611,7 +1619,7 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
     <div style="color:#f59e0b;font-size:1.1rem;font-weight:700">{_fmt(meeting.scheduled_at)}</div>
     <div style="color:#9ca3af;font-size:10px;margin-top:2px">Date RDV</div>
   </div>
-  <div>{_meeting_badge(meeting.status)}</div>
+  <div>{_meeting_badge(meeting.status, meeting.scheduled_at)}</div>
   {"<div><div style='color:#2ecc71;font-size:1.1rem;font-weight:700'>{}€</div><div style='color:#9ca3af;font-size:10px;margin-top:2px'>Deal signé</div></div>".format(int(meeting.deal_value)) if meeting.deal_value else ""}
 </div>
 
