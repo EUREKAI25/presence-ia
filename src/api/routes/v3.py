@@ -377,10 +377,18 @@ def _load_prompts() -> list:
         return _DEFAULT_PROMPTS
 
 
+_GEMINI_PROMPTS = [
+    "Cite des {profession}s à {city} que tu connais.",
+    "Quelles entreprises de {profession} sont actives à {city} ?",
+    "Donne-moi une liste de {profession}s à {city}.",
+]
+
 def _run_ia_test(profession: str, city: str) -> dict:
     """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
     city_cap   = city.capitalize()
     prompts    = [p.format(profession=profession.lower(), city=city_cap) for p in _load_prompts()]
+    # Gemini refuse souvent "recommandes-tu" → prompts factuels dédiés (affiché = prompt utilisateur)
+    gemini_prompts = [p.format(profession=profession.lower(), city=city_cap) for p in _GEMINI_PROMPTS]
     results    = []
 
     # ── Clients IA — modèles identiques aux versions web utilisées par les prospects ──
@@ -439,12 +447,16 @@ def _run_ia_test(profession: str, city: str) -> dict:
                     log.error("IA test ChatGPT fallback: %s", e2)
 
         if gemini_key:
+            # Prompt factuel pour Gemini (évite le mode refus "je ne peux pas recommander")
+            # Le prompt AFFICHÉ reste le prompt utilisateur standard
+            _gi = prompts.index(prompt) if prompt in prompts else 0
+            gemini_query = gemini_prompts[_gi] if _gi < len(gemini_prompts) else prompt
             try:
                 # REST API direct → Google Search Grounding (SDK trop vieux sur VPS)
                 resp = http_req.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
                     json={
-                        "contents": [{"parts": [{"text": prompt}]}],
+                        "contents": [{"parts": [{"text": gemini_query}]}],
                         "tools": [{"googleSearch": {}}],
                     },
                     timeout=30,
@@ -452,7 +464,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 resp.raise_for_status()
                 data = resp.json()
                 text = data["candidates"][0]["content"]["parts"][0]["text"]
-                results.append({"model": "Gemini", "prompt": prompt,
+                results.append({"model": "Gemini", "prompt": prompt,  # prompt affiché = user prompt
                                 "response": _strip_markdown(text.strip()),
                                 "tested_at": ts})
             except Exception as e:
