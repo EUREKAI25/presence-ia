@@ -503,52 +503,45 @@ def _run_ia_test(profession: str, city: str) -> dict:
 
 
 def _validate_companies_batch(results: list, profession: str, city: str, anthropic_client) -> None:
-    """Valide les noms d'entreprises extraits via Claude Haiku et les stocke dans chaque résultat.
+    """Valide les noms d'entreprises via Claude Haiku — un appel par résultat.
     Modifie results in-place en ajoutant le champ 'competitors'."""
     import anthropic as _anthropic
-
-    # Construire le contexte de tous les résultats en une seule requête
-    lines = []
-    for i, r in enumerate(results):
-        lines.append(f"[{i}] {r.get('model')} — {r.get('prompt')}")
-        lines.append(r.get("response", "")[:600])
-        lines.append("")
-
-    prompt = (
-        f"Tu analyses des réponses d'IA sur la recherche de {profession}s à {city}.\n"
-        f"Pour chaque bloc [N] ci-dessous, extrais UNIQUEMENT les noms d'entreprises "
-        f"ou de professionnels réels (pas des services, descriptions, conseils, URLs, adverbes).\n"
-        f"Format de réponse STRICT : [N]: Nom1 | Nom2 | Nom3 (ou [N]: AUCUN si rien)\n\n"
-        + "\n".join(lines)
-    )
 
     key = os.getenv("ANTHROPIC_API_KEY", "")
     if not key:
         return
 
     client = anthropic_client or _anthropic.Anthropic(api_key=key)
-    msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = msg.content[0].text.strip()
 
-    # Parser la réponse "[N]: Nom1 | Nom2"
-    for line in text.split("\n"):
-        line = line.strip()
-        m = re.match(r'\[(\d+)\]\s*:\s*(.*)', line)
-        if not m:
+    for r in results:
+        response_text = (r.get("response") or "")[:800]
+        if not response_text.strip():
+            r["competitors"] = []
             continue
-        idx = int(m.group(1))
-        names_raw = m.group(2).strip()
-        if idx >= len(results):
-            continue
-        if names_raw.upper() == "AUCUN" or not names_raw:
-            results[idx]["competitors"] = []
-        else:
-            names = [n.strip() for n in names_raw.split("|") if n.strip()]
-            results[idx]["competitors"] = names[:7]
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=150,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Dans ce texte sur les {profession.lower()}s à {city}, "
+                        f"liste UNIQUEMENT les noms d'entreprises ou de professionnels réels. "
+                        f"Un nom par ligne. Si aucun, réponds exactement: AUCUN\n\n{response_text}"
+                    )
+                }],
+            )
+            raw = msg.content[0].text.strip()
+            log.debug("Haiku validation %s: %s", r.get("model"), raw[:100])
+            if raw.upper() == "AUCUN" or not raw:
+                r["competitors"] = []
+            else:
+                names = [line.strip().lstrip("•-– ") for line in raw.split("\n") if line.strip()]
+                # Filtrer les lignes qui sont clairement des phrases (> 5 mots)
+                r["competitors"] = [n for n in names if n and len(n.split()) <= 5][:7]
+        except Exception as e:
+            log.warning("Haiku validation échouée pour %s: %s", r.get("model"), e)
+            # Pas de competitors field → fallback regex au rendu
 
 
 # ── Landing HTML ──────────────────────────────────────────────────────────────
