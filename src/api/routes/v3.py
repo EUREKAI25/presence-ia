@@ -469,6 +469,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
                 resp.raise_for_status()
                 data = resp.json()
                 text = data["candidates"][0]["content"]["parts"][0]["text"]
+                log.info("Gemini raw response (%d chars): %s", len(text), text[:300])
                 results.append({"model": "Gemini", "prompt": prompt,  # prompt affiché = user prompt
                                 "response": _strip_markdown(text.strip()),
                                 "tested_at": ts})
