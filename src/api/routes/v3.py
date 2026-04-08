@@ -378,9 +378,9 @@ def _load_prompts() -> list:
 
 
 _GEMINI_PROMPTS = [
-    "Cite des {profession}s à {city} que tu connais.",
-    "Quelles entreprises de {profession} sont actives à {city} ?",
     "Donne-moi une liste de {profession}s à {city}.",
+    "Liste des {profession}s que tu connais à {city}.",
+    "Quels {profession}s travaillent à {city} ? Donne une liste.",
 ]
 
 def _run_ia_test(profession: str, city: str) -> dict:
