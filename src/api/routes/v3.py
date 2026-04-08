@@ -532,7 +532,7 @@ def _validate_companies_batch(results: list, profession: str, city: str, anthrop
                 }],
             )
             raw = msg.content[0].text.strip()
-            log.debug("Haiku validation %s: %s", r.get("model"), raw[:100])
+            log.info("Haiku validation %s → %s", r.get("model"), raw[:120])
             if raw.upper() == "AUCUN" or not raw:
                 r["competitors"] = []
             else:
