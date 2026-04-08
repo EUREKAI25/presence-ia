@@ -321,7 +321,7 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
         resp = http_req.post(
             "https://api.brevo.com/v3/transactionalSMS/sms",
             headers={"api-key": api_key, "Content-Type": "application/json"},
-            json={"sender": "PresenceIA", "recipient": phone,
+            json={"sender": os.getenv("SMS_SENDER", "PresenceIA"), "recipient": phone,
                   "content": message, "type": "transactional"},
             timeout=10,
         )

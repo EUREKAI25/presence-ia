@@ -728,10 +728,17 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
     from .v3 import _send_brevo_sms, _contact_message_sms
+    from ..models import V3ProspectDB
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    msg = _contact_message_sms(name, city, profession, "")
+    # Récupérer la landing_url depuis V3ProspectDB si dispo
+    base_url = os.getenv("BASE_URL", "https://presence-ia.com")
+    v3 = db.query(V3ProspectDB).filter_by(
+        company_name=name, city=city
+    ).first() if name else None
+    landing_url = (base_url + v3.landing_url) if v3 and v3.landing_url else ""
+    msg = _contact_message_sms(name, city, profession, landing_url)
     delivery_id = _mkt.create_sms_delivery(c.id)
     ok  = _send_brevo_sms(c.phone, msg)
     _mkt.mark_sent(delivery_id, ok)
