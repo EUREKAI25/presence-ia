@@ -126,7 +126,7 @@ a{text-decoration:none}
         display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">3</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous êtes payé</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
-        Votre commission est calculée automatiquement sur chaque deal signé. Versement déclenché rapidement selon le montant cumulé. Pas de plafond.
+        Votre commission est calculée automatiquement sur chaque deal signé. Paiement immédiat sur demande selon le montant cumulé. Pas de plafond.
       </p>
     </div>
   </div>
