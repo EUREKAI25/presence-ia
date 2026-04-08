@@ -604,12 +604,17 @@ def _render_landing(
         "contacter", "obtenir", "utiliser", "faire", "trouver", "chercher",
         "prendre", "privilégier", "éviter", "noter", "savoir", "pensez",
         "il ", "elle ", "vous ", "nous ",
+        # Articles/pronoms en début → phrase, pas un nom d'entreprise
+        "le ", "la ", "les ", "un ", "une ", "des ", "ce ", "cette ",
+        "cela ", "en ", "par ", "pour ", "avec ", "sans ", "sur ",
     }
     _REJECT_CONTAINS = {
         "listés", "listées", "listée", "témoigne", "témoignage",
         "trustup", "travaux.com", "houzz", "habitatpresto", "pages jaunes",
         "besoins", "plusieurs devis", "avis clients", "clairement",
         "annuaire", "recommandé par", "recommandée par",
+        # Verbes conjugués → phrase, jamais un nom d'entreprise
+        "dépend", "permet", "propose", "offre des", "réalise", "intervient",
     }
 
     def _is_company_name(n: str) -> bool:
@@ -624,7 +629,7 @@ def _render_landing(
             if kw in nl:
                 return False
         # Trop de mots → phrase de conseil, pas un nom d'entreprise
-        if len(nl.split()) > 6:
+        if len(nl.split()) > 5:
             return False
         return True
 
