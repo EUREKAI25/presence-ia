@@ -135,9 +135,8 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "Votre rapport IA {city} est pret. "
-    "ChatGPT vous cite-t-il ? {landing_url} "
-    "Stop: contact@presence-ia.com"
+    "{metiers} \u00e0 {ville}, ChatGPT cite vos concurrents, pas vous. "
+    "Voir : {landing_url} STOP"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
