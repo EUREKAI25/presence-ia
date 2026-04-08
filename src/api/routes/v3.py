@@ -135,8 +135,8 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "Bonjour, test visibilité IA effectué pour votre entreprise à {city}. "
-    "Rapport : {landing_url} - Présence IA. STOP: contact@presence-ia.com"
+    "Bonjour, audit IA realise pour votre entreprise a {city}. "
+    "Voir : {landing_url} STOP: contact@presence-ia.com"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
