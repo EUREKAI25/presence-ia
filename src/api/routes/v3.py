@@ -2824,7 +2824,7 @@ def refresh_ia(token: str = "", city: str = "", profession: str = ""):
                             p.ia_tested_at = ia_data.get("tested_at")
                             p.ia_results   = ia_results_json
                     db.commit()
-                log.info("refresh-ia OK: %s %s (score=%d)", _profession, _city, new_score)
+                log.info("refresh-ia OK: %s %s (validated=%s, score=%d)", _profession, _city, new_v, new_n)
             except Exception as exc:
                 log.error("refresh-ia %s %s: %s", _city, _profession, exc)
 
