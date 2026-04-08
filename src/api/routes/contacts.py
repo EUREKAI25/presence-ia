@@ -728,7 +728,7 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
     from .v3 import _send_brevo_sms, _contact_message_sms
-    from ..models import V3ProspectDB
+    from ...models import V3ProspectDB
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
