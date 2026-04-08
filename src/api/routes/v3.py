@@ -97,23 +97,30 @@ def _make_token(name: str, city: str, profession: str) -> str:
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 
-def _count_ia_competitors(ia_results_json: Optional[str]) -> int:
-    """Compte le total de noms distincts extraits dans un ia_results JSON."""
+def _count_ia_competitors(ia_results_json: Optional[str]) -> tuple:
+    """Retourne (has_validated, total_count) pour comparer la qualité des ia_results.
+    has_validated=True si au moins un résultat a le champ 'competitors' (validé par Haiku)."""
     if not ia_results_json:
-        return 0
+        return (False, 0)
     try:
         results = json.loads(ia_results_json)
-        seen: set = set()
-        for r in results:
-            resp = r.get("response") or ""
-            # Extraction simplifiée : markdown links + bold
-            for m in re.finditer(r'\[([^\]]{3,60})\]\(https?://', resp):
-                seen.add(m.group(1).strip().lower())
-            for m in re.finditer(r'\*\*([^*]{3,60})\*\*', resp):
-                seen.add(m.group(1).strip().lower())
-        return len(seen)
+        has_validated = any("competitors" in r for r in results)
+        if has_validated:
+            # Compter depuis competitors[] validé
+            total = sum(len(r.get("competitors") or []) for r in results)
+        else:
+            # Fallback : compter depuis les liens markdown + bold bruts
+            seen: set = set()
+            for r in results:
+                resp = r.get("response") or ""
+                for m in re.finditer(r'\[([^\]]{3,60})\]\(https?://', resp):
+                    seen.add(m.group(1).strip().lower())
+                for m in re.finditer(r'\*\*([^*]{3,60})\*\*', resp):
+                    seen.add(m.group(1).strip().lower())
+            total = len(seen)
+        return (has_validated, total)
     except Exception:
-        return 0
+        return (False, 0)
 
 def _city_image_key(city: str) -> str:
     return city.lower().strip()
@@ -2189,8 +2196,10 @@ def generate_v3(req: GenerateRequest, token: str = ""):
                     existing.competitors = json.dumps(competitors, ensure_ascii=False)
                     existing.rating = p.get("rating") or existing.rating
                     if ia_data and ia_results_json:
-                        # Mise à jour seulement si les nouveaux résultats sont meilleurs
-                        if _count_ia_competitors(ia_results_json) >= _count_ia_competitors(existing.ia_results):
+                        # Mise à jour si nouveau est validé (Haiku) ou meilleur score
+                        new_v, new_n = _count_ia_competitors(ia_results_json)
+                        old_v, old_n = _count_ia_competitors(existing.ia_results)
+                        if new_v > old_v or (new_v == old_v and new_n >= old_n):
                             existing.ia_prompt    = ia_data.get("prompt")
                             existing.ia_response  = ia_data.get("response")
                             existing.ia_model     = ia_data.get("model")
@@ -2781,11 +2790,12 @@ def refresh_ia(token: str = "", city: str = "", profession: str = ""):
                 if not ia_data:
                     continue
                 ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) if ia_data.get("results") else None
-                new_score = _count_ia_competitors(ia_results_json)
+                new_v, new_n = _count_ia_competitors(ia_results_json)
                 with SessionLocal() as db:
                     for p in db.query(V3ProspectDB).filter_by(city=_city, profession=_profession).all():
-                        # Ne pas écraser si les résultats existants sont meilleurs (Gemini non-déterministe)
-                        if new_score >= _count_ia_competitors(p.ia_results):
+                        # Priorité : validé (Haiku) > non validé ; à égalité, conserver le meilleur score
+                        old_v, old_n = _count_ia_competitors(p.ia_results)
+                        if new_v > old_v or (new_v == old_v and new_n >= old_n):
                             p.ia_prompt    = ia_data.get("prompt")
                             p.ia_response  = ia_data.get("response")
                             p.ia_model     = ia_data.get("model")
