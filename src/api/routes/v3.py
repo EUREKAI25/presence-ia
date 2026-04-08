@@ -485,6 +485,13 @@ def _run_ia_test(profession: str, city: str) -> dict:
     if not results:
         return {}
 
+    # ── Validation des noms d'entreprises par Claude Haiku ────────────────────
+    # Appelé une seule fois pour tous les résultats (batch), évite les appels multiples
+    try:
+        _validate_companies_batch(results, profession, city_cap, anthropic_client)
+    except Exception as e:
+        log.warning("Validation Haiku échouée, fallback regex: %s", e)
+
     first = results[0]
     return {
         "results":   results,
@@ -493,6 +500,55 @@ def _run_ia_test(profession: str, city: str) -> dict:
         "model":     first["model"],
         "tested_at": datetime.fromisoformat(first["tested_at"]),
     }
+
+
+def _validate_companies_batch(results: list, profession: str, city: str, anthropic_client) -> None:
+    """Valide les noms d'entreprises extraits via Claude Haiku et les stocke dans chaque résultat.
+    Modifie results in-place en ajoutant le champ 'competitors'."""
+    import anthropic as _anthropic
+
+    # Construire le contexte de tous les résultats en une seule requête
+    lines = []
+    for i, r in enumerate(results):
+        lines.append(f"[{i}] {r.get('model')} — {r.get('prompt')}")
+        lines.append(r.get("response", "")[:600])
+        lines.append("")
+
+    prompt = (
+        f"Tu analyses des réponses d'IA sur la recherche de {profession}s à {city}.\n"
+        f"Pour chaque bloc [N] ci-dessous, extrais UNIQUEMENT les noms d'entreprises "
+        f"ou de professionnels réels (pas des services, descriptions, conseils, URLs, adverbes).\n"
+        f"Format de réponse STRICT : [N]: Nom1 | Nom2 | Nom3 (ou [N]: AUCUN si rien)\n\n"
+        + "\n".join(lines)
+    )
+
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not key:
+        return
+
+    client = anthropic_client or _anthropic.Anthropic(api_key=key)
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text.strip()
+
+    # Parser la réponse "[N]: Nom1 | Nom2"
+    for line in text.split("\n"):
+        line = line.strip()
+        m = re.match(r'\[(\d+)\]\s*:\s*(.*)', line)
+        if not m:
+            continue
+        idx = int(m.group(1))
+        names_raw = m.group(2).strip()
+        if idx >= len(results):
+            continue
+        if names_raw.upper() == "AUCUN" or not names_raw:
+            results[idx]["competitors"] = []
+        else:
+            names = [n.strip() for n in names_raw.split("|") if n.strip()]
+            results[idx]["competitors"] = names[:7]
 
 
 # ── Landing HTML ──────────────────────────────────────────────────────────────
@@ -721,7 +777,8 @@ def _render_landing(
                 if r:
                     lbl = _ia_accordion_label(_nm, r.get("response", ""), p.name, p.profession)
                     _resp = r.get("response", "")
-                    _competitors = _extract_competitors_from_response(_resp)
+                    # Préférer les concurrents pré-validés par Haiku (stockés à la génération)
+                    _competitors = r.get("competitors") if r.get("competitors") is not None else _extract_competitors_from_response(_resp)
                     if "vous cite ✓" in lbl:
                         items_html = f'<li class="ia-col__cited">{name} ✓</li>'
                         for _cn in _competitors:
