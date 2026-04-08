@@ -809,9 +809,9 @@ def _render_landing(
                     elif _competitors:
                         items_html = "".join(f'<li>{_cn}</li>' for _cn in _competitors)
                     else:
-                        items_html = '<li class="ia-col__empty">Personne n'est cité</li>'
+                        items_html = '<li class="ia-col__empty">Personne n&#39;est cit&#233;</li>'
                 else:
-                    items_html = '<li class="ia-col__empty">Personne n'est cité</li>'
+                    items_html = '<li class="ia-col__empty">Personne n&#39;est cit&#233;</li>'
                 cols += (
                     f'<div class="ia-col">'
                     f'<div class="ia-col__brand" style="color:{_color}">{_nm} <span style="font-size:.78em;font-weight:400;color:#94a3b8">{_co}</span></div>'
