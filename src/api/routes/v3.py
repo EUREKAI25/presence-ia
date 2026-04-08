@@ -136,7 +136,7 @@ _DEFAULT_EMAIL_TEMPLATE = (
 
 _DEFAULT_SMS_TEMPLATE = (
     "les IA recommandent d'autres {metiers} que vous a {ville} : "
-    "regardez plutot {landing_url} STOP"
+    "regardez plutot {landing_url}"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
@@ -2335,7 +2335,9 @@ async def send_sms_prospect(tok: str, request: Request):
             return JSONResponse({"ok": False, "error": "Pas de téléphone"})
         lt_global = db.get(V3LandingTextDB, "__global__")
         tpl       = lt_global.sms_template if lt_global and lt_global.sms_template else None
-        msg   = _contact_message_sms(p.name, p.city, p.profession, p.landing_url, tpl)
+        abs_lu    = p.landing_url or ""
+        if abs_lu.startswith("/"): abs_lu = BASE_URL + abs_lu
+        msg   = _contact_message_sms(p.name, p.city, p.profession, abs_lu, tpl)
         ok    = _send_brevo_sms(p.phone, msg)
         if ok:
             p.sent_at     = datetime.utcnow()
