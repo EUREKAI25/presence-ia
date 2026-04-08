@@ -604,9 +604,6 @@ def _render_landing(
         "contacter", "obtenir", "utiliser", "faire", "trouver", "chercher",
         "prendre", "privilégier", "éviter", "noter", "savoir", "pensez",
         "il ", "elle ", "vous ", "nous ",
-        # Articles/pronoms en début → phrase, pas un nom d'entreprise
-        "le ", "la ", "les ", "un ", "une ", "des ", "ce ", "cette ",
-        "cela ", "en ", "par ", "pour ", "avec ", "sans ", "sur ",
     }
     _REJECT_CONTAINS = {
         "listés", "listées", "listée", "témoigne", "témoignage",
@@ -614,7 +611,9 @@ def _render_landing(
         "besoins", "plusieurs devis", "avis clients", "clairement",
         "annuaire", "recommandé par", "recommandée par",
         # Verbes conjugués → phrase, jamais un nom d'entreprise
-        "dépend", "permet", "propose", "offre des", "réalise", "intervient",
+        "dépend", "réalise", "intervient",
+        # Domaines web → URL, pas un nom d'entreprise
+        ".fr", ".com", ".net", ".org", ".io", ".fr/",
     }
 
     def _is_company_name(n: str) -> bool:
