@@ -735,7 +735,7 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     # Récupérer la landing_url depuis V3ProspectDB si dispo
     base_url = os.getenv("BASE_URL", "https://presence-ia.com")
     v3 = db.query(V3ProspectDB).filter_by(
-        company_name=name, city=city
+        name=name, city=city
     ).first() if name else None
     landing_url = (base_url + v3.landing_url) if v3 and v3.landing_url else ""
     msg = _contact_message_sms(name, city, profession, landing_url)
