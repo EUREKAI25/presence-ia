@@ -550,15 +550,19 @@ def _validate_companies_batch(results: list, profession: str, city: str, anthrop
                 messages=[{
                     "role": "user",
                     "content": (
-                        f"Dans ce texte sur les {profession.lower()}s à {city}, "
-                        f"liste UNIQUEMENT les noms d'entreprises ou de professionnels réels. "
-                        f"Un nom par ligne. Si aucun, réponds exactement: AUCUN\n\n{response_text}"
+                        f"Extrait de ce texte les noms propres mentionnés comme {profession.lower()}s ou entreprises à {city}. "
+                        f"Donne uniquement les noms tels qu'ils apparaissent dans le texte, un par ligne, sans commentaire ni explication. "
+                        f"Si le texte ne cite aucun nom d'entreprise ou de professionnel, réponds exactement: AUCUN\n\n{response_text}"
                     )
                 }],
             )
             raw = msg.content[0].text.strip()
             log.info("Haiku validation %s → %s", r.get("model"), raw[:120])
-            if raw.upper() == "AUCUN" or not raw:
+            # Détecter les réponses-disclaimer Haiku ("Je ne peux pas confirmer...")
+            _disclaimer_starts = ("je ne peux", "je suis désolé", "il m'est impossible",
+                                   "i cannot", "i'm unable", "je ne suis pas")
+            _is_disclaimer = raw.lower().startswith(_disclaimer_starts)
+            if raw.upper() == "AUCUN" or not raw or _is_disclaimer:
                 r["competitors"] = []
             else:
                 names = [line.strip().lstrip("•-– ") for line in raw.split("\n") if line.strip()]
