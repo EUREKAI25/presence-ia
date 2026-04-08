@@ -5,6 +5,7 @@ Jobs actifs :
 - run_due_targets   : toutes les heures — prospection automatique Google Places
 """
 import logging
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
