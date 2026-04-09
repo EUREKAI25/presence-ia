@@ -172,3 +172,98 @@ async def api_update_template(slug: str, request: Request, db: Session = Depends
     if not t:
         raise HTTPException(404, "Template introuvable")
     return {"ok": True, "slug": t.slug}
+
+
+# ── Page Recrutement Closers ──────────────────────────────────────────────────
+
+@router.get("/admin/recrutement", response_class=HTMLResponse)
+def admin_recrutement(request: Request, db: Session = Depends(get_db)):
+    _check(request)
+    token = request.query_params.get("token", admin_token())
+
+    fb   = db_get_template(db, "recrutement_facebook")
+    mp   = db_get_template(db, "recrutement_mp")
+    fb_body = (fb.body or "").replace("`", "&#96;").replace("\\", "\\\\")
+    mp_body = (mp.body or "").replace("`", "&#96;").replace("\\", "\\\\")
+
+    def _card(slug, title, icon, body_escaped, token=token):
+        return f"""
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:24px;margin-bottom:24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">{icon}</span>
+      <strong style="font-size:15px;color:#f1f5f9">{title}</strong>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="copyMsg('{slug}')"
+        style="background:#6366f1;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
+        Copier
+      </button>
+      <a href="/admin/templates/{slug}?token={token}"
+        style="background:#374151;color:#e5e7eb;padding:6px 14px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">
+        Modifier
+      </a>
+    </div>
+  </div>
+  <textarea id="body_{slug}" rows="12"
+    style="width:100%;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;
+           color:#e5e7eb;font-size:13px;font-family:monospace;padding:12px;resize:vertical"
+    oninput="autoSave('{slug}', this.value)">{(db_get_template(db, slug).body or '').replace('<','&lt;').replace('>','&gt;')}</textarea>
+  <div id="saved_{slug}" style="font-size:11px;color:#10b981;margin-top:6px;display:none">Sauvegardé ✓</div>
+</div>"""
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><title>Recrutement Closers — PRESENCE_IA</title>
+<style>
+*{{box-sizing:border-box}}
+body{{font-family:'Segoe UI',sans-serif;background:#0d0d1a;margin:0;color:#f1f5f9}}
+</style>
+</head><body>
+{admin_nav(token, "recrutement")}
+<div style="max-width:800px;margin:32px auto;padding:0 20px">
+  <h1 style="font-size:18px;margin-bottom:6px;color:#f1f5f9">Recrutement Closers</h1>
+  <p style="color:#6b7280;font-size:13px;margin-bottom:28px">
+    Messages à poster sur Facebook pour recruter des closers.
+    Modifiez directement — sauvegarde automatique.
+  </p>
+
+  {_card("recrutement_facebook", "Post Facebook", "📢",  fb_body)}
+  {_card("recrutement_mp",       "Message Privé (réponse commentaires)", "💬", mp_body)}
+
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:10px;padding:20px">
+    <div style="font-size:12px;font-weight:700;color:#9ca3af;margin-bottom:12px">PROCÉDURE</div>
+    <ol style="color:#9ca3af;font-size:13px;line-height:1.8;margin:0;padding-left:20px">
+      <li>Copier le <strong style="color:#f1f5f9">Post Facebook</strong> → poster sur ton profil / page</li>
+      <li>Quand quelqu'un commente "CLOSER" → lui envoyer le <strong style="color:#f1f5f9">Message Privé</strong></li>
+      <li>Le lien de candidature : <a href="https://presence-ia.com/closer/recruit" target="_blank"
+          style="color:#6366f1">presence-ia.com/closer/recruit</a></li>
+    </ol>
+  </div>
+</div>
+<script>
+async function autoSave(slug, value) {{
+  clearTimeout(window['_t_'+slug]);
+  window['_t_'+slug] = setTimeout(async () => {{
+    const r = await fetch('/api/admin/templates/'+slug+'?token={token}', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{body: value}})
+    }});
+    if(r.ok) {{
+      const el = document.getElementById('saved_'+slug);
+      el.style.display='block';
+      setTimeout(()=>el.style.display='none', 2000);
+    }}
+  }}, 900);
+}}
+function copyMsg(slug) {{
+  const ta = document.getElementById('body_'+slug);
+  navigator.clipboard.writeText(ta.value).then(() => {{
+    const btn = ta.closest('div').querySelector('button');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copié !';
+    btn.style.background = '#10b981';
+    setTimeout(() => {{ btn.textContent = orig; btn.style.background = '#6366f1'; }}, 1800);
+  }});
+}}
+</script>
+</body></html>""")

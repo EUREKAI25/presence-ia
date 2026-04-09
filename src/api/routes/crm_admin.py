@@ -2,8 +2,8 @@
 import os
 import json
 from pathlib import Path
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Request, UploadFile, File
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 from ._nav import admin_nav
 from ...database import SessionLocal
@@ -911,7 +911,9 @@ async def save_application_notes(app_id: str, request: Request):
 # Messages de recrutement closers
 # ─────────────────────────────────────────────────────────────────────────────
 
-_MESSAGES_FILE = Path(__file__).parent.parent.parent.parent / "data" / "closer_messages.json"
+_MESSAGES_FILE   = Path(__file__).parent.parent.parent.parent / "data" / "closer_messages.json"
+_POST_IMAGE_DIR  = Path(__file__).parent.parent.parent.parent / "data"
+_POST_IMAGE_STEM = "closer_post_image"
 
 _DEFAULT_MESSAGES = {
     "post_groupe": (
@@ -953,18 +955,31 @@ def closer_messages_page(request: Request):
     token = _check_token(request)
     msgs = _load_closer_messages()
 
+    # Vérifier si une image est déjà uploadée
+    existing_image = next(_POST_IMAGE_DIR.glob(f"{_POST_IMAGE_STEM}.*"), None)
+    img_html = ""
+    if existing_image:
+        img_html = (
+            f'<img src="/admin/crm/closer-messages/image?token={token}" '
+            f'style="max-width:100%;max-height:220px;border-radius:6px;border:1px solid #2a2a4e;margin-top:10px;display:block">'
+        )
+
     def _ta(key, label, hint, rows=6):
         val = msgs.get(key, "").replace("&", "&amp;").replace("<", "&lt;")
         return (
             f'<div style="margin-bottom:24px">'
             f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">'
             f'  <label style="color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">{label}</label>'
-            f'  <button type="button" onclick="copyField(\'{key}\')" '
-            f'  style="padding:3px 10px;background:#1a1a2e;border:1px solid #2a2a4e;'
-            f'  border-radius:4px;color:#9ca3af;font-size:10px;cursor:pointer">Copier</button>'
+            f'  <div style="display:flex;gap:6px">'
+            f'    <span id="saved_{key}" style="color:#10b981;font-size:10px;display:none;align-self:center">✓</span>'
+            f'    <button type="button" onclick="copyField(\'{key}\')" '
+            f'    style="padding:3px 10px;background:#1a1a2e;border:1px solid #2a2a4e;'
+            f'    border-radius:4px;color:#9ca3af;font-size:10px;cursor:pointer">Copier</button>'
+            f'  </div>'
             f'</div>'
             f'<p style="color:#555;font-size:11px;margin-bottom:6px">{hint}</p>'
             f'<textarea id="{key}" rows="{rows}" '
+            f'oninput="autoSave(\'{key}\')" '
             f'style="width:100%;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;'
             f'padding:10px 12px;color:#e8e8f0;font-size:13px;font-family:inherit;'
             f'resize:vertical;outline:none;line-height:1.6">{val}</textarea>'
@@ -1024,6 +1039,25 @@ textarea:focus{{border-color:#6366f1!important;outline:none}}
 
 <div class="sep"></div>
 
+<!-- Image post -->
+<div style="margin-bottom:28px">
+  <label style="color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:8px">Image du post</label>
+  <p style="color:#555;font-size:11px;margin-bottom:10px">Image à joindre au post Facebook/LinkedIn. Formats acceptés : JPG, PNG, WebP.</p>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <label style="padding:6px 16px;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;color:#9ca3af;font-size:12px;cursor:pointer">
+      Uploader une image
+      <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="uploadImg(this)">
+    </label>
+    {'<a href="/admin/crm/closer-messages/image?token='+token+'" download style="padding:6px 16px;background:#6366f120;border:1px solid #6366f140;border-radius:6px;color:#6366f1;font-size:12px;text-decoration:none">Télécharger ↓</a>' if existing_image else ''}
+    <span id="img-status" style="color:#10b981;font-size:11px;display:none"></span>
+  </div>
+  <div id="img-preview">
+    {img_html}
+  </div>
+</div>
+
+<div class="sep"></div>
+
 <!-- Messages -->
 {_ta("post_groupe",    "1 — Post groupe (LinkedIn / Facebook / Instagram)",
      "Message public. Les gens qui répondent « closing » reçoivent ensuite le DM.", rows=9)}
@@ -1032,18 +1066,42 @@ textarea:focus{{border-color:#6366f1!important;outline:none}}
 {_ta("dm_individuel",  "3 — DM individuel (optionnel — approche directe)",
      "Pour contacter quelqu'un spécifiquement, sans passer par le post.", rows=6)}
 
-<button onclick="save()" style="padding:10px 28px;background:#6366f1;border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Sauvegarder</button>
-
 </div>
 <div class="toast" id="toast"></div>
 <script>
 function copyText(t){{navigator.clipboard.writeText(t).then(()=>toast('Copié ✓'))}}
 function copyField(id){{navigator.clipboard.writeText(document.getElementById(id).value).then(()=>toast('Copié ✓'))}}
 function toast(m){{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}}
-async function save(){{
-  const d={{}};['post_groupe','dm_suivi','dm_individuel'].forEach(k=>d[k]=document.getElementById(k).value);
-  const r=await fetch('/admin/crm/closer-messages?token={token}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(d)}});
-  toast(r.ok?'Sauvegardé ✓':'Erreur !');
+var _timers={{}};
+function autoSave(key){{
+  clearTimeout(_timers[key]);
+  _timers[key]=setTimeout(async function(){{
+    const d={{}};['post_groupe','dm_suivi','dm_individuel'].forEach(k=>d[k]=document.getElementById(k).value);
+    const r=await fetch('/admin/crm/closer-messages?token={token}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(d)}});
+    if(r.ok){{const s=document.getElementById('saved_'+key);s.style.display='inline';setTimeout(()=>s.style.display='none',1800);}}
+  }},800);
+}}
+async function uploadImg(inp){{
+  if(!inp.files[0]) return;
+  const fd=new FormData(); fd.append('file',inp.files[0]);
+  const r=await fetch('/admin/crm/closer-messages/image?token={token}',{{method:'POST',body:fd}});
+  if(r.ok){{
+    const s=document.getElementById('img-status'); s.textContent='Image uploadée ✓'; s.style.display='inline';
+    setTimeout(()=>s.style.display='none',2500);
+    const preview=document.getElementById('img-preview');
+    const img=document.createElement('img');
+    img.src=URL.createObjectURL(inp.files[0]);
+    img.style.cssText='max-width:100%;max-height:220px;border-radius:6px;border:1px solid #2a2a4e;margin-top:10px;display:block';
+    preview.innerHTML=''; preview.appendChild(img);
+    // Ajouter bouton télécharger si absent
+    if(!document.getElementById('dl-btn')){{
+      const a=document.createElement('a');
+      a.id='dl-btn'; a.href='/admin/crm/closer-messages/image?token={token}';
+      a.download=''; a.textContent='Télécharger ↓';
+      a.style.cssText='padding:6px 16px;background:#6366f120;border:1px solid #6366f140;border-radius:6px;color:#6366f1;font-size:12px;text-decoration:none;margin-left:10px';
+      inp.parentElement.parentElement.querySelector('div').appendChild(a);
+    }}
+  }}
 }}
 </script>
 </body></html>"""
@@ -1060,6 +1118,29 @@ async def save_closer_messages(request: Request):
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
+
+
+@router.post("/admin/crm/closer-messages/image")
+async def upload_post_image(request: Request, file: UploadFile = File(...)):
+    _check_token(request)
+    import shutil, mimetypes
+    ext = Path(file.filename).suffix.lower() or ".jpg"
+    # Supprimer l'ancienne image (toutes extensions)
+    for old in _POST_IMAGE_DIR.glob(f"{_POST_IMAGE_STEM}.*"):
+        old.unlink(missing_ok=True)
+    dest = _POST_IMAGE_DIR / f"{_POST_IMAGE_STEM}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return JSONResponse({"ok": True, "filename": dest.name})
+
+
+@router.get("/admin/crm/closer-messages/image")
+def download_post_image(request: Request):
+    _check_token(request)
+    for p in _POST_IMAGE_DIR.glob(f"{_POST_IMAGE_STEM}.*"):
+        return FileResponse(str(p), filename=p.name)
+    from fastapi import HTTPException
+    raise HTTPException(404, "Aucune image uploadée")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
