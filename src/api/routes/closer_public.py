@@ -10,6 +10,8 @@ Routes :
 """
 import os
 import uuid
+import json
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -1227,9 +1229,136 @@ def closer_portal(token: str, request: Request):
     except Exception:
         leaderboard_rows_real = '<tr><td colspan="3" style="padding:20px;text-align:center;color:#555">Données non disponibles</td></tr>'
 
+    # ── Paiement ──────────────────────────────────────────────────────────────
+    closer_iban = ""
+    payment_requests_closer = []
+    if closer:
+        try:
+            closer_meta = json.loads(closer.meta) if isinstance(closer.meta, str) else (closer.meta or {})
+            closer_iban = closer_meta.get("iban", "")
+        except Exception:
+            pass
+        try:
+            import json as _pj
+            _pf = Path(__file__).parent.parent.parent.parent / "data" / "payment_requests.json"
+            if _pf.exists():
+                _all = _pj.loads(_pf.read_text(encoding="utf-8"))
+                payment_requests_closer = [r for r in _all if r.get("closer_id") == str(closer.id)]
+        except Exception:
+            pass
+
+    _pr_rows = ""
+    for pr in payment_requests_closer:
+        _st_color = "#2ecc71" if pr.get("status") == "paid" else "#f59e0b"
+        _st_label = "Versé" if pr.get("status") == "paid" else "En attente"
+        _paid_note = f' · versé le {pr["paid_at"][:10]}' if pr.get("paid_at") else ""
+        _pr_rows += (
+            f'<tr style="border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:10px 14px;color:#ccc;font-size:12px">{pr.get("requested_at","")[:10]}</td>'
+            f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;font-weight:600">{pr.get("amount",0):.0f}€</td>'
+            f'<td style="padding:10px 14px"><span style="background:{_st_color}20;color:{_st_color};'
+            f'font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px">{_st_label}</span>{_paid_note}</td>'
+            f'</tr>'
+        )
+    if not _pr_rows:
+        _pr_rows = '<tr><td colspan="3" style="padding:20px;color:#555;text-align:center;font-size:12px">Aucune demande</td></tr>'
+
+    _iban_save_js = f"""
+async function saveIban(){{
+  const iban=document.getElementById('iban-input').value.trim().toUpperCase();
+  if(!iban){{alert('Saisissez votre IBAN.');return;}}
+  const r=await fetch('/closer/{token}/iban',{{method:'POST',
+    headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{iban}})
+  }});
+  if(r.ok){{document.getElementById('iban-saved').style.display='inline';
+    setTimeout(()=>document.getElementById('iban-saved').style.display='none',2000);}}
+}}
+async function requestPayment(){{
+  const r=await fetch('/closer/{token}/payment-request',{{method:'POST',
+    headers:{{'Content-Type':'application/json'}}
+  }});
+  const d=await r.json();
+  if(d.ok){{alert('Demande envoyée ! Montant : '+d.amount+'€ · versement le 10 du mois.');location.reload();}}
+  else{{alert(d.error||'Erreur');}}
+}}
+""" if closer else "function saveIban(){{}} function requestPayment(){{}}"
+
+    _pending_amount = comm_a_verser
+    _can_request = closer and _pending_amount > 0 and not any(
+        r.get("status") == "pending" for r in payment_requests_closer
+    )
+    _request_btn_style = (
+        "background:#6366f1;color:#fff;cursor:pointer"
+        if _can_request else
+        "background:#2a2a4e;color:#555;cursor:not-allowed"
+    )
+    _request_btn_title = (
+        "" if _can_request else
+        ("Demande déjà en cours" if any(r.get("status") == "pending" for r in payment_requests_closer)
+         else "Aucun montant à verser")
+    )
+
+    panel_paiement = f"""
+<div style="margin-bottom:24px">
+  <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:4px">Paiement des commissions</h2>
+  <p style="color:#6b7280;font-size:12px">Versement le 10 du mois suivant la signature du client.</p>
+</div>
+
+<!-- Solde -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:24px">
+  <div style="background:#1a1a2e;border:1px solid #2ecc7140;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{comm_verse:.0f}€</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">Déjà versé</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #f59e0b40;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#f59e0b">{_pending_amount:.0f}€</div>
+    <div style="color:#9ca3af;font-size:10px;margin-top:4px">À verser</div>
+  </div>
+</div>
+
+<!-- IBAN -->
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin-bottom:20px">
+  <p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Votre IBAN (pour le virement)</p>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input id="iban-input" value="{closer_iban}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+      style="flex:1;min-width:240px;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
+             padding:10px 14px;color:#e8e8f0;font-size:13px;font-family:monospace;outline:none">
+    <button onclick="saveIban()" style="padding:10px 20px;background:#6366f1;border:none;
+      border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Enregistrer</button>
+    <span id="iban-saved" style="color:#2ecc71;font-size:12px;display:none">IBAN enregistré ✓</span>
+  </div>
+  <p style="color:#555;font-size:11px;margin-top:8px">Format international. Ex : FR76 3000 6000 0112 3456 7890 189</p>
+</div>
+
+<!-- Demander paiement -->
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin-bottom:20px">
+  <p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Demander un versement</p>
+  <p style="color:#ccc;font-size:13px;margin-bottom:14px">
+    Solde à verser : <strong style="color:#f59e0b">{_pending_amount:.0f}€</strong>
+  </p>
+  <button onclick="requestPayment()" {('title="'+_request_btn_title+'"') if _request_btn_title else ''}
+    {"disabled" if not _can_request else ""}
+    style="padding:10px 24px;border:none;border-radius:6px;font-size:13px;font-weight:600;{_request_btn_style}">
+    Demander le versement
+  </button>
+  {('<p style="color:#f59e0b;font-size:11px;margin-top:8px">⚠ ' + _request_btn_title + '</p>') if _request_btn_title else ''}
+</div>
+
+<!-- Historique demandes -->
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:14px 16px;border-bottom:1px solid #2a2a4e;margin:0">Historique des demandes</p>
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #1a1a2e">Date demande</th>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #1a1a2e">Montant</th>
+  <th style="padding:8px 14px;text-align:left;color:#555;font-size:10px;border-bottom:1px solid #1a1a2e">Statut</th>
+</tr></thead>
+<tbody>{_pr_rows}</tbody></table></div>
+<script>{_iban_save_js}</script>"""
+
     # ── Onglets ───────────────────────────────────────────────────────────────
     TABS = [("rdv", "Mes RDV"), ("commissions", "Commissions"),
-            ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections")]
+            ("paiement", "Paiement"), ("offre", "L'offre"), ("script", "Script"), ("objections", "Objections")]
 
     def _tab_btn(slug, label):
         active = slug == tab
@@ -1341,6 +1470,7 @@ def closer_portal(token: str, request: Request):
     panels = {
         "rdv":         panel_rdv,
         "commissions": panel_commissions,
+        "paiement":    panel_paiement,
         "offre":       panel_offre,
         "script":      panel_script,
         "objections":  panel_objections,
@@ -1386,6 +1516,7 @@ tr:hover{{background:#111127}}
 const _panels = {{
   rdv: `{panels_js["rdv"]}`,
   commissions: `{panels_js["commissions"]}`,
+  paiement: `{panels_js["paiement"]}`,
   offre: `{panels_js["offre"]}`,
   script: `{panels_js["script"]}`,
   objections: `{panels_js["objections"]}`,
@@ -2111,3 +2242,110 @@ async def closer_claim_slot(token: str, slot_id: str):
         return JSONResponse({"ok": ok, "message": message, "error": None if ok else message})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paiement SEPA — enregistrement IBAN + demande de versement
+# ─────────────────────────────────────────────────────────────────────────────
+
+_PAYMENT_REQUESTS_FILE = Path(__file__).parent.parent.parent.parent / "data" / "payment_requests.json"
+
+
+def _load_payment_requests() -> list:
+    try:
+        if _PAYMENT_REQUESTS_FILE.exists():
+            return json.loads(_PAYMENT_REQUESTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+
+def _save_payment_requests(requests: list):
+    _PAYMENT_REQUESTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _PAYMENT_REQUESTS_FILE.write_text(
+        json.dumps(requests, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+@router.post("/closer/{token}/iban")
+async def save_closer_iban(token: str, request: Request):
+    """Enregistre l'IBAN du closer dans closer.meta."""
+    closer = _get_closer_by_token(token)
+    if not closer:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Lien invalide")
+    data = await request.json()
+    iban = data.get("iban", "").strip().upper().replace(" ", "")
+    if not iban or len(iban) < 15:
+        return JSONResponse({"ok": False, "error": "IBAN invalide"}, status_code=400)
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        with MktSession() as mdb:
+            c = mdb.get(type(closer), closer.id)
+            meta = {}
+            try:
+                meta = json.loads(c.meta) if isinstance(c.meta, str) else (c.meta or {})
+            except Exception:
+                pass
+            meta["iban"] = iban
+            c.meta = json.dumps(meta, ensure_ascii=False)
+            mdb.commit()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/closer/{token}/payment-request")
+async def create_payment_request(token: str):
+    """Crée une demande de paiement pour le closer (solde des commissions non versées)."""
+    from fastapi import HTTPException
+    closer = _get_closer_by_token(token)
+    if not closer:
+        raise HTTPException(404, "Lien invalide")
+
+    # Vérifier qu'il n'y a pas déjà une demande en attente
+    reqs = _load_payment_requests()
+    pending = [r for r in reqs if r.get("closer_id") == str(closer.id) and r.get("status") == "pending"]
+    if pending:
+        return JSONResponse({"ok": False, "error": "Une demande est déjà en cours"}, status_code=400)
+
+    # Calculer le montant (commissions non payées)
+    amount = 0.0
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import CommissionDB
+        with MktSession() as mdb:
+            comms = mdb.query(CommissionDB).filter_by(
+                project_id=PROJECT_ID, closer_id=str(closer.id)
+            ).all()
+            amount = sum(c.amount or 0 for c in comms if getattr(c, "status", "") != "paid")
+    except Exception:
+        pass
+
+    if amount <= 0:
+        return JSONResponse({"ok": False, "error": "Aucun solde à verser"}, status_code=400)
+
+    # Récupérer l'IBAN
+    iban = ""
+    try:
+        meta = json.loads(closer.meta) if isinstance(closer.meta, str) else (closer.meta or {})
+        iban = meta.get("iban", "")
+    except Exception:
+        pass
+    if not iban:
+        return JSONResponse({"ok": False, "error": "Enregistrez votre IBAN d'abord"}, status_code=400)
+
+    from datetime import datetime as _dt
+    req = {
+        "id":           uuid.uuid4().hex,
+        "closer_id":    str(closer.id),
+        "closer_name":  closer.name or "",
+        "iban":         iban,
+        "amount":       round(amount, 2),
+        "requested_at": _dt.utcnow().isoformat(),
+        "status":       "pending",
+        "paid_at":      None,
+    }
+    reqs.append(req)
+    _save_payment_requests(reqs)
+    return JSONResponse({"ok": True, "amount": round(amount, 2)})

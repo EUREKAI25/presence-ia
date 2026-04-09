@@ -26,10 +26,11 @@ def admin_nav(token: str, active: str = "") -> str:
             ("outbound-stats",  "Outbound"),
         ]),
         ("CLOSERS", [
-            ("closers-hub",  "Accueil"),
-            ("crm",          "Pipeline"),
-            ("crm/closers",  "Liste closers"),
-            ("recrutement",  "Recrutement"),
+            ("closers-hub",       "Accueil"),
+            ("crm",               "Pipeline"),
+            ("crm/closers",       "Liste closers"),
+            ("recrutement",       "Recrutement"),
+            ("crm/paiements",     "Paiements"),
         ]),
         ("FINANCES", [
             ("finances",    "Revenus & Coûts"),

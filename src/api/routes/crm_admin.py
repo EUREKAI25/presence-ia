@@ -1353,6 +1353,245 @@ async def save_closer_content_route(request: Request):
         return JSONResponse({"ok": False, "error": str(e)})
 
 
+@router.get("/admin/crm/paiements", response_class=HTMLResponse)
+def crm_paiements(request: Request):
+    """Admin — demandes de paiement closers + génération SEPA XML."""
+    token = _check_token(request)
+
+    from src.api.routes.closer_public import _load_payment_requests, _save_payment_requests
+    reqs = _load_payment_requests()
+
+    pending = [r for r in reqs if r.get("status") == "pending"]
+    paid    = [r for r in reqs if r.get("status") == "paid"]
+
+    total_pending = sum(r.get("amount", 0) for r in pending)
+
+    def _req_row(r, is_pending=True):
+        iban_display = r.get("iban", "—")
+        if len(iban_display) > 10:
+            iban_display = iban_display[:4] + " •••• " + iban_display[-4:]
+        actions = ""
+        if is_pending:
+            actions = (
+                f'<button onclick="markPaid(\'{r["id"]}\')" '
+                f'style="padding:4px 10px;background:#2ecc71;border:none;border-radius:4px;'
+                f'color:#0f0f1a;font-size:10px;font-weight:600;cursor:pointer">Marquer payé</button>'
+            )
+        paid_note = f'<div style="color:#6b7280;font-size:10px">{r.get("paid_at","")[:10]}</div>' if r.get("paid_at") else ""
+        return (
+            f'<tr style="border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:10px 14px;color:#fff;font-size:12px">{r.get("closer_name","—")}</td>'
+            f'<td style="padding:10px 14px;color:#2ecc71;font-size:13px;font-weight:600">{r.get("amount",0):.2f}€</td>'
+            f'<td style="padding:10px 14px;color:#9ca3af;font-size:11px;font-family:monospace">{iban_display}</td>'
+            f'<td style="padding:10px 14px;color:#9ca3af;font-size:11px">{r.get("requested_at","")[:10]}</td>'
+            f'<td style="padding:10px 14px">{paid_note}{actions}</td>'
+            f'</tr>'
+        )
+
+    pending_rows = "".join(_req_row(r, True) for r in pending) or \
+        '<tr><td colspan="5" style="padding:20px;color:#555;text-align:center">Aucune demande en attente</td></tr>'
+    paid_rows = "".join(_req_row(r, False) for r in paid[-20:]) or \
+        '<tr><td colspan="5" style="padding:20px;color:#555;text-align:center">Aucun paiement effectué</td></tr>'
+
+    company_iban = os.getenv("COMPANY_IBAN", "")
+    sepa_warning = "" if company_iban else (
+        '<div style="background:#f59e0b15;border:1px solid #f59e0b40;border-radius:6px;'
+        'padding:10px 14px;margin-bottom:20px;color:#f59e0b;font-size:12px">'
+        '⚠ Variable d\'environnement <code>COMPANY_IBAN</code> non configurée — '
+        'nécessaire pour générer le fichier SEPA.</div>'
+    )
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><title>Paiements Closers</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+table{{width:100%;border-collapse:collapse}}
+th{{padding:8px 14px;text-align:left;color:#9ca3af;font-size:10px;font-weight:600;
+   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e}}
+tr:hover{{background:#111127}}
+</style></head><body>
+{admin_nav(token, "crm/paiements")}
+<div style="max-width:1000px;margin:0 auto;padding:24px">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+  <div>
+    <h1 style="color:#fff;font-size:18px;margin-bottom:4px">Paiements Closers</h1>
+    <p style="color:#6b7280;font-size:12px">Virement SEPA — téléchargez le fichier XML pour import dans Boursorama.</p>
+  </div>
+  <a href="/admin/crm/closers?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Closers</a>
+</div>
+
+{sepa_warning}
+
+<!-- Résumé -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px">
+  <div style="background:#1a1a2e;border:1px solid #f59e0b40;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#f59e0b">{len(pending)}</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Demandes en attente</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2ecc7140;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#2ecc71">{total_pending:.2f}€</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Total à verser</div>
+  </div>
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
+    <div style="font-size:2rem;font-weight:700;color:#9ca3af">{len(paid)}</div>
+    <div style="color:#9ca3af;font-size:11px;margin-top:4px">Paiements effectués</div>
+  </div>
+</div>
+
+<!-- Demandes en attente -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <h2 style="color:#fff;font-size:14px;font-weight:700">Demandes en attente ({len(pending)})</h2>
+  {(
+    f'<button onclick="downloadSepa()" style="padding:8px 18px;background:#6366f1;border:none;'
+    f'border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">'
+    f'Générer fichier SEPA XML ↓</button>'
+  ) if pending else ""}
+</div>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:32px">
+<table><thead><tr>
+  <th>Closer</th><th>Montant</th><th>IBAN</th><th>Date demande</th><th>Action</th>
+</tr></thead>
+<tbody>{pending_rows}</tbody></table></div>
+
+<!-- Historique -->
+<h2 style="color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Historique paiements</h2>
+<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<table><thead><tr>
+  <th>Closer</th><th>Montant</th><th>IBAN</th><th>Date demande</th><th>Versé le</th>
+</tr></thead>
+<tbody>{paid_rows}</tbody></table></div>
+
+</div>
+<script>
+async function markPaid(id){{
+  if(!confirm('Marquer ce paiement comme versé ?')) return;
+  const r=await fetch('/api/admin/closers/payment/'+id+'/mark-paid?token={token}',{{method:'POST'}});
+  const d=await r.json();
+  if(d.ok) location.reload();
+  else alert(d.error||'Erreur');
+}}
+async function downloadSepa(){{
+  const a=document.createElement('a');
+  a.href='/api/admin/closers/sepa-xml?token={token}';
+  a.download='virements_closers.xml';
+  a.click();
+}}
+</script>
+</body></html>""")
+
+
+@router.post("/api/admin/closers/payment/{req_id}/mark-paid")
+async def mark_payment_paid(req_id: str, request: Request):
+    """Marque une demande de paiement comme versée et met à jour CommissionDB."""
+    _check_token(request)
+    from datetime import datetime as _dt
+    from src.api.routes.closer_public import _load_payment_requests, _save_payment_requests
+
+    reqs = _load_payment_requests()
+    req = next((r for r in reqs if r.get("id") == req_id), None)
+    if not req:
+        return JSONResponse({"ok": False, "error": "Demande introuvable"})
+
+    req["status"] = "paid"
+    req["paid_at"] = _dt.utcnow().isoformat()
+    _save_payment_requests(reqs)
+
+    # Mettre à jour CommissionDB
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import CommissionDB
+        with MktSession() as mdb:
+            comms = mdb.query(CommissionDB).filter_by(
+                project_id="presence-ia", closer_id=req.get("closer_id", "")
+            ).all()
+            for c in comms:
+                if getattr(c, "status", "") != "paid":
+                    c.status = "paid"
+                    c.paid_at = _dt.utcnow()
+            mdb.commit()
+    except Exception:
+        pass
+
+    return JSONResponse({"ok": True})
+
+
+@router.get("/api/admin/closers/sepa-xml")
+def generate_sepa_xml(request: Request):
+    """Génère un fichier SEPA pain.001.001.03 pour tous les paiements en attente."""
+    from fastapi import HTTPException
+    from fastapi.responses import Response
+    _check_token(request)
+
+    from src.api.routes.closer_public import _load_payment_requests
+    reqs = [r for r in _load_payment_requests() if r.get("status") == "pending"]
+    if not reqs:
+        raise HTTPException(400, "Aucune demande en attente")
+
+    company_iban = os.getenv("COMPANY_IBAN", "")
+    company_bic  = os.getenv("COMPANY_BIC", "BOUSFRPPXXX")
+    company_name = os.getenv("COMPANY_NAME", "PRESENCE IA")
+    if not company_iban:
+        raise HTTPException(400, "Variable COMPANY_IBAN non configurée")
+
+    from datetime import datetime as _dt, date as _date, timedelta as _td
+    now       = _dt.utcnow()
+    exec_date = (_date.today() + _td(days=2)).isoformat()
+    msg_id    = f"PRESIAI-{now.strftime('%Y%m%d%H%M%S')}"
+    total     = sum(r.get("amount", 0) for r in reqs)
+
+    def _tx(r, idx):
+        name  = r.get("closer_name", "Closer")[:70]
+        iban  = r.get("iban", "").replace(" ", "")
+        amt   = f'{r.get("amount", 0):.2f}'
+        end2end = f"COMM-{r['id'][:12].upper()}"
+        ref   = f"Commission Closer Presence IA {now.strftime('%m/%Y')}"[:140]
+        return (
+            f'      <CdtTrfTxInf>'
+            f'<PmtId><EndToEndId>{end2end}</EndToEndId></PmtId>'
+            f'<Amt><InstdAmt Ccy="EUR">{amt}</InstdAmt></Amt>'
+            f'<Cdtr><Nm>{name}</Nm></Cdtr>'
+            f'<CdtrAcct><Id><IBAN>{iban}</IBAN></Id></CdtrAcct>'
+            f'<RmtInf><Ustrd>{ref}</Ustrd></RmtInf>'
+            f'</CdtTrfTxInf>'
+        )
+
+    transactions = "\n".join(_tx(r, i) for i, r in enumerate(reqs))
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <CstmrCdtTrfInitn>
+    <GrpHdr>
+      <MsgId>{msg_id}</MsgId>
+      <CreDtTm>{now.strftime('%Y-%m-%dT%H:%M:%S')}</CreDtTm>
+      <NbOfTxs>{len(reqs)}</NbOfTxs>
+      <CtrlSum>{total:.2f}</CtrlSum>
+      <InitgPty><Nm>{company_name}</Nm></InitgPty>
+    </GrpHdr>
+    <PmtInf>
+      <PmtInfId>{msg_id}-001</PmtInfId>
+      <PmtMtd>TRF</PmtMtd>
+      <NbOfTxs>{len(reqs)}</NbOfTxs>
+      <CtrlSum>{total:.2f}</CtrlSum>
+      <PmtTpInf><SvcLvl><Cd>SEPA</Cd></SvcLvl></PmtTpInf>
+      <ReqdExctnDt>{exec_date}</ReqdExctnDt>
+      <Dbtr><Nm>{company_name}</Nm></Dbtr>
+      <DbtrAcct><Id><IBAN>{company_iban}</IBAN></Id></DbtrAcct>
+      <DbtrAgt><FinInstnId><BIC>{company_bic}</BIC></FinInstnId></DbtrAgt>
+{transactions}
+    </PmtInf>
+  </CstmrCdtTrfInitn>
+</Document>"""
+
+    filename = f"virements_closers_{now.strftime('%Y%m%d')}.xml"
+    return Response(
+        content=xml.encode("utf-8"),
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/api/admin/closers/apply-bonus")
 async def apply_monthly_bonus(request: Request):
     """Phase 2 — calcule et enregistre la prime mensuelle du top closer.
