@@ -32,6 +32,14 @@ def _mkt():
 @router.get("/closer", response_class=HTMLResponse)
 def closer_presentation():
     """Page de présentation du programme closer."""
+    from src.api.routes.crm_admin import _load_closer_content as _lcc
+    _cfg = _lcc()
+    _bonus_enabled = _cfg.get("bonus_enabled", False)
+    _bonus_rate    = float(_cfg.get("bonus_rate", 0.04))
+    _max_standard  = 1620   # 18% × 9000
+    _max_with_bonus = int(9000 * (0.18 + _bonus_rate))  # ex: 1980
+    _display_max   = f"{_max_with_bonus:,}€".replace(",", " ") if _bonus_enabled else "1 620€"
+    _display_sub   = f"par deal signé · dont {int(_bonus_rate*100)}% bonus top closer" if _bonus_enabled else "par deal signé"
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Devenez Closer — Présence IA</title>
@@ -85,8 +93,8 @@ a{text-decoration:none}
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à 2 000€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à {_display_max}</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">{_display_sub}</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
@@ -694,6 +702,18 @@ def closer_portal_demo(request: Request):
 </tr></thead>
 <tbody>{past_rows}</tbody></table></div>"""
 
+    _bonus_on   = content.get("bonus_enabled", False)
+    _bonus_rate = float(content.get("bonus_rate", 0.04))
+    _bonus_block = (
+        f'<div style="background:#6366f110;border:1px solid #6366f140;border-radius:8px;padding:14px 16px;margin-top:12px">'
+        f'<p style="color:#a5b4fc;font-size:11px;font-weight:700;margin-bottom:4px">BONUS MENSUEL ACTIF</p>'
+        f'<p style="color:#ccc;font-size:12px;line-height:1.6">'
+        f'Le top closer du mois reçoit +{int(_bonus_rate*100)}% rétroactif sur tous ses deals.<br>'
+        f'Taux effectif : <strong style="color:#a5b4fc">{int((0.18+_bonus_rate)*100)}%</strong> · '
+        f'Max sur Domination : <strong style="color:#2ecc71">{int(9000*(0.18+_bonus_rate))}€</strong>'
+        f'</p></div>'
+    ) if _bonus_on else ""
+
     panel_commissions = f"""
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
   <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
@@ -712,7 +732,8 @@ def closer_portal_demo(request: Request):
 <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
 <p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Détail</p>
 <div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html}</div>
-</div>"""
+</div>
+{_bonus_block}"""
 
     def _resource_block(title, text, color="#6366f1"):
         return (
@@ -1011,6 +1032,7 @@ def _load_portal_content() -> dict:
         "objections": "Objections non encore configurées.",
         "rdv_guide": "Guide RDV non encore configuré.",
         "commission_info": "18% du deal · jusqu'à 1 620€ par deal signé (offre Domination IA Locale).",
+        "bonus_enabled": False, "bonus_rate": 0.04, "bonus_top_n": 1,
     }
 
 

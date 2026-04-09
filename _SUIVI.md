@@ -2,7 +2,71 @@
 
 **Statut** : 🟢 actif — Pipeline complet opérationnel
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-04-07
+**Dernière MAJ** : 2026-04-09
+
+---
+
+## 🔌 SESSION 2026-04-09 — Recrutement closers + commissions + bonus phase 2
+
+### Réalisé
+
+| Fix / Feature | Détail | Statut |
+|---|---|---|
+| Badge RDV passé | `_meeting_badge()` → "Passé" si scheduled_at < now (au lieu de "À venir") | ✅ |
+| Reset données test | Meetings [TEST] Nathalie supprimés, prospect resetté (contacted=0, sent_at=NULL) | ✅ |
+| Messages recrutement | `/admin/crm/closer-messages` : auto-save, upload/download image post | ✅ |
+| Commission 15% → 18% | Landing `/closer/` + portail closer + démo leaderboard | ✅ |
+| Fix Gemini systemInstruction | Appel REST manquait systemInstruction → Gemini citait 0 entreprise | ✅ |
+| Fix Haiku validation | Prompt "réels" → disclaimer → reformulé en extraction neutre. Score 11→20 | ✅ |
+
+### Structure commissions — décision 2026-04-09
+
+**Phase 1 (lancement) :**
+- Taux fixe : **18%** par deal
+- Max par deal : **1 620€** (18% × 9 000€ offre Domination)
+- Pas de bonus — simple, clair, honnête
+
+**Phase 2 (recrutement élargi) :**
+- Taux standard : 18% (inchangé)
+- Bonus mensuel top closer : +4% rétroactif sur tous les deals du mois → taux effectif **22%**
+- Max avec bonus : **1 980€ ≈ 2 000€** sur un deal Domination
+- Calculé en fin de mois, versé séparément
+- Implémenté dans le code (`bonus_enabled: false`) — à activer en phase 2
+
+### Logique bonus (implémentée, désactivée)
+
+- Config dans `data/closer_content.json` : `bonus_enabled`, `bonus_rate` (0.04), `bonus_top_n` (1)
+- Route `POST /api/admin/closers/apply-bonus?month=YYYY-MM` : calcule + enregistre la prime mensuelle
+- Portail closer : affiche "Prime mensuelle" quand `bonus_enabled=true`
+- Landing `/closer/` : affiche "jusqu'à 2 000€" quand activé, "jusqu'à 1 620€" sinon
+
+---
+
+## 🔌 SESSION 2026-04-08 — Fix Gemini + Haiku validation
+
+### Réalisé
+
+| Fix | Détail | Statut |
+|---|---|---|
+| `v3.py` SyntaxError démarrage | Apostrophe dans `'Personne n'est cité'` cassait le parse Python → HTML entities | ✅ |
+| `v3.py` Gemini systemInstruction | Appel REST n'avait pas `systemInstruction` (présent dans `ia_test.py` mais pas en prod) → Gemini refusait de citer des entreprises | ✅ |
+| `v3.py` Haiku prompt extraction | Mot "réels" dans le prompt déclenchait disclaimer Haiku ("Je ne peux pas confirmer…") → reformulé en extraction neutre ("Extrait les noms tels qu'ils apparaissent") + garde-fou disclaimer | ✅ |
+| `v3.py` `new_score` undefined | Variable mal nommée dans log refresh-ia → `new_n`/`new_v` | ✅ |
+
+**Résultat après fix** : refresh Paris/Pisciniste → score **20** (validated=True)
+- ChatGPT : Idoine Piscines, BUSINESSACCOR/INFINIMENT BLEU, Piscines de France Paris, Oasis Piscines… ✅
+- Gemini : Carré Bleu Paris, Hydro Sud Direct, AQUAPISCINE, Piscines Waterair Paris, Everblue Paris ✅
+- Claude : Aqua Système Solution, BIOTOP, AEPS, Paris Pools, Wiser Piscine ✅
+
+**Note ChatGPT** : pas de problème Haiku pour ChatGPT — validation correcte sur les 3 prompts.
+
+### Piste d'optimisation future — Playwright + API fallback
+
+> Idée : récupérer les concurrents via capture d'écran Playwright (ce que voient vraiment les utilisateurs) avec l'API en fallback.
+> **Avantage** : vérité terrain (résultats réels sur l'interface ChatGPT/Gemini/Claude).
+> **Inconvénient** : nécessite une machine allumée (pas exécutable en prod autonome depuis le VPS).
+> **Architecture suggérée** : Playwright local → upload résultats → VPS stocke ; VPS API en fallback si Playwright indisponible.
+> **Priorité** : basse (API fonctionne bien depuis la fix Haiku) — à reconsidérer si qualité des résultats se dégrade.
 
 ---
 

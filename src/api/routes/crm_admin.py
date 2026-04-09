@@ -1205,14 +1205,21 @@ _DEFAULT_CONTENT: dict = {
         "- Si non : noter la raison dans les notes du RDV"
     ),
     "commission_info": (
-        "Taux : 15% du deal HT\n\n"
+        "Taux : 18% du deal HT\n\n"
         "Commissions par offre :\n"
-        "Offre 1 — Audit Complet (500€) → 75€\n"
-        "Offre 2 — Exécution Complète (3 500€) → 525€\n"
-        "Offre 3 — Domination IA Locale (9 000€) → 1 350€\n\n"
+        "Audit Flash IA (97€) → 17€\n"
+        "Kit Autonome (500€) → 90€\n"
+        "Tout Inclus (3 500€) → 630€\n"
+        "Domination IA Locale (9 000€) → 1 620€\n\n"
         "Paiement : versé le 10 du mois suivant la signature du client\n"
         "Condition : client non remboursé dans les 14 jours"
     ),
+    # ── Bonus mensuel (Phase 2 — désactivé au lancement) ──────────────────────
+    # Quand bonus_enabled=true : le top closer du mois reçoit +bonus_rate rétroactif
+    # sur tous ses deals du mois → taux effectif 18%+4% = 22% → jusqu'à 1980€/deal
+    "bonus_enabled":  False,
+    "bonus_rate":     0.04,   # +4% rétroactif sur le mois pour le top closer
+    "bonus_top_n":    1,      # nombre de closers qui reçoivent le bonus
 }
 
 
@@ -1325,10 +1332,110 @@ async def save_closer_content_route(request: Request):
     _check_token(request)
     data = await request.json()
     allowed = {"offer_title", "offer_price", "offer_pitch", "pitch_script",
-               "objections", "rdv_guide", "commission_info"}
+               "objections", "rdv_guide", "commission_info",
+               "bonus_enabled", "bonus_rate", "bonus_top_n"}
     try:
-        _save_closer_content({k: v for k, v in data.items() if k in allowed})
+        payload = {}
+        for k, v in data.items():
+            if k not in allowed:
+                continue
+            if k == "bonus_enabled":
+                payload[k] = bool(v)
+            elif k in ("bonus_rate", "bonus_top_n"):
+                payload[k] = float(v) if k == "bonus_rate" else int(v)
+            else:
+                payload[k] = v
+        existing = _load_closer_content()
+        existing.update(payload)
+        _save_closer_content(existing)
         return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
+@router.post("/api/admin/closers/apply-bonus")
+async def apply_monthly_bonus(request: Request):
+    """Phase 2 — calcule et enregistre la prime mensuelle du top closer.
+    Appel : POST /api/admin/closers/apply-bonus?month=2026-04&token=XXX
+    Retourne le détail du calcul sans modifier la DB si dry_run=true."""
+    _check_token(request)
+    from datetime import datetime as _dt
+    import calendar
+
+    params = request.query_params
+    month_str = params.get("month", _dt.utcnow().strftime("%Y-%m"))
+    dry_run   = params.get("dry_run", "false").lower() == "true"
+
+    content = _load_closer_content()
+    if not content.get("bonus_enabled"):
+        return JSONResponse({"ok": False, "error": "bonus_enabled=false — activez d'abord le bonus dans les paramètres"})
+
+    bonus_rate = float(content.get("bonus_rate", 0.04))
+    top_n      = int(content.get("bonus_top_n", 1))
+
+    try:
+        year, month = int(month_str[:4]), int(month_str[5:7])
+        date_from = _dt(year, month, 1)
+        date_to   = _dt(year, month, calendar.monthrange(year, month)[1], 23, 59, 59)
+    except Exception:
+        return JSONResponse({"ok": False, "error": f"Format month invalide : {month_str} (attendu YYYY-MM)"})
+
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB, CloserDB
+        with MktSession() as mdb:
+            meetings = (
+                mdb.query(MeetingDB)
+                .filter(MeetingDB.status == "completed")
+                .filter(MeetingDB.scheduled_at.between(date_from, date_to))
+                .all()
+            )
+            if not meetings:
+                return JSONResponse({"ok": True, "month": month_str, "bonuses": [],
+                                     "note": "Aucun deal signé ce mois"})
+
+            # Agréger par closer
+            from collections import defaultdict
+            by_closer: dict = defaultdict(lambda: {"deals": 0, "ca": 0.0, "closer_id": ""})
+            for m in meetings:
+                cid = m.closer_id or "inconnu"
+                by_closer[cid]["closer_id"] = cid
+                by_closer[cid]["deals"] += 1
+                by_closer[cid]["ca"] += float(m.deal_value or 0)
+
+            ranked = sorted(by_closer.values(), key=lambda x: x["ca"], reverse=True)
+            top_closers = ranked[:top_n]
+
+            bonuses = []
+            for c in top_closers:
+                prime = round(c["ca"] * bonus_rate, 2)
+                bonuses.append({
+                    "closer_id":   c["closer_id"],
+                    "deals":       c["deals"],
+                    "ca":          c["ca"],
+                    "bonus_rate":  f"+{bonus_rate*100:.0f}%",
+                    "prime":       prime,
+                    "taux_effectif": f"{(0.18 + bonus_rate)*100:.0f}%",
+                })
+
+            if not dry_run:
+                # Stocker dans un fichier JSON (pas de table CommissionDB dédiée pour l'instant)
+                bonus_log_path = Path(__file__).parent.parent.parent.parent / "data" / "bonus_log.json"
+                log = []
+                if bonus_log_path.exists():
+                    try:
+                        log = json.loads(bonus_log_path.read_text())
+                    except Exception:
+                        pass
+                for b in bonuses:
+                    log.append({"month": month_str, **b})
+                bonus_log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2))
+
+            return JSONResponse({
+                "ok": True, "month": month_str, "dry_run": dry_run,
+                "bonuses": bonuses,
+                "note": "dry_run=true — rien n'a été enregistré" if dry_run else "Bonus enregistrés dans data/bonus_log.json"
+            })
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
 
