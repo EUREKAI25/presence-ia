@@ -86,7 +86,7 @@ a{text-decoration:none}
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à 2 000€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé · bonus premiers closers</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
@@ -1010,7 +1010,7 @@ def _load_portal_content() -> dict:
         "pitch_script": "Script non encore configuré — rendez-vous dans l'admin → Contenu portail.",
         "objections": "Objections non encore configurées.",
         "rdv_guide": "Guide RDV non encore configuré.",
-        "commission_info": "18% du deal · jusqu'à 1 620€ par deal signé (offre Domination IA Locale) · jusqu'à 2 000€ avec bonus premiers closers.",
+        "commission_info": "18% du deal · jusqu'à 1 620€ par deal signé (offre Domination IA Locale).",
     }
 
 
