@@ -68,7 +68,7 @@ a{text-decoration:none}
     <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
       Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
-      -webkit-text-fill-color:transparent">15% de commission</span><br>sur chaque deal que vous signez
+      -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
     </h1>
     <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
       Les prospects ont réservé leur créneau. Vous choisissez ceux que vous voulez prendre.<br>
@@ -81,12 +81,12 @@ a{text-decoration:none}
     <!-- Chiffres -->
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">15%</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">18%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à 1 350€</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#2ecc71">jusqu'à 2 000€</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:4px">par deal signé · bonus premiers closers</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">100%</div>
@@ -434,9 +434,9 @@ _DEMO_SLOTS = [
 ]
 
 _DEMO_LEADERBOARD = [
-    {"rank": 1, "name": "Kévin R.",    "signed": 4, "commission": 2100.0, "bonus": False, "rate": 15},
-    {"rank": 2, "name": "Marie Martin","signed": 2, "commission": 1050.0, "bonus": False, "rate": 15},
-    {"rank": 3, "name": "David L.",    "signed": 1, "commission": 525.0,  "bonus": False, "rate": 15},
+    {"rank": 1, "name": "Kévin R.",    "signed": 4, "commission": 2520.0, "bonus": False, "rate": 18},
+    {"rank": 2, "name": "Marie Martin","signed": 2, "commission": 1260.0, "bonus": False, "rate": 18},
+    {"rank": 3, "name": "David L.",    "signed": 1, "commission": 630.0,  "bonus": False, "rate": 18},
 ]
 
 
@@ -595,7 +595,7 @@ function claimSlot(id){{
 def closer_portal_demo(request: Request):
     """Portail closer — aperçu avec données de démonstration."""
     content  = _load_portal_content()
-    commission_rate = 0.15
+    commission_rate = 0.18
     name = "Marie Martin"
 
     stats = {
@@ -1010,7 +1010,7 @@ def _load_portal_content() -> dict:
         "pitch_script": "Script non encore configuré — rendez-vous dans l'admin → Contenu portail.",
         "objections": "Objections non encore configurées.",
         "rdv_guide": "Guide RDV non encore configuré.",
-        "commission_info": "15% du deal · jusqu'à 1 350€ par deal signé (offre Domination IA Locale).",
+        "commission_info": "18% du deal · jusqu'à 1 620€ par deal signé (offre Domination IA Locale) · jusqu'à 2 000€ avec bonus premiers closers.",
     }
 
 
