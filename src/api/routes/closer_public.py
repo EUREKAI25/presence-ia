@@ -38,9 +38,9 @@ def closer_presentation():
     _cfg = _lcc()
     _bonus_enabled = _cfg.get("bonus_enabled", False)
     _bonus_rate    = float(_cfg.get("bonus_rate", 0.04))
-    _max_standard  = 1620   # 18% × 9000
+    _max_standard  = 2000
     _max_with_bonus = int(9000 * (0.18 + _bonus_rate))  # ex: 1980
-    _display_max   = f"{_max_with_bonus:,}€".replace(",", " ") if _bonus_enabled else "1 620€"
+    _display_max   = f"{_max_with_bonus:,}€".replace(",", " ") if _bonus_enabled else "2 000€"
     _display_sub   = f"par deal signé · dont {int(_bonus_rate*100)}% bonus top closer" if _bonus_enabled else "par deal signé"
     _html = """<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
