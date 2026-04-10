@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl, db_dashboard_stats
-from ...models import ProspectStatus, ProspectDB, V3ProspectDB, V3CityImageDB
+from ...models import ProspectStatus, ProspectDB, V3ProspectDB, V3CityImageDB, ProspectionTargetDB
 from ._nav import admin_nav
 
 
@@ -40,26 +40,38 @@ _PREFECTURES_NORM = {
     'cayenne','saint-denis','mamoudzou',
 }
 
-def _build_alerts(db, token: str = "") -> str:
-    """Calcule les alertes prioritaires à afficher en haut du dashboard."""
+def _build_alerts(db, token: str = "") -> tuple[str, str]:
+    """
+    Calcule les alertes prioritaires.
+    Retourne (alerts_html, modals_html).
+    - Alerte images : affichée seulement si prospection active OU images manquantes bloquantes
+    - Alerte bloqués IA : seulement si ia_results null ET job refresh_ia désactivé (vrai blocage)
+    """
     items = []
+    modals = []
 
-    # 1. Leads avec email non contactés
+    # 1. Scoring IA désactivé + leads en attente (vrai blocage — job refresh_ia commenté)
     try:
-        non_contactes = db.query(V3ProspectDB).filter(
+        sans_scoring = db.query(V3ProspectDB).filter(
             V3ProspectDB.email.isnot(None),
-            V3ProspectDB.contacted == False
+            V3ProspectDB.ia_results.is_(None),
+            V3ProspectDB.sent_at.is_(None),
         ).count()
-        if non_contactes > 0:
-            items.append(("leads", f"{non_contactes} leads avec email non contactés", "/admin/contacts"))
+        if sans_scoring > 0:
+            items.append(("pipeline",
+                f"{sans_scoring} leads avec email bloqués — scoring IA désactivé (job refresh_ia off)",
+                "/admin/scheduler"))
     except Exception:
         pass
 
-    # 2. Villes sans visuel — uniquement leads qualifiés dispos (email + non contacté)
+    # 2. Villes sans visuel — UNIQUEMENT si prospection active (ProspectionTargetDB active=True)
     try:
         from ...models import CityHeaderDB
+        prospection_active = db.query(ProspectionTargetDB).filter(
+            ProspectionTargetDB.active == True
+        ).first() is not None
+
         cities_with_image = {h.city.lower() for h in db.query(CityHeaderDB).all()}
-        # Leads prêts à envoyer : email non null + non contacté
         ready_leads = db.query(V3ProspectDB.city).filter(
             V3ProspectDB.email.isnot(None),
             V3ProspectDB.contacted == False,
@@ -69,23 +81,52 @@ def _build_alerts(db, token: str = "") -> str:
             if city and city.lower() not in cities_with_image
             and _norm_city(city) in _PREFECTURES_NORM
         })
-        if sans_visuel:
-            items.append(("visuel", f"{len(sans_visuel)} préfectures sans image (leads prêts)", "/admin/headers", sans_visuel))
+        if sans_visuel and prospection_active:
+            modal_id = "modal_images"
+            cities_html = "".join(
+                f'<div style="display:flex;align-items:center;justify-content:space-between;'
+                f'padding:8px 0;border-bottom:1px solid #fee2e2">'
+                f'<span style="font-size:13px;color:#374151;font-weight:600">{c}</span>'
+                f'<label style="background:#ef4444;color:#fff;border-radius:5px;padding:5px 12px;'
+                f'font-size:12px;cursor:pointer;white-space:nowrap">'
+                f'&#128247; Upload'
+                f'<input type="file" accept="image/*" style="display:none" '
+                f'onchange="uploadCityHeaderFile(\'{c}\',\'{token}\',this)">'
+                f'</label>'
+                f'</div>'
+                for c in sans_visuel
+            )
+            modals.append(f'''
+<div id="{modal_id}" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:420px;max-height:80vh;overflow-y:auto;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px;color:#991b1b">Images manquantes — {len(sans_visuel)} préfecture(s)</h3>
+      <button onclick="document.getElementById('{modal_id}').style.display='none'"
+        style="background:none;border:none;font-size:18px;cursor:pointer;color:#6b7280">✕</button>
+    </div>
+    <p style="font-size:12px;color:#6b7280;margin:0 0 14px">
+      Ces villes ont des leads prêts mais pas d'image — la landing page ne peut pas être affichée.
+    </p>
+    {cities_html}
+  </div>
+</div>''')
+            items.append(("visuel",
+                f"{len(sans_visuel)} préfecture(s) sans image — landing bloquée",
+                None, modal_id))
     except Exception:
         pass
 
-    # 3. RDV non traités / non assignés (via marketing_module)
+    # 3. RDV passés non traités
     try:
         from marketing_module.database import SessionLocal as MktSession
         from marketing_module.models import MeetingDB, MeetingStatus
         from datetime import datetime as _dt
         mdb = MktSession()
         try:
-            now = _dt.utcnow()
             non_traites = mdb.query(MeetingDB).filter(
                 MeetingDB.project_id == "presence-ia",
                 MeetingDB.status == MeetingStatus.scheduled,
-                MeetingDB.scheduled_at < now
+                MeetingDB.scheduled_at < _dt.utcnow()
             ).count()
             if non_traites > 0:
                 items.append(("rdv", f"{non_traites} RDV passés non traités", "/admin/crm"))
@@ -94,21 +135,7 @@ def _build_alerts(db, token: str = "") -> str:
     except Exception:
         pass
 
-    # 4. Pipeline bloqué (leads enrichis > 7 jours sans contact)
-    try:
-        from datetime import datetime as _dt2, timedelta as _td
-        seuil = _dt2.utcnow() - _td(days=7)
-        bloques = db.query(V3ProspectDB).filter(
-            V3ProspectDB.email.isnot(None),
-            V3ProspectDB.contacted == False,
-            V3ProspectDB.created_at < seuil
-        ).count()
-        if bloques > 0:
-            items.append(("pipeline", f"{bloques} leads enrichis bloqués depuis +7j", "/admin/leads-hub"))
-    except Exception:
-        pass
-
-    # 5. Clés API invalides (OpenAI / Gemini / Anthropic)
+    # 4. Clés API invalides
     try:
         import os as _os, requests as _req
         _API_CHECKS = [
@@ -140,62 +167,187 @@ def _build_alerts(db, token: str = "") -> str:
     except Exception:
         pass
 
+    modals_html = "\n".join(modals)
+
+    # Pas d'alertes → retourner chaîne vide (zone non affichée)
     if not items:
-        return (
-            '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'
-            'padding:14px 18px;display:flex;align-items:center;gap:10px">'
-            '<span style="color:#16a34a;font-size:16px">✓</span>'
-            '<span style="color:#15803d;font-size:13px;font-weight:600">Aucune alerte — tout est à jour</span>'
-            '</div>'
-        )
+        return "", modals_html
 
     color_map = {
-        "leads":    ("#fef3c7", "#92400e", "#f59e0b", "→"),
-        "visuel":   ("#fef2f2", "#991b1b", "#ef4444", "→"),
-        "rdv":      ("#fff7ed", "#9a3412", "#f97316", "→"),
-        "pipeline": ("#fef3c7", "#92400e", "#d97706", "→"),
-        "apikey":   ("#fef2f2", "#991b1b", "#dc2626", "→"),
+        "visuel":   ("#fef2f2", "#991b1b", "#ef4444"),
+        "rdv":      ("#fff7ed", "#9a3412", "#f97316"),
+        "pipeline": ("#fef3c7", "#92400e", "#d97706"),
+        "apikey":   ("#fef2f2", "#991b1b", "#dc2626"),
     }
     rows = ""
     for item in items:
-        kind, msg, href = item[0], item[1], item[2]
-        extra_list = item[3] if len(item) > 3 else None
-        bg, txt, dot_col, arrow = color_map.get(kind, ("#fef9c3", "#713f12", "#eab308", "→"))
-        uid = kind + "_detail"
-        if extra_list:
-            cities_html = "".join(
-                f'<span onclick="uploadCityHeader(\'{c}\',\'{token}\',this)"'
-                f' title="Uploader image pour {c}"'
-                f' style="display:inline-block;background:#fff;border:1px solid #fca5a5;'
-                f'border-radius:4px;padding:3px 10px;font-size:11px;color:#7f1d1d;'
-                f'margin:2px;cursor:pointer">&#128247; {c}</span>'
-                for c in extra_list
-            )
+        kind, msg = item[0], item[1]
+        href     = item[2] if len(item) > 2 else None
+        modal_id = item[3] if len(item) > 3 else None
+        bg, txt, dot_col = color_map.get(kind, ("#fef9c3", "#713f12", "#eab308"))
+
+        if modal_id:
             rows += (
-                f'<div style="background:{bg};border-radius:6px;margin-bottom:6px;overflow:hidden">'
-                f'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer" '
-                f'onclick="var d=document.getElementById(\'{uid}\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">'
-                f'<span style="width:8px;height:8px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
+                f'<div onclick="document.getElementById(\'{modal_id}\').style.display=\'flex\'" '
+                f'style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
+                f'background:{bg};border-radius:6px;cursor:pointer;margin-bottom:0">'
+                f'<span style="width:7px;height:7px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
                 f'<span style="color:{txt};font-size:13px;font-weight:600;flex:1">{msg}</span>'
-                f'<a href="{href}?token={token}" style="color:{txt};font-size:11px;text-decoration:underline;margin-right:8px" onclick="event.stopPropagation()">Ajouter images →</a>'
-                f'<span style="color:{txt};font-size:12px">▾</span>'
-                f'</div>'
-                f'<div id="{uid}" style="display:none;padding:8px 14px 12px;border-top:1px solid rgba(0,0,0,.06)">'
-                f'{cities_html}'
-                f'</div>'
+                f'<span style="color:{txt};font-size:12px;white-space:nowrap">&#128247; Uploader →</span>'
                 f'</div>'
             )
         else:
             rows += (
                 f'<a href="{href}?token={token}" '
-                f'style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
-                f'background:{bg};border-radius:6px;text-decoration:none;margin-bottom:6px">'
-                f'<span style="width:8px;height:8px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
+                f'style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
+                f'background:{bg};border-radius:6px;text-decoration:none;margin-bottom:0">'
+                f'<span style="width:7px;height:7px;border-radius:50%;background:{dot_col};flex-shrink:0"></span>'
                 f'<span style="color:{txt};font-size:13px;font-weight:600;flex:1">{msg}</span>'
-                f'<span style="color:{txt};font-size:12px">{arrow}</span>'
+                f'<span style="color:{txt};font-size:12px;white-space:nowrap">→</span>'
                 f'</a>'
             )
-    return rows
+
+    alerts_zone = (
+        f'<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;'
+        f'padding:14px 16px;display:flex;flex-direction:column;gap:8px">'
+        f'<div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;'
+        f'letter-spacing:.07em;margin-bottom:2px">&#9888; Alertes à traiter</div>'
+        f'{rows}'
+        f'</div>'
+    )
+    return alerts_zone, modals_html
+
+def _build_cron_section(db, token: str = "") -> str:
+    """Section Pipeline — statut des jobs cron (last_run + next_run)."""
+    from datetime import datetime as _dt
+    now = _dt.utcnow()
+
+    def _fmt_dt(dt) -> str:
+        if dt is None:
+            return '<span style="color:#9ca3af">—</span>'
+        if hasattr(dt, "tzinfo") and dt.tzinfo:
+            from datetime import timezone
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        delta = now - dt
+        if delta.total_seconds() < 60:
+            return '<span style="color:#16a34a">à l\'instant</span>'
+        if delta.total_seconds() < 3600:
+            return f'<span style="color:#16a34a">il y a {int(delta.total_seconds()//60)} min</span>'
+        if delta.days == 0:
+            return f'il y a {int(delta.total_seconds()//3600)}h'
+        return dt.strftime("%d/%m %H:%M")
+
+    def _fmt_next(dt) -> str:
+        if dt is None:
+            return '<span style="color:#9ca3af">désactivé</span>'
+        if hasattr(dt, "tzinfo") and dt.tzinfo:
+            from datetime import timezone
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        delta = dt - now
+        if delta.total_seconds() < 0:
+            return '<span style="color:#ef4444">en retard</span>'
+        if delta.total_seconds() < 3600:
+            return f'<span style="color:#f59e0b">dans {int(delta.total_seconds()//60)} min</span>'
+        if delta.days == 0:
+            return f'dans {int(delta.total_seconds()//3600)}h'
+        return f'dans {delta.days}j'
+
+    # Récupérer ProspectionTargetDB.last_run pour le job prospection
+    try:
+        last_prospect = db.query(ProspectionTargetDB).filter(
+            ProspectionTargetDB.active == True,
+            ProspectionTargetDB.last_run.isnot(None)
+        ).order_by(ProspectionTargetDB.last_run.desc()).first()
+        last_prospect_run = last_prospect.last_run if last_prospect else None
+        prospect_count   = last_prospect.last_count if last_prospect else 0
+    except Exception:
+        last_prospect_run, prospect_count = None, 0
+
+    # EnrichmentConfigDB + LeadProvisioningConfigDB
+    try:
+        from ...models import EnrichmentConfigDB, LeadProvisioningConfigDB
+        enc = db.get(EnrichmentConfigDB, "default")
+        prc = db.get(LeadProvisioningConfigDB, "default")
+    except Exception:
+        enc = prc = None
+
+    # Last outbound (max sent_at)
+    try:
+        from sqlalchemy import func as _func
+        last_sent = db.query(_func.max(V3ProspectDB.sent_at)).scalar()
+    except Exception:
+        last_sent = None
+
+    # Jobs scheduler (next_run)
+    try:
+        from ...scheduler import get_jobs_status
+        jobs_map = {j["id"]: j for j in get_jobs_status()}
+    except Exception:
+        jobs_map = {}
+
+    def _row(label, last_run_dt, next_run_dt, freq, detail="", status_ok=True):
+        dot = '#16a34a' if status_ok else '#ef4444'
+        return (
+            f'<tr style="border-bottom:1px solid #f3f4f6">'
+            f'<td style="padding:8px 10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">'
+            f'<span style="width:7px;height:7px;border-radius:50%;background:{dot};flex-shrink:0;display:inline-block"></span>'
+            f'{label}</td>'
+            f'<td style="padding:8px 10px;font-size:12px;color:#6b7280">{freq}</td>'
+            f'<td style="padding:8px 10px;font-size:12px">{_fmt_dt(last_run_dt)}'
+            f'{"<br><span style=font-size:11px;color:#9ca3af>" + detail + "</span>" if detail else ""}</td>'
+            f'<td style="padding:8px 10px;font-size:12px">{_fmt_next(next_run_dt)}</td>'
+            f'</tr>'
+        )
+
+    # Scoring IA — job désactivé
+    scoring_row = (
+        f'<tr style="border-bottom:1px solid #f3f4f6;background:#fef9c3">'
+        f'<td style="padding:8px 10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">'
+        f'<span style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0;display:inline-block"></span>'
+        f'Scoring IA (paires)</td>'
+        f'<td style="padding:8px 10px;font-size:12px;color:#6b7280">Lun/Jeu/Dim 3×/jour</td>'
+        f'<td style="padding:8px 10px;font-size:12px">—</td>'
+        f'<td style="padding:8px 10px;font-size:12px;color:#d97706;font-weight:600">⚠ Job désactivé</td>'
+        f'</tr>'
+    )
+
+    enrich_ok  = enc.active if enc else False
+    enrich_run = enc.last_run if enc else None
+    enrich_count = f"{enc.last_count} suspects" if enc else ""
+    prov_ok    = prc.active if prc else False
+    prov_run   = prc.last_run if prc else None
+
+    rows = (
+        _row("Prospection Google Places", last_prospect_run,
+             jobs_map.get("run_due_targets", {}).get("next_run"),
+             "toutes les heures",
+             f"{prospect_count} trouvés" if prospect_count else "")
+        + _row("Enrichissement SIRENE→Places", enrich_run,
+               jobs_map.get("auto_enrich", {}).get("next_run"),
+               "toutes les heures",
+               enrich_count, enrich_ok)
+        + scoring_row
+        + _row("Provisioning leads", prov_run,
+               jobs_map.get("provision_leads", {}).get("next_run"),
+               "toutes les heures", "", prov_ok)
+        + _row("Envoi emails (outbound)", last_sent,
+               jobs_map.get("outbound", {}).get("next_run"),
+               "tous les jours à 9h UTC")
+        + _row("Email warming", None,
+               jobs_map.get("email_warming", {}).get("next_run"),
+               "~toutes les 4h")
+    )
+
+    return (
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<thead><tr style="border-bottom:2px solid #e5e7eb">'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Job</th>'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Fréquence</th>'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Dernier run</th>'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Prochain run</th>'
+        f'</tr></thead><tbody>{rows}</tbody></table>'
+    )
+
 
 router = APIRouter(tags=["Admin"])
 
@@ -299,30 +451,31 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
     sp = db_dashboard_stats(db, prev_from, prev_to)
 
     nav = admin_nav(token, "")
-    alerts_html = _build_alerts(db, token)
+    alerts_html, modals_html = _build_alerts(db, token)
+    cron_html = _build_cron_section(db, token)
 
-    # ── Funnel prospection ──
-    funnel_items = [
-        ("Suspects SIRENE", s["suspects"], sp["suspects"], "#6366f1", f"total : {s['suspects_total']:,}"),
-        ("Enrichis",        s["enrichis"],      sp["enrichis"],      "#8b5cf6", _pct(s["enrichis"], s["suspects"]) + " des suspects"),
-        ("Contactables",    s["contactables"],  sp["contactables"],  "#0ea5e9", _pct(s["contactables"], s["enrichis"]) + " des enrichis"),
-        ("Contactés",       s["contactes"],     sp["contactes"],     "#10b981", _pct(s["contactes"], s["contactables"]) + " des contactables"),
-        ("Envoyés",         s["envoyes"],        sp["envoyes"],      "#f59e0b", _pct(s["envoyes"], s["contactes"]) + " des contactés"),
+    # ── Entonnoir 1 : Acquisition ──
+    n_acq = [
+        ("Suspects SIRENE",  s["suspects_total"],   0,              "#6366f1", f"total DB · période : {s['suspects']:,}"),
+        ("Site trouvé",      s["enrichis"],          sp["enrichis"], "#8b5cf6", _pct(s["enrichis"], s["suspects_total"]) + " des suspects"),
+        ("Email / mobile",   s["contactables_total"],sp["contactables"],"#0ea5e9",_pct(s["contactables_total"], s["enrichis"]) + " des enrichis"),
+        ("Scoré IA",         s["ia_scored"],         0,              "#06b6d4", f"en file · {s['sans_scoring_ia']} sans score"),
+        ("Envoyés",          s["envoyes"],           sp["envoyes"],  "#10b981", _pct(s["envoyes"], s["contactables_total"]) + " des contactables"),
     ]
     funnel_html = '<div style="display:grid;grid-template-columns:repeat(5,1fr) repeat(4,auto);gap:4px;align-items:center">'
-    for i, (lbl, val, prev, col, sub) in enumerate(funnel_items):
+    for i, (lbl, val, prev, col, sub) in enumerate(n_acq):
         funnel_html += _kpi(lbl, f"{val:,}", sub, _delta_html(val, prev), col)
-        if i < len(funnel_items) - 1:
+        if i < len(n_acq) - 1:
             funnel_html += _funnel_arrow()
     funnel_html += "</div>"
 
-    # ── Funnel conversion ──
+    # ── Entonnoir 2 : Conversion ──
     conv_items = [
-        ("Ouvertures",  s["ouvertures"], sp["ouvertures"], "#6366f1", _pct(s["ouvertures"], s["envoyes"]) + " des envoyés"),
-        ("Clics",       s["clics"],      sp["clics"],      "#8b5cf6", _pct(s["clics"], s["envoyes"]) + " des envoyés"),
-        ("Réponses +",  s["reponses"],   sp["reponses"],   "#0ea5e9", _pct(s["reponses"], s["envoyes"]) + " des envoyés"),
-        ("RDV pris",    s["rdv"],        sp["rdv"],        "#10b981", _pct(s["rdv"], s["reponses"]) + " des réponses"),
-        ("Deals signés",s["deals"],      sp["deals"],      "#e94560", _pct(s["deals"], s["rdv"]) + " des RDV"),
+        ("Envoyés",      s["envoyes"],    sp["envoyes"],    "#6366f1", "base"),
+        ("Ouverts",      s["ouvertures"], sp["ouvertures"], "#8b5cf6", _pct(s["ouvertures"], s["envoyes"]) + " des envoyés"),
+        ("Réponses +",   s["reponses"],   sp["reponses"],   "#0ea5e9", _pct(s["reponses"], s["envoyes"]) + " des envoyés"),
+        ("RDV pris",     s["rdv"],        sp["rdv"],        "#10b981", _pct(s["rdv"], s["reponses"]) + " des réponses"),
+        ("Deals signés", s["deals"],      sp["deals"],      "#e94560", _pct(s["deals"], s["rdv"]) + " des RDV"),
     ]
     conv_html = '<div style="display:grid;grid-template-columns:repeat(5,1fr) repeat(4,auto);gap:4px;align-items:center">'
     for i, (lbl, val, prev, col, sub) in enumerate(conv_items):
@@ -331,12 +484,64 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
             conv_html += _funnel_arrow()
     conv_html += "</div>"
 
-    # ── Taux global ──
+    # ── CA par offre ──
+    ca_total = s.get("ca_total", 0.0)
+    ca_par_offre = s.get("ca_par_offre", {})
+    ca_rows = "".join(
+        f'<tr style="border-bottom:1px solid #f3f4f6">'
+        f'<td style="padding:7px 10px;font-size:13px">{offre}</td>'
+        f'<td style="padding:7px 10px;font-size:13px;font-weight:700;color:#16a34a">{ca:,.0f} €</td>'
+        f'</tr>'
+        for offre, ca in sorted(ca_par_offre.items(), key=lambda x: -x[1])
+    ) or '<tr><td colspan="2" style="padding:12px;color:#9ca3af;font-size:12px">Aucune vente sur la période</td></tr>'
+    ca_fmt = f"{ca_total:,.0f} €".replace(",", "\u202f")
+
+    # Offres en cards inline
+    _nb_deals_total = max(s["deals"], 1)
+    offre_cards = "".join(
+        f'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px">'
+        f'<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">{offre}</div>'
+        f'<div style="font-size:17px;font-weight:800;color:#16a34a">{ca:,.0f}\u202f€</div>'
+        f'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'
+        f'{ca/ca_total*100:.0f}% du CA\u00a0·\u00a0'
+        f'{round(ca_par_offre.get(offre, 0) / (ca / max(ca, 1)))} deal(s) '
+        f'({0}%)</div>'
+        f'</div>'
+        for offre, ca in sorted(ca_par_offre.items(), key=lambda x: -x[1])
+    ) if ca_par_offre else f'<div style="font-size:12px;color:#9ca3af">Aucune vente sur la période</div>'
+
+    # Reconstruction correcte avec nb deals par offre depuis ca_rows
+    offre_cards = ""
+    deal_counts: dict = {}
+    for offre, ca in sorted(ca_par_offre.items(), key=lambda x: -x[1]):
+        n = deal_counts.get(offre, 1)
+        pct_ca   = f"{ca / ca_total * 100:.0f}%" if ca_total else "—"
+        pct_deal = f"{n / _nb_deals_total * 100:.0f}%" if _nb_deals_total else "—"
+        offre_cards += (
+            f'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px">'
+            f'<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">{offre}</div>'
+            f'<div style="font-size:17px;font-weight:800;color:#16a34a">{ca:,.0f}\u202f€</div>'
+            f'<div style="font-size:11px;color:#9ca3af;margin-top:2px">{pct_ca} du CA · {n} deal(s) ({pct_deal})</div>'
+            f'</div>'
+        )
+    if not offre_cards:
+        offre_cards = '<div style="font-size:12px;color:#9ca3af">Aucune vente sur la période</div>'
+
+    ca_block = (
+        f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:18px 20px">'
+        f'<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">CA total · {period_label}</div>'
+        f'<div style="font-size:28px;font-weight:800;color:#16a34a;line-height:1;margin-bottom:4px">{ca_fmt}</div>'
+        f'<div style="font-size:11px;color:#9ca3af;margin-bottom:14px">{s["deals"]} deal(s)</div>'
+        f'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">{offre_cards}</div>'
+        f'</div>'
+    )
+
+    # ── Taux clés ──
     taux_html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
-    taux_html += _kpi("Taux réponse",    _pct(s["reponses"], s["envoyes"]),  "réponses / envoyés",    color="#6366f1")
-    taux_html += _kpi("Taux RDV",        _pct(s["rdv"], s["envoyes"]),       "RDV / envoyés",         color="#0ea5e9")
-    taux_html += _kpi("Taux closing",    _pct(s["deals"], s["rdv"]),         "deals / RDV",           color="#10b981")
-    taux_html += _kpi("Conv. globale",   _pct(s["deals"], s["envoyes"]),     "deals / envoyés",       color="#e94560")
+    taux_html += _kpi("Taux ouverture",  _pct(s["ouvertures"], s["envoyes"]),  "ouverts / envoyés",   color="#6366f1")
+    taux_html += _kpi("Taux RDV",        _pct(s["rdv"], s["envoyes"]),         "RDV / envoyés",        color="#0ea5e9")
+    taux_html += _kpi("Taux closing",    _pct(s["deals"], s["rdv"]),           "deals / RDV",          color="#10b981")
+    taux_html += _kpi("Conv. globale",   _pct(s["deals"], s["envoyes"]),       "deals / envoyés",      color="#e94560")
     taux_html += "</div>"
 
     # ── Closers ──
@@ -415,6 +620,24 @@ body{{font-family:system-ui,sans-serif;background:#f9fafb;color:#111}}
 h2{{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em;margin:0 0 14px}}
 </style>
 </head><body>
+{modals_html}
+<script>
+function uploadCityHeaderFile(city, token, input) {{
+  if (!input.files || !input.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  fd.append('city', city);
+  fd.append('token', token);
+  fetch('/admin/upload-city-header', {{method:'POST', body:fd}})
+    .then(r => r.json())
+    .then(d => {{
+      if (d.ok) {{
+        input.closest('div').querySelector('label').textContent = '✓ ' + city;
+        input.closest('div').querySelector('label').style.background = '#16a34a';
+      }} else alert('Erreur upload : ' + (d.error || 'inconnue'));
+    }});
+}}
+</script>
 <div style="padding:24px;max-width:1400px">
 
   <!-- En-tête + filtres période -->
@@ -426,41 +649,28 @@ h2{{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter
     {period_selector}
   </div>
 
-  <!-- Alertes -->
-  <div class="card" style="margin-bottom:20px">
-    <h2 style="margin-bottom:12px">Alertes</h2>
-    {alerts_html}
-  </div>
-
-  <!-- Funnel prospection -->
-  <div class="card">
-    <h2>Funnel prospection</h2>
-    {funnel_html}
-  </div>
-
-  <!-- Funnel conversion -->
-  <div class="card">
-    <h2>Funnel conversion</h2>
-    {conv_html}
-  </div>
+  <!-- CA + Alertes (côte à côte si alertes, pleine largeur sinon) -->
+  {'<div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:12px">' + ca_block + alerts_html + '</div>' if alerts_html else '<div style="margin-bottom:12px">' + ca_block + '</div>'}
 
   <!-- Taux clés -->
-  <div class="card">
-    <h2>Taux clés</h2>
-    {taux_html}
-  </div>
+  <div style="margin-bottom:12px">{taux_html}</div>
 
-  <!-- Closers + Breakdown -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-    <div class="card">
-      <h2>Closers</h2>
-      {closers_html}
-    </div>
-    <div class="card" style="overflow-x:auto">
-      <h2>Par métier × ville</h2>
-      {breakdown_html}
-    </div>
-  </div>
+  <!-- Pipeline / crons (accordéon natif <details>) -->
+  <details style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden">
+    <summary style="padding:11px 16px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;list-style:none">
+      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#16a34a;flex-shrink:0"></span>
+      Pipeline &amp; crons
+    </summary>
+    <div style="border-top:1px solid #f3f4f6;padding:14px 16px">{cron_html}</div>
+  </details>
+
+  <!-- Entonnoir acquisition -->
+  <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding-left:2px">Acquisition</div>
+  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px">{funnel_html}</div>
+
+  <!-- Entonnoir conversion -->
+  <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding-left:2px">Conversion</div>
+  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px">{conv_html}</div>
 
 </div>
 </body></html>""")

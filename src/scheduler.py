@@ -119,6 +119,33 @@ def start_scheduler():
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
 
+def get_jobs_status() -> list[dict]:
+    """Retourne le statut des jobs principaux (next_run depuis APScheduler)."""
+    JOB_LABELS = {
+        "run_due_targets": ("Prospection Google Places", "toutes les heures"),
+        "auto_enrich":     ("Enrichissement SIRENE→Places", "toutes les heures"),
+        "provision_leads": ("Provisioning leads", "toutes les heures"),
+        "outbound":        ("Envoi emails outbound", "tous les jours à 9h UTC"),
+        "auto_qualify":    ("Qualification SIRENE", "Lun/Mer/Ven 2h UTC"),
+        "email_warming":   ("Email warming", "~toutes les 4h"),
+        "check_api_keys":  ("Vérif. clés API", "toutes les 6h"),
+    }
+    if not _scheduler or not _scheduler.running:
+        return [{"id": k, "label": v[0], "freq": v[1], "next_run": None, "running": False}
+                for k, v in JOB_LABELS.items()]
+    result = []
+    for job_id, (label, freq) in JOB_LABELS.items():
+        job = _scheduler.get_job(job_id)
+        result.append({
+            "id": job_id,
+            "label": label,
+            "freq": freq,
+            "next_run": job.next_run_time if job else None,
+            "running": True,
+        })
+    return result
+
+
 def _job_check_api_keys():
     """Vérifie que les clés OpenAI, Gemini et Anthropic sont valides.
     Envoie une alerte email via Brevo si l'une d'elles retourne 401/403.

@@ -794,6 +794,21 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
         or_(V3ProspectDB.email.isnot(None), V3ProspectDB.phone.isnot(None))
     ).count()
 
+    # ── Scorés IA (ia_results présent, email ok, pas encore envoyés) ──
+    ia_scored = db.query(V3ProspectDB).filter(
+        V3ProspectDB.ia_results.isnot(None),
+        V3ProspectDB.email.isnot(None),
+        V3ProspectDB.sent_at.is_(None),
+    ).count()
+    ia_scored_total = ia_scored  # pas de filtre période ici : c'est un état courant
+
+    # ── En attente scoring IA (email ok, pas de ia_results, pas envoyés) ──
+    sans_scoring_ia = db.query(V3ProspectDB).filter(
+        V3ProspectDB.email.isnot(None),
+        V3ProspectDB.ia_results.is_(None),
+        V3ProspectDB.sent_at.is_(None),
+    ).count()
+
     # ── Contactés (envoi réalisé sur la période) ──
     contactes = db.query(V3ProspectDB).filter(
         V3ProspectDB.sent_at.between(date_from, date_to),
@@ -819,31 +834,35 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
     mkt = _db_mkt_stats_period(date_from, date_to)
 
     return {
-        "suspects":          suspects,
-        "suspects_total":    suspects_total,
-        "enrichis":          enrichis,
-        "contactables":      contactables,
+        "suspects":           suspects,
+        "suspects_total":     suspects_total,
+        "enrichis":           enrichis,
+        "contactables":       contactables,
         "contactables_total": contactables_total,
-        "contactes":         contactes,
-        "envoyes":           mkt["sent"],
-        "ouvertures":        mkt["opened"],
-        "clics":             mkt["clicked"],
-        "bounces":           mkt["bounced"],
-        "reponses":          mkt["replied"],
-        "rdv":               mkt["rdv"],
-        "deals":             mkt["deals"],
-        "closers_actifs":    mkt["closers_actifs"],
-        "top_closers":       mkt["top_closers"],
-        "breakdown":         [{"profession": r.profession, "ville": r.city,
-                               "contactables": r.n_contactables,
-                               "contactes": int(r.n_contactes or 0)} for r in breakdown_rows],
+        "ia_scored":          ia_scored,
+        "sans_scoring_ia":    sans_scoring_ia,
+        "contactes":          contactes,
+        "envoyes":            mkt["sent"],
+        "ouvertures":         mkt["opened"],
+        "clics":              mkt["clicked"],
+        "bounces":            mkt["bounced"],
+        "reponses":           mkt["replied"],
+        "rdv":                mkt["rdv"],
+        "deals":              mkt["deals"],
+        "ca_total":           mkt.get("ca_total", 0.0),
+        "ca_par_offre":       mkt.get("ca_par_offre", {}),
+        "closers_actifs":     mkt["closers_actifs"],
+        "top_closers":        mkt["top_closers"],
+        "breakdown":          [{"profession": r.profession, "ville": r.city,
+                                "contactables": r.n_contactables,
+                                "contactes": int(r.n_contactes or 0)} for r in breakdown_rows],
     }
 
 
 def _db_mkt_stats_period(date_from, date_to) -> dict:
     """Lit les stats marketing pour une période depuis marketing_module."""
     empty = {"sent":0,"opened":0,"clicked":0,"bounced":0,"replied":0,
-             "rdv":0,"deals":0,"closers_actifs":0,"top_closers":[]}
+             "rdv":0,"deals":0,"ca_total":0.0,"ca_par_offre":{},"closers_actifs":0,"top_closers":[]}
     try:
         from marketing_module.database import SessionLocal as MktSession
         from marketing_module.models import (
@@ -872,6 +891,14 @@ def _db_mkt_stats_period(date_from, date_to) -> dict:
                 top.append({"name": c.name, "deals": n})
             top.sort(key=lambda x: -x["deals"])
 
+            deals_closed = [m for m in meetings if m.status == MeetingStatus.completed]
+            ca_total = sum((m.deal_value or 0.0) for m in deals_closed)
+            ca_par_offre: dict = {}
+            for m in deals_closed:
+                if (m.deal_value or 0) > 0:
+                    offer = getattr(m, "offer_name", None) or "—"
+                    ca_par_offre[offer] = ca_par_offre.get(offer, 0.0) + (m.deal_value or 0)
+
             return {
                 "sent":          sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.sent),
                 "opened":        sum(1 for d in deliveries if d.opened_at),
@@ -879,7 +906,9 @@ def _db_mkt_stats_period(date_from, date_to) -> dict:
                 "bounced":       sum(1 for d in deliveries if d.delivery_status == DeliveryStatus.bounced),
                 "replied":       sum(1 for d in deliveries if d.reply_status == ReplyStatus.positive),
                 "rdv":           len(meetings),
-                "deals":         sum(1 for m in meetings if m.status == MeetingStatus.completed),
+                "deals":         len(deals_closed),
+                "ca_total":      ca_total,
+                "ca_par_offre":  ca_par_offre,
                 "closers_actifs": len(closers),
                 "top_closers":   top[:3],
             }
