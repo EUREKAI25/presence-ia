@@ -2198,6 +2198,98 @@ def closer_slots(token: str, request: Request):
     except Exception:
         pass
 
+    # ── Dataset mock : injecté si aucun slot réel ou ?demo=1 ──────────────────
+    _demo = request.query_params.get("demo") or not slot_data
+    if _demo:
+        _prospects = [
+            ("Cabinet Aubert",    "Lyon",        "Expert-comptable",  "06 12 34 56 78", 86, ["BDO","Mazars"],         ["3 concurrents visibles en IA","Réputation Google 4.3/5 · 47 avis","Coordonnées directes disponibles"]),
+            ("Clinique Moreau",   "Paris 15e",   "Chirurgien dentiste","06 23 45 67 89", 74, ["Dentego"],              ["1 concurrent visible en IA","Activité établie (31 avis Google)","Coordonnées directes disponibles"]),
+            ("Auto École Martin", "Bordeaux",    "Auto-école",        "05 56 78 90 12", 61, [],                       ["Coordonnées directes disponibles"]),
+            ("Plomberie Durand",  "Nantes",      "Plombier",          "02 40 12 34 56", 79, ["Engie Home","Dalkia"],  ["2 concurrents visibles en IA","Réputation Google 4.5/5 · 62 avis","Coordonnées directes disponibles"]),
+            ("Koiffure Studio",   "Lille",       "Coiffeur",          "",               55, ["Saint Algue"],          ["1 concurrent visible en IA"]),
+            ("Garage Renard",     "Strasbourg",  "Garagiste",         "03 88 56 78 90", 82, ["Midas","Speedy"],       ["2 concurrents visibles en IA","Réputation Google 4.1/5 · 88 avis","Coordonnées directes disponibles"]),
+            ("Notaire Lefebvre",  "Montpellier", "Notaire",           "04 67 34 56 78", 91, [],                       ["Réputation Google 4.8/5 · 19 avis","Coordonnées directes disponibles"]),
+            ("Institut Beauté",   "Nice",        "Esthéticienne",     "04 93 12 34 56", 67, ["Yves Rocher"],          ["1 concurrent visible en IA","Coordonnées directes disponibles"]),
+        ]
+        _base     = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        _mock_def = [
+            # (delta_h, state, prospect_idx)
+            #  Urgents < 24h — accessibles
+            ( 2,   "booked_accessible_urgent",  0),
+            ( 6,   "booked_accessible_urgent",  1),
+            (14,   "booked_accessible_urgent",  2),
+            (20,   "booked_accessible_urgent",  3),
+            # Urgents 24-48h — accessibles
+            (26,   "booked_accessible_urgent",  4),
+            (36,   "booked_accessible_urgent",  5),
+            (44,   "booked_accessible_urgent",  6),
+            # Futurs accessibles 2-4 jours
+            (52,   "booked_accessible",         7),
+            (62,   "booked_accessible",         0),
+            (74,   "booked_accessible",         1),
+            (88,   "booked_accessible",         2),
+            (100,  "booked_accessible",         3),
+            # Futurs non accessibles (credit_block)
+            (56,   "credit_block",              4),
+            (70,   "credit_block",              5),
+            (96,   "credit_block",              6),
+            # Pris par moi
+            (30,   "mine",                      7),
+            (78,   "mine",                      0),
+            (110,  "mine",                      1),
+            # Pris par autre
+            (10,   "taken_other",               2),
+            (48,   "taken_other",               3),
+            (64,   "taken_other",               4),
+            (116,  "taken_other",               5),
+            # Futurs lointains accessibles (5-7 jours)
+            (122,  "booked_accessible",         6),
+            (134,  "booked_accessible",         7),
+            (148,  "booked_accessible",         0),
+        ]
+        for i, (dh, state, pi) in enumerate(_mock_def):
+            _t   = _base + _dt.timedelta(hours=dh)
+            _dur = _dt.timedelta(minutes=20)
+            _pu  = _prospects[pi]
+            _is_urgent        = dh < 48
+            _is_mine          = (state == "mine")
+            _is_taken_other   = (state == "taken_other")
+            _can_claim        = (state in ("booked_accessible", "booked_accessible_urgent"))
+            _credit_block     = (state == "credit_block")
+            slot_data.append({
+                "id":             f"mock-{i}",
+                "starts":         _t.isoformat(),
+                "ends":           (_t + _dur).isoformat(),
+                "is_urgent":      _is_urgent,
+                "is_mine":        _is_mine,
+                "is_taken_other": _is_taken_other,
+                "can_claim":      _can_claim,
+                "credit_block":   _credit_block,
+                "meeting_id":     None,
+                "prospect": {
+                    "name":       _pu[0],
+                    "city":       _pu[1],
+                    "profession": _pu[2],
+                    "phone":      _pu[3],
+                    "score":      _pu[4],
+                    "explainers": _pu[6],
+                },
+            })
+        my_meetings = [
+            {"id": "mock-rdv-1", "scheduled": (_base + _dt.timedelta(hours=30)).isoformat(),
+             "scheduled_str": (_base + _dt.timedelta(hours=30)).strftime("%d/%m %H:%M"),
+             "status": "scheduled", "is_future": True, "deal_value": None,
+             "prospect_name": "Cabinet Aubert", "prospect_city": "Lyon", "prospect_phone": "06 12 34 56 78"},
+            {"id": "mock-rdv-2", "scheduled": (_base - _dt.timedelta(hours=48)).isoformat(),
+             "scheduled_str": (_base - _dt.timedelta(hours=48)).strftime("%d/%m %H:%M"),
+             "status": "completed", "is_future": False, "deal_value": 3500,
+             "prospect_name": "Garage Renard", "prospect_city": "Strasbourg", "prospect_phone": "03 88 56 78 90"},
+            {"id": "mock-rdv-3", "scheduled": (_base - _dt.timedelta(hours=24)).isoformat(),
+             "scheduled_str": (_base - _dt.timedelta(hours=24)).strftime("%d/%m %H:%M"),
+             "status": "no_show", "is_future": False, "deal_value": None,
+             "prospect_name": "Plomberie Durand", "prospect_city": "Nantes", "prospect_phone": "02 40 12 34 56"},
+        ]
+
     for r in lb:
         if str(r["closer_id"]) == str(closer.id):
             my_rank = str(r["rank"])

@@ -2,7 +2,149 @@
 
 **Statut** : 🟢 actif — Pipeline complet opérationnel
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-04-09
+**Dernière MAJ** : 2026-04-10
+
+---
+
+## 🔌 SESSION 2026-04-10 (suite) — Recrutement + Planning interactif
+
+### Livré en prod
+
+**Landing closer :**
+- Montant max corrigé → 2 000€
+- Bloc présentation activité + profil recherché (texte verbatim, entre hero et "Comment ça marche")
+
+**Planning closer (`/closer/{token}/slots`) :**
+- Calendrier interactif jour / semaine / mois (grille temporelle 8h-21h)
+- Tous les états visuels (urgent/accessible/pris-moi/pris-autre/non-accessible)
+- Filtres checkboxes actifs par défaut
+- Popup prospect : nom, ville, score/100, explainers, bouton "Prendre ce RDV"
+- Section "Mes RDV" en bas avec Vente / Rappel / Refus
+- Mobile : vue Jour par défaut
+
+**CRM candidatures :**
+- Données de test supprimées (Test Closer, Thomas Leroy, Nathalie BRIGITTE ×4)
+- Stage "Liste d'attente" (⏳ violet) ajouté
+- Emails Brevo automatiques sur Validé / Refusé / Liste d'attente
+
+**En cours :**
+- Dataset mock à injecter dans le calendrier (slots vides sans Calendly)
+
+---
+
+## 🔌 SESSION 2026-04-10 — Couche crédits + CRM — implémentation complète
+
+### Livré en prod (commit 8f32c98)
+
+**Couche crédits sur slots (`closer_public.py`) :**
+- Mode LIBRE / CONTRÔLÉ selon présence de slots urgents non pris
+- Bannière contextuelle adaptée
+- Urgents toujours cliquables (bypass crédits)
+- Futurs filtrés : grisés si solde insuffisant
+- Fallback : crédits levés si tous closers bloqués par crédits (pas conflit) sur un urgent
+- Sort : urgents (chronologique) → futurs (chronologique)
+
+**Enregistrement CRM à la prise de slot :**
+- `db_claim_slot()` → update `closer_id` sur MeetingDB existant, ou crée MeetingDB si absent
+- Suivi post-RDV (Vente/Rappel/Refus) : géré par `closer_complete_meeting()` existant
+
+**Specs livrées :**
+- `SPECS_CALENDRIER_CLOSER.html` — règles métier complètes
+- `SPECS_CREDITS_SLOTS.html` — spec couche crédits validée
+- `STRESS_TEST_CALENDRIER.html` — 10 scénarios de stress
+
+---
+
+## 🔌 SESSION 2026-04-09 — Calendrier RDV + logique closer (spécifications)
+
+### Règles métier validées — Calendrier / Attribution RDV
+
+**Flux :**
+1. Prospect réserve un créneau (multiples de 20 min)
+2. Créneau apparaît en attente dans le portail closer
+3. Closer choisit parmi les RDV déjà réservés — ne gère pas ses plages
+
+**Contraintes :**
+- Capacité réelle d'un closer : 1 RDV / 40 min (20 min appel + 20 min tampon)
+- Closer bloqué de T à T+40 après prise d'un RDV à T
+- Créneaux affichés au prospect : multiples de 20 min (indépendant des closers)
+
+### Capacité par jour (lancement prudent)
+
+| Jour | Créneaux | Closers actifs |
+|------|----------|----------------|
+| J1 | 2 | 1 (test) |
+| J2 | 4 | 2 |
+| J3 | 6 | 2 |
+| J4–J7 | 8 | 2 |
+| J8+ | selon taux prise | 2 → 3+ |
+
+- Taux prise > 80% sur 3 jours → +2 créneaux + activer closer suivant (liste attente)
+- Taux prise < 40% sur 3 jours → –1 créneau
+- Ouverture des slots : calculée à J-3 pour chaque journée
+
+### Priorisation closer (règle principale)
+
+RDV triés par urgence croissante dans le portail. **Seul le RDV le plus proche est cliquable** — les autres sont grisés tant qu'un RDV plus proche non pris existe pour ce closer.
+
+### Escalade anti-créneau vide
+
+| Délai avant RDV | Action |
+|----------------|--------|
+| T-2h | Badge URGENT visible pour tous les closers |
+| T-1h | Notification email/push à tous les closers actifs |
+| T-30min | Alerte admin → assignation manuelle ou annulation |
+| T-15min | Créneau fermé automatiquement + prospect notifié + replanification |
+
+### Actualisation calendrier (event-driven, pas de polling)
+
+| Événement | Action |
+|-----------|--------|
+| Prospect réserve | Décrémenter slots, notifier closers |
+| Closer prend RDV | Bloquer T+20 pour lui, MAJ disponibilités |
+| Closer annule | Recalculer blocages, remettre en attente |
+| Admin modifie capacité | Recalcul immédiat |
+
+Seul job planifié : vérification toutes les 5 min des créneaux < 2h sans closer → déclenche escalade.
+
+### À implémenter (prochaine session)
+
+- [ ] Portail closer : tri par urgence + blocage cliquabilité si RDV plus proche non pris
+- [ ] Job 5 min : détection créneaux sans closer < 2h → alertes
+- [ ] Fermeture automatique slot à T-15min
+- [ ] Config admin : capacité par jour (editable)
+
+---
+
+## 🔌 SESSION 2026-04-08 — Système paiement SEPA closers
+
+### Réalisé
+
+| Feature | Détail | Statut |
+|---|---|---|
+| Onglet "Paiement" portail closer | IBAN + balance + bouton demande + historique demandes | ✅ |
+| POST `/closer/{token}/iban` | Enregistre IBAN dans `closer.meta["iban"]` | ✅ |
+| POST `/closer/{token}/payment-request` | Crée entrée dans `data/payment_requests.json` (vérif IBAN + solde > 0 + pas de demande en cours) | ✅ |
+| Admin `/admin/crm/paiements` | Listing demandes en attente + historique + total à verser | ✅ |
+| GET `/api/admin/closers/sepa-xml` | Génère fichier SEPA pain.001.001.03 (tous les pending) — télécharger, importer dans Boursorama | ✅ |
+| POST `/api/admin/closers/payment/{id}/mark-paid` | Marque payé + MAJ `CommissionDB.status = 'paid'` | ✅ |
+| Nav : lien "Paiements" | Section CLOSERS sidebar | ✅ |
+
+### Vars d'env requises pour SEPA
+
+```
+COMPANY_IBAN=FR76...   # IBAN de Présence IA (compte débiteur)
+COMPANY_BIC=BOUSFRPPXXX  # BIC Boursorama (optionnel, défaut Boursorama)
+COMPANY_NAME=PRESENCE IA  # Nom à l'origine du virement
+```
+
+### Flux complet
+
+1. Closer entre son IBAN dans l'onglet "Paiement" → enregistré dans `closer.meta`
+2. Closer clique "Demander le versement" → entrée dans `data/payment_requests.json`
+3. Admin voit la demande sur `/admin/crm/paiements`
+4. Admin télécharge le fichier SEPA XML → importe dans Boursorama
+5. Admin clique "Marquer payé" → statut mis à jour, CommissionDB marqué paid
 
 ---
 
