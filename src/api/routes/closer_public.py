@@ -2005,12 +2005,40 @@ async def closer_send_payment_link(closer_token: str, meeting_id: str, request: 
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Couche crédits — helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _credit_value(starts_at, now_naive) -> int:
+    """Valeur crédits d'un slot selon son délai. Positif = urgent, négatif = futur lointain."""
+    delta_h = (starts_at - now_naive).total_seconds() / 3600
+    if delta_h < 24:   return  2
+    if delta_h < 48:   return  1
+    if delta_h < 72:   return  0
+    if delta_h < 120:  return -1   # 3–5 jours
+    if delta_h < 240:  return -2   # 5–10 jours
+    return -3
+
+
+def _calc_closer_credits(closer_id: str, mdb) -> int:
+    """Solde = Σ valeurs des slots futurs *claimed* par ce closer (passés exclus)."""
+    from datetime import datetime as _dt2
+    from marketing_module.models import SlotDB, SlotStatus
+    now = _dt2.utcnow()
+    taken = mdb.query(SlotDB).filter(
+        SlotDB.closer_id == str(closer_id),
+        SlotDB.status == SlotStatus.claimed,
+        SlotDB.starts_at > now,
+    ).all()
+    return sum(_credit_value(s.starts_at, now) for s in taken)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Page créneaux du closer
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/closer/{token}/slots", response_class=HTMLResponse)
 def closer_slots(token: str, request: Request):
-    """Page de sélection des créneaux disponibles pour un closer."""
+    """Page de sélection des créneaux avec couche de filtrage crédits."""
     closer = _get_closer_by_token(token)
     if not closer:
         return HTMLResponse("<p style='font-family:sans-serif;padding:40px;color:#666'>Lien invalide.</p>",
@@ -2020,130 +2048,210 @@ def closer_slots(token: str, request: Request):
     now  = _dt.datetime.utcnow()
     week = now + _dt.timedelta(days=14)
 
-    slots  = []
-    lb     = []
-    my_rank = "—"
+    slot_data = []
+    lb        = []
+    my_rank   = "—"
+    credits   = 0
+
     try:
         from marketing_module.database import (SessionLocal as MktSession,
                                                db_list_slots, db_monthly_leaderboard)
-        from marketing_module.models import SlotStatus, MeetingDB
+        from marketing_module.models import SlotDB, SlotStatus, MeetingDB, CloserDB
         from ...database import SessionLocal
         from ...models import V3ProspectDB
 
         with MktSession() as mdb:
-            slots = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=week)
-            lb    = db_monthly_leaderboard(mdb, PROJECT_ID)
+            credits = _calc_closer_credits(str(closer.id), mdb)
+            raw_slots = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=week)
+            lb        = db_monthly_leaderboard(mdb, PROJECT_ID)
 
-            # Enrichir les slots avec les infos prospect
-            slot_data = []
-            for s in slots:
+            # Crédits de tous les closers actifs (pour fallback)
+            all_closers = mdb.query(CloserDB).filter_by(
+                project_id=PROJECT_ID, is_active=True
+            ).all()
+            all_credits = {
+                str(c.id): _calc_closer_credits(str(c.id), mdb) for c in all_closers
+            }
+
+            for s in raw_slots:
                 prospect_info = ""
                 if s.meeting_id:
                     mtg = mdb.query(MeetingDB).filter_by(id=s.meeting_id).first()
-                    if mtg:
+                    if mtg and mtg.prospect_id:
                         with SessionLocal() as db:
-                            p = db.query(V3ProspectDB).filter_by(token=mtg.prospect_id).first()
+                            p = db.query(V3ProspectDB).filter_by(
+                                token=mtg.prospect_id
+                            ).first()
                         if p:
-                            prospect_info = f"{p.name} · {p.city} · {p.profession}"
+                            parts = [x for x in [p.name, p.city, p.profession] if x]
+                            prospect_info = " · ".join(parts)
+
+                delta_h   = (s.starts_at - now).total_seconds() / 3600
+                is_urgent = delta_h < 48
+                cv        = _credit_value(s.starts_at, now)
+
+                is_mine         = (s.status == SlotStatus.claimed
+                                   and str(s.closer_id) == str(closer.id))
+                is_taken_other  = (s.status in (SlotStatus.claimed, SlotStatus.blocked)
+                                   and str(s.closer_id) != str(closer.id))
+                is_booked       = (s.status == SlotStatus.booked)
+
+                # Règle crédits : urgents → toujours prenables (exception spec)
+                # Futurs : solde + coût doit rester ≥ 0
+                if is_urgent:
+                    credit_ok = True
+                else:
+                    credit_ok = (credits + cv) >= 0
+
+                # Fallback : urgent bloqué par crédits pour TOUS les closers éligibles
+                # (ici inutile car urgents toujours OK, mais appliqué par spec)
+                if is_booked and is_urgent and not credit_ok:
+                    eligible = [
+                        c for c in all_closers
+                        if (all_credits.get(str(c.id), 0) + cv) < 0
+                    ]
+                    if len(eligible) == len(all_closers):
+                        credit_ok = True  # fallback : lever contrainte crédits
+
+                can_claim    = is_booked and credit_ok
+                credit_block = is_booked and not credit_ok
+
                 slot_data.append({
-                    "id":            s.id,
-                    "starts_at":     s.starts_at,
-                    "ends_at":       s.ends_at,
-                    "status":        s.status,
-                    "closer_id":     s.closer_id,
+                    "id":           s.id,
+                    "starts_at":    s.starts_at,
+                    "ends_at":      s.ends_at,
+                    "status":       s.status,
+                    "closer_id":    s.closer_id,
                     "prospect_info": prospect_info,
+                    "is_urgent":    is_urgent,
+                    "is_mine":      is_mine,
+                    "is_taken_other": is_taken_other,
+                    "can_claim":    can_claim,
+                    "credit_block": credit_block,
                 })
+
     except Exception:
         slot_data = []
 
     for r in lb:
-        if r["closer_id"] == closer.id:
+        if str(r["closer_id"]) == str(closer.id):
             my_rank = str(r["rank"])
             break
 
-    # Grouper par jour
-    days: dict = {}
-    for s in slot_data:
-        day = s["starts_at"].strftime("%A %d/%m")
-        days.setdefault(day, []).append(s)
+    # Tri : urgents d'abord, puis futurs, chronologique dans chaque groupe
+    urgents = sorted([s for s in slot_data if s["is_urgent"]],
+                     key=lambda x: x["starts_at"])
+    futurs  = sorted([s for s in slot_data if not s["is_urgent"]],
+                     key=lambda x: x["starts_at"])
 
-    STATUS_INFO = {
-        "available": ("#2ecc71", "Disponible", False),
-        "booked":    ("#8b5cf6", "Prospect inscrit — à prendre", True),
-        "claimed":   ("#6366f1", "Pris par moi", False),
-        "completed": ("#9ca3af", "Terminé", False),
-        "cancelled": ("#374151", "Annulé", False),
-    }
+    # Mode
+    urgent_free  = [s for s in urgents if s["can_claim"]]
+    mode_libre   = len(urgent_free) == 0
 
-    days_html = ""
-    for day, day_slots in days.items():
-        slots_html = ""
-        for s in day_slots:
-            # Si claimed par quelqu'un d'autre
-            if s["status"] == "claimed" and s["closer_id"] != closer.id:
-                color, label, can_claim = "#374151", "Pris", False
-            else:
-                color, label, can_claim = STATUS_INFO.get(s["status"], ("#555", s["status"], False))
-                if s["status"] == "claimed" and s["closer_id"] == closer.id:
-                    color, label = "#6366f1", "Pris par moi"
+    if mode_libre:
+        banner_msg    = "Aucun rendez-vous urgent pour le moment — choisissez librement."
+        banner_color  = "#2ecc71"
+        banner_bg     = "#2ecc7110"
+        banner_border = "#2ecc7130"
+    else:
+        banner_msg    = ("Choisissez vos créneaux parmi vos options. "
+                         "Assurez en priorité les créneaux urgents pour débloquer les créneaux éloignés.")
+        banner_color  = "#f59e0b"
+        banner_bg     = "#f59e0b10"
+        banner_border = "#f59e0b30"
 
-            starts_fmt = s["starts_at"].strftime("%H:%M")
-            ends_fmt   = s["ends_at"].strftime("%H:%M")
+    def _slot_card(s):
+        if s["is_mine"]:
+            color, label, show_btn = "#6366f1", "Réservé", False
+        elif s["is_taken_other"] or s["status"] in (SlotStatus.blocked, SlotStatus.completed, SlotStatus.cancelled):
+            color, label, show_btn = "#374151", "Pris", False
+        elif s["credit_block"]:
+            color, label, show_btn = "#374151", "Non accessible", False
+        elif s["can_claim"]:
+            color  = "#e94560" if s["is_urgent"] else "#8b5cf6"
+            label  = "À prendre"
+            show_btn = True
+        else:
+            color, label, show_btn = "#555", "—", False
 
-            prospect_div = (
-                f'<div style="color:#9ca3af;font-size:11px;margin-top:2px">{s["prospect_info"]}</div>'
-            ) if s["prospect_info"] else ""
+        dim = "opacity:.4;" if (s["credit_block"] or s["is_taken_other"]
+                                or s["status"] in (SlotStatus.blocked,
+                                                   SlotStatus.completed,
+                                                   SlotStatus.cancelled)) else ""
 
-            claim_btn = (
-                f'<button onclick="claimSlot(\'{s["id"]}\')" '
-                f'style="margin-top:8px;padding:5px 12px;background:#8b5cf6;border:none;'
-                f'border-radius:4px;color:#fff;font-size:11px;font-weight:600;cursor:pointer">'
-                f'Prendre ce créneau</button>'
-            ) if can_claim else ""
+        dt_fmt = s["starts_at"].strftime("%d/%m %H:%M")
+        end_fmt = s["ends_at"].strftime("%H:%M")
 
-            slots_html += (
-                f'<div id="slot-{s["id"]}" style="background:#1a1a2e;border:1px solid {color}40;'
-                f'border-radius:8px;padding:12px 16px;margin-bottom:8px">'
-                f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-                f'  <div>'
-                f'    <span style="color:#fff;font-weight:600;font-size:13px">{starts_fmt} – {ends_fmt}</span>'
-                f'    {prospect_div}'
-                f'    {claim_btn}'
-                f'  </div>'
-                f'  <span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
-                f'  padding:2px 7px;border-radius:10px;flex-shrink:0">{label}</span>'
-                f'</div></div>'
-            )
-        days_html += (
-            f'<div style="margin-bottom:24px">'
-            f'<h3 style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;'
-            f'letter-spacing:.08em;margin-bottom:12px">{day}</h3>'
-            f'{slots_html or "<p style=\'color:#555;font-size:12px\'>Aucun créneau ce jour</p>"}'
-            f'</div>'
+        urgent_badge = (
+            '<span style="background:#e9456020;color:#e94560;font-size:9px;font-weight:700;'
+            'padding:1px 6px;border-radius:8px;margin-left:8px">URGENT</span>'
+        ) if s["is_urgent"] and not s["is_mine"] and not s["is_taken_other"] else ""
+
+        prospect_div = (
+            f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{s["prospect_info"]}</div>'
+        ) if s["prospect_info"] else ""
+
+        btn_html = (
+            f'<button onclick="claimSlot(\'{s["id"]}\')" '
+            f'style="margin-top:8px;padding:6px 16px;background:{color};border:none;'
+            f'border-radius:4px;color:#fff;font-size:11px;font-weight:700;cursor:pointer">'
+            f'Prendre</button>'
+        ) if show_btn else ""
+
+        return (
+            f'<div id="slot-{s["id"]}" style="background:#1a1a2e;border:1px solid {color}30;'
+            f'border-radius:8px;padding:12px 16px;margin-bottom:8px;{dim}">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+            f'  <div>'
+            f'    <span style="color:#fff;font-weight:600;font-size:13px">{dt_fmt} – {end_fmt}</span>'
+            f'    {urgent_badge}'
+            f'    {prospect_div}'
+            f'    {btn_html}'
+            f'  </div>'
+            f'  <span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
+            f'  padding:2px 7px;border-radius:10px;flex-shrink:0;white-space:nowrap">{label}</span>'
+            f'</div></div>'
         )
 
-    if not days_html:
-        days_html = '<p style="color:#555;font-size:13px;padding:20px 0">Aucun créneau disponible pour les 14 prochains jours.</p>'
+    urgents_html = ""
+    if urgents:
+        urgents_html = (
+            f'<p style="color:#e94560;font-size:10px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.08em;margin-bottom:10px">RDV urgents — priorité</p>'
+            + "".join(_slot_card(s) for s in urgents)
+        )
+
+    futurs_html = ""
+    if futurs:
+        futurs_html = (
+            f'<p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.08em;margin:{"24px" if urgents else "0"} 0 10px">Créneaux futurs</p>'
+            + "".join(_slot_card(s) for s in futurs)
+        )
+
+    slots_section = urgents_html + futurs_html
+    if not slots_section:
+        slots_section = ('<p style="color:#555;font-size:13px;padding:20px 0">'
+                         'Aucun créneau disponible pour les 14 prochains jours.</p>')
 
     # Leaderboard sidebar
     lb_rows = ""
     for r in lb:
-        is_me = r["closer_id"] == closer.id
-        bonus_badge = ('<span style="background:#2ecc7120;color:#2ecc71;font-size:9px;'
-                       'font-weight:600;padding:1px 5px;border-radius:8px;margin-left:4px">+5%</span>'
-                       ) if r["bonus"] else ""
-        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
+        is_me = str(r["closer_id"]) == str(closer.id)
+        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else f'#{r["rank"]}')
         lb_rows += (
-            f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
-            f'<td style="padding:8px 12px;font-size:12px;color:#9ca3af">'
-            f'{rank_icon}</td>'
-            f'<td style="padding:8px 12px;font-size:12px;color:#fff;font-weight:{"700" if is_me else "400"}">'
-            f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
-            f'<td style="padding:8px 12px;font-size:12px;color:#2ecc71;text-align:right">{r["signed"]}</td>'
-            f'</tr>'
+            f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
+            f'border-bottom:1px solid #1a1a2e">'
+            f'<td style="padding:8px 12px;font-size:12px;color:#9ca3af">{rank_icon}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:#fff;'
+            f'font-weight:{"700" if is_me else "400"}">'
+            f'{r["name"]}{" (moi)" if is_me else ""}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:#2ecc71;text-align:right">'
+            f'{r["signed"]}</td></tr>'
         )
     if not lb_rows:
-        lb_rows = '<tr><td colspan="3" style="padding:16px;text-align:center;color:#555">Aucune donnée</td></tr>'
+        lb_rows = ('<tr><td colspan="3" style="padding:16px;text-align:center;color:#555">'
+                   'Aucune donnée</td></tr>')
 
     name = closer.name
 
@@ -2156,7 +2264,7 @@ body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 table{{width:100%;border-collapse:collapse}}
 #toast{{position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#0f0f1a;
   padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
-  opacity:0;transition:opacity .3s;pointer-events:none}}
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}}
 </style></head><body>
 <div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
             display:flex;align-items:center;justify-content:space-between">
@@ -2166,61 +2274,55 @@ table{{width:100%;border-collapse:collapse}}
   </div>
   <div style="display:flex;align-items:center;gap:12px">
     <span style="color:#fff;font-size:13px;font-weight:600">{name}</span>
-    <a href="/closer/{token}?tab=classement" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
+    <a href="/closer/{token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
   </div>
 </div>
 
-<div style="max-width:900px;margin:0 auto;padding:28px 20px">
+<div style="max-width:940px;margin:0 auto;padding:28px 20px">
 
-<!-- Légende -->
-<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px">
-  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#2ecc71;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Disponible</span></div>
-  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#8b5cf6;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Prospect inscrit</span></div>
-  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#6366f1;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par moi</span></div>
-  <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#374151;border-radius:50%;display:inline-block"></span><span style="color:#9ca3af;font-size:11px">Pris par un autre</span></div>
+<!-- Bannière mode -->
+<div style="background:{banner_bg};border:1px solid {banner_border};border-radius:6px;
+  padding:10px 16px;margin-bottom:24px;color:{banner_color};font-size:12px;line-height:1.6">
+  {banner_msg}
 </div>
 
-<div style="display:grid;grid-template-columns:1fr minmax(240px,320px);gap:28px">
+<div style="display:grid;grid-template-columns:1fr minmax(220px,280px);gap:28px;align-items:start">
+
+<!-- Créneaux -->
 <div>
-  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Créneaux — 14 prochains jours</h2>
-  {days_html}
+  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Créneaux disponibles</h2>
+  {slots_section}
 </div>
+
+<!-- Sidebar classement -->
 <div>
-  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Classement du mois</h2>
-  {'<div style="background:#6366f120;border:1px solid #6366f140;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#a5b4fc">Votre rang : #' + my_rank + '</div>' if my_rank != "—" else ""}
-  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:12px">
+  <h2 style="color:#fff;font-size:14px;font-weight:700;margin-bottom:12px">Classement du mois</h2>
+  {'<div style="background:#6366f120;border:1px solid #6366f140;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#a5b4fc">Votre rang : #' + my_rank + '</div>' if my_rank != "—" else ""}
+  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
   <table style="border-collapse:collapse">
   <tbody>{lb_rows}</tbody>
   </table></div>
-  <p style="color:#555;font-size:11px;line-height:1.5">Les 2 premiers reçoivent +5% de commission ce mois.</p>
-</div>
 </div>
 
+</div>
 </div>
 <div id="toast"></div>
 <script>
 function toast(m, err){{
   const t=document.getElementById('toast');
-  t.textContent=m;t.style.background=err?'#e94560':'#2ecc71';
+  t.textContent=m;t.style.background=err?'#e94560':'#2ecc71';t.style.color=err?'#fff':'#0f0f1a';
   t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
 }}
 async function claimSlot(slotId){{
-  const btn=event.target;
-  btn.textContent='En cours…';btn.disabled=true;
+  const btn=event.target; btn.textContent='…'; btn.disabled=true;
   const r=await fetch('/closer/{token}/slots/'+slotId+'/claim',{{method:'POST'}});
   const d=await r.json();
   if(d.ok){{
     toast('Créneau réservé ✓');
-    // Mettre à jour le slot visuellement
-    const el=document.getElementById('slot-'+slotId);
-    if(el){{
-      el.style.borderColor='#6366f140';
-      el.querySelector('span[style*="border-radius:10px"]').textContent='Pris par moi';
-      btn.remove();
-    }}
+    setTimeout(()=>location.reload(), 900);
   }} else {{
-    btn.textContent='Prendre ce créneau';btn.disabled=false;
-    toast(d.error||'Erreur',true);
+    btn.textContent='Prendre'; btn.disabled=false;
+    toast(d.error||'Erreur', true);
   }}
 }}
 </script>
@@ -2236,9 +2338,24 @@ async def closer_claim_slot(token: str, slot_id: str):
         raise HTTPException(404, "Lien invalide")
 
     try:
-        from marketing_module.database import SessionLocal as MktSession, db_claim_slot
+        from marketing_module.database import SessionLocal as MktSession, db_claim_slot, db_update_meeting, db_create_meeting
+        from marketing_module.models import SlotDB
         with MktSession() as mdb:
             ok, message = db_claim_slot(mdb, slot_id, closer.id)
+            if ok:
+                slot = mdb.query(SlotDB).filter(SlotDB.id == slot_id).first()
+                if slot and slot.meeting_id:
+                    db_update_meeting(mdb, slot.meeting_id, {"closer_id": str(closer.id)})
+                elif slot:
+                    from datetime import datetime as _dt_now
+                    db_create_meeting(mdb, {
+                        "project_id": str(slot.project_id) if slot.project_id else None,
+                        "slot_id": str(slot.id),
+                        "closer_id": str(closer.id),
+                        "scheduled_at": slot.starts_at,
+                        "status": "scheduled",
+                        "claimed_at": _dt_now.utcnow().isoformat(),
+                    })
         return JSONResponse({"ok": ok, "message": message, "error": None if ok else message})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
