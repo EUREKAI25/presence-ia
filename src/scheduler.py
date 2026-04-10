@@ -1455,7 +1455,7 @@ def _job_outbound(force: bool = False):
     from .database import SessionLocal
     from .models import V3ProspectDB
 
-    dry_run = os.getenv("OUTBOUND_DRY_RUN", "false").lower() == "true"
+    dry_run = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"  # SÉCURITÉ : défaut=true, activation explicite requise
     cap     = int(os.getenv("OUTBOUND_CAP", "10"))
     if dry_run:
         cap = min(cap, 20)   # sécurité : cap 20 max en dry_run
