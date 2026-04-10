@@ -41,11 +41,67 @@ def _app_stage_badge(stage: str) -> str:
         "contacted": ("#9ca3af", "Contacté"),
         "applied":   ("#6366f1", "Candidature"),
         "reviewing": ("#f59e0b", "En cours"),
+        "waitlist":  ("#a78bfa", "Liste d'attente"),
         "validated": ("#2ecc71", "Validé"),
         "rejected":  ("#e94560", "Refusé"),
     }
     color, label = m.get(stage, ("#9ca3af", stage))
     return _badge(label, color)
+
+
+def _send_recruit_email(to_email: str, to_name: str, stage: str) -> bool:
+    """Envoie un email de notification au candidat selon le stage."""
+    import requests as _req
+    api_key = os.getenv("BREVO_API_KEY", "")
+    if not api_key or not to_email:
+        return False
+    subjects = {
+        "validated": "Votre candidature Présence IA a été retenue",
+        "rejected":  "Suites de votre candidature Présence IA",
+        "waitlist":  "Votre candidature Présence IA — liste d'attente",
+    }
+    bodies = {
+        "validated": (
+            f"Bonjour {to_name},\n\n"
+            "Nous avons étudié votre candidature et nous sommes ravis de vous informer qu'elle a été retenue.\n\n"
+            "Un membre de l'équipe vous contactera très prochainement pour la suite du processus.\n\n"
+            "À très bientôt,\nL'équipe Présence IA"
+        ),
+        "rejected": (
+            f"Bonjour {to_name},\n\n"
+            "Nous avons bien étudié votre candidature et nous vous remercions de l'intérêt que vous portez au programme closer Présence IA.\n\n"
+            "Après examen, nous ne sommes pas en mesure de donner une suite favorable à votre candidature à ce stade.\n\n"
+            "Nous vous souhaitons bonne continuation.\n\nL'équipe Présence IA"
+        ),
+        "waitlist": (
+            f"Bonjour {to_name},\n\n"
+            "Nous avons bien reçu et examiné votre candidature.\n\n"
+            "Votre profil nous intéresse et nous le conservons dans notre liste d'attente. "
+            "Nous vous contacterons dès qu'une nouvelle place se libère.\n\n"
+            "À bientôt,\nL'équipe Présence IA"
+        ),
+    }
+    subject = subjects.get(stage)
+    body    = bodies.get(stage)
+    if not subject or not body:
+        return False
+    sender_name  = os.getenv("SENDER_NAME",  "Présence IA")
+    sender_email = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
+    try:
+        resp = _req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            json={
+                "sender":      {"name": sender_name, "email": sender_email},
+                "to":          [{"email": to_email, "name": to_name}],
+                "subject":     subject,
+                "textContent": body,
+            },
+            timeout=8,
+        )
+        return resp.status_code == 201
+    except Exception:
+        return False
 
 
 def _delivery_badge(d: dict) -> str:
@@ -809,13 +865,20 @@ def crm_application_detail(app_id: str, request: Request):
         return HTMLResponse("<p>Candidature introuvable</p>", status_code=404)
 
     name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "—"
+    _stage_opts = [
+        ("contacted", "Contacté",         "#9ca3af"),
+        ("applied",   "Candidature",      "#6366f1"),
+        ("reviewing", "En cours",         "#f59e0b"),
+        ("waitlist",  "⏳ Liste d'attente","#a78bfa"),
+        ("validated", "✓ Valider",        "#2ecc71"),
+        ("rejected",  "✗ Refuser",        "#e94560"),
+    ]
     stage_btns = "".join(
         f'<button onclick="setStage(\'{app.id}\',\'{s}\')" '
         f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;'
-        f'background:{("" if app.stage!=s else "#6366f1")};color:{"#fff" if app.stage==s else "#9ca3af"};'
-        f'border:1px solid {"#6366f1" if app.stage==s else "#2a2a4e"}">{l}</button>'
-        for s, l in [("contacted","Contacté"),("applied","Candidature"),
-                     ("reviewing","En cours"),("validated","✓ Valider"),("rejected","✗ Refuser")]
+        f'background:{"transparent" if app.stage!=s else c+"30"};color:{c if app.stage!=s else c};'
+        f'border:1px solid {c if app.stage==s else "#2a2a4e"}">{l}</button>'
+        for s, l, c in _stage_opts
     )
 
     video_block = (f'<div style="margin-top:12px"><a href="{app.video_url}" target="_blank" '
@@ -889,6 +952,14 @@ async def set_application_stage(app_id: str, request: Request):
             updates["reviewed_at"] = datetime.utcnow()
         with MktSession() as mdb:
             db_update_application(mdb, app_id, updates)
+            # Email candidat sur décision finale
+            if stage in ("validated", "rejected", "waitlist"):
+                app = mdb.query(
+                    __import__("marketing_module.models", fromlist=["CloserApplicationDB"]).CloserApplicationDB
+                ).filter_by(id=app_id).first()
+                if app and app.email:
+                    _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
+                    _send_recruit_email(app.email, _name, stage)
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
