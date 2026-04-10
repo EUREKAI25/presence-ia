@@ -2767,8 +2767,23 @@ function renderMesRdv(){
     cur=new Date(sorted[0].starts);
   }
 })();
+// DEBUG temporaire — supprimer après validation
+try {
+  document.getElementById('cal').insertAdjacentHTML('beforebegin',
+    '<div id="dbg" style="background:#1a1a2e;border:1px solid #6366f1;border-radius:6px;padding:8px 14px;margin:8px 20px;font-size:11px;color:#a5b4fc">'
+    +'Slots chargés : '+SLOTS.length
+    +' | Urgents : '+SLOTS.filter(s=>s.is_urgent&&s.can_claim).length
+    +' | Vue : <span id="dbg-view"></span>'
+    +' | Semaine : <span id="dbg-week"></span></div>');
+} catch(e){}
+function _dbgUpdate(){
+  try{
+    document.getElementById('dbg-view').textContent=view;
+    document.getElementById('dbg-week').textContent=document.getElementById('cal-label').textContent;
+  }catch(e){}
+}
 view=window.innerWidth<640?'day':'week';
-setView(view);
+setView(view);_dbgUpdate();
 renderMesRdv();
 </script>
 </body></html>"""
