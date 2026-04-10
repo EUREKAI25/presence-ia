@@ -42,7 +42,7 @@ def closer_presentation():
     _max_with_bonus = int(9000 * (0.18 + _bonus_rate))  # ex: 1980
     _display_max   = f"{_max_with_bonus:,}€".replace(",", " ") if _bonus_enabled else "1 620€"
     _display_sub   = f"par deal signé · dont {int(_bonus_rate*100)}% bonus top closer" if _bonus_enabled else "par deal signé"
-    return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
+    _html = """<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Devenez Closer — Présence IA</title>
 <style>
@@ -181,7 +181,9 @@ a{text-decoration:none}
   </div>
 </section>
 
-</body></html>""")
+</body></html>"""
+    _html = _html.replace("{_display_max}", _display_max).replace("{_display_sub}", _display_sub)
+    return HTMLResponse(_html)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
