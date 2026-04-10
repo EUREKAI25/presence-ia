@@ -556,3 +556,18 @@ class IaCitedCompanyDB(Base):
     models         : Mapped[str]      = mapped_column(sa.Text,   default="[]")       # JSON list des modèles qui l'ont citée
     first_seen     : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow)
     last_seen      : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class JobCostLogDB(Base):
+    """Tracking des coûts API par exécution de job."""
+    __tablename__ = "job_cost_log"
+    id               : Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id           : Mapped[str]            = mapped_column(sa.String, nullable=False, index=True)
+    started_at       : Mapped[datetime]       = mapped_column(sa.DateTime, nullable=False)
+    ended_at         : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    paire            : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # "Paris × couvreur" ou "auto"
+    nb_appels_google : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    nb_appels_gemini : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    nb_leads_generes : Mapped[int]            = mapped_column(sa.Integer, default=0)
+    cost_estimated   : Mapped[float]          = mapped_column(sa.Float,   default=0.0)    # nb_google × 0.017$
+    created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)

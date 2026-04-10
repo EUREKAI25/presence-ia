@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl, db_dashboard_stats
+from ...database import get_db, db_get_campaign, db_list_campaigns, db_list_prospects, db_get_prospect, jl, db_dashboard_stats, db_cost_stats
 from ...models import ProspectStatus, ProspectDB, V3ProspectDB, V3CityImageDB, ProspectionTargetDB
 from ._nav import admin_nav
 
@@ -439,6 +439,55 @@ def _funnel_arrow():
     return '<div style="display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:18px;padding:0 2px">→</div>'
 
 
+def _build_cost_section(costs: dict) -> str:
+    """Accordéon coûts API — Google Places + Gemini."""
+    cpl = f"${costs['cost_per_lead']:.4f}" if costs["cost_per_lead"] is not None else "—"
+    total_fmt = f"${costs['total_cost']:.4f}"
+
+    job_rows = "".join(
+        f'<tr style="border-bottom:1px solid #1a1a2e">'
+        f'<td style="padding:7px 10px;font-size:12px;color:#9ca3af">{j["date"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;font-weight:600">{j["job_id"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;color:#6b7280">{j["paire"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;text-align:right;color:#0ea5e9">{j["google"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;text-align:right;color:#8b5cf6">{j["gemini"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;text-align:right;color:#10b981">{j["leads"]}</td>'
+        f'<td style="padding:7px 10px;font-size:12px;text-align:right;font-weight:700;color:#e94560">${j["cost"]:.4f}</td>'
+        f'</tr>'
+        for j in costs["recent_jobs"]
+    ) or f'<tr><td colspan="7" style="padding:14px;color:#6b7280;font-size:12px;text-align:center">Aucune donnée — le tracking démarre au prochain job d\'enrichissement</td></tr>'
+
+    return (
+        f'<details style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden">'
+        f'<summary style="padding:11px 16px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;list-style:none">'
+        f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#0ea5e9;flex-shrink:0"></span>'
+        f'Coûts API'
+        f'<span style="margin-left:auto;font-size:12px;font-weight:400;color:#6b7280">'
+        f'Total {total_fmt} · {costs["total_google"]} appels Places · coût/lead {cpl}'
+        f'</span>'
+        f'</summary>'
+        f'<div style="border-top:1px solid #f3f4f6;padding:14px 16px">'
+        f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">'
+        + _kpi("Total coût", total_fmt, "Google Places cumulé", color="#e94560")
+        + _kpi("Appels Places", f'{costs["total_google"]:,}', f'@$0.017/appel', color="#0ea5e9")
+        + _kpi("Leads générés", f'{costs["total_leads"]:,}', "contacts créés", color="#10b981")
+        + _kpi("Coût / lead", cpl, "coût total ÷ leads", color="#8b5cf6")
+        + f'</div>'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<thead><tr style="border-bottom:2px solid #e5e7eb">'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Date</th>'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Job</th>'
+        f'<th style="text-align:left;padding:7px 10px;font-size:11px;color:#6b7280">Paire</th>'
+        f'<th style="text-align:right;padding:7px 10px;font-size:11px;color:#0ea5e9">Places</th>'
+        f'<th style="text-align:right;padding:7px 10px;font-size:11px;color:#8b5cf6">Gemini</th>'
+        f'<th style="text-align:right;padding:7px 10px;font-size:11px;color:#10b981">Leads</th>'
+        f'<th style="text-align:right;padding:7px 10px;font-size:11px;color:#e94560">Coût $</th>'
+        f'</tr></thead><tbody>{job_rows}</tbody></table>'
+        f'</div>'
+        f'</details>'
+    )
+
+
 @router.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, db: Session = Depends(get_db),
                     period: str = "exercice", date_from: str = None, date_to: str = None):
@@ -449,6 +498,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
 
     s  = db_dashboard_stats(db, dt_from, dt_to)
     sp = db_dashboard_stats(db, prev_from, prev_to)
+    costs = db_cost_stats(db)
 
     nav = admin_nav(token, "")
     alerts_html, modals_html = _build_alerts(db, token)
@@ -671,6 +721,9 @@ function uploadCityHeaderFile(city, token, input) {{
   <!-- Entonnoir conversion -->
   <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding-left:2px">Conversion</div>
   <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px">{conv_html}</div>
+
+  <!-- Coûts API (accordéon) -->
+  {_build_cost_section(costs)}
 
 </div>
 </body></html>""")

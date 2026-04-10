@@ -1145,6 +1145,32 @@ def _job_auto_enrich(force: bool = False):
 
         log.info("auto_enrich: terminé — %d contact(s) créés", total_enriched)
 
+        # ── Tracking coûts ────────────────────────────────────────────────
+        try:
+            from .cost_tracker import tracker as _tracker
+            from .models import JobCostLogDB
+            counts = _tracker.get_and_reset()
+            cost = round(counts["google"] * 0.017, 4)
+            db4 = SessionLocal()
+            try:
+                db4.add(JobCostLogDB(
+                    job_id="auto_enrich",
+                    started_at=now,
+                    ended_at=datetime.utcnow(),
+                    paire="auto",
+                    nb_appels_google=counts["google"],
+                    nb_appels_gemini=counts["gemini"],
+                    nb_leads_generes=total_enriched,
+                    cost_estimated=cost,
+                ))
+                db4.commit()
+            finally:
+                db4.close()
+            log.info("auto_enrich: coûts — google=%d gemini=%d coût=%.4f$",
+                     counts["google"], counts["gemini"], cost)
+        except Exception as ce:
+            log.warning("auto_enrich: tracking coûts échoué — %s", ce)
+
     except Exception as e:
         log.error("_job_auto_enrich: %s", e)
 

@@ -859,6 +859,55 @@ def db_dashboard_stats(db: Session, date_from, date_to) -> dict:
     }
 
 
+def db_cost_stats(db: Session) -> dict:
+    """
+    Agrège les coûts API depuis job_cost_log.
+    Retourne : total, par job, par lead, par client (si nb ventes connu).
+    """
+    from sqlalchemy import func
+    from .models import JobCostLogDB
+
+    rows = db.query(JobCostLogDB).order_by(JobCostLogDB.started_at.desc()).all()
+    if not rows:
+        return {
+            "total_cost": 0.0,
+            "total_google": 0,
+            "total_gemini": 0,
+            "total_leads": 0,
+            "cost_per_lead": None,
+            "recent_jobs": [],
+        }
+
+    total_cost   = round(sum(r.cost_estimated   for r in rows), 4)
+    total_google = sum(r.nb_appels_google for r in rows)
+    total_gemini = sum(r.nb_appels_gemini for r in rows)
+    total_leads  = sum(r.nb_leads_generes for r in rows)
+
+    cost_per_lead = round(total_cost / total_leads, 4) if total_leads > 0 else None
+
+    recent = [
+        {
+            "job_id":  r.job_id,
+            "date":    r.started_at.strftime("%d/%m %H:%M") if r.started_at else "—",
+            "paire":   r.paire or "—",
+            "google":  r.nb_appels_google,
+            "gemini":  r.nb_appels_gemini,
+            "leads":   r.nb_leads_generes,
+            "cost":    round(r.cost_estimated, 4),
+        }
+        for r in rows[:20]
+    ]
+
+    return {
+        "total_cost":   total_cost,
+        "total_google": total_google,
+        "total_gemini": total_gemini,
+        "total_leads":  total_leads,
+        "cost_per_lead": cost_per_lead,
+        "recent_jobs":  recent,
+    }
+
+
 def _db_mkt_stats_period(date_from, date_to) -> dict:
     """Lit les stats marketing pour une période depuis marketing_module."""
     empty = {"sent":0,"opened":0,"clicked":0,"bounced":0,"replied":0,

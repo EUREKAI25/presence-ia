@@ -35,6 +35,11 @@ def fetch_company_info(name: str, city: str, api_key: str = None) -> Dict:
     }
 
     try:
+        try:
+            from .cost_tracker import tracker as _tracker
+            _tracker.increment_gemini()
+        except Exception:
+            pass
         r = requests.post(
             f"{_GEMINI_URL}?key={api_key}",
             json=payload,

@@ -114,6 +114,11 @@ def fetch_text_search(profession: str, city: str, api_key: str,
     query  = f"{profession} {city}"
     params = {"query": query, "key": api_key, "language": "fr"}
 
+    try:
+        from .cost_tracker import tracker as _tracker
+        _tracker.increment_google()
+    except Exception:
+        pass
     resp = requests.get(_TEXT_SEARCH_URL, params=params, timeout=10)
     resp.raise_for_status()
     data = resp.json()
@@ -136,6 +141,11 @@ def fetch_place_details(place_id: str, api_key: str) -> Dict:
         "key":      api_key,
         "language": "fr",
     }
+    try:
+        from .cost_tracker import tracker as _tracker
+        _tracker.increment_google()
+    except Exception:
+        pass
     resp = requests.get(_DETAILS_URL, params=params, timeout=10)
     resp.raise_for_status()
     data = resp.json()
