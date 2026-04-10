@@ -439,6 +439,86 @@ def _funnel_arrow():
     return '<div style="display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:18px;padding:0 2px">→</div>'
 
 
+def _build_slot_coverage(need: dict | None) -> str:
+    """Card pilotage pipeline — couverture créneaux Calendly + statut outbound."""
+    if not need:
+        return ""
+
+    statut     = need["statut"]
+    taux       = need["taux_couverture"]
+    proche     = need["proche"]
+    bootstrap  = need["bootstrap"]
+    source     = need.get("source_slots", "config")
+
+    statut_colors = {
+        "saturated": ("#fef2f2", "#ef4444", "Saturé"),
+        "running":   ("#f0fdf4", "#16a34a", "En cours"),
+        "idle":      ("#f9fafb", "#6b7280", "En attente"),
+    }
+    bg, col, label = statut_colors.get(statut, ("#f9fafb", "#6b7280", statut))
+
+    # Barre de progression couverture
+    pct_bar   = min(100, taux)
+    bar_col   = "#ef4444" if taux >= 85 else ("#16a34a" if taux >= 70 else "#f59e0b")
+
+    # Zones (proche / moyen / lointain)
+    def _zone(name, data):
+        t = data["total"]
+        r = data["reserves"]
+        d = data["disponibles"]
+        pct = round(r / t * 100) if t > 0 else 0
+        return (
+            f'<div style="text-align:center;padding:8px 12px;background:#f9fafb;border-radius:6px">'
+            f'<div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;margin-bottom:3px">{name}</div>'
+            f'<div style="font-size:16px;font-weight:800;color:#374151">{r}<span style="font-size:11px;color:#9ca3af">/{t}</span></div>'
+            f'<div style="font-size:11px;color:#6b7280">{d} dispo · {pct}%</div>'
+            f'</div>'
+        )
+
+    zones = (
+        _zone("J+2→J+4 ★", proche)
+        + _zone("J+5→J+7", need["moyen"])
+        + _zone("J+8→J+14", need["lointain"])
+    )
+
+    bootstrap_badge = (
+        f'<span style="background:#fef9c3;color:#854d0e;font-size:10px;font-weight:700;'
+        f'padding:2px 7px;border-radius:10px;margin-left:8px">BOOTSTRAP 2%</span>'
+        if bootstrap else ""
+    )
+    source_badge = (
+        f'<span style="font-size:10px;color:#9ca3af;margin-left:6px">({source})</span>'
+    )
+
+    return (
+        f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:12px">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+        f'<div style="display:flex;align-items:center;gap:8px">'
+        f'<span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em">Pilotage pipeline</span>'
+        f'{bootstrap_badge}{source_badge}'
+        f'</div>'
+        f'<span style="background:{bg};color:{col};font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid {col}20">{label}</span>'
+        f'</div>'
+        f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px">'
+        + _kpi("Couverture proche", f"{taux:.0f}%", "objectif 70–85%", color=bar_col)
+        + _kpi("Leads en file", f'{need["leads_en_file"]:,}', "scorés IA · non envoyés", color="#6366f1")
+        + _kpi("Leads nécessaires", f'{need["leads_necessaires"]:,}', f'slots dispo / {need["taux_conversion"]*100:.0f}%', color="#0ea5e9")
+        + _kpi("À générer", f'{need["leads_manquants"]:,}', "cap prochain run", color="#e94560" if need["leads_manquants"] > 0 else "#10b981")
+        + f'</div>'
+        f'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">{zones}</div>'
+        f'<div style="background:#f3f4f6;border-radius:6px;height:8px;overflow:hidden">'
+        f'<div style="background:{bar_col};height:100%;width:{pct_bar:.0f}%;transition:width .3s"></div>'
+        f'</div>'
+        f'<div style="display:flex;justify-content:space-between;margin-top:4px">'
+        f'<span style="font-size:10px;color:#9ca3af">0%</span>'
+        f'<span style="font-size:10px;color:#f59e0b;font-weight:600">70% min</span>'
+        f'<span style="font-size:10px;color:#ef4444;font-weight:600">85% stop</span>'
+        f'<span style="font-size:10px;color:#9ca3af">100%</span>'
+        f'</div>'
+        f'</div>'
+    )
+
+
 def _build_cost_section(costs: dict) -> str:
     """Accordéon coûts API — Google Places + Gemini."""
     cpl = f"${costs['cost_per_lead']:.4f}" if costs["cost_per_lead"] is not None else "—"
@@ -499,6 +579,13 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db),
     s  = db_dashboard_stats(db, dt_from, dt_to)
     sp = db_dashboard_stats(db, prev_from, prev_to)
     costs = db_cost_stats(db)
+
+    # Slot coverage (Calendly)
+    try:
+        from ...scheduler import compute_outbound_need
+        slot_need = compute_outbound_need()
+    except Exception:
+        slot_need = None
 
     nav = admin_nav(token, "")
     alerts_html, modals_html = _build_alerts(db, token)
@@ -704,6 +791,9 @@ function uploadCityHeaderFile(city, token, input) {{
 
   <!-- Taux clés -->
   <div style="margin-bottom:12px">{taux_html}</div>
+
+  <!-- Pilotage pipeline (slots Calendly) -->
+  {_build_slot_coverage(slot_need)}
 
   <!-- Pipeline / crons (accordéon natif <details>) -->
   <details style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden">

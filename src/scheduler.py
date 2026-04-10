@@ -1466,6 +1466,174 @@ def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
     return any(kw in combined for kw in keywords)
 
 
+def _get_calendly_available_slots(token: str, org: str, start, end) -> list:
+    """
+    Interroge Calendly pour les créneaux disponibles sur la période [start, end].
+    Retourne une liste de dicts {start, end} ou [] si API non disponible.
+    """
+    import requests as _req
+    headers = {"Authorization": f"Bearer {token}"}
+    start_str = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_str   = end.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Récupérer les event types actifs
+    r = _req.get("https://api.calendly.com/event_types",
+                 params={"organization": org, "active": "true", "count": 10},
+                 headers=headers, timeout=10)
+    if r.status_code != 200:
+        return []
+
+    available = []
+    for et in r.json().get("collection", []):
+        et_uri = et.get("uri", "")
+        if not et_uri:
+            continue
+        r2 = _req.get("https://api.calendly.com/event_type_available_times",
+                      params={"event_type": et_uri,
+                              "start_time": start_str, "end_time": end_str},
+                      headers=headers, timeout=10)
+        if r2.status_code == 200:
+            for t in r2.json().get("collection", []):
+                if t.get("status") == "available":
+                    available.append({"start": t["start_time"], "end": t["end_time"]})
+    return available
+
+
+def compute_outbound_need() -> dict:
+    """
+    Calcule le besoin en leads en fonction des créneaux Calendly.
+
+    Retourne :
+      proche         : {total, reserves, disponibles}
+      taux_couverture: float (%)
+      leads_en_file  : int
+      leads_necessaires: int
+      cap_recommande : int (envois max pour ce run)
+      statut         : "idle" | "running" | "saturated"
+      bootstrap      : bool
+    """
+    import os
+    from datetime import datetime, timezone, timedelta
+    from .database import SessionLocal
+    from .models import V3ProspectDB
+
+    now = datetime.now(timezone.utc)
+
+    # ── Fenêtres ──────────────────────────────────────────────────────────────
+    def _range(d_start, d_end):
+        return (now + timedelta(days=d_start),
+                now + timedelta(days=d_end, hours=23, minutes=59, seconds=59))
+
+    proche_start,   proche_end   = _range(2, 4)
+    moyen_start,    moyen_end    = _range(5, 7)
+    lointain_start, lointain_end = _range(8, 14)
+
+    token = os.getenv("CALENDLY_TOKEN", "")
+    org   = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
+    slots_per_day = int(os.getenv("CLOSER_SLOTS_PER_DAY", "2"))
+
+    # ── Créneaux disponibles (Calendly API) ───────────────────────────────────
+    def _count_in_range(slots, start, end):
+        n = 0
+        for s in slots:
+            try:
+                t = datetime.fromisoformat(s["start"].replace("Z", "+00:00"))
+                if start <= t <= end:
+                    n += 1
+            except Exception:
+                pass
+        return n
+
+    all_available = []
+    if token:
+        try:
+            all_available = _get_calendly_available_slots(
+                token, org, proche_start, lointain_end)
+        except Exception as e:
+            log.warning("compute_outbound_need: Calendly API indisponible — %s", e)
+
+    if all_available:
+        proche_dispo_cal   = _count_in_range(all_available, proche_start, proche_end)
+        moyen_dispo_cal    = _count_in_range(all_available, moyen_start, moyen_end)
+        lointain_dispo_cal = _count_in_range(all_available, lointain_start, lointain_end)
+    else:
+        # Fallback : capacité configurée (jours × slots/jour)
+        proche_dispo_cal   = 3 * slots_per_day
+        moyen_dispo_cal    = 3 * slots_per_day
+        lointain_dispo_cal = 7 * slots_per_day
+
+    # ── Créneaux réservés (meetings DB) ───────────────────────────────────────
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB, MeetingStatus
+
+        with MktSession() as mdb:
+            def _booked(start, end):
+                return mdb.query(MeetingDB).filter(
+                    MeetingDB.project_id == "presence-ia",
+                    MeetingDB.status == MeetingStatus.scheduled,
+                    MeetingDB.scheduled_at >= start,
+                    MeetingDB.scheduled_at <= end,
+                ).count()
+
+            proche_reserves   = _booked(proche_start, proche_end)
+            moyen_reserves    = _booked(moyen_start, moyen_end)
+            lointain_reserves = _booked(lointain_start, lointain_end)
+    except Exception as e:
+        log.warning("compute_outbound_need: marketing_module indisponible — %s", e)
+        proche_reserves = moyen_reserves = lointain_reserves = 0
+
+    # ── Totaux slots proches (dispo + réservés = total proposé aux prospects) ─
+    proche_total      = proche_dispo_cal + proche_reserves
+    proche_disponibles = max(0, proche_dispo_cal)
+
+    taux = (proche_reserves / proche_total) if proche_total > 0 else 0.0
+
+    # ── Leads en file + mode bootstrap ────────────────────────────────────────
+    with SessionLocal() as db:
+        leads_en_file = db.query(V3ProspectDB).filter(
+            V3ProspectDB.ia_results.isnot(None),
+            V3ProspectDB.sent_at.is_(None),
+            V3ProspectDB.email.isnot(None),
+        ).count()
+        sent_total = db.query(V3ProspectDB).filter(
+            V3ProspectDB.sent_at.isnot(None)
+        ).count()
+
+    bootstrap        = sent_total < 30
+    taux_conversion  = 0.02   # 2% fixe (mode bootstrap)
+    leads_necessaires = int(proche_disponibles / taux_conversion) if proche_disponibles > 0 else 0
+    leads_manquants   = max(0, leads_necessaires - leads_en_file)
+
+    # ── Statut ────────────────────────────────────────────────────────────────
+    if taux >= 0.85:
+        statut = "saturated"
+    elif taux < 0.70 and leads_en_file < leads_necessaires:
+        statut = "running"
+    else:
+        statut = "idle"
+
+    return {
+        "proche":           {"total": proche_total, "reserves": proche_reserves,
+                             "disponibles": proche_disponibles},
+        "moyen":            {"total": moyen_dispo_cal + moyen_reserves,
+                             "reserves": moyen_reserves,
+                             "disponibles": max(0, moyen_dispo_cal)},
+        "lointain":         {"total": lointain_dispo_cal + lointain_reserves,
+                             "reserves": lointain_reserves,
+                             "disponibles": max(0, lointain_dispo_cal)},
+        "taux_couverture":  round(taux * 100, 1),
+        "leads_en_file":    leads_en_file,
+        "leads_necessaires": leads_necessaires,
+        "leads_manquants":  leads_manquants,
+        "cap_recommande":   leads_manquants,
+        "statut":           statut,
+        "bootstrap":        bootstrap,
+        "taux_conversion":  taux_conversion,
+        "source_slots":     "calendly" if all_available else "config",
+    }
+
+
 def _job_outbound(force: bool = False):
     """
     Outbound v3_prospects — tous les jours à 9h UTC.
@@ -1473,8 +1641,9 @@ def _job_outbound(force: bool = False):
     Score : skip si l'entreprise est déjà citée par l'IA, envoyer sinon.
 
     Variables d'env :
-      OUTBOUND_CAP     — nombre max d'envois par run (défaut : 10)
-      OUTBOUND_DRY_RUN — si "true" : aucun envoi, aucune écriture DB, logs only
+      OUTBOUND_CAP          — nombre max d'envois par run (défaut : 10)
+      OUTBOUND_DRY_RUN      — si "true" : aucun envoi, aucune écriture DB, logs only
+      CLOSER_SLOTS_PER_DAY  — capacité fallback si Calendly API indisponible (défaut : 2)
     """
     import os, random, requests as _req
     from datetime import datetime
@@ -1492,6 +1661,32 @@ def _job_outbound(force: bool = False):
         return
 
     mode_label = "DRY_RUN" if dry_run else "LIVE"
+
+    # ── Pilotage par slots Calendly ───────────────────────────────────────────
+    if not force:
+        try:
+            need = compute_outbound_need()
+            statut = need["statut"]
+            log.info(
+                "[OUTBOUND] slots proches %d/%d (%.0f%%) · leads_file=%d · besoin=%d · statut=%s",
+                need["proche"]["reserves"], need["proche"]["total"],
+                need["taux_couverture"],
+                need["leads_en_file"], need["leads_necessaires"], statut,
+            )
+            if statut == "saturated":
+                log.info("[OUTBOUND] Saturé (%.0f%% > 85%%) — skip", need["taux_couverture"])
+                return
+            if statut == "idle":
+                log.info("[OUTBOUND] Idle — leads en file suffisants (%d >= %d) — skip",
+                         need["leads_en_file"], need["leads_necessaires"])
+                return
+            # Ajuster le cap au besoin réel
+            if need["cap_recommande"] > 0:
+                cap = min(cap, need["cap_recommande"])
+                log.info("[OUTBOUND] Cap ajusté à %d (besoin réel)", cap)
+        except Exception as e:
+            log.warning("[OUTBOUND] Calcul slot coverage échoué — mode normal: %s", e)
+
     log.info("[OUTBOUND] démarrage — mode=%s cap=%d", mode_label, cap)
 
     # ── Sélection : ia_results + email non null + non encore envoyés ──────────
