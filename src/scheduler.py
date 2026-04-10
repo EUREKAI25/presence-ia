@@ -1526,12 +1526,10 @@ def _job_outbound(force: bool = False):
             continue
 
         # Préparer l'envoi
-        idx    = (sent + would_send) % len(_WARMING_SENDERS)
-        sender = _WARMING_SENDERS[idx]
+        sender      = os.getenv("OUTBOUND_SENDER_EMAIL", "bonjour@presence-ia.com")
+        sender_name = os.getenv("OUTBOUND_SENDER_NAME", "Sarah — Présence IA")
         city_display      = (prospect.city or "").title()
         profession_display = (prospect.profession or "professionnel").lower()
-
-        sender_name = sender.split("@")[0].replace("-", " ").capitalize()
 
         subject = random.choice(_OUTBOUND_SUBJECTS).format(
             profession=profession_display, ville=city_display,
@@ -1562,7 +1560,7 @@ def _job_outbound(force: bool = False):
                     "https://api.brevo.com/v3/smtp/email",
                     headers={"api-key": brevo_key, "Content-Type": "application/json"},
                     json={
-                        "sender":      {"name": "Présence IA", "email": sender},
+                        "sender":      {"name": sender_name, "email": sender},
                         "to":          [{"email": prospect.email, "name": prospect.name}],
                         "subject":     subject,
                         "textContent": body,
