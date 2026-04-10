@@ -453,6 +453,7 @@ def _build_slot_coverage(need: dict | None) -> str:
     statut_colors = {
         "saturated": ("#fef2f2", "#ef4444", "Saturé"),
         "running":   ("#f0fdf4", "#16a34a", "En cours"),
+        "top_up":    ("#fffbeb", "#d97706", "Appoint léger"),
         "idle":      ("#f9fafb", "#6b7280", "En attente"),
     }
     bg, col, label = statut_colors.get(statut, ("#f9fafb", "#6b7280", statut))

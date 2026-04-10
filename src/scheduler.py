@@ -1605,32 +1605,44 @@ def compute_outbound_need() -> dict:
     leads_necessaires = int(proche_disponibles / taux_conversion) if proche_disponibles > 0 else 0
     leads_manquants   = max(0, leads_necessaires - leads_en_file)
 
-    # ── Statut ────────────────────────────────────────────────────────────────
+    # ── Statut (4 niveaux) ────────────────────────────────────────────────────
+    # STOP     : couverture > 85%
+    # RUN      : couverture < 70% → génération agressive
+    # TOP_UP   : couverture 70–85% ET file insuffisante → appoint léger (50% du manque)
+    # IDLE     : couverture 70–85% ET file suffisante
     if taux >= 0.85:
-        statut = "saturated"
-    elif taux < 0.70 and leads_en_file < leads_necessaires:
-        statut = "running"
+        statut        = "saturated"
+        cap_recommande = 0
+    elif taux < 0.70:
+        statut        = "running"
+        cap_recommande = leads_manquants
     else:
-        statut = "idle"
+        # Zone intermédiaire 70–85%
+        if leads_en_file >= leads_necessaires:
+            statut        = "idle"
+            cap_recommande = 0
+        else:
+            statut        = "top_up"
+            cap_recommande = max(1, leads_manquants // 2)
 
     return {
-        "proche":           {"total": proche_total, "reserves": proche_reserves,
-                             "disponibles": proche_disponibles},
-        "moyen":            {"total": moyen_dispo_cal + moyen_reserves,
-                             "reserves": moyen_reserves,
-                             "disponibles": max(0, moyen_dispo_cal)},
-        "lointain":         {"total": lointain_dispo_cal + lointain_reserves,
-                             "reserves": lointain_reserves,
-                             "disponibles": max(0, lointain_dispo_cal)},
-        "taux_couverture":  round(taux * 100, 1),
-        "leads_en_file":    leads_en_file,
+        "proche":            {"total": proche_total, "reserves": proche_reserves,
+                              "disponibles": proche_disponibles},
+        "moyen":             {"total": moyen_dispo_cal + moyen_reserves,
+                              "reserves": moyen_reserves,
+                              "disponibles": max(0, moyen_dispo_cal)},
+        "lointain":          {"total": lointain_dispo_cal + lointain_reserves,
+                              "reserves": lointain_reserves,
+                              "disponibles": max(0, lointain_dispo_cal)},
+        "taux_couverture":   round(taux * 100, 1),
+        "leads_en_file":     leads_en_file,
         "leads_necessaires": leads_necessaires,
-        "leads_manquants":  leads_manquants,
-        "cap_recommande":   leads_manquants,
-        "statut":           statut,
-        "bootstrap":        bootstrap,
-        "taux_conversion":  taux_conversion,
-        "source_slots":     "calendly" if all_available else "config",
+        "leads_manquants":   leads_manquants,
+        "cap_recommande":    cap_recommande,
+        "statut":            statut,
+        "bootstrap":         bootstrap,
+        "taux_conversion":   taux_conversion,
+        "source_slots":      "calendly" if all_available else "config",
     }
 
 
@@ -1680,10 +1692,11 @@ def _job_outbound(force: bool = False):
                 log.info("[OUTBOUND] Idle — leads en file suffisants (%d >= %d) — skip",
                          need["leads_en_file"], need["leads_necessaires"])
                 return
-            # Ajuster le cap au besoin réel
+            # Ajuster le cap au besoin réel (running = cap plein, top_up = 50% du manque)
             if need["cap_recommande"] > 0:
                 cap = min(cap, need["cap_recommande"])
-                log.info("[OUTBOUND] Cap ajusté à %d (besoin réel)", cap)
+                mode_cap = "top_up" if statut == "top_up" else "run"
+                log.info("[OUTBOUND] Cap ajusté à %d (%s)", cap, mode_cap)
         except Exception as e:
             log.warning("[OUTBOUND] Calcul slot coverage échoué — mode normal: %s", e)
 
