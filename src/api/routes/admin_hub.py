@@ -131,7 +131,10 @@ def _mkt_stats() -> dict:
 
 
 def _pct(a, b):
-    return f"{a/b*100:.0f}%" if b else "—"
+    if not b: return "—"
+    v = a / b * 100
+    if v < 1 and v > 0: return f"<1%"
+    return f"{v:.0f}%"
 
 
 # ── Coûts helpers ────────────────────────────────────────────────────────────
@@ -180,23 +183,24 @@ def leads_hub(request: Request, db: Session = Depends(get_db)):
 
     kpis = (
         f'<div class="grid-4">'
-        + _kpi("SIRENE scannés", f"{sirene_total:,}", "entreprises en base", "#6366f1")
+        + _kpi("SIRENE scannés",    f"{sirene_total:,}",    "entreprises en base",               "#6366f1")
         + _kpi("Recherchés Gemini", f"{sirene_recherches:,}", _pct(sirene_recherches, sirene_total) + " du total", "#8b5cf6")
-        + _kpi("Avec contact", f"{sirene_contacts:,}", _pct(sirene_contacts, sirene_recherches) + " des recherchés", "#10b981")
-        + _kpi("En pipeline V3", f"{total:,}", _pct(total, sirene_contacts or 1) + " des contactables", "#e94560")
+        + _kpi("Contactables",      f"{sirene_contacts:,}", _pct(sirene_contacts, sirene_recherches) + " des recherchés", "#10b981")
+        + _kpi("En pipeline V3",    f"{total:,}",           f"{sirene_pipeline:,} depuis SIRENE · {total-sirene_pipeline:,} autres", "#e94560")
         + f'</div>'
     )
 
     funnel_rows = (
-        _stat_row("Entreprises SIRENE",     f"{sirene_total:,}")
-        + _stat_row("Recherchées (Gemini)", f"{sirene_recherches:,}", _pct(sirene_recherches, sirene_total))
-        + _stat_row("Avec contact trouvé",  f"{sirene_contacts:,}",   _pct(sirene_contacts, sirene_recherches))
-        + _stat_row("En pipeline contacts", f"{total:,}",             _pct(total, sirene_contacts or 1))
-        + _stat_row("Avec email",           f"{enrichis:,}",          _pct(enrichis, total))
-        + _stat_row("IA testés",            f"{ia_tested:,}",         _pct(ia_tested, total))
-        + _stat_row("Contactés",            f"{contactes:,}",         _pct(contactes, enrichis))
-        + _stat_row("RDV pris",             f"{rdv:,}",               _pct(rdv, contactes))
-        + _stat_row("Deals signés",         f"{deals:,}",             _pct(deals, rdv), "#e94560")
+        _stat_row("Entreprises SIRENE",      f"{sirene_total:,}")
+        + _stat_row("Recherchées (Gemini)",  f"{sirene_recherches:,}", _pct(sirene_recherches, sirene_total))
+        + _stat_row("Avec contact trouvé",   f"{sirene_contacts:,}",   _pct(sirene_contacts, sirene_recherches))
+        + _stat_row("Provisionnés → V3",     f"{sirene_pipeline:,}",   _pct(sirene_pipeline, sirene_contacts or 1))
+        + _stat_row("Total V3 (toutes sources)", f"{total:,}",         "")
+        + _stat_row("Avec email",            f"{enrichis:,}",          _pct(enrichis, total))
+        + _stat_row("IA testés",             f"{ia_tested:,}",         _pct(ia_tested, total))
+        + _stat_row("Contactés",             f"{contactes:,}",         _pct(contactes, enrichis))
+        + _stat_row("RDV pris",              f"{rdv:,}",               _pct(rdv, contactes))
+        + _stat_row("Deals signés",          f"{deals:,}",             _pct(deals, rdv), "#e94560")
     )
 
     links = (
