@@ -2040,20 +2040,21 @@ def _calc_closer_credits(closer_id: str, mdb) -> int:
 
 @router.get("/closer/{token}/slots", response_class=HTMLResponse)
 def closer_slots(token: str, request: Request):
-    """Page de sélection des créneaux avec couche de filtrage crédits."""
+    """Planning interactif — calendrier jour/semaine/mois avec couche crédits."""
     closer = _get_closer_by_token(token)
     if not closer:
         return HTMLResponse("<p style='font-family:sans-serif;padding:40px;color:#666'>Lien invalide.</p>",
                             status_code=404)
 
     import datetime as _dt
-    now  = _dt.datetime.utcnow()
-    week = now + _dt.timedelta(days=14)
+    import json as _json
+    now = _dt.datetime.utcnow()
+    end = now + _dt.timedelta(days=30)
 
-    slot_data = []
-    lb        = []
-    my_rank   = "—"
-    credits   = 0
+    slot_data   = []
+    my_meetings = []
+    lb          = []
+    my_rank     = "—"
 
     try:
         from marketing_module.database import (SessionLocal as MktSession,
@@ -2063,272 +2064,603 @@ def closer_slots(token: str, request: Request):
         from ...models import V3ProspectDB
 
         with MktSession() as mdb:
-            credits = _calc_closer_credits(str(closer.id), mdb)
-            raw_slots = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=week)
-            lb        = db_monthly_leaderboard(mdb, PROJECT_ID)
-
-            # Crédits de tous les closers actifs (pour fallback)
+            credits     = _calc_closer_credits(str(closer.id), mdb)
+            raw_slots   = db_list_slots(mdb, PROJECT_ID, from_dt=now, to_dt=end)
+            lb          = db_monthly_leaderboard(mdb, PROJECT_ID)
             all_closers = mdb.query(CloserDB).filter_by(
                 project_id=PROJECT_ID, is_active=True
             ).all()
-            all_credits = {
-                str(c.id): _calc_closer_credits(str(c.id), mdb) for c in all_closers
-            }
+            all_credits = {str(c.id): _calc_closer_credits(str(c.id), mdb) for c in all_closers}
 
-            for s in raw_slots:
-                prospect_info = ""
-                if s.meeting_id:
-                    mtg = mdb.query(MeetingDB).filter_by(id=s.meeting_id).first()
-                    if mtg and mtg.prospect_id:
-                        with SessionLocal() as db:
-                            p = db.query(V3ProspectDB).filter_by(
-                                token=mtg.prospect_id
-                            ).first()
-                        if p:
-                            parts = [x for x in [p.name, p.city, p.profession] if x]
-                            prospect_info = " · ".join(parts)
+            with SessionLocal() as db:
+                # ── Slots ────────────────────────────────────────────────────
+                for s in raw_slots:
+                    p_name = p_city = p_profession = p_phone = ""
+                    p_rating = p_reviews = None
+                    p_competitors = []
+                    score = None
+                    meeting_id = None
 
-                delta_h   = (s.starts_at - now).total_seconds() / 3600
-                is_urgent = delta_h < 48
-                cv        = _credit_value(s.starts_at, now)
+                    if s.meeting_id:
+                        mtg = mdb.query(MeetingDB).filter_by(id=s.meeting_id).first()
+                        if mtg:
+                            meeting_id = str(mtg.id)
+                            if mtg.prospect_id:
+                                p = db.query(V3ProspectDB).filter_by(
+                                    token=mtg.prospect_id
+                                ).first()
+                                if p:
+                                    p_name       = p.name or ""
+                                    p_city       = p.city or ""
+                                    p_profession = p.profession or ""
+                                    p_phone      = p.phone or ""
+                                    p_rating     = p.rating
+                                    p_reviews    = p.reviews_count
+                                    if p.competitors:
+                                        try:
+                                            p_competitors = _json.loads(p.competitors)
+                                        except Exception:
+                                            pass
+                                    if p_rating:
+                                        score = round(p_rating * 20)
 
-                is_mine         = (s.status == SlotStatus.claimed
-                                   and str(s.closer_id) == str(closer.id))
-                is_taken_other  = (s.status in (SlotStatus.claimed, SlotStatus.blocked)
-                                   and str(s.closer_id) != str(closer.id))
-                is_booked       = (s.status == SlotStatus.booked)
+                    delta_h   = (s.starts_at - now).total_seconds() / 3600
+                    is_urgent = delta_h < 48
+                    cv        = _credit_value(s.starts_at, now)
 
-                # Règle crédits : urgents → toujours prenables (exception spec)
-                # Futurs : solde + coût doit rester ≥ 0
-                if is_urgent:
-                    credit_ok = True
-                else:
-                    credit_ok = (credits + cv) >= 0
+                    is_mine        = (s.status == SlotStatus.claimed
+                                      and str(s.closer_id) == str(closer.id))
+                    is_taken_other = (s.status in (SlotStatus.claimed, SlotStatus.blocked)
+                                      and str(s.closer_id) != str(closer.id))
+                    is_booked      = (s.status == SlotStatus.booked)
 
-                # Fallback : urgent bloqué par crédits pour TOUS les closers éligibles
-                # (ici inutile car urgents toujours OK, mais appliqué par spec)
-                if is_booked and is_urgent and not credit_ok:
-                    eligible = [
-                        c for c in all_closers
-                        if (all_credits.get(str(c.id), 0) + cv) < 0
-                    ]
-                    if len(eligible) == len(all_closers):
-                        credit_ok = True  # fallback : lever contrainte crédits
+                    credit_ok = True if is_urgent else (credits + cv) >= 0
+                    if is_booked and is_urgent and not credit_ok:
+                        eligible = [c for c in all_closers
+                                    if (all_credits.get(str(c.id), 0) + cv) < 0]
+                        if len(eligible) == len(all_closers):
+                            credit_ok = True
 
-                can_claim    = is_booked and credit_ok
-                credit_block = is_booked and not credit_ok
+                    can_claim    = is_booked and credit_ok
+                    credit_block = is_booked and not credit_ok
 
-                slot_data.append({
-                    "id":           s.id,
-                    "starts_at":    s.starts_at,
-                    "ends_at":      s.ends_at,
-                    "status":       s.status,
-                    "closer_id":    s.closer_id,
-                    "prospect_info": prospect_info,
-                    "is_urgent":    is_urgent,
-                    "is_mine":      is_mine,
-                    "is_taken_other": is_taken_other,
-                    "can_claim":    can_claim,
-                    "credit_block": credit_block,
-                })
+                    explainers = []
+                    if p_competitors:
+                        explainers.append(f"{len(p_competitors)} concurrent(s) visible(s) en IA")
+                    if p_rating and p_rating >= 4.0:
+                        explainers.append(f"Réputation Google {p_rating}/5 · {p_reviews or '?'} avis")
+                    elif p_reviews and int(p_reviews) > 20:
+                        explainers.append(f"Activité établie ({p_reviews} avis Google)")
+                    if p_phone:
+                        explainers.append("Coordonnées directes disponibles")
+
+                    slot_data.append({
+                        "id":             str(s.id),
+                        "starts":         s.starts_at.isoformat(),
+                        "ends":           s.ends_at.isoformat() if s.ends_at else None,
+                        "is_urgent":      is_urgent,
+                        "is_mine":        is_mine,
+                        "is_taken_other": is_taken_other,
+                        "can_claim":      can_claim,
+                        "credit_block":   credit_block,
+                        "meeting_id":     meeting_id,
+                        "prospect": {
+                            "name":       p_name,
+                            "city":       p_city,
+                            "profession": p_profession,
+                            "phone":      p_phone,
+                            "score":      score,
+                            "explainers": explainers[:3],
+                        },
+                    })
+
+                # ── Mes RDV ──────────────────────────────────────────────────
+                my_mtgs = mdb.query(MeetingDB).filter_by(
+                    project_id=PROJECT_ID, closer_id=closer.id
+                ).order_by(MeetingDB.scheduled_at.desc()).limit(50).all()
+                for m in my_mtgs:
+                    pp = None
+                    if m.prospect_id:
+                        pp = db.query(V3ProspectDB).filter_by(token=m.prospect_id).first()
+                    my_meetings.append({
+                        "id":             str(m.id),
+                        "scheduled":      m.scheduled_at.isoformat() if m.scheduled_at else None,
+                        "scheduled_str":  m.scheduled_at.strftime("%d/%m %H:%M") if m.scheduled_at else "—",
+                        "status":         str(m.status),
+                        "is_future":      bool(m.scheduled_at and m.scheduled_at > now),
+                        "deal_value":     m.deal_value,
+                        "prospect_name":  pp.name  if pp else "—",
+                        "prospect_city":  pp.city  if pp else "—",
+                        "prospect_phone": pp.phone if pp else "",
+                    })
 
     except Exception:
-        slot_data = []
+        pass
 
     for r in lb:
         if str(r["closer_id"]) == str(closer.id):
             my_rank = str(r["rank"])
             break
 
-    # Tri : urgents d'abord, puis futurs, chronologique dans chaque groupe
-    urgents = sorted([s for s in slot_data if s["is_urgent"]],
-                     key=lambda x: x["starts_at"])
-    futurs  = sorted([s for s in slot_data if not s["is_urgent"]],
-                     key=lambda x: x["starts_at"])
-
-    # Mode
-    urgent_free  = [s for s in urgents if s["can_claim"]]
+    urgent_free  = [s for s in slot_data if s["is_urgent"] and s["can_claim"]]
     mode_libre   = len(urgent_free) == 0
+    banner_msg   = ("Aucun rendez-vous urgent — choisissez librement."
+                    if mode_libre else
+                    "Créneaux urgents à assurer en priorité pour débloquer les créneaux éloignés.")
+    banner_color = "#2ecc71" if mode_libre else "#f59e0b"
+    banner_bg    = "#2ecc7110" if mode_libre else "#f59e0b10"
+    banner_bdr   = "#2ecc7130" if mode_libre else "#f59e0b30"
 
-    if mode_libre:
-        banner_msg    = "Aucun rendez-vous urgent pour le moment — choisissez librement."
-        banner_color  = "#2ecc71"
-        banner_bg     = "#2ecc7110"
-        banner_border = "#2ecc7130"
-    else:
-        banner_msg    = ("Choisissez vos créneaux parmi vos options. "
-                         "Assurez en priorité les créneaux urgents pour débloquer les créneaux éloignés.")
-        banner_color  = "#f59e0b"
-        banner_bg     = "#f59e0b10"
-        banner_border = "#f59e0b30"
+    name          = closer.name
+    slots_json    = _json.dumps(slot_data,   ensure_ascii=False)
+    meetings_json = _json.dumps(my_meetings, ensure_ascii=False)
 
-    def _slot_card(s):
-        if s["is_mine"]:
-            color, label, show_btn = "#6366f1", "Réservé", False
-        elif s["is_taken_other"] or s["status"] in (SlotStatus.blocked, SlotStatus.completed, SlotStatus.cancelled):
-            color, label, show_btn = "#374151", "Pris", False
-        elif s["credit_block"]:
-            color, label, show_btn = "#374151", "Non accessible", False
-        elif s["can_claim"]:
-            color  = "#e94560" if s["is_urgent"] else "#8b5cf6"
-            label  = "À prendre"
-            show_btn = True
-        else:
-            color, label, show_btn = "#555", "—", False
-
-        dim = "opacity:.4;" if (s["credit_block"] or s["is_taken_other"]
-                                or s["status"] in (SlotStatus.blocked,
-                                                   SlotStatus.completed,
-                                                   SlotStatus.cancelled)) else ""
-
-        dt_fmt = s["starts_at"].strftime("%d/%m %H:%M")
-        end_fmt = s["ends_at"].strftime("%H:%M")
-
-        urgent_badge = (
-            '<span style="background:#e9456020;color:#e94560;font-size:9px;font-weight:700;'
-            'padding:1px 6px;border-radius:8px;margin-left:8px">URGENT</span>'
-        ) if s["is_urgent"] and not s["is_mine"] and not s["is_taken_other"] else ""
-
-        prospect_div = (
-            f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{s["prospect_info"]}</div>'
-        ) if s["prospect_info"] else ""
-
-        btn_html = (
-            f'<button onclick="claimSlot(\'{s["id"]}\')" '
-            f'style="margin-top:8px;padding:6px 16px;background:{color};border:none;'
-            f'border-radius:4px;color:#fff;font-size:11px;font-weight:700;cursor:pointer">'
-            f'Prendre</button>'
-        ) if show_btn else ""
-
-        return (
-            f'<div id="slot-{s["id"]}" style="background:#1a1a2e;border:1px solid {color}30;'
-            f'border-radius:8px;padding:12px 16px;margin-bottom:8px;{dim}">'
-            f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-            f'  <div>'
-            f'    <span style="color:#fff;font-weight:600;font-size:13px">{dt_fmt} – {end_fmt}</span>'
-            f'    {urgent_badge}'
-            f'    {prospect_div}'
-            f'    {btn_html}'
-            f'  </div>'
-            f'  <span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
-            f'  padding:2px 7px;border-radius:10px;flex-shrink:0;white-space:nowrap">{label}</span>'
-            f'</div></div>'
-        )
-
-    urgents_html = ""
-    if urgents:
-        urgents_html = (
-            f'<p style="color:#e94560;font-size:10px;font-weight:700;text-transform:uppercase;'
-            f'letter-spacing:.08em;margin-bottom:10px">RDV urgents — priorité</p>'
-            + "".join(_slot_card(s) for s in urgents)
-        )
-
-    futurs_html = ""
-    if futurs:
-        futurs_html = (
-            f'<p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;'
-            f'letter-spacing:.08em;margin:{"24px" if urgents else "0"} 0 10px">Créneaux futurs</p>'
-            + "".join(_slot_card(s) for s in futurs)
-        )
-
-    slots_section = urgents_html + futurs_html
-    if not slots_section:
-        slots_section = ('<p style="color:#555;font-size:13px;padding:20px 0">'
-                         'Aucun créneau disponible pour les 14 prochains jours.</p>')
-
-    # Leaderboard sidebar
-    lb_rows = ""
-    for r in lb:
-        is_me = str(r["closer_id"]) == str(closer.id)
-        rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else f'#{r["rank"]}')
-        lb_rows += (
-            f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
-            f'border-bottom:1px solid #1a1a2e">'
-            f'<td style="padding:8px 12px;font-size:12px;color:#9ca3af">{rank_icon}</td>'
-            f'<td style="padding:8px 12px;font-size:12px;color:#fff;'
-            f'font-weight:{"700" if is_me else "400"}">'
-            f'{r["name"]}{" (moi)" if is_me else ""}</td>'
-            f'<td style="padding:8px 12px;font-size:12px;color:#2ecc71;text-align:right">'
-            f'{r["signed"]}</td></tr>'
-        )
-    if not lb_rows:
-        lb_rows = ('<tr><td colspan="3" style="padding:16px;text-align:center;color:#555">'
-                   'Aucune donnée</td></tr>')
-
-    name = closer.name
-
-    return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Créneaux — {name}</title>
+    # Placeholders évitent l'échappement CSS/JS dans une f-string
+    _html = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planning — __NAME__</title>
 <style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
-table{{width:100%;border-collapse:collapse}}
-#toast{{position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#0f0f1a;
-  padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
-  opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}}
-</style></head><body>
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
-            display:flex;align-items:center;justify-content:space-between">
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}
+.cal-slot:hover{filter:brightness(1.2);z-index:2}
+#popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px}
+#popup-overlay.open{display:flex}
+#popup-box{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;
+  padding:24px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:#2ecc71;color:#0f0f1a;padding:10px 22px;border-radius:6px;
+  font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200}
+.vbtn{padding:6px 14px;border:1px solid #2a2a4e;border-radius:6px;
+  font-size:11px;font-weight:600;cursor:pointer;background:#1a1a2e;color:#9ca3af;transition:all .15s}
+.vbtn.active{background:#6366f1;color:#fff;border-color:#6366f1}
+.fchip{padding:5px 12px;border:1px solid #2a2a4e;border-radius:20px;
+  font-size:11px;font-weight:600;cursor:pointer;background:#1a1a2e;color:#555;transition:all .15s}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:12px 20px;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50">
   <div style="display:flex;align-items:center;gap:10px">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
-    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+    <img src="/assets/logo.svg" alt="" style="height:22px">
+    <span style="color:#9ca3af;font-size:11px">Planning</span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span style="color:#fff;font-size:13px;font-weight:600">{name}</span>
-    <a href="/closer/{token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
+  <div style="display:flex;align-items:center;gap:14px">
+    <span style="color:#fff;font-size:13px;font-weight:600">__NAME__</span>
+    <a href="/closer/__TOKEN__" style="color:#527FB3;font-size:12px;text-decoration:none">← Portail</a>
   </div>
 </div>
 
-<div style="max-width:940px;margin:0 auto;padding:28px 20px">
+<!-- Banner -->
+<div style="background:__BANNER_BG__;border-bottom:1px solid __BANNER_BDR__;
+  padding:8px 20px;color:__BANNER_COLOR__;font-size:11px;line-height:1.6">__BANNER_MSG__</div>
 
-<!-- Bannière mode -->
-<div style="background:{banner_bg};border:1px solid {banner_border};border-radius:6px;
-  padding:10px 16px;margin-bottom:24px;color:{banner_color};font-size:12px;line-height:1.6">
-  {banner_msg}
+<div style="max-width:1100px;margin:0 auto">
+
+<!-- Controls -->
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:14px 20px;border-bottom:1px solid #1a1a2e">
+
+  <div style="display:flex;gap:4px">
+    <button class="vbtn" id="vbtn-day"   onclick="setView('day')">Jour</button>
+    <button class="vbtn" id="vbtn-week"  onclick="setView('week')">Semaine</button>
+    <button class="vbtn" id="vbtn-month" onclick="setView('mois')">Mois</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:6px">
+    <button onclick="navigate(-1)" style="padding:5px 11px;background:#1a1a2e;
+      border:1px solid #2a2a4e;border-radius:4px;color:#9ca3af;cursor:pointer;font-size:14px">‹</button>
+    <span id="cal-label" style="font-size:12px;color:#fff;font-weight:600;
+      min-width:130px;text-align:center"></span>
+    <button onclick="navigate(1)" style="padding:5px 11px;background:#1a1a2e;
+      border:1px solid #2a2a4e;border-radius:4px;color:#9ca3af;cursor:pointer;font-size:14px">›</button>
+    <button onclick="goToday()" style="padding:5px 10px;background:#1a1a2e;
+      border:1px solid #2a2a4e;border-radius:4px;color:#527FB3;cursor:pointer;
+      font-size:10px;font-weight:600">Auj.</button>
+  </div>
+
+  <div style="flex:1;min-width:8px"></div>
+
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <button class="fchip" id="f-urgent"     onclick="toggleF('urgent')"    >⚡ Urgents</button>
+    <button class="fchip" id="f-accessible" onclick="toggleF('accessible')">● Accessibles</button>
+    <button class="fchip" id="f-pris"       onclick="toggleF('pris')"      >● Pris</button>
+    <button class="fchip" id="f-blocked"    onclick="toggleF('blocked')"   >● Non accessibles</button>
+  </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr minmax(220px,280px);gap:28px;align-items:start">
-
-<!-- Créneaux -->
-<div>
-  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px">Créneaux disponibles</h2>
-  {slots_section}
+<!-- Calendar -->
+<div style="overflow-x:auto;padding:16px 20px 0">
+  <div id="cal"></div>
 </div>
 
-<!-- Sidebar classement -->
-<div>
-  <h2 style="color:#fff;font-size:14px;font-weight:700;margin-bottom:12px">Classement du mois</h2>
-  {'<div style="background:#6366f120;border:1px solid #6366f140;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#a5b4fc">Votre rang : #' + my_rank + '</div>' if my_rank != "—" else ""}
-  <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
-  <table style="border-collapse:collapse">
-  <tbody>{lb_rows}</tbody>
-  </table></div>
+<!-- Mes RDV -->
+<div style="max-width:760px;margin:44px auto 0;padding:0 20px 60px">
+  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px;
+    padding-bottom:10px;border-bottom:1px solid #2a2a4e">Mes RDV</h2>
+  <div id="mes-rdv"></div>
 </div>
 
 </div>
+
+<!-- Popup -->
+<div id="popup-overlay" onclick="closePopup()">
+  <div id="popup-box" onclick="event.stopPropagation()">
+    <div id="popup-body"></div>
+  </div>
 </div>
+
 <div id="toast"></div>
+
 <script>
-function toast(m, err){{
-  const t=document.getElementById('toast');
-  t.textContent=m;t.style.background=err?'#e94560':'#2ecc71';t.style.color=err?'#fff':'#0f0f1a';
-  t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
-}}
-async function claimSlot(slotId){{
-  const btn=event.target; btn.textContent='…'; btn.disabled=true;
-  const r=await fetch('/closer/{token}/slots/'+slotId+'/claim',{{method:'POST'}});
+const SLOTS        = __SLOTS_JSON__;
+const MY_MEETINGS  = __MEETINGS_JSON__;
+const TOKEN        = '__TOKEN__';
+
+// ── Constants ─────────────────────────────────────────────────────────────
+const HR=60, DAY_S=8, DAY_E=21, CAL_H=(DAY_E-DAY_S)*HR;
+const DAYS_FR=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const MONTHS_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet',
+                 'Août','Septembre','Octobre','Novembre','Décembre'];
+const FC={urgent:'#e94560',accessible:'#8b5cf6',pris:'#6366f1',blocked:'#6b7280'};
+
+// ── State ─────────────────────────────────────────────────────────────────
+let view='week', cur=new Date();
+let F={urgent:true,accessible:true,pris:true,blocked:true};
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+function weekStart(d){const r=new Date(d);r.setDate(r.getDate()-((r.getDay()+6)%7));r.setHours(0,0,0,0);return r;}
+function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+function fmtT(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function he(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── Slot style ────────────────────────────────────────────────────────────
+function sStyle(s){
+  if(s.is_mine)                  return{bg:'#6366f130',br:'#6366f1',c:'#a5b4fc',lbl:'Réservé',dim:false};
+  if(s.is_taken_other)           return{bg:'#1a1a2e',  br:'#2a2a4e',c:'#555',   lbl:'Pris',   dim:true };
+  if(s.credit_block)             return{bg:'#111',     br:'#1e1e30',c:'#333',   lbl:'—',      dim:true };
+  if(s.can_claim&&s.is_urgent)   return{bg:'#e94560',  br:'#e94560',c:'#fff',   lbl:'URGENT', dim:false};
+  if(s.can_claim)                return{bg:'#8b5cf6',  br:'#8b5cf6',c:'#fff',   lbl:'Libre',  dim:false};
+  return                               {bg:'#111',     br:'#1e1e30',c:'#333',   lbl:'—',      dim:true };
+}
+
+function visible(s){
+  const mu=F.urgent    && s.is_urgent && s.can_claim;
+  const ma=F.accessible&& !s.is_urgent&& s.can_claim;
+  const mb=F.blocked   &&(s.credit_block||(s.is_taken_other&&!s.is_mine));
+  const mp=F.pris      && s.is_mine;
+  return mu||ma||mb||mp;
+}
+
+// ── Time column ───────────────────────────────────────────────────────────
+function timeCol(){
+  let h='<div style="position:relative;height:'+CAL_H+'px;width:38px;flex-shrink:0">';
+  for(let hr=DAY_S;hr<=DAY_E;hr++){
+    h+=`<div style="position:absolute;top:${(hr-DAY_S)*HR}px;right:3px;font-size:9px;
+      color:#2a2a4e;transform:translateY(-50%);white-space:nowrap">${hr}h</div>`;
+  }
+  return h+'</div>';
+}
+
+function hLines(){
+  let h='';
+  for(let hr=DAY_S;hr<=DAY_E;hr++)
+    h+=`<div style="position:absolute;top:${(hr-DAY_S)*HR}px;left:0;right:0;
+      border-top:1px solid #1a1a2e;pointer-events:none"></div>`;
+  return h;
+}
+
+function slotBlock(s,wide=false){
+  const st=sStyle(s);
+  const d=new Date(s.starts);
+  const top=(d.getHours()-DAY_S)*HR+d.getMinutes();
+  if(top<0||top>CAL_H-2) return '';
+  const dim=st.dim?'opacity:0.35;':'';
+  const pname=he((s.prospect.name||'').split(' ')[0]);
+  const urg=s.is_urgent&&s.can_claim?'⚡':'';
+  const tl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  return `<div onclick="openPopup('${he(s.id)}')" class="cal-slot"
+    style="position:absolute;left:2px;right:2px;top:${top}px;height:19px;
+    background:${st.bg};border:1px solid ${st.br};border-radius:3px;
+    color:${st.c};font-size:9px;overflow:hidden;cursor:pointer;
+    padding:1px 3px;white-space:nowrap;text-overflow:ellipsis;${dim}"
+    title="${he(s.prospect.name)} · ${he(s.prospect.city)}">${urg}${wide?tl+' ':''}${pname}</div>`;
+}
+
+// ── Views ─────────────────────────────────────────────────────────────────
+function renderDay(){
+  const dSlots=SLOTS.filter(s=>sameDay(new Date(s.starts),cur)&&visible(s));
+  document.getElementById('cal-label').textContent=
+    ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'][((cur.getDay()+6)%7)]+
+    ' '+cur.getDate()+' '+MONTHS_FR[cur.getMonth()];
+  let h='<div style="display:flex;max-width:500px">'+timeCol();
+  let body=`<div style="position:relative;height:${CAL_H}px;flex:1;border-left:1px solid #1a1a2e">${hLines()}`;
+  if(!dSlots.length) body+=`<div style="position:absolute;top:180px;left:0;right:0;
+    text-align:center;color:#2a2a4e;font-size:12px">Aucun créneau ce jour</div>`;
+  dSlots.forEach(s=>{body+=slotBlock(s,true);});
+  document.getElementById('cal').innerHTML=h+body+'</div></div>';
+}
+
+function renderWeek(){
+  const start=weekStart(cur);
+  const days=Array.from({length:7},(_,i)=>addD(start,i));
+  const e=days[6];
+  document.getElementById('cal-label').textContent=
+    String(start.getDate()).padStart(2,'0')+'/'+(start.getMonth()+1)+
+    ' – '+String(e.getDate()).padStart(2,'0')+'/'+(e.getMonth()+1);
+  let h='<div style="display:flex;min-width:560px">'+timeCol();
+  days.forEach(d=>{
+    const today=sameDay(d,new Date());
+    const ds=SLOTS.filter(s=>sameDay(new Date(s.starts),d)&&visible(s));
+    h+=`<div style="flex:1;min-width:0">
+      <div style="text-align:center;padding:5px 2px;font-size:10px;border-bottom:1px solid #1a1a2e;
+        color:${today?'#6366f1':'#9ca3af'};font-weight:${today?700:400};
+        background:${today?'#6366f108':'transparent'}">${DAYS_FR[((d.getDay()+6)%7)]} ${d.getDate()}</div>
+      <div style="position:relative;height:${CAL_H}px;border-left:1px solid #1a1a2e;
+        background:${today?'#6366f105':'transparent'}">${hLines()}${ds.map(s=>slotBlock(s)).join('')}</div>
+    </div>`;
+  });
+  document.getElementById('cal').innerHTML=h+'</div>';
+}
+
+function renderMonth(){
+  const y=cur.getFullYear(),m=cur.getMonth();
+  document.getElementById('cal-label').textContent=MONTHS_FR[m]+' '+y;
+  const gs=addD(new Date(y,m,1),-((new Date(y,m,1).getDay()+6)%7));
+  let h='<div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px">';
+  DAYS_FR.forEach(dn=>{h+=`<div style="text-align:center;font-size:9px;color:#6b7280;padding:3px">${dn}</div>`;});
+  h+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#1a1a2e;border-radius:8px;overflow:hidden">';
+  for(let i=0;i<42;i++){
+    const cell=addD(gs,i);
+    const inM=cell.getMonth()===m;
+    const isT=sameDay(cell,new Date());
+    const cs=SLOTS.filter(s=>sameDay(new Date(s.starts),cell)&&visible(s));
+    h+=`<div onclick="gotoDay(${cell.getFullYear()},${cell.getMonth()},${cell.getDate()})"
+      style="background:#0f0f1a;min-height:66px;padding:5px;cursor:pointer">
+      <div style="font-size:10px;font-weight:${isT?700:400};margin-bottom:3px;
+        color:${isT?'#6366f1':(inM?'#9ca3af':'#2a2a4e')}">${cell.getDate()}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px">`;
+    cs.slice(0,8).forEach(s=>{
+      const st=sStyle(s);
+      h+=`<div onclick="event.stopPropagation();openPopup('${he(s.id)}')"
+        style="width:7px;height:7px;border-radius:50%;background:${st.br};cursor:pointer"
+        title="${he(s.prospect.name)}"></div>`;
+    });
+    if(cs.length>8) h+=`<span style="font-size:8px;color:#555">+${cs.length-8}</span>`;
+    h+='</div></div>';
+  }
+  document.getElementById('cal').innerHTML=h+'</div></div>';
+}
+
+function render(){
+  if(view==='day')       renderDay();
+  else if(view==='week') renderWeek();
+  else                   renderMonth();
+}
+
+function navigate(dir){
+  if(view==='day')   cur=addD(cur,dir);
+  else if(view==='week') cur=addD(cur,dir*7);
+  else cur=new Date(cur.getFullYear(),cur.getMonth()+dir,1);
+  render();
+}
+function goToday(){cur=new Date();render();}
+function gotoDay(y,m,d){cur=new Date(y,m,d);setView('day');}
+
+function setView(v){
+  view=v;
+  ['day','week','mois'].forEach(k=>{
+    const b=document.getElementById('vbtn-'+k);
+    if(b) b.className='vbtn'+(k===v?' active':'');
+  });
+  render();
+}
+
+function toggleF(key){
+  F[key]=!F[key];
+  const chip=document.getElementById('f-'+key);
+  if(chip){
+    chip.style.background =F[key]?FC[key]+'28':'#1a1a2e';
+    chip.style.color      =F[key]?FC[key]:'#555';
+    chip.style.borderColor=F[key]?FC[key]+'50':'#2a2a4e';
+  }
+  render();
+}
+
+// ── Popup ─────────────────────────────────────────────────────────────────
+function openPopup(id){
+  const s=SLOTS.find(x=>x.id===id); if(!s) return;
+  const st=sStyle(s);
+  const sd=new Date(s.starts),ed=s.ends?new Date(s.ends):null;
+  const tStr=fmtT(s.starts)+(ed?' – '+fmtT(s.ends):'')+
+    ' · '+String(sd.getDate()).padStart(2,'0')+'/'+(sd.getMonth()+1)+'/'+sd.getFullYear();
+
+  const urgBadge=s.is_urgent?`<span style="background:#e9456020;color:#e94560;font-size:9px;
+    font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px">URGENT</span>`:'';
+
+  const chip=s.is_mine?
+    `<div style="background:#6366f120;color:#6366f1;font-size:10px;padding:3px 10px;
+      border-radius:4px;display:inline-block;margin-bottom:10px">Réservé par moi</div>`:
+    s.is_taken_other?
+    `<div style="background:#37415130;color:#6b7280;font-size:10px;padding:3px 10px;
+      border-radius:4px;display:inline-block;margin-bottom:10px">Déjà pris</div>`:
+    s.credit_block?
+    `<div style="background:#37415130;color:#555;font-size:10px;padding:3px 10px;
+      border-radius:4px;display:inline-block;margin-bottom:10px">Non accessible</div>`:'';
+
+  const scoreBar=s.prospect.score?`<div style="margin:14px 0">
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="font-size:10px;color:#9ca3af">Score prospect</span>
+      <span style="font-size:13px;font-weight:700;color:#e9a020">${s.prospect.score}/100</span>
+    </div>
+    <div style="height:4px;background:#111;border-radius:2px">
+      <div style="height:4px;width:${s.prospect.score}%;background:linear-gradient(90deg,#f59e0b,#2ecc71);border-radius:2px"></div>
+    </div></div>`:'';
+
+  const expl=(s.prospect.explainers||[]).length?
+    `<div style="margin:12px 0;background:#111;border-radius:6px;padding:10px 12px">`+
+    s.prospect.explainers.map(e=>`<div style="display:flex;gap:7px;margin-bottom:5px;align-items:flex-start">
+      <span style="color:#2ecc71;font-size:10px;flex-shrink:0">✓</span>
+      <span style="font-size:11px;color:#ccc">${he(e)}</span></div>`).join('')+'</div>':'';
+
+  const pSection=(!s.prospect.name&&!s.prospect.city)?
+    `<div style="color:#555;font-size:12px;margin:8px 0;font-style:italic">Aucune info prospect</div>`:
+    `<div style="margin-bottom:10px">
+      <div style="font-size:16px;font-weight:700;color:#fff">${he(s.prospect.name)}${urgBadge}</div>
+      <div style="font-size:12px;color:#9ca3af;margin-top:3px">
+        ${he(s.prospect.profession)}${s.prospect.profession&&s.prospect.city?' · ':''}${he(s.prospect.city)}
+      </div></div>`;
+
+  const claimBtn=s.can_claim?`<button onclick="claimSlot('${he(s.id)}')" id="claim-btn"
+    style="width:100%;padding:12px;background:${s.is_urgent?'#e94560':'#8b5cf6'};border:none;
+    border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px">
+    Prendre ce RDV${s.is_urgent?' — URGENT':''}</button>`:'';
+
+  document.getElementById('popup-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+      <div style="flex:1">${pSection}</div>
+      <button onclick="closePopup()" style="background:none;border:none;color:#6b7280;
+        font-size:22px;cursor:pointer;line-height:1;flex-shrink:0;margin-left:12px;margin-top:-4px">×</button>
+    </div>
+    ${chip}
+    <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:8px">🕐 ${tStr}</div>
+    ${scoreBar}${expl}${claimBtn}`;
+  document.getElementById('popup-overlay').className='open';
+}
+function closePopup(){document.getElementById('popup-overlay').className='';}
+
+// ── Claim ─────────────────────────────────────────────────────────────────
+async function claimSlot(id){
+  const btn=document.getElementById('claim-btn');
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  const r=await fetch('/closer/'+TOKEN+'/slots/'+id+'/claim',{method:'POST'});
   const d=await r.json();
-  if(d.ok){{
-    toast('Créneau réservé ✓');
-    setTimeout(()=>location.reload(), 900);
-  }} else {{
-    btn.textContent='Prendre'; btn.disabled=false;
-    toast(d.error||'Erreur', true);
-  }}
-}}
+  if(d.ok){closePopup();toast('Créneau réservé ✓');setTimeout(()=>location.reload(),900);}
+  else{if(btn){btn.textContent='Prendre ce RDV';btn.disabled=false;}toast(d.error||'Erreur',true);}
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg,err){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.background=err?'#e94560':'#2ecc71';t.style.color=err?'#fff':'#0f0f1a';
+  t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
+}
+
+// ── Mes RDV ───────────────────────────────────────────────────────────────
+function stInfo(st){
+  const m={'scheduled':['#f59e0b','À venir'],'MeetingStatus.scheduled':['#f59e0b','À venir'],
+    'completed':['#2ecc71','Signé'],'MeetingStatus.completed':['#2ecc71','Signé'],
+    'no_show':['#e94560','No-show'],'MeetingStatus.no_show':['#e94560','No-show'],
+    'cancelled':['#9ca3af','Annulé'],'MeetingStatus.cancelled':['#9ca3af','Annulé']};
+  return m[st]||['#9ca3af',st];
+}
+
+function rdvCard(m,isPast){
+  const[sc,sl]=stInfo(m.status);
+  const done=['completed','MeetingStatus.completed','cancelled','MeetingStatus.cancelled'].includes(m.status);
+  const tel=m.prospect_phone?`<a href="tel:${he(m.prospect_phone)}"
+    style="display:inline-block;margin-top:4px;padding:3px 10px;background:#6366f120;
+    border:1px solid #6366f140;border-radius:4px;color:#6366f1;font-size:10px;text-decoration:none">📞 Appeler</a>`:'';
+  const acts=isPast&&!done?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+    <button onclick="updM('${he(m.id)}','completed')"
+      style="padding:4px 12px;background:#2ecc7120;border:1px solid #2ecc7140;
+      border-radius:4px;color:#2ecc71;font-size:10px;font-weight:600;cursor:pointer">Vente</button>
+    <button onclick="updM('${he(m.id)}','relance')"
+      style="padding:4px 12px;background:#f59e0b20;border:1px solid #f59e0b40;
+      border-radius:4px;color:#f59e0b;font-size:10px;font-weight:600;cursor:pointer">Rappel</button>
+    <button onclick="updM('${he(m.id)}','no_show')"
+      style="padding:4px 12px;background:#e9456020;border:1px solid #e9456040;
+      border-radius:4px;color:#e94560;font-size:10px;font-weight:600;cursor:pointer">Refus</button>
+  </div>`:'';
+  return`<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;
+    padding:14px 16px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="color:#fff;font-size:13px;font-weight:600">${he(m.prospect_name)}</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px">${he(m.prospect_city)}</div>${tel}</div>
+      <div style="text-align:right;flex-shrink:0;margin-left:12px">
+        <div style="color:#6366f1;font-size:12px;font-weight:600">${he(m.scheduled_str)}</div>
+        <span style="background:${sc}20;color:${sc};font-size:9px;font-weight:600;
+          padding:1px 7px;border-radius:8px;display:inline-block;margin-top:4px">${sl}</span>
+      </div></div>${acts}</div>`;
+}
+
+async function updM(id,outcome){
+  let dv=null;
+  if(outcome==='completed'){const v=prompt('Montant du deal (€) :');if(v===null)return;dv=parseFloat(v)||0;}
+  const body={status:outcome};if(dv!==null)body.deal_value=dv;
+  const r=await fetch('/closer/'+TOKEN+'/meeting/'+id+'/complete',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){toast('RDV mis à jour ✓');setTimeout(()=>location.reload(),900);}
+  else toast('Erreur',true);
+}
+
+function renderMesRdv(){
+  const up=MY_MEETINGS.filter(m=>m.is_future);
+  const pa=MY_MEETINGS.filter(m=>!m.is_future);
+  if(!MY_MEETINGS.length){
+    document.getElementById('mes-rdv').innerHTML=
+      '<p style="color:#374151;font-size:12px;padding:12px 0">Aucun RDV enregistré</p>';return;
+  }
+  let h='';
+  if(up.length){
+    h+=`<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+      font-weight:700;margin-bottom:10px">À venir (${up.length})</p>`;
+    up.forEach(m=>{h+=rdvCard(m,false);});
+  }
+  if(pa.length){
+    h+=`<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+      font-weight:700;margin:${up.length?'20px':'0'} 0 10px">Passés</p>`;
+    pa.slice(0,20).forEach(m=>{h+=rdvCard(m,true);});
+  }
+  document.getElementById('mes-rdv').innerHTML=h;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(function initFilters(){
+  const on=v=>window.innerWidth<640?v==='urgent'||v==='accessible':true;
+  Object.keys(F).forEach(k=>{
+    F[k]=on(k);
+    const chip=document.getElementById('f-'+k);
+    if(chip){
+      chip.style.background =F[k]?FC[k]+'28':'#1a1a2e';
+      chip.style.color      =F[k]?FC[k]:'#555';
+      chip.style.borderColor=F[k]?FC[k]+'50':'#2a2a4e';
+    }
+  });
+  // Force all ON on desktop
+  if(window.innerWidth>=640){
+    Object.keys(F).forEach(k=>{F[k]=true;});
+    ['urgent','accessible','pris','blocked'].forEach(k=>{
+      const chip=document.getElementById('f-'+k);
+      if(chip){chip.style.background=FC[k]+'28';chip.style.color=FC[k];chip.style.borderColor=FC[k]+'50';}
+    });
+  }
+})();
+view=window.innerWidth<640?'day':'week';
+setView(view);
+renderMesRdv();
 </script>
-</body></html>""")
+</body></html>"""
+
+    _html = (_html
+        .replace("__NAME__",          name)
+        .replace("__TOKEN__",         token)
+        .replace("__BANNER_MSG__",    banner_msg)
+        .replace("__BANNER_COLOR__",  banner_color)
+        .replace("__BANNER_BG__",     banner_bg)
+        .replace("__BANNER_BDR__",    banner_bdr)
+        .replace("__MY_RANK__",       my_rank)
+        .replace("__SLOTS_JSON__",    slots_json)
+        .replace("__MEETINGS_JSON__", meetings_json)
+    )
+    return HTMLResponse(_html)
 
 
 @router.post("/closer/{token}/slots/{slot_id}/claim")
