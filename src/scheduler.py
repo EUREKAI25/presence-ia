@@ -1525,9 +1525,16 @@ def _job_outbound(force: bool = False):
                      prospect.name[:40], prospect.city or "", prospect.email)
             continue
 
-        # Préparer l'envoi
-        sender      = os.getenv("OUTBOUND_SENDER_EMAIL", "bonjour@presence-ia.com")
-        sender_name = os.getenv("OUTBOUND_SENDER_NAME", "Sarah — Présence IA")
+        # Préparer l'envoi — rotation sur domaines dédiés avec prénoms humains
+        _OUTBOUND_SENDERS = [
+            ("sophie@presence-ia.online",  "Sophie — Présence IA"),
+            ("marie@presence-ia.info",     "Marie — Présence IA"),
+            ("lea@presence-ia.cloud",      "Léa — Présence IA"),
+            ("emma@presence-ia.site",      "Emma — Présence IA"),
+            ("julie@presence-ia.website",  "Julie — Présence IA"),
+        ]
+        idx         = (sent + would_send) % len(_OUTBOUND_SENDERS)
+        sender, sender_name = _OUTBOUND_SENDERS[idx]
         city_display      = (prospect.city or "").title()
         profession_display = (prospect.profession or "professionnel").lower()
 
