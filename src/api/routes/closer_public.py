@@ -776,10 +776,10 @@ def closer_portal_demo(request: Request):
     leaderboard_rows_demo = ""
     for r in _DEMO_LEADERBOARD:
         is_me = r["name"] == "Marie Martin"
-    # panel_rdv avec bouton Agenda
+    # panel_rdv avec bouton Agenda (pointe vers le nouveau calendrier interactif)
     panel_rdv = (
         f'<div style="margin-bottom:20px">'
-        f'<a href="/closer/demo/slots" style="display:inline-block;background:#8b5cf6;'
+        f'<a href="/closer/test-planning-2026/slots?demo=1" style="display:inline-block;background:#8b5cf6;'
         f'color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">'
         f'📅 Agenda — voir les créneaux disponibles →</a>'
         f'</div>'
@@ -2754,6 +2754,17 @@ function renderMesRdv(){
       const chip=document.getElementById('f-'+k);
       if(chip){chip.style.background=FC[k]+'28';chip.style.color=FC[k];chip.style.borderColor=FC[k]+'50';}
     });
+  }
+})();
+// Auto-naviguer vers la semaine du premier slot visible si aucun slot cette semaine
+(function autoNav(){
+  const ws=weekStart(new Date());
+  const we=addD(ws,7);
+  const hasCur=SLOTS.some(s=>{const d=new Date(s.starts);return d>=ws&&d<we;});
+  if(!hasCur&&SLOTS.length>0){
+    // Trier par date et aller sur le premier slot
+    const sorted=SLOTS.slice().sort((a,b)=>new Date(a.starts)-new Date(b.starts));
+    cur=new Date(sorted[0].starts);
   }
 })();
 view=window.innerWidth<640?'day':'week';
