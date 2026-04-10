@@ -110,6 +110,27 @@ a{text-decoration:none}
   </div>
 </section>
 
+<!-- PRÉSENTATION ACTIVITÉ -->
+<section style="padding:0 20px 64px">
+  <div style="max-width:680px;margin:0 auto">
+    <p style="color:#ccc;font-size:1rem;line-height:1.85;margin-bottom:20px">
+      Présence IA aide les entreprises locales à apparaître dans les réponses des IA comme ChatGPT, Claude ou Gemini — là où leurs prospects prennent désormais leurs décisions.
+    </p>
+    <p style="color:#9ca3af;font-size:.95rem;line-height:1.85;margin-bottom:20px">
+      Ces entreprises investissent pour être présentes sur Google. Pourtant, elles ne sont pas visibles là où les décisions se prennent vraiment. Résultat&nbsp;: des concurrents qui ne dépensent parfois rien en publicité passent devant elles dans les recommandations des IA. Le manque à gagner est énorme.
+    </p>
+    <p style="color:#9ca3af;font-size:.95rem;line-height:1.85;margin-bottom:20px">
+      Nous générons des rendez-vous avec des prospects qui ont déjà pris conscience de ce décalage et veulent le corriger. L'offre est claire, les outils sont solides, avec trois options simples pour adapter la solution sans friction.
+    </p>
+    <p style="color:#9ca3af;font-size:.95rem;line-height:1.85;margin-bottom:20px">
+      Ici, vous n'avez pas à convaincre de l'existence du problème&nbsp;: il est déjà visible. Vous apportez une réponse claire, directe et activable.
+    </p>
+    <p style="color:#ccc;font-size:1rem;line-height:1.85">
+      Nous recherchons des closers capables de transformer cette évidence en décision — rapidement, proprement, sans forcer.
+    </p>
+  </div>
+</section>
+
 <!-- COMMENT ÇA MARCHE -->
 <section id="comment" style="padding:72px 20px;max-width:900px;margin:0 auto">
   <h2 style="color:#fff;font-size:1.8rem;font-weight:700;text-align:center;margin-bottom:8px">Comment ça marche</h2>
