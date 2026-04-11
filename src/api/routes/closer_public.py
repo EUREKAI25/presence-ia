@@ -2155,24 +2155,31 @@ def closer_slots(token: str, request: Request):
                     if p_phone:
                         explainers.append("Coordonnées directes disponibles")
 
+                    # Statut au format design validé
+                    if is_mine:
+                        _status = "claimed_me"
+                    elif is_taken_other:
+                        _status = "claimed_other"
+                    elif can_claim and is_urgent:
+                        _status = "accessible_urgent"
+                    elif can_claim:
+                        _status = "accessible"
+                    else:
+                        _status = "inaccessible"
+
                     slot_data.append({
-                        "id":             str(s.id),
-                        "starts":         s.starts_at.isoformat(),
-                        "ends":           s.ends_at.isoformat() if s.ends_at else None,
-                        "is_urgent":      is_urgent,
-                        "is_mine":        is_mine,
-                        "is_taken_other": is_taken_other,
-                        "can_claim":      can_claim,
-                        "credit_block":   credit_block,
-                        "meeting_id":     meeting_id,
-                        "prospect": {
-                            "name":       p_name,
+                        "id":         str(s.id),
+                        "date":       s.starts_at.strftime("%Y-%m-%d"),
+                        "time_start": s.starts_at.strftime("%H:%M"),
+                        "time_end":   s.ends_at.strftime("%H:%M") if s.ends_at else "",
+                        "status":     _status,
+                        "prospect":   {
+                            "company":    p_name,
                             "city":       p_city,
                             "profession": p_profession,
-                            "phone":      p_phone,
-                            "score":      score,
-                            "explainers": explainers[:3],
-                        },
+                            "score":      score or 0,
+                            "elements":   explainers[:3],
+                        } if p_name else None,
                     })
 
                 # ── Mes RDV ──────────────────────────────────────────────────
@@ -2251,28 +2258,29 @@ def closer_slots(token: str, request: Request):
             _t   = _base + _dt.timedelta(hours=dh)
             _dur = _dt.timedelta(minutes=20)
             _pu  = _prospects[pi]
-            _is_urgent        = dh < 48
-            _is_mine          = (state == "mine")
-            _is_taken_other   = (state == "taken_other")
-            _can_claim        = (state in ("booked_accessible", "booked_accessible_urgent"))
-            _credit_block     = (state == "credit_block")
+            _is_urgent = dh < 48
+            if state == "mine":
+                _st = "claimed_me"
+            elif state == "taken_other":
+                _st = "claimed_other"
+            elif state == "credit_block":
+                _st = "inaccessible"
+            elif _is_urgent:
+                _st = "accessible_urgent"
+            else:
+                _st = "accessible"
             slot_data.append({
-                "id":             f"mock-{i}",
-                "starts":         _t.isoformat(),
-                "ends":           (_t + _dur).isoformat(),
-                "is_urgent":      _is_urgent,
-                "is_mine":        _is_mine,
-                "is_taken_other": _is_taken_other,
-                "can_claim":      _can_claim,
-                "credit_block":   _credit_block,
-                "meeting_id":     None,
-                "prospect": {
-                    "name":       _pu[0],
+                "id":         f"mock-{i}",
+                "date":       _t.strftime("%Y-%m-%d"),
+                "time_start": _t.strftime("%H:%M"),
+                "time_end":   (_t + _dur).strftime("%H:%M"),
+                "status":     _st,
+                "prospect":   {
+                    "company":    _pu[0],
                     "city":       _pu[1],
                     "profession": _pu[2],
-                    "phone":      _pu[3],
                     "score":      _pu[4],
-                    "explainers": _pu[6],
+                    "elements":   _pu[6],
                 },
             })
         my_meetings = [
@@ -2295,509 +2303,402 @@ def closer_slots(token: str, request: Request):
             my_rank = str(r["rank"])
             break
 
-    urgent_free  = [s for s in slot_data if s["is_urgent"] and s["can_claim"]]
-    mode_libre   = len(urgent_free) == 0
-    banner_msg   = ("Aucun rendez-vous urgent — choisissez librement."
-                    if mode_libre else
-                    "Créneaux urgents à assurer en priorité pour débloquer les créneaux éloignés.")
-    banner_color = "#2ecc71" if mode_libre else "#f59e0b"
-    banner_bg    = "#2ecc7110" if mode_libre else "#f59e0b10"
-    banner_bdr   = "#2ecc7130" if mode_libre else "#f59e0b30"
+    name       = closer.name
+    today_str  = now.strftime("%Y-%m-%d")
+    slots_json = _json.dumps(slot_data, ensure_ascii=False)
 
-    name          = closer.name
-    slots_json    = _json.dumps(slot_data,   ensure_ascii=False)
-    meetings_json = _json.dumps(my_meetings, ensure_ascii=False)
-
-    # Placeholders évitent l'échappement CSS/JS dans une f-string
+    # ── Template validé : grille 4 semaines + vue jour ──────────────────────────
     _html = """<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Planning — __NAME__</title>
+<title>Agenda — __NAME__</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}
-.cal-slot:hover{filter:brightness(1.2);z-index:2}
-#popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;
-  display:none;align-items:center;justify-content:center;padding:20px}
-#popup-overlay.open{display:flex}
-#popup-box{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;
-  padding:24px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto}
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-  background:#2ecc71;color:#0f0f1a;padding:10px 22px;border-radius:6px;
-  font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200}
-.vbtn{padding:6px 14px;border:1px solid #2a2a4e;border-radius:6px;
-  font-size:11px;font-weight:600;cursor:pointer;background:#1a1a2e;color:#9ca3af;transition:all .15s}
-.vbtn.active{background:#6366f1;color:#fff;border-color:#6366f1}
-.fchip{padding:5px 12px;border:1px solid #2a2a4e;border-radius:20px;
-  font-size:11px;font-weight:600;cursor:pointer;background:#1a1a2e;color:#555;transition:all .15s}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;min-height:100vh}
+.hdr{background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr-title{font-size:14px;font-weight:700;color:#fff}
+.hdr-back{color:#6366f1;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#6366f112}
+.main{max-width:560px;margin:0 auto;padding:20px 14px 60px}
+.sec-lbl{color:#4b5563;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.wk-hdrs{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
+.wk-hdr{text-align:center;font-size:9px;color:#4b5563;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 0}
+.wk-row{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.wk-sep{height:8px}
+.day-cell{aspect-ratio:1;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative;-webkit-tap-highlight-color:transparent;user-select:none}
+.day-cell:not(.day-empty):not(.day-past):active{transform:scale(.93)}
+.day-num{font-size:clamp(10px,2.8vw,14px);font-weight:700;line-height:1;color:#fff}
+.day-mon{font-size:clamp(7px,1.4vw,9px);color:rgba(255,255,255,.65);margin-top:1px}
+.day-red    {background:#dc2626}
+.day-green  {background:#16a34a}
+.day-locked {background:#16a34a;opacity:.28;cursor:pointer}
+.day-locked:hover{opacity:.42}
+.day-empty  {background:transparent;border:1px solid #1a1a2e;cursor:default}
+.day-past   {background:#1a1a2e!important;border:1px solid #1f2937!important;opacity:1!important;cursor:default!important}
+.day-past .day-num{color:#2d3748}
+.day-past .day-mon{color:#2d3748}
+.day-selected{box-shadow:0 0 0 2.5px #6366f1,0 0 0 5px #6366f125;transform:scale(1.07)!important}
+.day-today::after{content:'';position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:rgba(255,255,255,.9);border-radius:50%}
+#day-heading{font-size:15px;font-weight:700;color:#fff;margin-top:28px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #1a1a2e}
+.day-empty-msg{color:#374151;font-size:13px;padding:28px 0;text-align:center}
+.slot{display:flex;align-items:center;padding:11px 13px;border-radius:8px;margin-bottom:5px;border:1px solid transparent;gap:10px;-webkit-tap-highlight-color:transparent;transition:background .1s}
+.slot[data-clickable=true]{cursor:pointer}
+.slot[data-clickable=true]:active{transform:scale(.98)}
+.slot-time{font-size:12px;font-weight:600;color:#6b7280;min-width:96px;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.slot-state{flex:1;display:flex;align-items:center;gap:7px;min-width:0}
+.slot-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.slot-label{font-size:12px;font-weight:600;white-space:nowrap}
+.slot-badge{font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:2px 6px;border-radius:10px;background:#7f1d1d;color:#fca5a5;flex-shrink:0}
+.slot-arrow{color:#374151;font-size:16px;flex-shrink:0;margin-left:auto}
+.s-accessible      {background:#052e1622;border-color:#16a34a30}
+.s-accessible:hover{background:#052e1640}
+.s-urgent          {background:#450a0a22;border-color:#dc262630}
+.s-urgent:hover    {background:#450a0a44}
+.s-inaccessible    {background:#052e1618;border-color:#16a34a18;opacity:.38;cursor:pointer}
+.s-inaccessible:hover{opacity:.55}
+.s-claimed-me      {background:#2e106522;border-color:#7c3aed30}
+.s-claimed-other   {background:#78350f22;border-color:#f59e0b30;opacity:.8}
+.s-safety          {background:#2e106518;border-color:#a78bfa28;opacity:.7}
+.m-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:flex-end;justify-content:center}
+.m-overlay.open{display:flex}
+@media(min-width:500px){.m-overlay{align-items:center;padding:20px}}
+.m-box{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:16px 16px 0 0;width:100%;max-width:460px;padding:22px 20px 28px;max-height:88vh;overflow-y:auto;position:relative;animation:slideUp .18s ease}
+@media(min-width:500px){.m-box{border-radius:14px}}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.m-handle{width:36px;height:4px;background:#374151;border-radius:2px;margin:0 auto 18px}
+.m-close{position:absolute;top:18px;right:16px;background:#1f2937;border:1px solid #374151;color:#9ca3af;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;line-height:28px;text-align:center}
+.m-tag{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;padding:3px 9px;border-radius:10px;margin-bottom:12px}
+.m-company{font-size:20px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:3px}
+.m-meta{font-size:12px;color:#6b7280;margin-bottom:18px}
+.m-score-wrap{background:#0f172a;border-radius:10px;padding:14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px}
+.m-score-num{font-size:32px;font-weight:900;min-width:48px;line-height:1}
+.m-score-lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.m-elements{display:flex;flex-direction:column;gap:5px}
+.m-elem{font-size:11px;color:#9ca3af;padding-left:13px;position:relative;line-height:1.5}
+.m-elem::before{content:'—';position:absolute;left:0;color:#374151}
+.m-divider{height:1px;background:#1f2937;margin:16px 0}
+.m-datetime{font-size:12px;color:#6b7280;margin-bottom:18px;display:flex;align-items:center;gap:6px}
+.m-datetime::before{content:'📅'}
+.btn-claim{width:100%;padding:14px;background:#6366f1;border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:background .12s,transform .1s}
+.btn-claim:hover{background:#4f46e5}
+.btn-claim:active{transform:scale(.98)}
+.btn-claim:disabled{background:#1f2937;color:#4b5563;cursor:default;transform:none}
+.m-info{text-align:center;font-size:13px;color:#4b5563;padding:24px 16px;line-height:1.6}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:12px 20px;
-  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50">
-  <div style="display:flex;align-items:center;gap:10px">
-    <img src="/assets/logo.svg" alt="" style="height:22px">
-    <span style="color:#9ca3af;font-size:11px">Planning</span>
+<div class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-title">Agenda</span>
   </div>
-  <div style="display:flex;align-items:center;gap:14px">
-    <span style="color:#fff;font-size:13px;font-weight:600">__NAME__</span>
-    <a href="/closer/__TOKEN__" style="color:#527FB3;font-size:12px;text-decoration:none">← Portail</a>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="font-size:13px;font-weight:600;color:#fff">__NAME__</span>
+    <a href="/closer/__TOKEN__" class="hdr-back">← Portail</a>
   </div>
 </div>
 
-<!-- Banner -->
-<div style="background:__BANNER_BG__;border-bottom:1px solid __BANNER_BDR__;
-  padding:8px 20px;color:__BANNER_COLOR__;font-size:11px;line-height:1.6">__BANNER_MSG__</div>
-
-<div style="max-width:1100px;margin:0 auto">
-
-<!-- Controls -->
-<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:14px 20px;border-bottom:1px solid #1a1a2e">
-
-  <div style="display:flex;gap:4px">
-    <button class="vbtn" id="vbtn-day"   onclick="setView('day')">Jour</button>
-    <button class="vbtn" id="vbtn-week"  onclick="setView('week')">Semaine</button>
-    <button class="vbtn" id="vbtn-month" onclick="setView('mois')">Mois</button>
+<div class="main">
+  <div class="sec-lbl">Vue globale</div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:#dc2626"></div>Urgent</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#16a34a"></div>Disponible</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#16a34a;opacity:.3"></div>Verrouillé</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#0f0f1a;border:1px solid #1f2937"></div>Vide</div>
   </div>
+  <div class="wk-hdrs" id="wk-hdrs"></div>
+  <div id="wk-grid"></div>
+  <div id="day-heading">—</div>
+  <div id="slots-list"></div>
+</div>
 
-  <div style="display:flex;align-items:center;gap:6px">
-    <button onclick="navigate(-1)" style="padding:5px 11px;background:#1a1a2e;
-      border:1px solid #2a2a4e;border-radius:4px;color:#9ca3af;cursor:pointer;font-size:14px">‹</button>
-    <span id="cal-label" style="font-size:12px;color:#fff;font-weight:600;
-      min-width:130px;text-align:center"></span>
-    <button onclick="navigate(1)" style="padding:5px 11px;background:#1a1a2e;
-      border:1px solid #2a2a4e;border-radius:4px;color:#9ca3af;cursor:pointer;font-size:14px">›</button>
-    <button onclick="goToday()" style="padding:5px 10px;background:#1a1a2e;
-      border:1px solid #2a2a4e;border-radius:4px;color:#527FB3;cursor:pointer;
-      font-size:10px;font-weight:600">Auj.</button>
-  </div>
-
-  <div style="flex:1;min-width:8px"></div>
-
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <button class="fchip" id="f-urgent"     onclick="toggleF('urgent')"    >⚡ Urgents</button>
-    <button class="fchip" id="f-accessible" onclick="toggleF('accessible')">● Accessibles</button>
-    <button class="fchip" id="f-pris"       onclick="toggleF('pris')"      >● Pris</button>
-    <button class="fchip" id="f-blocked"    onclick="toggleF('blocked')"   >● Non accessibles</button>
+<div class="m-overlay" id="m-overlay" onclick="handleOverlay(event)">
+  <div class="m-box" id="m-box">
+    <div class="m-handle"></div>
+    <button class="m-close" onclick="closeModal()">✕</button>
+    <div id="m-content"></div>
   </div>
 </div>
-
-<!-- Calendar -->
-<div style="overflow-x:auto;padding:16px 20px 0">
-  <div id="cal"></div>
-</div>
-
-<!-- Mes RDV -->
-<div style="max-width:760px;margin:44px auto 0;padding:0 20px 60px">
-  <h2 style="color:#fff;font-size:15px;font-weight:700;margin-bottom:16px;
-    padding-bottom:10px;border-bottom:1px solid #2a2a4e">Mes RDV</h2>
-  <div id="mes-rdv"></div>
-</div>
-
-</div>
-
-<!-- Popup -->
-<div id="popup-overlay" onclick="closePopup()">
-  <div id="popup-box" onclick="event.stopPropagation()">
-    <div id="popup-body"></div>
-  </div>
-</div>
-
-<div id="toast"></div>
 
 <script>
-const SLOTS        = __SLOTS_JSON__;
-const MY_MEETINGS  = __MEETINGS_JSON__;
-const TOKEN        = '__TOKEN__';
+const SLOTS = __SLOTS_JSON__;
+const TODAY = "__TODAY__";
+const TOKEN = "__TOKEN__";
 
-// ── Constants ─────────────────────────────────────────────────────────────
-const HR=60, DAY_S=8, DAY_E=21, CAL_H=(DAY_E-DAY_S)*HR;
-const DAYS_FR=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-const MONTHS_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet',
-                 'Août','Septembre','Octobre','Novembre','Décembre'];
-const FC={urgent:'#e94560',accessible:'#8b5cf6',pris:'#6366f1',blocked:'#6b7280'};
+const byDate = {};
+SLOTS.forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
 
-// ── State ─────────────────────────────────────────────────────────────────
-let view='week', cur=new Date();
-let F={urgent:true,accessible:true,pris:true,blocked:true};
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
-function weekStart(d){const r=new Date(d);r.setDate(r.getDate()-((r.getDay()+6)%7));r.setHours(0,0,0,0);return r;}
-function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
-function fmtT(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-function he(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-// ── Slot style ────────────────────────────────────────────────────────────
-function sStyle(s){
-  if(s.is_mine)                  return{bg:'#6366f130',br:'#6366f1',c:'#a5b4fc',lbl:'Réservé',dim:false};
-  if(s.is_taken_other)           return{bg:'#1a1a2e',  br:'#2a2a4e',c:'#555',   lbl:'Pris',   dim:true };
-  if(s.credit_block)             return{bg:'#111',     br:'#1e1e30',c:'#333',   lbl:'—',      dim:true };
-  if(s.can_claim&&s.is_urgent)   return{bg:'#e94560',  br:'#e94560',c:'#fff',   lbl:'URGENT', dim:false};
-  if(s.can_claim)                return{bg:'#8b5cf6',  br:'#8b5cf6',c:'#fff',   lbl:'Libre',  dim:false};
-  return                               {bg:'#111',     br:'#1e1e30',c:'#333',   lbl:'—',      dim:true };
+function dayColor(iso) {
+  const ss = byDate[iso] || [];
+  if (!ss.length) return 'empty';
+  if (ss.some(s => s.status === 'accessible_urgent')) return 'red';
+  if (ss.some(s => s.status === 'accessible' || s.status === 'claimed_me' || s.status === 'claimed_other' || s.status === 'safety_margin')) return 'green';
+  return 'locked';
 }
 
-function visible(s){
-  const mu=F.urgent    && s.is_urgent && s.can_claim;
-  const ma=F.accessible&& !s.is_urgent&& s.can_claim;
-  const mb=F.blocked   &&(s.credit_block||(s.is_taken_other&&!s.is_mine));
-  const mp=F.pris      && s.is_mine;
-  return mu||ma||mb||mp;
+function parseIso(str) {
+  const [y,m,d] = str.split('-').map(Number);
+  return new Date(y, m-1, d);
 }
-
-// ── Time column ───────────────────────────────────────────────────────────
-function timeCol(){
-  let h='<div style="position:relative;height:'+CAL_H+'px;width:38px;flex-shrink:0">';
-  for(let hr=DAY_S;hr<=DAY_E;hr++){
-    h+=`<div style="position:absolute;top:${(hr-DAY_S)*HR}px;right:3px;font-size:9px;
-      color:#2a2a4e;transform:translateY(-50%);white-space:nowrap">${hr}h</div>`;
-  }
-  return h+'</div>';
+function toIso(dt) {
+  const y = dt.getFullYear(), m = String(dt.getMonth()+1).padStart(2,'0'),
+        d = String(dt.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
 }
+const todayDt = parseIso(TODAY);
+const monday = new Date(todayDt);
+monday.setDate(todayDt.getDate() - (todayDt.getDay() || 7) + 1);
 
-function hLines(){
-  let h='';
-  for(let hr=DAY_S;hr<=DAY_E;hr++)
-    h+=`<div style="position:absolute;top:${(hr-DAY_S)*HR}px;left:0;right:0;
-      border-top:1px solid #1a1a2e;pointer-events:none"></div>`;
-  return h;
-}
+const MONTHS_SHORT = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
+const DAYS_SHORT   = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+const DAYS_LONG    = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MONTHS_LONG  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
-function slotBlock(s,wide=false){
-  const st=sStyle(s);
-  const d=new Date(s.starts);
-  const top=(d.getHours()-DAY_S)*HR+d.getMinutes();
-  if(top<0||top>CAL_H-2) return '';
-  const dim=st.dim?'opacity:0.35;':'';
-  const pname=he((s.prospect.name||'').split(' ')[0]);
-  const urg=s.is_urgent&&s.can_claim?'⚡':'';
-  const tl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  return `<div onclick="openPopup('${he(s.id)}')" class="cal-slot"
-    style="position:absolute;left:2px;right:2px;top:${top}px;height:19px;
-    background:${st.bg};border:1px solid ${st.br};border-radius:3px;
-    color:${st.c};font-size:9px;overflow:hidden;cursor:pointer;
-    padding:1px 3px;white-space:nowrap;text-overflow:ellipsis;${dim}"
-    title="${he(s.prospect.name)} · ${he(s.prospect.city)}">${urg}${wide?tl+' ':''}${pname}</div>`;
-}
-
-// ── Views ─────────────────────────────────────────────────────────────────
-function renderDay(){
-  const dSlots=SLOTS.filter(s=>sameDay(new Date(s.starts),cur)&&visible(s));
-  document.getElementById('cal-label').textContent=
-    ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'][((cur.getDay()+6)%7)]+
-    ' '+cur.getDate()+' '+MONTHS_FR[cur.getMonth()];
-  let h='<div style="display:flex;max-width:500px">'+timeCol();
-  let body=`<div style="position:relative;height:${CAL_H}px;flex:1;border-left:1px solid #1a1a2e">${hLines()}`;
-  if(!dSlots.length) body+=`<div style="position:absolute;top:180px;left:0;right:0;
-    text-align:center;color:#2a2a4e;font-size:12px">Aucun créneau ce jour</div>`;
-  dSlots.forEach(s=>{body+=slotBlock(s,true);});
-  document.getElementById('cal').innerHTML=h+body+'</div></div>';
-}
-
-function renderWeek(){
-  const start=weekStart(cur);
-  const days=Array.from({length:7},(_,i)=>addD(start,i));
-  const e=days[6];
-  document.getElementById('cal-label').textContent=
-    String(start.getDate()).padStart(2,'0')+'/'+(start.getMonth()+1)+
-    ' – '+String(e.getDate()).padStart(2,'0')+'/'+(e.getMonth()+1);
-  let h='<div style="display:flex;min-width:560px">'+timeCol();
-  days.forEach(d=>{
-    const today=sameDay(d,new Date());
-    const ds=SLOTS.filter(s=>sameDay(new Date(s.starts),d)&&visible(s));
-    h+=`<div style="flex:1;min-width:0">
-      <div style="text-align:center;padding:5px 2px;font-size:10px;border-bottom:1px solid #1a1a2e;
-        color:${today?'#6366f1':'#9ca3af'};font-weight:${today?700:400};
-        background:${today?'#6366f108':'transparent'}">${DAYS_FR[((d.getDay()+6)%7)]} ${d.getDate()}</div>
-      <div style="position:relative;height:${CAL_H}px;border-left:1px solid #1a1a2e;
-        background:${today?'#6366f105':'transparent'}">${hLines()}${ds.map(s=>slotBlock(s)).join('')}</div>
-    </div>`;
+function renderGrid() {
+  const hdrs = document.getElementById('wk-hdrs');
+  DAYS_SHORT.forEach(l => {
+    const el = document.createElement('div');
+    el.className = 'wk-hdr'; el.textContent = l;
+    hdrs.appendChild(el);
   });
-  document.getElementById('cal').innerHTML=h+'</div>';
-}
-
-function renderMonth(){
-  const y=cur.getFullYear(),m=cur.getMonth();
-  document.getElementById('cal-label').textContent=MONTHS_FR[m]+' '+y;
-  const gs=addD(new Date(y,m,1),-((new Date(y,m,1).getDay()+6)%7));
-  let h='<div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px">';
-  DAYS_FR.forEach(dn=>{h+=`<div style="text-align:center;font-size:9px;color:#6b7280;padding:3px">${dn}</div>`;});
-  h+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#1a1a2e;border-radius:8px;overflow:hidden">';
-  for(let i=0;i<42;i++){
-    const cell=addD(gs,i);
-    const inM=cell.getMonth()===m;
-    const isT=sameDay(cell,new Date());
-    const cs=SLOTS.filter(s=>sameDay(new Date(s.starts),cell)&&visible(s));
-    h+=`<div onclick="gotoDay(${cell.getFullYear()},${cell.getMonth()},${cell.getDate()})"
-      style="background:#0f0f1a;min-height:66px;padding:5px;cursor:pointer">
-      <div style="font-size:10px;font-weight:${isT?700:400};margin-bottom:3px;
-        color:${isT?'#6366f1':(inM?'#9ca3af':'#2a2a4e')}">${cell.getDate()}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:2px">`;
-    cs.slice(0,8).forEach(s=>{
-      const st=sStyle(s);
-      h+=`<div onclick="event.stopPropagation();openPopup('${he(s.id)}')"
-        style="width:7px;height:7px;border-radius:50%;background:${st.br};cursor:pointer"
-        title="${he(s.prospect.name)}"></div>`;
-    });
-    if(cs.length>8) h+=`<span style="font-size:8px;color:#555">+${cs.length-8}</span>`;
-    h+='</div></div>';
-  }
-  document.getElementById('cal').innerHTML=h+'</div></div>';
-}
-
-function render(){
-  if(view==='day')       renderDay();
-  else if(view==='week') renderWeek();
-  else                   renderMonth();
-}
-
-function navigate(dir){
-  if(view==='day')   cur=addD(cur,dir);
-  else if(view==='week') cur=addD(cur,dir*7);
-  else cur=new Date(cur.getFullYear(),cur.getMonth()+dir,1);
-  render();
-}
-function goToday(){cur=new Date();render();}
-function gotoDay(y,m,d){cur=new Date(y,m,d);setView('day');}
-
-function setView(v){
-  view=v;
-  ['day','week','mois'].forEach(k=>{
-    const b=document.getElementById('vbtn-'+k);
-    if(b) b.className='vbtn'+(k===v?' active':'');
-  });
-  render();
-}
-
-function toggleF(key){
-  F[key]=!F[key];
-  const chip=document.getElementById('f-'+key);
-  if(chip){
-    chip.style.background =F[key]?FC[key]+'28':'#1a1a2e';
-    chip.style.color      =F[key]?FC[key]:'#555';
-    chip.style.borderColor=F[key]?FC[key]+'50':'#2a2a4e';
-  }
-  render();
-}
-
-// ── Popup ─────────────────────────────────────────────────────────────────
-function openPopup(id){
-  const s=SLOTS.find(x=>x.id===id); if(!s) return;
-  const st=sStyle(s);
-  const sd=new Date(s.starts),ed=s.ends?new Date(s.ends):null;
-  const tStr=fmtT(s.starts)+(ed?' – '+fmtT(s.ends):'')+
-    ' · '+String(sd.getDate()).padStart(2,'0')+'/'+(sd.getMonth()+1)+'/'+sd.getFullYear();
-
-  const urgBadge=s.is_urgent?`<span style="background:#e9456020;color:#e94560;font-size:9px;
-    font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px">URGENT</span>`:'';
-
-  const chip=s.is_mine?
-    `<div style="background:#6366f120;color:#6366f1;font-size:10px;padding:3px 10px;
-      border-radius:4px;display:inline-block;margin-bottom:10px">Réservé par moi</div>`:
-    s.is_taken_other?
-    `<div style="background:#37415130;color:#6b7280;font-size:10px;padding:3px 10px;
-      border-radius:4px;display:inline-block;margin-bottom:10px">Déjà pris</div>`:
-    s.credit_block?
-    `<div style="background:#37415130;color:#555;font-size:10px;padding:3px 10px;
-      border-radius:4px;display:inline-block;margin-bottom:10px">Non accessible</div>`:'';
-
-  const scoreBar=s.prospect.score?`<div style="margin:14px 0">
-    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-      <span style="font-size:10px;color:#9ca3af">Score prospect</span>
-      <span style="font-size:13px;font-weight:700;color:#e9a020">${s.prospect.score}/100</span>
-    </div>
-    <div style="height:4px;background:#111;border-radius:2px">
-      <div style="height:4px;width:${s.prospect.score}%;background:linear-gradient(90deg,#f59e0b,#2ecc71);border-radius:2px"></div>
-    </div></div>`:'';
-
-  const expl=(s.prospect.explainers||[]).length?
-    `<div style="margin:12px 0;background:#111;border-radius:6px;padding:10px 12px">`+
-    s.prospect.explainers.map(e=>`<div style="display:flex;gap:7px;margin-bottom:5px;align-items:flex-start">
-      <span style="color:#2ecc71;font-size:10px;flex-shrink:0">✓</span>
-      <span style="font-size:11px;color:#ccc">${he(e)}</span></div>`).join('')+'</div>':'';
-
-  const pSection=(!s.prospect.name&&!s.prospect.city)?
-    `<div style="color:#555;font-size:12px;margin:8px 0;font-style:italic">Aucune info prospect</div>`:
-    `<div style="margin-bottom:10px">
-      <div style="font-size:16px;font-weight:700;color:#fff">${he(s.prospect.name)}${urgBadge}</div>
-      <div style="font-size:12px;color:#9ca3af;margin-top:3px">
-        ${he(s.prospect.profession)}${s.prospect.profession&&s.prospect.city?' · ':''}${he(s.prospect.city)}
-      </div></div>`;
-
-  const claimBtn=s.can_claim?`<button onclick="claimSlot('${he(s.id)}')" id="claim-btn"
-    style="width:100%;padding:12px;background:${s.is_urgent?'#e94560':'#8b5cf6'};border:none;
-    border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px">
-    Prendre ce RDV${s.is_urgent?' — URGENT':''}</button>`:'';
-
-  document.getElementById('popup-body').innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-      <div style="flex:1">${pSection}</div>
-      <button onclick="closePopup()" style="background:none;border:none;color:#6b7280;
-        font-size:22px;cursor:pointer;line-height:1;flex-shrink:0;margin-left:12px;margin-top:-4px">×</button>
-    </div>
-    ${chip}
-    <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:8px">🕐 ${tStr}</div>
-    ${scoreBar}${expl}${claimBtn}`;
-  document.getElementById('popup-overlay').className='open';
-}
-function closePopup(){document.getElementById('popup-overlay').className='';}
-
-// ── Claim ─────────────────────────────────────────────────────────────────
-async function claimSlot(id){
-  const btn=document.getElementById('claim-btn');
-  if(btn){btn.textContent='…';btn.disabled=true;}
-  const r=await fetch('/closer/'+TOKEN+'/slots/'+id+'/claim',{method:'POST'});
-  const d=await r.json();
-  if(d.ok){closePopup();toast('Créneau réservé ✓');setTimeout(()=>location.reload(),900);}
-  else{if(btn){btn.textContent='Prendre ce RDV';btn.disabled=false;}toast(d.error||'Erreur',true);}
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────
-function toast(msg,err){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.style.background=err?'#e94560':'#2ecc71';t.style.color=err?'#fff':'#0f0f1a';
-  t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2500);
-}
-
-// ── Mes RDV ───────────────────────────────────────────────────────────────
-function stInfo(st){
-  const m={'scheduled':['#f59e0b','À venir'],'MeetingStatus.scheduled':['#f59e0b','À venir'],
-    'completed':['#2ecc71','Signé'],'MeetingStatus.completed':['#2ecc71','Signé'],
-    'no_show':['#e94560','No-show'],'MeetingStatus.no_show':['#e94560','No-show'],
-    'cancelled':['#9ca3af','Annulé'],'MeetingStatus.cancelled':['#9ca3af','Annulé']};
-  return m[st]||['#9ca3af',st];
-}
-
-function rdvCard(m,isPast){
-  const[sc,sl]=stInfo(m.status);
-  const done=['completed','MeetingStatus.completed','cancelled','MeetingStatus.cancelled'].includes(m.status);
-  const tel=m.prospect_phone?`<a href="tel:${he(m.prospect_phone)}"
-    style="display:inline-block;margin-top:4px;padding:3px 10px;background:#6366f120;
-    border:1px solid #6366f140;border-radius:4px;color:#6366f1;font-size:10px;text-decoration:none">📞 Appeler</a>`:'';
-  const acts=isPast&&!done?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-    <button onclick="updM('${he(m.id)}','completed')"
-      style="padding:4px 12px;background:#2ecc7120;border:1px solid #2ecc7140;
-      border-radius:4px;color:#2ecc71;font-size:10px;font-weight:600;cursor:pointer">Vente</button>
-    <button onclick="updM('${he(m.id)}','relance')"
-      style="padding:4px 12px;background:#f59e0b20;border:1px solid #f59e0b40;
-      border-radius:4px;color:#f59e0b;font-size:10px;font-weight:600;cursor:pointer">Rappel</button>
-    <button onclick="updM('${he(m.id)}','no_show')"
-      style="padding:4px 12px;background:#e9456020;border:1px solid #e9456040;
-      border-radius:4px;color:#e94560;font-size:10px;font-weight:600;cursor:pointer">Refus</button>
-  </div>`:'';
-  return`<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;
-    padding:14px 16px;margin-bottom:8px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div><div style="color:#fff;font-size:13px;font-weight:600">${he(m.prospect_name)}</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px">${he(m.prospect_city)}</div>${tel}</div>
-      <div style="text-align:right;flex-shrink:0;margin-left:12px">
-        <div style="color:#6366f1;font-size:12px;font-weight:600">${he(m.scheduled_str)}</div>
-        <span style="background:${sc}20;color:${sc};font-size:9px;font-weight:600;
-          padding:1px 7px;border-radius:8px;display:inline-block;margin-top:4px">${sl}</span>
-      </div></div>${acts}</div>`;
-}
-
-async function updM(id,outcome){
-  let dv=null;
-  if(outcome==='completed'){const v=prompt('Montant du deal (€) :');if(v===null)return;dv=parseFloat(v)||0;}
-  const body={status:outcome};if(dv!==null)body.deal_value=dv;
-  const r=await fetch('/closer/'+TOKEN+'/meeting/'+id+'/complete',
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){toast('RDV mis à jour ✓');setTimeout(()=>location.reload(),900);}
-  else toast('Erreur',true);
-}
-
-function renderMesRdv(){
-  const up=MY_MEETINGS.filter(m=>m.is_future);
-  const pa=MY_MEETINGS.filter(m=>!m.is_future);
-  if(!MY_MEETINGS.length){
-    document.getElementById('mes-rdv').innerHTML=
-      '<p style="color:#374151;font-size:12px;padding:12px 0">Aucun RDV enregistré</p>';return;
-  }
-  let h='';
-  if(up.length){
-    h+=`<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
-      font-weight:700;margin-bottom:10px">À venir (${up.length})</p>`;
-    up.forEach(m=>{h+=rdvCard(m,false);});
-  }
-  if(pa.length){
-    h+=`<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
-      font-weight:700;margin:${up.length?'20px':'0'} 0 10px">Passés</p>`;
-    pa.slice(0,20).forEach(m=>{h+=rdvCard(m,true);});
-  }
-  document.getElementById('mes-rdv').innerHTML=h;
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────
-(function initFilters(){
-  const on=v=>window.innerWidth<640?v==='urgent'||v==='accessible':true;
-  Object.keys(F).forEach(k=>{
-    F[k]=on(k);
-    const chip=document.getElementById('f-'+k);
-    if(chip){
-      chip.style.background =F[k]?FC[k]+'28':'#1a1a2e';
-      chip.style.color      =F[k]?FC[k]:'#555';
-      chip.style.borderColor=F[k]?FC[k]+'50':'#2a2a4e';
+  const grid = document.getElementById('wk-grid');
+  const todayMidnight = new Date(todayDt.getFullYear(), todayDt.getMonth(), todayDt.getDate());
+  for (let w = 0; w < 4; w++) {
+    const row = document.createElement('div');
+    row.className = 'wk-row';
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(monday);
+      dt.setDate(monday.getDate() + w*7 + d);
+      const iso    = toIso(dt);
+      const color  = dayColor(iso);
+      const isPast = dt < todayMidnight;
+      const isToday = iso === TODAY;
+      const cellColor = isPast ? 'past' : color;
+      const cell = document.createElement('div');
+      let cls = 'day-cell day-' + cellColor;
+      if (isToday) cls += ' day-today';
+      cell.className = cls;
+      cell.dataset.date = iso;
+      const num = document.createElement('span');
+      num.className = 'day-num'; num.textContent = dt.getDate();
+      cell.appendChild(num);
+      if (dt.getDate() === 1) {
+        const mo = document.createElement('span');
+        mo.className = 'day-mon'; mo.textContent = MONTHS_SHORT[dt.getMonth()];
+        cell.appendChild(mo);
+      }
+      if (!isPast && color === 'locked') {
+        cell.addEventListener('click', () => openLockModal());
+      } else if (!isPast && color !== 'empty') {
+        cell.addEventListener('click', () => selectDay(iso));
+      }
+      row.appendChild(cell);
     }
-  });
-  // Force all ON on desktop
-  if(window.innerWidth>=640){
-    Object.keys(F).forEach(k=>{F[k]=true;});
-    ['urgent','accessible','pris','blocked'].forEach(k=>{
-      const chip=document.getElementById('f-'+k);
-      if(chip){chip.style.background=FC[k]+'28';chip.style.color=FC[k];chip.style.borderColor=FC[k]+'50';}
-    });
+    grid.appendChild(row);
+    if (w < 3) {
+      const sep = document.createElement('div');
+      sep.className = 'wk-sep';
+      grid.appendChild(sep);
+    }
   }
-})();
-// Auto-naviguer vers la semaine du premier slot visible si aucun slot cette semaine
-(function autoNav(){
-  const ws=weekStart(new Date());
-  const we=addD(ws,7);
-  const hasCur=SLOTS.some(s=>{const d=new Date(s.starts);return d>=ws&&d<we;});
-  if(!hasCur&&SLOTS.length>0){
-    // Trier par date et aller sur le premier slot
-    const sorted=SLOTS.slice().sort((a,b)=>new Date(a.starts)-new Date(b.starts));
-    cur=new Date(sorted[0].starts);
-  }
-})();
-// DEBUG temporaire — supprimer après validation
-try {
-  document.getElementById('cal').insertAdjacentHTML('beforebegin',
-    '<div id="dbg" style="background:#1a1a2e;border:1px solid #6366f1;border-radius:6px;padding:8px 14px;margin:8px 20px;font-size:11px;color:#a5b4fc">'
-    +'Slots chargés : '+SLOTS.length
-    +' | Urgents : '+SLOTS.filter(s=>s.is_urgent&&s.can_claim).length
-    +' | Vue : <span id="dbg-view"></span>'
-    +' | Semaine : <span id="dbg-week"></span></div>');
-} catch(e){}
-function _dbgUpdate(){
-  try{
-    document.getElementById('dbg-view').textContent=view;
-    document.getElementById('dbg-week').textContent=document.getElementById('cal-label').textContent;
-  }catch(e){}
 }
-view=window.innerWidth<640?'day':'week';
-setView(view);_dbgUpdate();
-renderMesRdv();
+
+let selectedDate = TODAY;
+
+function selectDay(iso) {
+  selectedDate = iso;
+  document.querySelectorAll('.day-cell').forEach(c => {
+    c.classList.toggle('day-selected', c.dataset.date === iso);
+  });
+  renderDay(iso);
+  setTimeout(() => document.getElementById('day-heading').scrollIntoView({behavior:'smooth', block:'nearest'}), 50);
+}
+
+const STATUS = {
+  accessible:        {dot:'#16a34a', label:'Disponible',        cls:'s-accessible',  arrow:true },
+  accessible_urgent: {dot:'#dc2626', label:'Disponible',        cls:'s-urgent',      arrow:true,  urgent:true},
+  inaccessible:      {dot:'#16a34a', label:'',                  cls:'s-inaccessible',arrow:true },
+  claimed_me:        {dot:'#7c3aed', label:'Pris — moi',        cls:'s-claimed-me',  arrow:true },
+  claimed_other:     {dot:'#f59e0b', label:'Attribué',          cls:'s-claimed-other',arrow:false},
+  safety_margin:     {dot:'#a78bfa', label:'Marge de sécurité', cls:'s-safety',      arrow:false},
+};
+
+function renderDay(iso) {
+  const dt = parseIso(iso);
+  document.getElementById('day-heading').textContent =
+    `${DAYS_LONG[dt.getDay()]} ${dt.getDate()} ${MONTHS_LONG[dt.getMonth()]} ${dt.getFullYear()}`;
+  const slots = (byDate[iso] || []).slice().sort((a,b) => a.time_start < b.time_start ? -1 : 1);
+  const list = document.getElementById('slots-list');
+  list.innerHTML = '';
+  if (!slots.length) {
+    list.innerHTML = '<div class="day-empty-msg">Aucun créneau ce jour.</div>';
+    return;
+  }
+  slots.forEach(slot => {
+    const cfg = STATUS[slot.status] || STATUS.inaccessible;
+    const div = document.createElement('div');
+    div.className = 'slot ' + cfg.cls;
+    div.dataset.clickable = cfg.arrow;
+    const time = document.createElement('div');
+    time.className = 'slot-time';
+    time.textContent = slot.time_start + ' – ' + slot.time_end;
+    const state = document.createElement('div');
+    state.className = 'slot-state';
+    const dot = document.createElement('div');
+    dot.className = 'slot-dot'; dot.style.background = cfg.dot;
+    const lbl = document.createElement('span');
+    lbl.className = 'slot-label'; lbl.style.color = cfg.dot; lbl.textContent = cfg.label;
+    state.appendChild(dot); state.appendChild(lbl);
+    if (cfg.urgent) {
+      const badge = document.createElement('span');
+      badge.className = 'slot-badge'; badge.textContent = 'URGENT';
+      state.appendChild(badge);
+    }
+    div.appendChild(time); div.appendChild(state);
+    if (cfg.arrow) {
+      const arrow = document.createElement('span');
+      arrow.className = 'slot-arrow'; arrow.textContent = '›';
+      div.appendChild(arrow);
+      div.addEventListener('click', () => openModal(slot));
+    }
+    list.appendChild(div);
+  });
+}
+
+function scoreColor(sc) {
+  return sc >= 85 ? '#ef4444' : sc >= 70 ? '#f59e0b' : '#22c55e';
+}
+function scoreLbl(sc) {
+  return sc >= 85 ? 'Situation critique — forte probabilité de conversion'
+       : sc >= 70 ? 'Écart de visibilité significatif'
+       :            'Écart de visibilité modéré';
+}
+
+function openModal(slot) {
+  const content = document.getElementById('m-content');
+  if (slot.status === 'inaccessible') {
+    content.innerHTML = `<div style="text-align:center;padding:28px 12px">
+      <div style="font-size:36px;margin-bottom:18px">🔒</div>
+      <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6;margin-bottom:8px">
+        Prenez d'abord un rendez-vous urgent pour débloquer tout le calendrier.
+      </p></div>`;
+  } else if (slot.status === 'claimed_other') {
+    content.innerHTML = '<div class="m-info">Ce créneau est déjà pris<br>par un autre closer.</div>';
+  } else {
+    const p = slot.prospect;
+    const isUrgent = slot.status === 'accessible_urgent';
+    const isMe     = slot.status === 'claimed_me';
+    const tagBg    = isUrgent ? '#7f1d1d' : isMe ? '#2e1065' : '#052e16';
+    const tagColor = isUrgent ? '#fca5a5' : isMe ? '#c4b5fd' : '#86efac';
+    const tagTxt   = isUrgent ? 'URGENT'  : isMe ? 'Pris par moi' : 'Disponible';
+    const elems = p ? p.elements.map(e => `<div class="m-elem">${e}</div>`).join('') : '';
+    const sc = p ? p.score : 0;
+    const scCol = scoreColor(sc);
+    content.innerHTML = `
+      <span class="m-tag" style="background:${tagBg};color:${tagColor}">${tagTxt}</span>
+      ${p ? `
+      <div class="m-company">${p.company}</div>
+      <div class="m-meta">${p.city}&ensp;·&ensp;${p.profession}</div>
+      <div class="m-score-wrap">
+        <div class="m-score-num" style="color:${scCol}">${sc}</div>
+        <div style="flex:1">
+          <div class="m-score-lbl">${scoreLbl(sc)}</div>
+          <div class="m-elements">${elems}</div>
+        </div>
+      </div>` : ''}
+      <div class="m-divider"></div>
+      <div class="m-datetime">${slot.time_start} – ${slot.time_end}</div>
+      ${isMe
+        ? '<button class="btn-claim" disabled>Vous avez déjà ce créneau</button>'
+        : '<button class="btn-claim" id="btn-claim">Prendre ce rendez-vous</button>'
+      }`;
+    if (!isMe) {
+      document.getElementById('btn-claim').addEventListener('click', function() {
+        claimSlot(this, slot);
+      });
+    }
+  }
+  document.getElementById('m-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function claimSlot(btn, slot) {
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/closer/' + TOKEN + '/slots/' + slot.id + '/claim', {method:'POST'});
+    if (r.ok) {
+      slot.status = 'claimed_me';
+      const daySlots = (byDate[slot.date] || []).slice().sort((a,b) => a.time_start < b.time_start ? -1 : 1);
+      const idx = daySlots.findIndex(s => s.id === slot.id);
+      if (idx >= 0 && idx < daySlots.length - 1) {
+        const next = daySlots[idx + 1];
+        if (next.status === 'accessible' || next.status === 'accessible_urgent') {
+          next.status = 'safety_margin';
+        }
+      }
+      btn.textContent = '✓ Créneau réservé !';
+      btn.style.background = '#16a34a';
+      setTimeout(() => { renderDay(slot.date); refreshDayCell(slot.date); closeModal(); }, 450);
+    } else {
+      const msg = await r.json().catch(() => ({}));
+      btn.textContent = msg.detail || 'Erreur — réessayez';
+      btn.style.background = '#dc2626';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = 'Erreur réseau';
+    btn.style.background = '#dc2626';
+    btn.disabled = false;
+  }
+}
+
+function refreshDayCell(iso) {
+  const cell = document.querySelector('.day-cell[data-date="' + iso + '"]');
+  if (!cell || cell.classList.contains('day-past')) return;
+  const newColor = dayColor(iso);
+  ['day-red','day-green','day-locked','day-empty'].forEach(c => cell.classList.remove(c));
+  cell.classList.add('day-' + newColor);
+  if (newColor !== 'empty' && newColor !== 'past') {
+    cell.onclick = newColor === 'locked' ? () => openLockModal() : () => selectDay(iso);
+  }
+}
+
+function openLockModal() {
+  document.getElementById('m-content').innerHTML = `
+    <div style="text-align:center;padding:28px 12px">
+      <div style="font-size:36px;margin-bottom:18px">🔒</div>
+      <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6">
+        Prenez d'abord un rendez-vous urgent pour débloquer tout le calendrier.
+      </p></div>`;
+  document.getElementById('m-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('m-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function handleOverlay(e) {
+  if (e.target === document.getElementById('m-overlay')) closeModal();
+}
+
+renderGrid();
+selectDay(TODAY);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 </script>
 </body></html>"""
 
     _html = (_html
-        .replace("__NAME__",          name)
-        .replace("__TOKEN__",         token)
-        .replace("__BANNER_MSG__",    banner_msg)
-        .replace("__BANNER_COLOR__",  banner_color)
-        .replace("__BANNER_BG__",     banner_bg)
-        .replace("__BANNER_BDR__",    banner_bdr)
-        .replace("__MY_RANK__",       my_rank)
-        .replace("__SLOTS_JSON__",    slots_json)
-        .replace("__MEETINGS_JSON__", meetings_json)
+        .replace("__NAME__",       name)
+        .replace("__TOKEN__",      token)
+        .replace("__TODAY__",      today_str)
+        .replace("__SLOTS_JSON__", slots_json)
     )
     return HTMLResponse(_html)
 
