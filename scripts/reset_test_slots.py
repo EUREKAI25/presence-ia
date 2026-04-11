@@ -56,8 +56,9 @@ def reset_test_slots(dry_run: bool = False) -> dict:
     Remet à zéro les données de test et injecte un nouveau jeu.
     Retourne un résumé {closers, slots_proches, slots_moyens, slots_lointains, meetings}.
     """
-    now   = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-    today = now.replace(hour=0)
+    # Utiliser le temps local du serveur (même référence que compute_outbound_need)
+    now   = datetime.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # ── Définition des slots ──────────────────────────────────────────────────
     # Créneaux à 9h, 10h, 11h, 14h, 15h — 20 min chacun
