@@ -736,13 +736,47 @@ def _job_imap_reply_poll():
 
 
 def _job_run_due_targets():
-    """Wrapper DB → appelle run_due_targets() depuis prospection_admin."""
+    """
+    Chantier C — Exécute la prospection pour la paire active uniquement.
+    Sélectionne automatiquement la meilleure paire si aucune n'est définie.
+    Vérifie la saturation après chaque exécution.
+    """
     try:
+        from datetime import datetime, timedelta
         from .database import SessionLocal
-        from .api.routes.prospection_admin import run_due_targets
+        from .active_pair import get_active_pair, select_next_pair, check_saturation
+        from .models import ProspectionTargetDB
+        from .api.routes.prospection_admin import _run_prospection, _FREQ_DAYS
+
         db = SessionLocal()
         try:
-            run_due_targets(db)
+            # Obtenir ou sélectionner la paire active
+            state = get_active_pair() or select_next_pair(db)
+            if not state:
+                log.info("_job_run_due_targets: aucune paire disponible")
+                return
+
+            city, profession = state["city"], state["profession"]
+            t = db.query(ProspectionTargetDB).filter_by(
+                city=city, profession=profession, active=True,
+            ).first()
+            if not t:
+                log.warning("_job_run_due_targets: paire active %s/%s introuvable",
+                            profession, city)
+                return
+
+            # Vérifier fréquence
+            delta_days = _FREQ_DAYS.get(t.frequency, 7)
+            if t.last_run and (datetime.utcnow() - t.last_run) < timedelta(days=delta_days):
+                log.info("_job_run_due_targets: %s/%s — pas encore dû", profession, city)
+                return
+
+            res = _run_prospection(db, t)
+            log.info("_job_run_due_targets: %s/%s — %d prospects importés",
+                     profession, city, res["imported"])
+
+            # Vérifier saturation après prospection
+            check_saturation(db)
         finally:
             db.close()
     except Exception as e:
@@ -1702,11 +1736,23 @@ def _job_outbound(force: bool = False):
 
     log.info("[OUTBOUND] démarrage — mode=%s cap=%d", mode_label, cap)
 
+    # ── Chantier C : vérifier/avancer la paire active ────────────────────────
+    from .active_pair import check_saturation as _check_saturation
+    with SessionLocal() as _db_pair:
+        _active = _check_saturation(_db_pair)
+    if not _active:
+        log.warning("[OUTBOUND] aucune paire active disponible — job annulé")
+        return
+    log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
+             _active["profession"], _active["city"], _active.get("score", 0))
+
     # ── Sélection : ia_results + email non null + non encore envoyés ──────────
     with SessionLocal() as db:
         has_email = (
             db.query(V3ProspectDB)
             .filter(
+                V3ProspectDB.city       == _active["city"],
+                V3ProspectDB.profession == _active["profession"],
                 V3ProspectDB.ia_results.isnot(None),
                 V3ProspectDB.sent_at.is_(None),
                 V3ProspectDB.email.isnot(None),

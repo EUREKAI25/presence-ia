@@ -520,6 +520,114 @@ def _build_slot_coverage(need: dict | None) -> str:
     )
 
 
+def _build_active_pair_card(db, token: str) -> str:
+    """Card Chantier C — paire active + classement des paires disponibles."""
+    from ...active_pair import get_active_pair, _available_count
+    from ...models import ProspectionTargetDB, ProfessionDB, ScoringConfigDB
+    from ...database import db_score_global
+
+    state = get_active_pair()
+
+    # Classement des paires
+    cfg     = db.query(ScoringConfigDB).filter_by(id="default").first()
+    targets = db.query(ProspectionTargetDB).filter_by(active=True).all()
+    ranked  = []
+    for t in targets:
+        prof  = db.query(ProfessionDB).filter_by(id=t.profession).first()
+        score = db_score_global(prof, cfg) if (prof and cfg) else 0.0
+        avail = _available_count(db, t.city, t.profession)
+        ranked.append({"id": t.id, "city": t.city, "profession": t.profession,
+                       "score": score, "available": avail})
+    ranked.sort(key=lambda x: x["score"], reverse=True)
+
+    # Bandeau paire active
+    if state:
+        pair_label = f'{state["city"]} · {state["profession"]}'
+        started    = state["started_at"][:10] if state.get("started_at") else "—"
+        avail_cur  = _available_count(db, state["city"], state["profession"])
+        override_badge = (
+            '<span style="background:#f59e0b20;color:#f59e0b;font-size:9px;font-weight:700;'
+            'padding:1px 6px;border-radius:8px;margin-left:6px">FORCÉE</span>'
+        ) if state.get("override") else ""
+        active_html = (
+            f'<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;'
+            f'padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;'
+            f'justify-content:space-between;flex-wrap:wrap;gap:8px">'
+            f'<div>'
+            f'<span style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.05em">Paire active</span>{override_badge}<br>'
+            f'<span style="font-size:14px;font-weight:700;color:#111827">{pair_label}</span>'
+            f'<span style="color:#6b7280;font-size:11px;margin-left:10px">'
+            f'score {state["score"]} · depuis {started} · {avail_cur} prospects dispo</span>'
+            f'</div>'
+            f'<button onclick="resetActivePair()" '
+            f'style="padding:6px 14px;background:#fff;border:1px solid #d1d5db;border-radius:6px;'
+            f'font-size:12px;cursor:pointer;color:#374151">Réinitialiser</button>'
+            f'</div>'
+        )
+    else:
+        active_html = (
+            f'<div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;'
+            f'padding:10px 14px;margin-bottom:12px">'
+            f'<span style="font-size:12px;color:#854d0e">Aucune paire active — '
+            f'sélection automatique au prochain job.</span>'
+            f'</div>'
+        )
+
+    # Tableau des paires classées
+    rows = ""
+    for r in ranked:
+        is_active = state and state["city"] == r["city"] and state["profession"] == r["profession"]
+        sat_color = "#6b7280" if r["available"] == 0 else "#111827"
+        sat_label = "saturée" if r["available"] == 0 else f'{r["available"]} dispo'
+        rows += (
+            f'<tr style="border-bottom:1px solid #f3f4f6;background:{"#f0fdf4" if is_active else "transparent"}">'
+            f'<td style="padding:8px 12px;font-size:12px;font-weight:{"700" if is_active else "400"};color:{sat_color}">'
+            f'{r["city"]} · {r["profession"]}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:#6366f1;font-weight:600">{r["score"]}</td>'
+            f'<td style="padding:8px 12px;font-size:12px;color:{sat_color}">{sat_label}</td>'
+            f'<td style="padding:8px 12px">'
+            + (
+                '<span style="font-size:10px;font-weight:600;color:#059669;background:#ecfdf5;'
+                'padding:1px 6px;border-radius:8px">active</span>'
+                if is_active else
+                f'<button onclick="forceActivePair(\'{r["id"]}\')" '
+                f'style="padding:3px 10px;background:#f3f4f6;border:1px solid #e5e7eb;'
+                f'border-radius:4px;font-size:11px;cursor:pointer;color:#374151">Forcer</button>'
+            )
+            + f'</td></tr>'
+        )
+
+    return (
+        f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;'
+        f'padding:16px 20px;margin-bottom:12px">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+        f'<span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;'
+        f'letter-spacing:.05em">Sélection paire (Chantier C)</span>'
+        f'</div>'
+        f'{active_html}'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<thead><tr style="border-bottom:2px solid #e5e7eb">'
+        f'<th style="text-align:left;padding:7px 12px;font-size:11px;color:#6b7280">Paire</th>'
+        f'<th style="text-align:left;padding:7px 12px;font-size:11px;color:#6b7280">Score</th>'
+        f'<th style="text-align:left;padding:7px 12px;font-size:11px;color:#6b7280">Prospects</th>'
+        f'<th style="padding:7px 12px"></th>'
+        f'</tr></thead><tbody>{rows}</tbody></table>'
+        f'<script>'
+        f'async function resetActivePair(){{'
+        f'  if(!confirm("Réinitialiser la paire active ?")) return;'
+        f'  await fetch("/api/admin/active-pair/reset?token={token}",{{method:"POST"}});'
+        f'  location.reload();'
+        f'}}'
+        f'async function forceActivePair(tid){{'
+        f'  await fetch("/api/admin/active-pair/force/"+tid+"?token={token}",{{method:"POST"}});'
+        f'  location.reload();'
+        f'}}'
+        f'</script>'
+        f'</div>'
+    )
+
+
 def _build_cost_section(costs: dict) -> str:
     """Accordéon coûts API — Google Places + Gemini."""
     cpl = f"${costs['cost_per_lead']:.4f}" if costs["cost_per_lead"] is not None else "—"
@@ -795,6 +903,9 @@ function uploadCityHeaderFile(city, token, input) {{
 
   <!-- Pilotage pipeline (slots Calendly) -->
   {_build_slot_coverage(slot_need)}
+
+  <!-- Chantier C — Sélection paire active -->
+  {_build_active_pair_card(db, token)}
 
   <!-- Pipeline / crons (accordéon natif <details>) -->
   <details style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden">
@@ -1277,3 +1388,44 @@ h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
   <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
 </p>
 </div></body></html>""")
+
+
+
+# ── Chantier C — endpoints paire active ──────────────────────────────────────
+
+from fastapi.responses import JSONResponse as _JSONResponse
+
+@router.post("/api/admin/active-pair/reset")
+def active_pair_reset(request: Request):
+    if (r := _check_token(request)) is not None: return r
+    from ...active_pair import clear_active_pair
+    clear_active_pair("reset_admin")
+    return _JSONResponse({"ok": True, "msg": "Paire active réinitialisée — sélection auto au prochain job."})
+
+
+@router.post("/api/admin/active-pair/force/{target_id}")
+def active_pair_force(target_id: str, request: Request, db: Session = Depends(get_db)):
+    if (r := _check_token(request)) is not None: return r
+    from ...active_pair import set_active_pair, _available_count
+    from ...models import ProspectionTargetDB, ProfessionDB, ScoringConfigDB
+    from ...database import db_score_global
+
+    t = db.query(ProspectionTargetDB).filter_by(id=target_id).first()
+    if not t:
+        return _JSONResponse({"ok": False, "error": "Cible introuvable"}, status_code=404)
+
+    cfg   = db.query(ScoringConfigDB).filter_by(id="default").first()
+    prof  = db.query(ProfessionDB).filter_by(id=t.profession).first()
+    score = db_score_global(prof, cfg) if (prof and cfg) else 0.0
+    state = set_active_pair(t.city, t.profession, score, str(t.id), override=True)
+    return _JSONResponse({"ok": True, "state": state})
+
+
+@router.get("/api/admin/active-pair")
+def active_pair_status(request: Request, db: Session = Depends(get_db)):
+    if (r := _check_token(request)) is not None: return r
+    from ...active_pair import get_active_pair, _available_count
+    state = get_active_pair()
+    if state:
+        state["available"] = _available_count(db, state["city"], state["profession"])
+    return _JSONResponse(state or {})
