@@ -43,6 +43,8 @@ def init_db():
             ("v3_prospects", "email_sent_at DATETIME"),
             ("v3_prospects", "email_opened_at DATETIME"),
             ("v3_prospects", "email_bounced_at DATETIME"),
+            ("v3_prospects", "email_clicked_at DATETIME"),
+            ("v3_prospects", "email_booked_at DATETIME"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col}"))

@@ -1345,6 +1345,33 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
         V3ProspectDB.email.isnot(None),
     ).count()
 
+    # ── Délais moyens de réaction ─────────────────────────────────────────────
+    def _avg_delay_h(records, ts_start_attr, ts_end_attr) -> str:
+        """Retourne le délai moyen en heures entre deux timestamps, sous forme lisible."""
+        deltas = []
+        for r in records:
+            t0 = getattr(r, ts_start_attr, None)
+            t1 = getattr(r, ts_end_attr, None)
+            if t0 and t1 and t1 > t0:
+                deltas.append((t1 - t0).total_seconds())
+        if not deltas:
+            return "—"
+        avg_s = sum(deltas) / len(deltas)
+        if avg_s < 3600:
+            return f"{int(avg_s // 60)} min ({len(deltas)} obs.)"
+        return f"{avg_s / 3600:.1f} h ({len(deltas)} obs.)"
+
+    all_sent = db.query(V3ProspectDB).filter(V3ProspectDB.email_sent_at.isnot(None)).all()
+    delay_open   = _avg_delay_h(all_sent, "email_sent_at", "email_opened_at")
+    delay_click  = _avg_delay_h(all_sent, "email_sent_at", "email_clicked_at")
+    delay_booked = _avg_delay_h(all_sent, "email_sent_at", "email_booked_at")
+
+    delay_cards = (
+        _kpi_card("Délai ouverture",  delay_open,   "envoi → ouverture", "#8b5cf6") +
+        _kpi_card("Délai clic",       delay_click,  "envoi → clic",      "#f59e0b") +
+        _kpi_card("Délai RDV",        delay_booked, "envoi → booking",   "#10b981")
+    )
+
     nav = admin_nav(token, "outbound")
     return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Outbound — Présence IA</title>
@@ -1369,6 +1396,9 @@ h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
   <span style="color:#6366f1">{eligible_total:,} prospects éligibles en DB</span></p>
 
 <div class="kpis">{kpis}</div>
+
+<h2>Délais moyens de réaction</h2>
+<div class="kpis">{delay_cards}</div>
 
 <h2>7 derniers jours</h2>
 <table>

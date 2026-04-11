@@ -21,7 +21,7 @@ router = APIRouter()
 _EVENT_MAP = {
     "delivered":   "delivered",
     "open":        "opened",
-    "click":       "opened",   # considéré comme ouvert
+    "click":       "clicked",
     "bounce":      "bounced",
     "hardBounce":  "bounced",
     "softBounce":  "bounced",
@@ -122,6 +122,12 @@ async def brevo_webhook(request: Request):
                 prospect.email_status = new_status
                 if new_status == "opened" and not prospect.email_opened_at:
                     prospect.email_opened_at = event_dt
+                if new_status == "clicked":
+                    if not prospect.email_clicked_at:
+                        prospect.email_clicked_at = event_dt
+                    # un clic implique une ouverture
+                    if not prospect.email_opened_at:
+                        prospect.email_opened_at = event_dt
                 if new_status == "bounced" and not prospect.email_bounced_at:
                     prospect.email_bounced_at = event_dt
                 db.commit()

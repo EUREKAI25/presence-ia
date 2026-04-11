@@ -521,6 +521,11 @@ def _job_calendly_poll():
                 if new_meeting:
                     db_sync_slot_from_meeting(mdb, "presence-ia", new_meeting)
 
+                # Tracker le booking sur le prospect V3
+                if prospect and not prospect.email_booked_at:
+                    prospect.email_booked_at = datetime.utcnow()
+                    db.commit()
+
                 # Stopper la séquence email : marquer la dernière livraison comme "replied"
                 from marketing_module.models import ProspectDeliveryDB
                 last_delivery = (
