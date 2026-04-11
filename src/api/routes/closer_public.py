@@ -2468,7 +2468,12 @@ function renderGrid() {
   });
   const grid = document.getElementById('wk-grid');
   const todayMidnight = new Date(todayDt.getFullYear(), todayDt.getMonth(), todayDt.getDate());
-  for (let w = 0; w < 4; w++) {
+  // Nombre de semaines dynamique : couvre jusqu'au dernier slot + 1 semaine de marge (min 2)
+  let lastDt = todayMidnight;
+  SLOTS.forEach(s => { const d = parseIso(s.date); if (d > lastDt) lastDt = d; });
+  const msPerWeek = 7 * 24 * 3600 * 1000;
+  const weeksNeeded = Math.max(2, Math.ceil((lastDt - monday + msPerWeek) / msPerWeek));
+  for (let w = 0; w < weeksNeeded; w++) {
     const row = document.createElement('div');
     row.className = 'wk-row';
     for (let d = 0; d < 7; d++) {
