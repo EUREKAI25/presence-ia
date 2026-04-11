@@ -2395,12 +2395,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="hdr">
   <div class="hdr-left">
-    <span class="hdr-title">Agenda</span>
+    <span class="hdr-title">__NAME__</span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span style="font-size:13px;font-weight:600;color:#fff">__NAME__</span>
-    <a href="/closer/__TOKEN__" class="hdr-back">← Portail</a>
-  </div>
+  <a href="/closer/__TOKEN__" class="hdr-back">← Portail</a>
 </div>
 
 <div class="main">
