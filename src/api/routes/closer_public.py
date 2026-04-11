@@ -1508,15 +1508,17 @@ async function requestPayment(){{
 body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 table{{width:100%;border-collapse:collapse}}
 tr:hover{{background:#111127}}
+.hdr{{background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}}
+.hdr-left{{display:flex;align-items:center;gap:10px}}
+.hdr-title{{font-size:14px;font-weight:700;color:#fff}}
+.hdr-back{{color:#6366f1;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#6366f112}}
 </style></head><body>
 
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
-            display:flex;align-items:center;justify-content:space-between">
-  <div style="display:flex;align-items:center;gap:10px">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:26px">
-    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+<div class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-title">Portail</span>
   </div>
-  <span style="color:#fff;font-weight:600;font-size:14px">{name}</span>
+  <a href="/closer/{token}/slots" class="hdr-back">Agenda →</a>
 </div>
 
 <div style="max-width:920px;margin:0 auto;padding:28px 20px">
@@ -2395,7 +2397,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="hdr">
   <div class="hdr-left">
-    <span class="hdr-title">__NAME__</span>
+    <span class="hdr-title">Agenda</span>
   </div>
   <a href="/closer/__TOKEN__" class="hdr-back">← Portail</a>
 </div>
