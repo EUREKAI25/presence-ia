@@ -1631,7 +1631,78 @@ function switchOffer(slug){{
   }});
 }}"""
 
-    panel_script = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
+    # ── Panel Script : accordéon ─────────────────────────────────────────────
+    import re as _re_scr
+    _scr_raw    = content.get("pitch_script", "")
+    _scr_blocks = [b.strip() for b in _re_scr.split(r'─{5,}', _scr_raw) if b.strip()]
+
+    def _render_script_block(raw: str, idx: int) -> str:
+        lines      = [ln for ln in raw.split("\n") if ln.strip()]
+        title_line = lines[0] if lines else f"Étape {idx+1}"
+        body_lines = lines[1:]
+
+        # Badge : numéroté si commence par chiffre, sinon "·"
+        num_match  = _re_scr.match(r'^(\d+)\.?\s+', title_line)
+        badge_num  = num_match.group(1) if num_match else "·"
+        title_clean = _re_scr.sub(r'^\d+\.?\s+', '', title_line).strip()
+
+        body_html = ""
+        for ln in body_lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            if stripped.startswith('"') or stripped.startswith('\u201c'):
+                body_html += (
+                    f'<div style="border-left:2px solid #6366f1;padding:8px 12px;margin:8px 0;'
+                    f'background:#6366f108;border-radius:0 6px 6px 0">'
+                    f'<span style="color:#e8e8f0;font-size:13px;font-style:italic">{stripped}</span>'
+                    f'</div>'
+                )
+            elif stripped.startswith("["):
+                body_html += (
+                    f'<p style="color:#6b7280;font-size:11px;font-style:italic;margin:4px 0">{stripped}</p>'
+                )
+            elif stripped.startswith("→") or stripped.startswith("Si ") or stripped.startswith("Ordre"):
+                body_html += (
+                    f'<div style="display:flex;gap:8px;padding:4px 0">'
+                    f'<span style="color:#6366f1;flex-shrink:0">›</span>'
+                    f'<span style="color:#ccc;font-size:13px">{stripped.lstrip("→").strip()}</span>'
+                    f'</div>'
+                )
+            elif stripped.isupper() and len(stripped) > 3:
+                body_html += (
+                    f'<p style="color:#a5b4fc;font-size:10px;font-weight:700;text-transform:uppercase;'
+                    f'letter-spacing:.1em;margin:14px 0 6px">{stripped.rstrip(" :")}</p>'
+                )
+            else:
+                body_html += (
+                    f'<p style="color:#ccc;font-size:13px;line-height:1.7;margin:4px 0">{stripped}</p>'
+                )
+
+        return (
+            f'<details style="border:1px solid #2a2a4e;border-radius:8px;margin-bottom:8px;overflow:hidden">'
+            f'<summary style="list-style:none;padding:14px 16px;cursor:pointer;display:flex;'
+            f'align-items:center;gap:12px;background:#1a1a2e;user-select:none">'
+            f'<span style="background:#6366f120;color:#a5b4fc;font-size:10px;font-weight:700;'
+            f'padding:2px 7px;border-radius:10px;flex-shrink:0">{badge_num}</span>'
+            f'<span style="color:#e8e8f0;font-size:13px;font-weight:600">{title_clean}</span>'
+            f'<span style="margin-left:auto;color:#6b7280;font-size:16px">▾</span>'
+            f'</summary>'
+            f'<div style="padding:16px;background:#0f0f1a">{body_html}</div>'
+            f'</details>'
+        )
+
+    _scr_items = "".join(_render_script_block(b, i) for i, b in enumerate(_scr_blocks))
+
+    panel_script = f"""
+<div style="margin-bottom:20px">
+  <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:4px">Script de vente</h2>
+  <p style="color:#6b7280;font-size:12px">Déroulé du call — 20 minutes.</p>
+</div>
+<style>
+details[open] summary span:last-child{{transform:rotate(180deg);transition:transform .2s}}
+</style>
+{_scr_items}"""
 
     # ── Panel Objections : accordéon ─────────────────────────────────────────
     import re as _re_obj
