@@ -1631,8 +1631,80 @@ function switchOffer(slug){{
   }});
 }}"""
 
-    panel_script      = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
-    panel_objections  = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
+    panel_script = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
+
+    # ── Panel Objections : accordéon ─────────────────────────────────────────
+    import re as _re_obj
+    _obj_raw    = content.get("objections", "")
+    _obj_blocks = [b.strip() for b in _re_obj.split(r'─{5,}', _obj_raw) if b.strip()]
+
+    def _render_objection(raw: str, idx: int) -> str:
+        lines      = [ln for ln in raw.split("\n") if ln.strip()]
+        title_line = lines[0] if lines else f"Objection {idx+1}"
+        body_lines = lines[1:]
+
+        body_html = ""
+        for ln in body_lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            # Logique / variante labels
+            if stripped.upper().startswith(("LOGIQUE", "VARIANTE", "À ÉVITER", "SI OUI", "SI NON",
+                                            "SI VAGUE", "SI RÉSISTANCE", "SI INSISTANCE",
+                                            "SI SCEPTICISME", "SI L'OBJECTION", "SI TIMING")):
+                body_html += (
+                    f'<p style="color:#f59e0b;font-size:10px;font-weight:700;text-transform:uppercase;'
+                    f'letter-spacing:.1em;margin:14px 0 6px">{stripped.rstrip(" :")}</p>'
+                )
+            elif stripped.startswith("→"):
+                body_html += (
+                    f'<div style="display:flex;gap:8px;padding:4px 0">'
+                    f'<span style="color:#f59e0b;flex-shrink:0">→</span>'
+                    f'<span style="color:#ccc;font-size:13px">{stripped[1:].strip()}</span>'
+                    f'</div>'
+                )
+            elif stripped.startswith('"') or stripped.startswith('\u201c'):
+                # Réplique entre guillemets → citation stylisée
+                body_html += (
+                    f'<div style="border-left:2px solid #f59e0b;padding:8px 12px;margin:8px 0;'
+                    f'background:#f59e0b08;border-radius:0 6px 6px 0">'
+                    f'<span style="color:#e8e8f0;font-size:13px;font-style:italic">{stripped}</span>'
+                    f'</div>'
+                )
+            elif stripped.startswith("["):
+                body_html += (
+                    f'<p style="color:#6b7280;font-size:11px;font-style:italic;margin:4px 0">{stripped}</p>'
+                )
+            else:
+                body_html += (
+                    f'<p style="color:#ccc;font-size:13px;line-height:1.7;margin:4px 0">{stripped}</p>'
+                )
+
+        return (
+            f'<details style="border:1px solid #2a2a4e;border-radius:8px;margin-bottom:8px;overflow:hidden">'
+            f'<summary style="list-style:none;padding:14px 16px;cursor:pointer;display:flex;'
+            f'align-items:center;gap:12px;background:#1a1a2e;user-select:none">'
+            f'<span style="background:#f59e0b20;color:#f59e0b;font-size:10px;font-weight:700;'
+            f'padding:2px 7px;border-radius:10px;flex-shrink:0">{idx+1}</span>'
+            f'<span style="color:#e8e8f0;font-size:13px;font-weight:600">{title_line.lstrip("0123456789. ")}</span>'
+            f'<span style="margin-left:auto;color:#6b7280;font-size:16px">▾</span>'
+            f'</summary>'
+            f'<div style="padding:16px;background:#0f0f1a">{body_html}</div>'
+            f'</details>'
+        )
+
+    _obj_items = "".join(_render_objection(b, i) for i, b in enumerate(_obj_blocks))
+
+    panel_objections = f"""
+<div style="margin-bottom:20px">
+  <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:4px">Réponses aux objections</h2>
+  <p style="color:#6b7280;font-size:12px">Cliquez sur une objection pour afficher la réponse.</p>
+</div>
+<style>
+details[open] summary span:last-child{{transform:rotate(180deg)}}
+details summary::-webkit-details-marker{{display:none}}
+</style>
+{_obj_items}"""
 
     panels = {
         "rdv":         panel_rdv,
