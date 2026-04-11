@@ -133,10 +133,15 @@ def check_saturation(db) -> dict | None:
 def _available_count(db, city: str, profession: str) -> int:
     """Nombre de prospects disponibles pour outbound sur cette paire."""
     from src.models import V3ProspectDB
+    from sqlalchemy import or_
     return db.query(V3ProspectDB).filter(
         V3ProspectDB.city       == city,
         V3ProspectDB.profession == profession,
         V3ProspectDB.email.isnot(None),
         V3ProspectDB.sent_at.is_(None),
-        V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
+        # NULL NOT IN (...) = NULL en SQL → exclut à tort les lignes sans statut
+        or_(
+            V3ProspectDB.email_status.is_(None),
+            V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
+        ),
     ).count()
