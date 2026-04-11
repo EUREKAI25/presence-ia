@@ -1486,7 +1486,151 @@ async function requestPayment(){{
             f'</div>'
         )
 
-    panel_offre       = _resource_block(content.get("offer_title","L'offre") + f' — {content.get("offer_price","")}', content.get("offer_pitch",""), "#2ecc71")
+    # ── Panel Offre : 3 sous-onglets ─────────────────────────────────────────
+    import re as _re_off
+    _pitch_raw   = content.get("offer_pitch", "")
+    _offer_blocks = [b.strip() for b in _re_off.split(r'─{5,}', _pitch_raw) if b.strip()]
+
+    _OFFER_META = [
+        {"slug": "o1", "label": "Offre 1", "color": "#6366f1", "bg": "#6366f115", "border": "#6366f130", "comm": "90€"},
+        {"slug": "o2", "label": "Offre 2", "color": "#2ecc71", "bg": "#2ecc7115", "border": "#2ecc7130", "comm": "630€"},
+        {"slug": "o3", "label": "Offre 3", "color": "#f59e0b", "bg": "#f59e0b15", "border": "#f59e0b30", "comm": "1 620€"},
+    ]
+
+    def _render_offer_block(raw: str, meta: dict) -> str:
+        lines = raw.split("\n")
+        title_line = lines[0].strip() if lines else ""
+        body_lines = lines[1:]
+
+        # Découpe en sections (ligne vide = séparateur, "→" = bullet)
+        html_parts = []
+        current_section = []
+        current_label  = None
+
+        def _flush():
+            nonlocal current_label, current_section
+            if not current_section and not current_label:
+                return
+            if current_label:
+                html_parts.append(
+                    f'<p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;'
+                    f'letter-spacing:.1em;margin:18px 0 8px">{current_label}</p>'
+                )
+            for ln in current_section:
+                if ln.startswith("→"):
+                    item = ln[1:].strip()
+                    html_parts.append(
+                        f'<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;'
+                        f'border-bottom:1px solid #1e1e38">'
+                        f'<span style="color:{meta["color"]};font-size:12px;flex-shrink:0">→</span>'
+                        f'<span style="color:#e8e8f0;font-size:13px">{item}</span>'
+                        f'</div>'
+                    )
+                else:
+                    html_parts.append(
+                        f'<p style="color:#ccc;font-size:13px;line-height:1.7;margin-bottom:4px">{ln}</p>'
+                    )
+            current_section = []
+            current_label   = None
+
+        # Parse les labels de section (majuscules seules)
+        _section_keywords = {"POUR QUI", "CE QU'ON LIVRE", "CE QU'ON FAIT",
+                              "GARANTIE", "EXCLUSIVITÉ TERRITORIALE", "RÉSULTAT"}
+
+        for ln in body_lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            # Détection label section
+            is_label = (stripped.isupper() and len(stripped) > 3) or any(
+                stripped.upper().startswith(kw) for kw in _section_keywords
+            )
+            if is_label and not stripped.startswith("→"):
+                _flush()
+                current_label = stripped.rstrip(" :")
+            else:
+                current_section.append(stripped)
+        _flush()
+
+        # Badge commission
+        comm_badge = (
+            f'<div style="background:{meta["bg"]};border:1px solid {meta["border"]};'
+            f'border-radius:6px;padding:10px 14px;display:inline-flex;align-items:center;gap:8px;margin-top:16px">'
+            f'<span style="color:#9ca3af;font-size:11px">Commission closer</span>'
+            f'<span style="color:{meta["color"]};font-size:16px;font-weight:700">{meta["comm"]}</span>'
+            f'</div>'
+        )
+
+        return (
+            f'<div>'
+            f'<div style="background:{meta["bg"]};border:1px solid {meta["border"]};'
+            f'border-radius:10px;padding:16px 18px;margin-bottom:18px">'
+            f'<p style="color:{meta["color"]};font-size:11px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.1em;margin-bottom:4px">{meta["label"]}</p>'
+            f'<p style="color:#fff;font-size:15px;font-weight:700;line-height:1.3">{title_line}</p>'
+            f'{comm_badge}'
+            f'</div>'
+            f'{"".join(html_parts)}'
+            f'</div>'
+        )
+
+    # Construire les 3 panneaux (skip le bloc intro s'il est avant les offres)
+    _offer_panels = []
+    for blk in _offer_blocks:
+        if blk.upper().startswith("OFFRE"):
+            _offer_panels.append(blk)
+
+    while len(_offer_panels) < 3:
+        _offer_panels.append("")
+
+    _offer_tabs_btns = "".join(
+        f'<button onclick="switchOffer(\'{m["slug"]}\')" id="obtn-{m["slug"]}" '
+        f'style="padding:7px 16px;border:1px solid {"" + m["border"]};border-radius:6px;cursor:pointer;'
+        f'font-size:12px;font-weight:{"700" if i==0 else "400"};'
+        f'background:{"" + m["bg"] if i==0 else "#0f0f1a"};'
+        f'color:{"" + m["color"] if i==0 else "#6b7280"}">'
+        f'{m["label"]}</button>'
+        for i, m in enumerate(_OFFER_META)
+    )
+
+    _offer_panels_html = "".join(
+        f'<div id="opanel-{m["slug"]}" style="display:{"block" if i==0 else "none"}">'
+        f'{_render_offer_block(_offer_panels[i], m)}'
+        f'</div>'
+        for i, m in enumerate(_OFFER_META)
+    )
+
+    _offer_meta_js = ','.join(
+        f'"{m["slug"]}":{{"bg":"{m["bg"]}","border":"{m["border"]}","color":"{m["color"]}"}}'
+        for m in _OFFER_META
+    )
+    _offer_slugs_js = ','.join(f'"{m["slug"]}"' for m in _OFFER_META)
+
+    panel_offre = f"""
+<div style="margin-bottom:20px">
+  <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:4px">Les offres</h2>
+  <p style="color:#6b7280;font-size:12px">Cliquez sur une offre pour afficher les détails.</p>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:20px">{_offer_tabs_btns}</div>
+<div id="offer-panels">{_offer_panels_html}</div>"""
+
+    # switchOffer sera injecté dans le main <script> plus bas
+    _switch_offer_js = f"""
+function switchOffer(slug){{
+  [{_offer_slugs_js}].forEach(s=>{{
+    document.getElementById('opanel-'+s).style.display = s===slug?'block':'none';
+  }});
+  const meta={{{_offer_meta_js}}};
+  [{_offer_slugs_js}].forEach(s=>{{
+    const b=document.getElementById('obtn-'+s);
+    const active=s===slug;
+    b.style.background=active?meta[s].bg:'#0f0f1a';
+    b.style.color=active?meta[s].color:'#6b7280';
+    b.style.fontWeight=active?'700':'400';
+    b.style.borderColor=meta[s].border;
+  }});
+}}"""
+
     panel_script      = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
     panel_objections  = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
 
@@ -1557,6 +1701,7 @@ function switchTab(slug) {{
   }});
   history.replaceState(null,'',location.pathname + '?tab=' + slug);
 }}
+{_switch_offer_js}
 </script>
 </body></html>""")
 
