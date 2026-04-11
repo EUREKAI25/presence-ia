@@ -573,3 +573,25 @@ class JobCostLogDB(Base):
     nb_leads_generes : Mapped[int]            = mapped_column(sa.Integer, default=0)
     cost_estimated   : Mapped[float]          = mapped_column(sa.Float,   default=0.0)    # nb_google × 0.017$
     created_at       : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+
+class PipelineHistoryLogDB(Base):
+    """Journal des décisions de pilotage outbound (une ligne par run _job_outbound)."""
+    __tablename__ = "pipeline_history_log"
+    id                    : Mapped[int]            = mapped_column(sa.Integer, primary_key=True, autoincrement=True)
+    ts                    : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow, index=True)
+    mode                  : Mapped[str]            = mapped_column(sa.String, nullable=False)   # BOOTSTRAP / AUTO
+    paire_city            : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    paire_profession      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    taux_couverture       : Mapped[Optional[float]]= mapped_column(sa.Float,  nullable=True)
+    slots_proches_total   : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    slots_proches_remplis : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    slots_moyens_total    : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    slots_moyens_remplis  : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    slots_lointains_total : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    slots_lointains_remplis: Mapped[Optional[int]] = mapped_column(sa.Integer, nullable=True)
+    leads_en_file         : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    leads_necessaires     : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    statut                : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # running/idle/saturated/top_up
+    cap_genere            : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
+    source_slots          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # calendly / config

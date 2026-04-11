@@ -1459,3 +1459,32 @@ def active_pair_status(request: Request, db: Session = Depends(get_db)):
     if state:
         state["available"] = _available_count(db, state["city"], state["profession"])
     return _JSONResponse(state or {})
+
+
+@router.get("/api/admin/pipeline-history")
+def pipeline_history(request: Request, db: Session = Depends(get_db)):
+    """Retourne les 50 dernières entrées du journal de pilotage."""
+    if (r := _check_token(request)) is not None: return r
+    from ...models import PipelineHistoryLogDB
+    rows = (db.query(PipelineHistoryLogDB)
+              .order_by(PipelineHistoryLogDB.ts.desc())
+              .limit(50)
+              .all())
+    data = [{
+        "ts":                  r.ts.strftime("%d/%m %H:%M") if r.ts else "—",
+        "mode":                r.mode or "—",
+        "paire":               f"{r.paire_city} × {r.paire_profession}" if r.paire_city else "—",
+        "taux_couverture":     r.taux_couverture,
+        "slots_proches_total": r.slots_proches_total,
+        "slots_proches_remplis": r.slots_proches_remplis,
+        "slots_moyens_total":  r.slots_moyens_total,
+        "slots_moyens_remplis": r.slots_moyens_remplis,
+        "slots_lointains_total": r.slots_lointains_total,
+        "slots_lointains_remplis": r.slots_lointains_remplis,
+        "leads_en_file":       r.leads_en_file,
+        "leads_necessaires":   r.leads_necessaires,
+        "statut":              r.statut or "—",
+        "cap_genere":          r.cap_genere,
+        "source_slots":        r.source_slots or "—",
+    } for r in rows]
+    return _JSONResponse({"rows": data})

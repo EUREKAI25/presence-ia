@@ -1714,9 +1714,11 @@ def _job_outbound(force: bool = False):
     mode_label = "DRY_RUN" if dry_run else "LIVE"
 
     # ── Pilotage par slots Calendly ───────────────────────────────────────────
+    _need_for_log = None   # conservé pour le journal
     if not force:
         try:
             need = compute_outbound_need()
+            _need_for_log = need
             statut = need["statut"]
             log.info(
                 "[OUTBOUND] slots proches %d/%d (%.0f%%) · leads_file=%d · besoin=%d · statut=%s",
@@ -1724,6 +1726,32 @@ def _job_outbound(force: bool = False):
                 need["taux_couverture"],
                 need["leads_en_file"], need["leads_necessaires"], statut,
             )
+            # ── Journal pilotage (toujours, même si skip) ───────────────────
+            try:
+                _paire_st = __import__("src.active_pair", fromlist=["get_active_pair"]).get_active_pair()
+                from .models import PipelineHistoryLogDB
+                with SessionLocal() as _hdb:
+                    _hdb.add(PipelineHistoryLogDB(
+                        mode              = "BOOTSTRAP" if need.get("bootstrap") else "AUTO",
+                        paire_city        = (_paire_st or {}).get("city"),
+                        paire_profession  = (_paire_st or {}).get("profession"),
+                        taux_couverture   = need.get("taux_couverture"),
+                        slots_proches_total    = need.get("proche", {}).get("total"),
+                        slots_proches_remplis  = need.get("proche", {}).get("reserves"),
+                        slots_moyens_total     = need.get("moyen",  {}).get("total"),
+                        slots_moyens_remplis   = need.get("moyen",  {}).get("reserves"),
+                        slots_lointains_total  = need.get("lointain", {}).get("total"),
+                        slots_lointains_remplis= need.get("lointain", {}).get("reserves"),
+                        leads_en_file     = need.get("leads_en_file"),
+                        leads_necessaires = need.get("leads_necessaires"),
+                        statut            = statut,
+                        cap_genere        = cap if statut not in ("saturated", "idle") else 0,
+                        source_slots      = need.get("source_slots"),
+                    ))
+                    _hdb.commit()
+            except Exception as _je:
+                log.debug("[OUTBOUND] pipeline_history_log: %s", _je)
+            # ───────────────────────────────────────────────────────────────
             if statut == "saturated":
                 log.info("[OUTBOUND] Saturé (%.0f%% > 85%%) — skip", need["taux_couverture"])
                 return
@@ -1738,8 +1766,6 @@ def _job_outbound(force: bool = False):
                 log.info("[OUTBOUND] Cap ajusté à %d (%s)", cap, mode_cap)
         except Exception as e:
             log.warning("[OUTBOUND] Calcul slot coverage échoué — mode normal: %s", e)
-
-    log.info("[OUTBOUND] démarrage — mode=%s cap=%d", mode_label, cap)
 
     # ── Chantier C : vérifier/avancer la paire active ────────────────────────
     from .active_pair import check_saturation as _check_saturation
