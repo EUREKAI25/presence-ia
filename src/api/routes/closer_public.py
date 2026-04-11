@@ -1498,7 +1498,7 @@ async function requestPayment(){{
         "script":      panel_script,
         "objections":  panel_objections,
     }
-    panels_js = {k: v.replace("`", "\\`").replace("${", "\\${") for k, v in panels.items()}
+    panels_js = {k: v.replace("`", "\\`").replace("${", "\\${").replace("</script>", "<\\/script>") for k, v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1516,7 +1516,7 @@ tr:hover{{background:#111127}}
 
 <div class="hdr">
   <div class="hdr-left">
-    <span class="hdr-title">Portail</span>
+    <span class="hdr-title">Agenda</span>
   </div>
   <a href="/closer/{token}/slots" class="hdr-back">Agenda →</a>
 </div>
