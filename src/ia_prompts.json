@@ -1,5 +1,5 @@
 [
-  "Quels {profession}s recommandes-tu à {city} ?",
-  "Je cherche un bon {profession} à {city}, tu as des recommandations ?",
-  "Trouve moi un bon {profession} à {city}."
+  "{terme} à {city}, tu as des recommandations ?",
+  "Je cherche {terme} à {city}, quelle entreprise tu conseilles ?",
+  "Quelle boîte tu recommandes pour {terme} à {city} ?"
 ]

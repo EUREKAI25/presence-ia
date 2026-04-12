@@ -364,9 +364,9 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 
 _PROMPTS_FILE = Path(__file__).resolve().parents[2] / "ia_prompts.json"
 _DEFAULT_PROMPTS = [
-    "Quels {profession}s recommandes-tu à {city} ?",
-    "Je cherche un bon {profession} à {city}, tu as des recommandations ?",
-    "Quelles entreprises de {profession} font un bon travail à {city} ?",
+    "{terme} à {city}, tu as des recommandations ?",
+    "Je cherche {terme} à {city}, quelle entreprise tu conseilles ?",
+    "Quelle boîte tu recommandes pour {terme} à {city} ?",
 ]
 
 def _load_prompts() -> list:
@@ -378,18 +378,45 @@ def _load_prompts() -> list:
 
 
 _GEMINI_PROMPTS = [
-    "Donne-moi une liste de {profession}s à {city}.",
-    "Liste des {profession}s que tu connais à {city}.",
-    "Quels {profession}s travaillent à {city} ? Donne une liste.",
+    "Donne-moi une liste d'entreprises pour {terme} à {city}.",
+    "Liste des professionnels que tu connais pour {terme} à {city}.",
+    "Quels professionnels travaillent sur {terme} à {city} ? Donne une liste.",
 ]
+
+
+def _resolve_termes(profession: str) -> list:
+    """Retourne les termes_recherche de la profession (gère label ET slug). Fallback : profession brute."""
+    try:
+        with SessionLocal() as _db:
+            from ...models import ProfessionDB as _PDB
+            prof_key = (profession or "").strip().lower()
+            p = _db.query(_PDB).filter(
+                (_PDB.id == prof_key) | (_PDB.label == profession.strip())
+            ).first()
+            if p and p.termes_recherche:
+                termes = json.loads(p.termes_recherche)
+                if termes:
+                    return termes
+    except Exception:
+        pass
+    return [profession.lower()]
+
 
 def _run_ia_test(profession: str, city: str) -> dict:
     """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
-    city_cap   = city.capitalize()
-    prompts    = [p.format(profession=profession.lower(), city=city_cap) for p in _load_prompts()]
-    # Gemini refuse souvent "recommandes-tu" → prompts factuels dédiés (affiché = prompt utilisateur)
-    gemini_prompts = [p.format(profession=profession.lower(), city=city_cap) for p in _GEMINI_PROMPTS]
-    results    = []
+    city_cap = city.capitalize()
+
+    # 1 terme différent par prompt, cyclé sur termes_recherche de la profession
+    termes = _resolve_termes(profession)
+    while len(termes) < 3:
+        termes.append(termes[0])
+
+    prompt_tpls  = _load_prompts()
+    prompts      = [t.format(terme=termes[i % len(termes)], city=city_cap)
+                    for i, t in enumerate(prompt_tpls)]
+    gemini_prompts = [t.format(terme=termes[i % len(termes)], city=city_cap)
+                      for i, t in enumerate(_GEMINI_PROMPTS)]
+    results = []
 
     # ── Clients IA — modèles identiques aux versions web utilisées par les prospects ──
     # ChatGPT : gpt-4o-search-preview (web search intégré, comme ChatGPT web)

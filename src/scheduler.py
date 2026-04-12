@@ -849,6 +849,39 @@ import datetime as _dt
 _WARMING_START = _dt.date(2026, 3, 20)
 
 
+_WARMING_FOLDER = "Warming"
+
+
+def _imap_ensure_folder(conn, folder: str) -> bool:
+    """Crée le dossier IMAP s'il n'existe pas encore."""
+    try:
+        ok, _ = conn.select(folder)
+        conn.select("INBOX")
+        return ok == "OK"
+    except Exception:
+        pass
+    try:
+        conn.create(folder)
+        conn.select("INBOX")
+        return True
+    except Exception as e:
+        log.debug("imap create folder %s: %s", folder, e)
+        return False
+
+
+def _imap_move(conn, uids: list, dest: str):
+    """Copie les UIDs vers dest puis les supprime de l'inbox."""
+    if not uids:
+        return
+    uid_str = ",".join(u.decode() if isinstance(u, bytes) else str(u) for u in uids)
+    try:
+        conn.copy(uid_str, dest)
+        conn.store(uid_str, "+FLAGS", "\\Deleted")
+        conn.expunge()
+    except Exception as e:
+        log.debug("imap_move → %s: %s", dest, e)
+
+
 def _warming_day_cap() -> int:
     """Nombre d'emails par session selon le jour de warming (ramp-up progressif)."""
     day = (_dt.datetime.utcnow().date() - _WARMING_START).days + 1
@@ -991,6 +1024,7 @@ def _job_warming():
                 conn = imaplib.IMAP4_SSL(imap_host, imap_port)
                 conn.login(email_addr, pwd)
                 conn.select("INBOX")
+                _imap_ensure_folder(conn, _WARMING_FOLDER)
 
                 # ── Passe 1 : bot répond aux emails X-Warming (envois initiaux) ──
                 _, data = conn.search(None, '(UNSEEN HEADER X-Warming 1)')
@@ -1017,6 +1051,7 @@ def _job_warming():
                         except Exception as e:
                             log.debug("warming reply uid=%s: %s", uid, e)
                     conn.store(",".join(u.decode() for u in uids), "+FLAGS", "\\Seen")
+                    _imap_move(conn, uids, _WARMING_FOLDER)
 
                 # ── Passe 2 : sender relance (40% des échanges, 2e aller-retour) ──
                 _, data2 = conn.search(None, '(UNSEEN HEADER X-Warming-Reply 1)')
@@ -1045,6 +1080,14 @@ def _job_warming():
                         except Exception as e:
                             log.debug("warming followup uid=%s: %s", uid, e)
                     conn.store(",".join(u.decode() for u in uids2), "+FLAGS", "\\Seen")
+                    _imap_move(conn, uids2, _WARMING_FOLDER)
+
+                # ── Passe 3 : archiver les X-Warming-Followup reçus ──
+                _, data3 = conn.search(None, '(HEADER X-Warming-Followup 1)')
+                if data3 and data3[0]:
+                    uids3 = data3[0].split()
+                    conn.store(",".join(u.decode() for u in uids3), "+FLAGS", "\\Seen")
+                    _imap_move(conn, uids3, _WARMING_FOLDER)
 
                 conn.logout()
                 log.info("warming IMAP %s — réponses: %d, relances: %d",
@@ -1418,7 +1461,7 @@ _OUTBOUND_SUBJECTS = [
 _OUTBOUND_BODY = """\
 Bonjour,
 
-On a testé ce que répond ChatGPT quand on cherche un {profession} à {ville}. Votre entreprise n'apparaît pas.
+On a cherché « {terme} {ville} » sur ChatGPT. Votre entreprise n'apparaît pas.
 
 Aujourd'hui, beaucoup de gens passent par là avant d'appeler.
 
@@ -1846,14 +1889,21 @@ def _job_outbound(force: bool = False):
         ]
         idx         = (sent + would_send) % len(_OUTBOUND_SENDERS)
         sender, sender_name = _OUTBOUND_SENDERS[idx]
-        city_display      = (prospect.city or "").title()
-        profession_display = (prospect.profession or "professionnel").lower()
+        city_display = (prospect.city or "").title()
 
-        subject = random.choice(_OUTBOUND_SUBJECTS).format(
-            profession=profession_display, ville=city_display,
-        )
+        # Résoudre le terme de recherche réaliste depuis ProfessionDB
+        _terme_display = None
+        try:
+            from .api.routes.v3 import _resolve_termes as _rt
+            _terme_display = _rt(prospect.profession or "")[0]
+        except Exception:
+            pass
+        if not _terme_display:
+            _terme_display = (prospect.profession or "professionnel").lower()
+
+        subject = random.choice(_OUTBOUND_SUBJECTS)
         body = _OUTBOUND_BODY.format(
-            profession=profession_display,
+            terme=_terme_display,
             ville=city_display,
         )
 
