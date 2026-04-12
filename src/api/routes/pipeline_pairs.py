@@ -136,14 +136,23 @@ def pipeline_pairs(request: Request):
                 1), else_=0)).label("dispo"),
         ).group_by(V3ProspectDB.profession, V3ProspectDB.city).all()
 
-        # Index : prof_label → city → stats
-        v3_by_prof: dict = defaultdict(dict)
+        # Index profession : accepte LABEL ou ID (slug) pour matcher V3ProspectDB.profession
+        _prof_key_to_id: dict = {}
+        for p in scored_profs:
+            if p.label:
+                _prof_key_to_id[p.label.strip().lower()] = p.id
+            _prof_key_to_id[p.id.strip().lower()] = p.id
+
+        # Index : prof_id → city → stats  (agrégation si label + slug existent)
+        v3_by_prof: dict = defaultdict(lambda: defaultdict(lambda: {"total":0,"sent":0,"dispo":0}))
         for r in v3_rows:
-            v3_by_prof[r.profession][r.city] = {
-                "total": r.total,
-                "sent":  r.sent,
-                "dispo": r.dispo,
-            }
+            pid = _prof_key_to_id.get((r.profession or "").strip().lower())
+            if not pid:
+                continue   # profession inconnue — ignorée
+            city_stats = v3_by_prof[pid][r.city]
+            city_stats["total"] += r.total
+            city_stats["sent"]  += r.sent
+            city_stats["dispo"] += r.dispo
 
         # ── Segments SIRENE par (profession_id, departement) ─────────────────
         segs_rows = (
@@ -202,7 +211,7 @@ def pipeline_pairs(request: Request):
     # Accordéons professions
     prof_blocks = []
     for prof in scored_profs:
-        cities_data = v3_by_prof.get(prof.label, {})
+        cities_data = v3_by_prof.get(prof.id, {})
         if not cities_data and prof.id not in segs_by_prof:
             continue  # skip professions sans données
 
