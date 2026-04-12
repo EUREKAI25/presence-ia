@@ -68,41 +68,59 @@ def clear_active_pair(reason: str = "saturation"):
 
 def select_next_pair(db) -> dict | None:
     """
-    Sélectionne la prochaine paire :
-    1. Toutes les paires actives (ProspectionTargetDB.active=True)
-    2. Triées par score profession décroissant (db_score_global)
-    3. Première avec au moins 1 prospect disponible pour outbound
-    Retourne le nouvel état ou None si toutes saturées.
+    Sélectionne la prochaine paire directement depuis V3ProspectDB :
+    - Uniquement les paires avec ≥1 prospect dispo (ia_results + email + not sent)
+    - Classées par score_métier × log(stock) décroissant
+    Indépendant de ProspectionTargetDB (qui pilote Google Places, pas l'outbound).
     """
-    from src.models import ProspectionTargetDB, ProfessionDB, ScoringConfigDB
+    import math
+    from src.models import ProfessionDB, ScoringConfigDB, V3ProspectDB
     from src.database import db_score_global
+    from sqlalchemy import func, or_
 
-    cfg     = db.query(ScoringConfigDB).filter_by(id="default").first()
-    targets = db.query(ProspectionTargetDB).filter_by(active=True).all()
+    cfg = db.query(ScoringConfigDB).filter_by(id="default").first()
 
-    if not targets:
-        log.info("active_pair: aucune cible active dans prospection_targets")
+    # Toutes les paires ayant du stock outbound dispo
+    pairs = (
+        db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
+        .filter(
+            V3ProspectDB.email.isnot(None),
+            V3ProspectDB.sent_at.is_(None),
+            V3ProspectDB.ia_results.isnot(None),
+            or_(
+                V3ProspectDB.email_status.is_(None),
+                V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
+            ),
+        )
+        .group_by(V3ProspectDB.city, V3ProspectDB.profession)
+        .all()
+    )
+
+    if not pairs:
+        log.info("active_pair: aucune paire disponible dans V3ProspectDB")
         return None
 
+    # Score combiné = score_métier (0-10) × 2  +  log(stock)
     scored = []
-    for t in targets:
-        prof  = db.query(ProfessionDB).filter_by(id=t.profession).first()
-        score = db_score_global(prof, cfg) if (prof and cfg) else 0.0
-        scored.append((t, score))
+    for p in pairs:
+        prof       = db.query(ProfessionDB).filter(ProfessionDB.label == p.profession).first()
+        prof_score = db_score_global(prof, cfg) if (prof and cfg) else 0.0
+        combined   = prof_score * 2 + math.log1p(p.n)
+        scored.append((p, prof_score, combined))
 
-    scored.sort(key=lambda x: x[1], reverse=True)
+    scored.sort(key=lambda x: x[2], reverse=True)
+    best, best_prof_score, _ = scored[0]
 
-    for t, score in scored:
-        if _available_count(db, t.city, t.profession) > 0:
-            return set_active_pair(
-                city=t.city,
-                profession=t.profession,
-                score=score,
-                target_id=str(t.id),
-            )
-
-    log.info("active_pair: toutes les paires sont saturées (0 prospect disponible)")
-    return None
+    log.info(
+        "active_pair: %d paires dispo — meilleure = %s / %s (stock=%d, score=%.1f)",
+        len(pairs), best.profession, best.city, best.n, best_prof_score,
+    )
+    return set_active_pair(
+        city=best.city,
+        profession=best.profession,
+        score=best_prof_score,
+        target_id="auto",
+    )
 
 
 # ── Saturation ────────────────────────────────────────────────────────────────

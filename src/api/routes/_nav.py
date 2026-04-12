@@ -14,6 +14,7 @@ def admin_nav(token: str, active: str = "") -> str:
     sections = [
         ("LEADS", [
             ("leads-hub",        "Accueil"),
+            ("pipeline-pairs",   "Avancement pipeline"),
             ("contacts",         "Contacts"),
             ("prospection",      "Automation"),
             ("suspects",         "Suspects"),

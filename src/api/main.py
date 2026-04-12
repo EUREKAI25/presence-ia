@@ -644,9 +644,11 @@ async function startCheckout(offerId) {{
 from .routes import campaign, ia_test, scoring, generate, admin, pipeline, jobs, upload, evidence, stripe_routes, contacts, offers, analytics, content, headers, scan_admin, prospection_admin, login, ai_inquiry, competitor_analysis, evidence_routes, cms, preview, v3, livrables, retest, demo, client_dashboard, closing_pack, templates, sequences, mkt, crm_admin, closer_public, professions_admin, rdv_admin, brevo_webhook
 from .routes.theme_admin import router as theme_admin_router
 from .routes.admin_hub import router as admin_hub_router
+from .routes.pipeline_pairs import router as pipeline_pairs_router
 from offers_module import router as offers_router
 
 app.include_router(brevo_webhook.router)  # Tracking emails outbound
+app.include_router(pipeline_pairs_router) # Avancement pipeline paires
 app.include_router(admin_hub_router)      # Hubs sections (leads-hub, marketing, closers-hub, finances)
 app.include_router(preview.router)
 app.include_router(campaign.router)
@@ -671,6 +673,8 @@ app.include_router(evidence_routes.router)
 app.include_router(cms.router)
 app.include_router(theme_admin_router)
 app.include_router(v3.router)
+from .routes.agenda_closer import router as agenda_closer_router
+app.include_router(agenda_closer_router)  # AVANT closer_public (routes statiques /closer/agenda)
 app.include_router(closer_public.router) # AVANT generate/{profession} catch-all
 app.include_router(closing_pack.router)  # AVANT generate/{profession} catch-all
 app.include_router(generate.router)      # catch-all /{profession} — DOIT ÊTRE EN DERNIER
