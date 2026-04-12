@@ -90,7 +90,7 @@ def admin_nav(token: str, active: str = "") -> str:
         f'}}'
         f'</style>'
         f'<script>(function(){{var l=document.createElement("link");l.rel="icon";'
-        f'l.type="image/png";l.href="/assets/favicon.png";document.head.appendChild(l);}})();</script>'
+        f'l.type="image/svg+xml";l.href="/assets/favicon.svg";document.head.appendChild(l);}})();</script>'
         f'<button id="pres-hamburger" aria-label="Menu" onclick="'
         f'document.querySelector(\'.pres-sidebar\').classList.toggle(\'open\');'
         f'document.getElementById(\'pres-overlay\').classList.toggle(\'show\')'

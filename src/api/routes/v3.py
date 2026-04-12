@@ -366,7 +366,7 @@ _PROMPTS_FILE = Path(__file__).resolve().parents[2] / "ia_prompts.json"
 _DEFAULT_PROMPTS = [
     "{terme} à {city}, tu as des recommandations ?",
     "Je cherche {terme} à {city}, quelle entreprise tu conseilles ?",
-    "Quelle boîte tu recommandes pour {terme} à {city} ?",
+    "Tu peux me recommander une entreprise pour {terme} à {city} ?",
 ]
 
 def _load_prompts() -> list:
@@ -995,7 +995,7 @@ def _render_landing(
     return f"""<!DOCTYPE html><html lang="fr"><head>
 {gtm_head()}
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{name} — Audit Visibilité IA</title><meta name="robots" content="noindex"><link rel="icon" href="/assets/favicon.png">
+<title>{name} — Audit Visibilité IA</title><meta name="robots" content="noindex"><link rel="icon" href="/assets/favicon.svg">
 <style>
 :root{{--acc:#e8355a;--acc2:#ff7043;--green:#16a34a;--txt:#111827;--muted:#6b7280;--light:#f3f4f8;--border:#e5e7eb;--card:#ffffff;--shadow:0 4px 24px rgba(0,0,0,.08)}}
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -1169,7 +1169,7 @@ def login_v3_page(request: Request):
         return RedirectResponse("/admin/v3", status_code=302)
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connexion — Présence IA</title><link rel="icon" href="/assets/favicon.png">
+<title>Connexion — Présence IA</title><link rel="icon" href="/assets/favicon.svg">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f4ff;min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -1462,7 +1462,7 @@ def admin_v3(
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin V3 — Présence IA</title><link rel="icon" href="/assets/favicon.png">
+<title>Admin V3 — Présence IA</title><link rel="icon" href="/assets/favicon.svg">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f9fa;color:#1a1a1a}}
