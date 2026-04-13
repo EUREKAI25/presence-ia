@@ -150,7 +150,7 @@ _DEFAULT_EMAIL_SUBJECT = "Les IA suggèrent vos concurrents"
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
-    "Lorsque vos éventuels clients demandent à leur IA préférée **quel {metier} choisir à {ville} ?**, "
+    "Lorsque vos éventuels clients demandent à leur IA préférée **quel {metier} choisir à {ville}**, "
     "plusieurs entreprises apparaissent.\n\n"
     "Pas la vôtre.\n\n"
     "Nous avons analysé votre visibilité réelle dans les réponses des IA, "
