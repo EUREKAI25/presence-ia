@@ -368,56 +368,23 @@ def _upsert_cited_companies(db, profession: str, city: str, cited: dict):
 
 
 def _job_refresh_ia():
-    """Relance les tests IA (ChatGPT + Gemini + Claude) pour la paire active
-    + les 4 prochaines paires par stock dispo — lun/jeu/dim à 9h30, 15h, 18h30 UTC.
-    Max 5 paires par run (= 15 appels API). Alimente ia_cited_companies.
+    """Relance les tests IA (ChatGPT + Gemini + Claude) uniquement pour la paire
+    active — lun/jeu/dim à 9h30, 15h, 18h30 UTC. 3 appels API par run.
+    Alimente ia_cited_companies.
     """
     try:
         import time as _time, json as _json
         from .database import SessionLocal
         from .api.routes.v3 import _run_ia_test, V3ProspectDB
         from .active_pair import get_active_pair
-        from sqlalchemy import func, case, or_
 
-        # Paire active en tête de liste
         active = get_active_pair()
-        priority_pairs = []
-        if active:
-            priority_pairs.append((active["city"], active["profession"]))
+        if not active:
+            log.info("refresh_ia : aucune paire active — skip")
+            return
 
-        # Top 4 paires suivantes par stock dispo (email + ia_results + non envoyé)
-        with SessionLocal() as db:
-            rows = (
-                db.query(
-                    V3ProspectDB.city,
-                    V3ProspectDB.profession,
-                    func.sum(case((
-                        V3ProspectDB.email.isnot(None) &
-                        V3ProspectDB.sent_at.is_(None) &
-                        (V3ProspectDB.email_status.is_(None) |
-                         V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
-                        1), else_=0)).label("dispo"),
-                )
-                .group_by(V3ProspectDB.city, V3ProspectDB.profession)
-                .order_by(func.sum(case((
-                    V3ProspectDB.email.isnot(None) &
-                    V3ProspectDB.sent_at.is_(None) &
-                    (V3ProspectDB.email_status.is_(None) |
-                     V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
-                    1), else_=0)).desc())
-                .limit(20)
-                .all()
-            )
-        for r in rows:
-            pair = (r.city, r.profession)
-            if pair not in priority_pairs:
-                priority_pairs.append(pair)
-            if len(priority_pairs) >= 5:
-                break
-
-        active_pairs = priority_pairs
-        log.info("refresh_ia : %d paires à tester %s", len(active_pairs),
-                 [(c, p[:20]) for c, p in active_pairs])
+        active_pairs = [(active["city"], active["profession"])]
+        log.info("refresh_ia : paire active — %s / %s", active["profession"], active["city"])
         for city, profession in active_pairs:
             try:
                 ia_data = _run_ia_test(profession, city)
