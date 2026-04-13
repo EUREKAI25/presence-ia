@@ -431,7 +431,7 @@ def render_home(db: Session, extra_body_end: str = "") -> str:
 
     css = """
 html{scroll-behavior:smooth}
-:root{--blue:#527FB3;--dark:#0f172a;--slate:#1e293b;--t:#1e293b;--m:#64748b;--bg:#f8fafc;--r:10px}
+:root{--blue:#527FB3;--dark:#0f172a;--slate:#1e293b;--t:#1e293b;--m:#64748b;--bg:#f8fafc;--r:10px;--gold:#996710;--gold-hover:#b07c12}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Segoe UI',sans-serif;color:var(--t);line-height:1.6;background:#fff}
 a{color:inherit}
@@ -449,9 +449,10 @@ a{color:inherit}
 .hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;max-width:820px;margin:0 auto 24px;letter-spacing:-.03em}
 .hero h1 em{font-style:normal;color:#60a5fa;display:block;font-size:1.25em;margin-top:10px}
 .hero p{font-size:1.1rem;max-width:540px;margin:0 auto 44px;color:#94a3b8;line-height:1.8}
-.btn-hero{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:16px 36px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(82,127,179,.4);transition:all .15s}
-.btn-hero:hover{background:#3d6a9a;transform:translateY(-1px);box-shadow:0 8px 32px rgba(82,127,179,.5)}
-.btn-hero-arrow{font-size:1.1rem;transition:transform .15s}
+.btn-hero{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#fff;font-weight:700;padding:16px 36px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(153,103,16,.35);transition:all .18s}
+.btn-hero:hover{background:var(--gold-hover);transform:translateY(-1px);box-shadow:0 8px 28px rgba(153,103,16,.45)}
+.btn-hero:active{transform:translateY(0);box-shadow:0 2px 12px rgba(153,103,16,.4)}
+.btn-hero-arrow{font-size:1.1rem;transition:transform .18s}
 .btn-hero:hover .btn-hero-arrow{transform:translateX(3px)}
 /* STATS */
 .stats-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:40px 24px}
