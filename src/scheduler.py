@@ -1483,6 +1483,110 @@ Vous avez déjà regardé ce que ça donne de votre côté ?
 
 _OUTBOUND_SMS = "Bonjour, on a cherché « {terme} {ville} » sur ChatGPT. Votre entreprise n'apparaît pas. Vous avez regardé ce que ça donne ?"
 
+_OUTBOUND_SENDERS = [
+    ("sophie@presence-ia.online",  "Sophie — Présence IA"),
+    ("marie@presence-ia.info",     "Marie — Présence IA"),
+    ("lea@presence-ia.cloud",      "Léa — Présence IA"),
+    ("emma@presence-ia.site",      "Emma — Présence IA"),
+    ("julie@presence-ia.website",  "Julie — Présence IA"),
+]
+
+
+def _outbound_send_one(profession: str, city: str,
+                       email: str = None, phone: str = None,
+                       dry_run: bool = True) -> dict:
+    """
+    Pipeline outbound complet pour UNE cible (test ou envoi réel unitaire).
+    Exécute dans l'ordre :
+      1. Requêtes IA (ChatGPT + Gemini + Claude) via _run_ia_test
+      2. Image ville (cache RefCityDB ou fetch Unsplash)
+      3. Formatage du message (_OUTBOUND_BODY / _OUTBOUND_SMS)
+      4. Envoi Brevo (email ou SMS) — sauf si dry_run=True
+
+    Retourne dict : ok, ia_ok, ia_total, ia_errors, has_image, img_source,
+                    terme, channel, body, error
+    """
+    import os, requests as _req, random
+    from .api.routes.v3 import _run_ia_test, _resolve_termes
+    from .models import RefCityDB
+    from .city_images import fetch_city_header_image
+    from .database import SessionLocal
+
+    brevo_key = os.getenv("BREVO_API_KEY", "")
+
+    # 1. Terme de recherche — même logique que la boucle outbound
+    termes = _resolve_termes(profession)
+    terme = termes[0] if termes else profession.lower()
+    city_display = city.title()
+
+    # 2. Requêtes IA
+    ia_data    = _run_ia_test(profession, city)
+    ia_results = ia_data.get("results", [])
+    ia_ok      = len([r for r in ia_results if r.get("ok")])
+    ia_total   = len(ia_results)
+    ia_errors  = [f"{e.get('model','?')}: {e.get('error','?')}" for e in ia_data.get("errors", [])]
+
+    # 3. Image ville
+    with SessionLocal() as _db:
+        _ref = _db.query(RefCityDB).filter_by(city_name=city.upper()).first()
+        if _ref and _ref.header_image_url:
+            has_image = True; img_source = "cache"
+        else:
+            img_url   = fetch_city_header_image(city)
+            has_image = bool(img_url); img_source = "unsplash" if img_url else None
+
+    # 4. Formatage
+    channel = "email" if email else "sms"
+    subject = random.choice(_OUTBOUND_SUBJECTS)
+    body    = (_OUTBOUND_BODY if channel == "email" else _OUTBOUND_SMS).format(
+        terme=terme, ville=city_display
+    )
+    sender, sender_name = _OUTBOUND_SENDERS[0]  # sender fixe pour les tests
+
+    base = {"ia_ok": ia_ok, "ia_total": ia_total, "ia_errors": ia_errors,
+            "has_image": has_image, "img_source": img_source,
+            "terme": terme, "channel": channel, "body": body}
+
+    if dry_run:
+        log.info("[OUTBOUND_TEST][DRY_RUN] %s — %s/%s — ia=%d/%d — img=%s",
+                 channel.upper(), profession, city, ia_ok, ia_total, has_image)
+        return {**base, "ok": True, "dry_run": True, "error": None}
+
+    # 5. Envoi réel
+    if not brevo_key:
+        return {**base, "ok": False, "error": "BREVO_API_KEY manquant"}
+    try:
+        if channel == "email" and email:
+            resp = _req.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                json={
+                    "sender":      {"name": sender_name, "email": sender},
+                    "to":          [{"email": email, "name": "Test"}],
+                    "subject":     f"[TEST] {subject}",
+                    "textContent": body,
+                },
+                timeout=15,
+            )
+        elif channel == "sms" and phone:
+            phone_e164 = _outbound_normalize_phone(phone)
+            if not phone_e164:
+                return {**base, "ok": False, "error": f"Numéro invalide : {phone}"}
+            resp = _req.post(
+                "https://api.brevo.com/v3/transactionalSms/send",
+                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                json={"sender": "PresenceIA", "recipient": phone_e164,
+                      "content": f"[TEST] {body}"},
+                timeout=15,
+            )
+        else:
+            return {**base, "ok": False, "error": "email ou phone requis"}
+        ok = resp.status_code in (200, 201, 202)
+        return {**base, "ok": ok,
+                "error": None if ok else f"Brevo HTTP {resp.status_code}"}
+    except Exception as exc:
+        return {**base, "ok": False, "error": str(exc)}
+
 
 def _outbound_normalize_phone(phone: str) -> str | None:
     """Normalise un numéro français en format international +33..."""
@@ -1945,13 +2049,6 @@ def _job_outbound(force: bool = False):
             continue
 
         # Préparer l'envoi — rotation sur domaines dédiés avec prénoms humains
-        _OUTBOUND_SENDERS = [
-            ("sophie@presence-ia.online",  "Sophie — Présence IA"),
-            ("marie@presence-ia.info",     "Marie — Présence IA"),
-            ("lea@presence-ia.cloud",      "Léa — Présence IA"),
-            ("emma@presence-ia.site",      "Emma — Présence IA"),
-            ("julie@presence-ia.website",  "Julie — Présence IA"),
-        ]
         idx         = (sent + would_send) % len(_OUTBOUND_SENDERS)
         sender, sender_name = _OUTBOUND_SENDERS[idx]
         city_display = (prospect.city_reference or prospect.city or "").title()

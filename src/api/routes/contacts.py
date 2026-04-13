@@ -508,37 +508,57 @@ async function _pollLeads() {{
 }})();
 document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
 
+function _fmtTestResult(d, label) {{
+  const ia   = 'IA: '+d.ia_ok+'/'+d.ia_total;
+  const img  = 'img: '+(d.has_image ? (d.img_source==='cache'?'✓cache':'✓Unsplash') : '✗');
+  const trm  = d.terme ? 'terme: <em>'+d.terme+'</em>' : '';
+  return label + ' · ' + ia + ' · ' + img + (trm ? ' · '+trm : '');
+}}
 async function testProfile(btn, email, profession, city, action) {{
   const resCell = btn.closest('td').querySelector('.test-res');
-  resCell.textContent = '…'; resCell.style.color = '#6b7280';
+  resCell.innerHTML = '⏳ IA en cours…'; resCell.style.color = '#6b7280';
   if (action === 'email') {{
     const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
       body: JSON.stringify({{email, profession, city}})
     }});
     const d = await r.json();
-    resCell.textContent = d.ok ? '✓ Email envoyé' : '✗ '+(d.error||'erreur');
-    resCell.style.color  = d.ok ? '#16a34a' : '#dc2626';
+    if (d.ok) {{
+      resCell.innerHTML = _fmtTestResult(d, '✓ Envoyé');
+      resCell.style.color = '#16a34a';
+    }} else {{
+      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur'));
+      resCell.style.color = '#dc2626';
+    }}
   }} else if (action === 'sms') {{
     const phone = document.getElementById('test-phone').value.trim();
-    if (!phone) {{ resCell.textContent = '⚠ Numéro requis'; resCell.style.color='#f59e0b'; return; }}
+    if (!phone) {{ resCell.innerHTML = '⚠ Numéro requis'; resCell.style.color='#f59e0b'; return; }}
     const r = await fetch('/admin/contacts/test/send-sms?token='+T, {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
       body: JSON.stringify({{phone, profession, city}})
     }});
     const d = await r.json();
-    resCell.textContent = d.ok ? '✓ SMS envoyé' : '✗ '+(d.error||'erreur');
-    resCell.style.color  = d.ok ? '#16a34a' : '#dc2626';
+    if (d.ok) {{
+      resCell.innerHTML = _fmtTestResult(d, '✓ SMS envoyé');
+      resCell.style.color = '#16a34a';
+    }} else {{
+      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur'));
+      resCell.style.color = '#dc2626';
+    }}
   }} else {{
     const r = await fetch('/admin/contacts/test/preview-sms?token='+T, {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
       body: JSON.stringify({{profession, city}})
     }});
     const d = await r.json();
-    resCell.innerHTML = d.preview
-      ? '<strong style="color:#7c3aed">Aperçu ('+d.chars+' car.) :</strong> ' + d.preview.split('\\n').join('<br>')
-      : '✗ '+(d.error||'erreur');
-    resCell.style.color = '#374151';
+    if (d.preview) {{
+      resCell.innerHTML = _fmtTestResult(d, '📋')
+        + '<br><strong>Message :</strong> ' + d.preview.split('\\n').join('<br>');
+      resCell.style.color = '#374151';
+    }} else {{
+      resCell.innerHTML = '✗ '+(d.error||'erreur');
+      resCell.style.color = '#dc2626';
+    }}
   }}
 }}
 
@@ -769,18 +789,9 @@ async def contact_test_email(request: Request, db: Session = Depends(get_db)):
     city       = data.get("city", "Paris").strip() or "Paris"
     if not email:
         return JSONResponse({"ok": False, "error": "email requis"})
-    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT
-    from ...models import V3LandingTextDB
-    lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
-    tpl      = lt.email_template if lt and lt.email_template else None
-    subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
-    metier   = profession.lower()
-    metiers  = metier + "s" if not metier.endswith("s") else metier
-    subj = "[TEST] " + subj_tpl.format(ville=city, metier=metier, metiers=metiers,
-                                       city=city, profession=profession, name="Test")
-    msg  = _contact_message("Prospect Test", city, profession, "", tpl)
-    ok   = _send_brevo_email(email, "Test", subj, msg)
-    return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
+    from ...scheduler import _outbound_send_one
+    result = _outbound_send_one(profession, city, email=email, dry_run=False)
+    return JSONResponse(result)
 
 
 @router.post("/admin/contacts/test/preview-sms")
@@ -789,12 +800,19 @@ async def contact_preview_sms(request: Request, db: Session = Depends(get_db)):
     data       = await request.json()
     profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
     city       = data.get("city", "Paris").strip() or "Paris"
-    from .v3 import _contact_message_sms
-    from ...models import V3LandingTextDB
-    lt  = db.query(V3LandingTextDB).filter_by(id="__global__").first()
-    tpl = lt.sms_template if lt and lt.sms_template else None
-    msg = "[TEST] " + _contact_message_sms("Prospect Test", city, profession, "", tpl)
-    return JSONResponse({"preview": msg, "chars": len(msg)})
+    from ...scheduler import _outbound_send_one
+    # dry_run=True : pipeline complet (IA + image + formatage), sans envoi
+    result = _outbound_send_one(profession, city, email="preview@test", dry_run=True)
+    return JSONResponse({
+        "preview":       result.get("body", ""),
+        "chars":         len(result.get("body", "")),
+        "ia_ok":         result.get("ia_ok", 0),
+        "ia_total":      result.get("ia_total", 0),
+        "ia_errors":     result.get("ia_errors", []),
+        "has_image":     result.get("has_image", False),
+        "img_source":    result.get("img_source"),
+        "terme":         result.get("terme", ""),
+    })
 
 
 @router.post("/admin/contacts/test/send-sms")
@@ -806,13 +824,9 @@ async def contact_test_sms(request: Request, db: Session = Depends(get_db)):
     city       = data.get("city", "Paris").strip() or "Paris"
     if not phone:
         return JSONResponse({"ok": False, "error": "phone requis"})
-    from .v3 import _send_brevo_sms, _contact_message_sms
-    from ...models import V3LandingTextDB
-    lt  = db.query(V3LandingTextDB).filter_by(id="__global__").first()
-    tpl = lt.sms_template if lt and lt.sms_template else None
-    msg = "[TEST] " + _contact_message_sms("Prospect Test", city, profession, "", tpl)
-    ok  = _send_brevo_sms(phone, msg)
-    return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})
+    from ...scheduler import _outbound_send_one
+    result = _outbound_send_one(profession, city, phone=phone, dry_run=False)
+    return JSONResponse(result)
 
 
 @router.post("/admin/contacts/{cid}/send-email")
