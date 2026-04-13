@@ -663,10 +663,13 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     ville      = city.title()
     subj = subj_tpl.format(ville=ville, metier=metier, metiers=metiers,
                            city=ville, profession=profession, name=name)
-    v3 = db.query(V3ProspectDB).filter(
-        (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
-    ).first()
-    landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
+    if c.landing_url:
+        landing_url = (BASE_URL.rstrip("/") + c.landing_url) if c.landing_url.startswith("/") else c.landing_url
+    else:
+        v3 = db.query(V3ProspectDB).filter(
+            (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
+        ).first()
+        landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
     msg  = _contact_message(name, city, profession, landing_url, tpl)
     delivery_id = _mkt.create_delivery(c.id)
     ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "", landing_url=landing_url)
@@ -683,17 +686,17 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     if not c: raise HTTPException(404)
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
-    from .v3 import _send_brevo_sms, _contact_message_sms
+    from .v3 import _send_brevo_sms, _contact_message_sms, BASE_URL
     from ...models import V3ProspectDB
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    # Récupérer la landing_url depuis V3ProspectDB si dispo
-    base_url = os.getenv("BASE_URL", "https://presence-ia.com")
-    v3 = db.query(V3ProspectDB).filter_by(
-        name=name, city=city
-    ).first() if name else None
-    landing_url = (base_url + v3.landing_url) if v3 and v3.landing_url else base_url
+    base_url   = BASE_URL
+    if c.landing_url:
+        landing_url = (base_url.rstrip("/") + c.landing_url) if c.landing_url.startswith("/") else c.landing_url
+    else:
+        v3 = db.query(V3ProspectDB).filter_by(name=name, city=city).first() if name else None
+        landing_url = (base_url + v3.landing_url) if v3 and v3.landing_url else base_url
     msg = _contact_message_sms(name, city, profession, landing_url)
     delivery_id = _mkt.create_sms_delivery(c.id)
     ok  = _send_brevo_sms(c.phone, msg)

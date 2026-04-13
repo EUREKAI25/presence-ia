@@ -265,6 +265,7 @@ class ContactDB(Base):
     date_message_sent: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     date_message_read: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     date_payment:      Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    landing_url:       Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)
     is_test:           Mapped[bool]               = mapped_column(sa.Boolean, default=False, server_default="0")
 
 

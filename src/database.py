@@ -48,6 +48,7 @@ def init_db():
             ("v3_prospects", "city_reference VARCHAR"),
             ("v3_prospects", "is_test INTEGER DEFAULT 0"),
             ("contacts", "is_test INTEGER DEFAULT 0"),
+            ("contacts", "landing_url TEXT"),
             ("scoring_config", "outbound_refs_only INTEGER DEFAULT 1"),
         ]:
             try:
@@ -107,16 +108,23 @@ def init_db():
             ("Consultant Communication TEST", "ANTIBES",  "Consultant en communication", "contact@nathaliebrigitte.com", "+393514459617"),
             ("Chef Cuisinier Mende TEST",     "MENDE",    "Chef cuisinier événementiel", "contact@presence-ia.com",      "+33660474292"),
         ]
+        from .models import V3ProspectDB as _V3P
         with SessionLocal() as _db:
             for name, city, prof, email, phone in _TEST_CONTACTS:
+                # Chercher une landing V3 existante pour cette paire ville+profession
+                v3 = _db.query(_V3P).filter_by(city=city, profession=prof).first()
+                landing = v3.landing_url if v3 else None
                 exists = _db.query(ContactDB).filter_by(company_name=name, is_test=True).first()
                 if not exists:
                     _db.add(ContactDB(
                         company_name=name, city=city, profession=prof,
-                        email=email, phone=phone, status="PROSPECT", is_test=True,
+                        email=email, phone=phone, status="PROSPECT",
+                        is_test=True, landing_url=landing,
                     ))
                 else:
                     exists.phone = phone
+                    if landing:
+                        exists.landing_url = landing
             _db.commit()
     except Exception as _e:
         import logging
