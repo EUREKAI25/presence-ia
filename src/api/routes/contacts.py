@@ -334,10 +334,10 @@ tr:hover td{{background:#fafafa}}
             TEST — SMS : <input id="test-phone" type="text" placeholder="06…" style="font-size:10px;padding:2px 6px;width:110px;border:1px solid #cbd5e1;border-radius:4px;margin-left:4px">
           </td>
         </tr>
-        <tr style="background:#eff6ff;border-top:1px solid #dbeafe">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#1e40af;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#1e40af">Pisciniste · Paris</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#dbeafe;color:#1e40af">TEST</span></td>
+        <tr style="background:#fefce8;border-top:1px solid #fde68a">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Pisciniste · Paris</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
           <td style="padding:6px 6px;font-size:11px">nathalie.brigitte@gmail.com</td>
           <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
           <td style="padding:6px 6px;font-size:11px">Paris</td>
@@ -352,10 +352,10 @@ tr:hover td{{background:#fafafa}}
             <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
           </td>
         </tr>
-        <tr style="background:#f0fdf4;border-top:1px solid #dcfce7">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#16a34a;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#15803d">Fleuriste événementiel · Bordeaux</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#166534">TEST</span></td>
+        <tr style="background:#fefce8;border-top:1px solid #fde68a">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Fleuriste événementiel · Bordeaux</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
           <td style="padding:6px 6px;font-size:11px">nathaliecbrigitte@gmail.com</td>
           <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
           <td style="padding:6px 6px;font-size:11px">Bordeaux</td>
@@ -370,10 +370,10 @@ tr:hover td{{background:#fafafa}}
             <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
           </td>
         </tr>
-        <tr style="background:#faf5ff;border-top:1px solid #f3e8ff">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#7c3aed;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#6d28d9">Consultant communication · Antibes</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#f3e8ff;color:#6d28d9">TEST</span></td>
+        <tr style="background:#fefce8;border-top:1px solid #fde68a">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Consultant communication · Antibes</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
           <td style="padding:6px 6px;font-size:11px">contact@nathaliebrigitte.com</td>
           <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
           <td style="padding:6px 6px;font-size:11px">Antibes</td>
@@ -388,10 +388,10 @@ tr:hover td{{background:#fafafa}}
             <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
           </td>
         </tr>
-        <tr style="background:#fff7ed;border-top:1px solid #fed7aa">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#ea580c;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#c2410c">Chef cuisinier · Mende <span style="font-size:9px;font-weight:400;color:#9ca3af">(sans visuel)</span></td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fed7aa;color:#9a3412">TEST</span></td>
+        <tr style="background:#fefce8;border-top:1px solid #fde68a">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Chef cuisinier · Mende <span style="font-size:9px;font-weight:400;color:#9ca3af">(sans visuel)</span></td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
           <td style="padding:6px 6px;font-size:11px">contact@presence-ia.com</td>
           <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
           <td style="padding:6px 6px;font-size:11px">Mende</td>
@@ -536,7 +536,7 @@ async function testProfile(btn, email, profession, city, action) {{
     }});
     const d = await r.json();
     resCell.innerHTML = d.preview
-      ? '<strong style="color:#7c3aed">Aperçu ('+d.chars+' car.) :</strong> ' + d.preview.split('\n').join('<br>')
+      ? '<strong style="color:#7c3aed">Aperçu ('+d.chars+' car.) :</strong> ' + d.preview.split('\\n').join('<br>')
       : '✗ '+(d.error||'erreur');
     resCell.style.color = '#374151';
   }}
