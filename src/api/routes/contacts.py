@@ -112,7 +112,8 @@ STATUS_BADGE = {
 def contacts_page(request: Request, db: Session = Depends(get_db),
                   status_filter: str = "", search: str = ""):
     token = _check_token(request)
-    contacts = db_list_contacts(db)
+    contacts = [c for c in db_list_contacts(db)
+                if "[TEST]" not in (c.company_name or "").upper()]
 
     # Filtres
     if status_filter:
@@ -296,75 +297,6 @@ tr:hover td{{background:#fafafa}}
     <span id="add-status" style="margin-left:10px;font-size:11px;color:#6b7280"></span>
   </div>
 
-  <!-- Mode test — 4 profils individuels -->
-  <div style="margin-bottom:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <span style="font-size:11px;color:#6b7280;font-weight:700">Profils de test</span>
-      <span style="font-size:10px;color:#9ca3af">SMS → numéro commun :</span>
-      <input id="test-phone" type="text" placeholder="06…" style="font-size:11px;padding:3px 7px;width:120px;border:1px solid #d1d5db;border-radius:5px">
-    </div>
-    <table style="font-size:11px;border-collapse:collapse;width:100%">
-      <thead><tr style="color:#6b7280;text-align:left">
-        <th style="padding:3px 8px">Email</th>
-        <th style="padding:3px 8px">Profession</th>
-        <th style="padding:3px 8px">Ville</th>
-        <th style="padding:3px 8px">P/SP</th>
-        <th style="padding:3px 8px">Actions</th>
-        <th style="padding:3px 8px;min-width:200px">Résultat</th>
-      </tr></thead>
-      <tbody>
-        <tr style="border-top:1px solid #e5e7eb;background:#eff6ff">
-          <td style="padding:4px 8px;color:#374151">nathalie.brigitte@gmail.com</td>
-          <td style="padding:4px 8px">Pisciniste</td>
-          <td style="padding:4px 8px">Paris</td>
-          <td style="padding:4px 8px"><span style="background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:4px 8px;white-space:nowrap">
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','email')" class="btn" style="background:#2563eb;padding:3px 8px;font-size:10px;margin-right:3px">✉</button>
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','sms')"   class="btn" style="background:#7c3aed;padding:3px 8px;font-size:10px;margin-right:3px">💬</button>
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','preview')" class="btn" style="background:#374151;padding:3px 8px;font-size:10px">📋</button>
-          </td>
-          <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
-        </tr>
-        <tr style="border-top:1px solid #e5e7eb;background:#f0fdf4">
-          <td style="padding:4px 8px;color:#374151">nathaliecbrigitte@gmail.com</td>
-          <td style="padding:4px 8px">Fleuriste événementiel</td>
-          <td style="padding:4px 8px">Bordeaux</td>
-          <td style="padding:4px 8px"><span style="background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:4px 8px;white-space:nowrap">
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','email')" class="btn" style="background:#2563eb;padding:3px 8px;font-size:10px;margin-right:3px">✉</button>
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','sms')"   class="btn" style="background:#7c3aed;padding:3px 8px;font-size:10px;margin-right:3px">💬</button>
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','preview')" class="btn" style="background:#374151;padding:3px 8px;font-size:10px">📋</button>
-          </td>
-          <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
-        </tr>
-        <tr style="border-top:1px solid #e5e7eb;background:#faf5ff">
-          <td style="padding:4px 8px;color:#374151">contact@nathaliebrigitte.com</td>
-          <td style="padding:4px 8px">Consultant en communication</td>
-          <td style="padding:4px 8px">Antibes</td>
-          <td style="padding:4px 8px"><span style="background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span></td>
-          <td style="padding:4px 8px;white-space:nowrap">
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','email')" class="btn" style="background:#2563eb;padding:3px 8px;font-size:10px;margin-right:3px">✉</button>
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','sms')"   class="btn" style="background:#7c3aed;padding:3px 8px;font-size:10px;margin-right:3px">💬</button>
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','preview')" class="btn" style="background:#374151;padding:3px 8px;font-size:10px">📋</button>
-          </td>
-          <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
-        </tr>
-        <tr style="border-top:1px solid #e5e7eb;background:#fff7ed">
-          <td style="padding:4px 8px;color:#374151">contact@presence-ia.com</td>
-          <td style="padding:4px 8px">Chef cuisinier événementiel</td>
-          <td style="padding:4px 8px">Mende <span style="color:#9ca3af;font-size:9px">(sans visuel)</span></td>
-          <td style="padding:4px 8px"><span style="background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:4px 8px;white-space:nowrap">
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','email')" class="btn" style="background:#2563eb;padding:3px 8px;font-size:10px;margin-right:3px">✉</button>
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','sms')"   class="btn" style="background:#7c3aed;padding:3px 8px;font-size:10px;margin-right:3px">💬</button>
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','preview')" class="btn" style="background:#374151;padding:3px 8px;font-size:10px">📋</button>
-          </td>
-          <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
   <!-- Barre actions groupées — toujours visible -->
   <div id="bulk-bar" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <span style="font-size:11px;color:#6b7280;font-weight:600">Sélectionner</span>
@@ -396,7 +328,87 @@ tr:hover td{{background:#fafafa}}
         <th style="text-align:center" title="👁 Email ouvert · 🏠 Landing visitée · 📅 Calendly cliqué">Tracking</th><th></th>
       </tr></thead>
       <tbody>
-        {rows if rows else '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
+        <!-- Profils de test (hors DB) -->
+        <tr style="background:#f1f5f9">
+          <td colspan="11" style="padding:4px 10px;font-size:10px;color:#64748b;font-weight:700;letter-spacing:.05em">
+            TEST — SMS : <input id="test-phone" type="text" placeholder="06…" style="font-size:10px;padding:2px 6px;width:110px;border:1px solid #cbd5e1;border-radius:4px;margin-left:4px">
+          </td>
+        </tr>
+        <tr style="background:#eff6ff;border-top:1px solid #dbeafe">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#1e40af;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#1e40af">Pisciniste · Paris</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#dbeafe;color:#1e40af">TEST</span></td>
+          <td style="padding:6px 6px;font-size:11px">nathalie.brigitte@gmail.com</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td style="padding:6px 6px;font-size:11px">Paris</td>
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
+          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Pisciniste</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td></td>
+          <td style="padding:6px 6px;white-space:nowrap">
+            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
+            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
+            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
+            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
+          </td>
+        </tr>
+        <tr style="background:#f0fdf4;border-top:1px solid #dcfce7">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#16a34a;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#15803d">Fleuriste événementiel · Bordeaux</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#166534">TEST</span></td>
+          <td style="padding:6px 6px;font-size:11px">nathaliecbrigitte@gmail.com</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td style="padding:6px 6px;font-size:11px">Bordeaux</td>
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
+          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Fleuriste événementiel</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td></td>
+          <td style="padding:6px 6px;white-space:nowrap">
+            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
+            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
+            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
+            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
+          </td>
+        </tr>
+        <tr style="background:#faf5ff;border-top:1px solid #f3e8ff">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#7c3aed;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#6d28d9">Consultant communication · Antibes</td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#f3e8ff;color:#6d28d9">TEST</span></td>
+          <td style="padding:6px 6px;font-size:11px">contact@nathaliebrigitte.com</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td style="padding:6px 6px;font-size:11px">Antibes</td>
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span></td>
+          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Consultant en communication</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td></td>
+          <td style="padding:6px 6px;white-space:nowrap">
+            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
+            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
+            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
+            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
+          </td>
+        </tr>
+        <tr style="background:#fff7ed;border-top:1px solid #fed7aa">
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#ea580c;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#c2410c">Chef cuisinier · Mende <span style="font-size:9px;font-weight:400;color:#9ca3af">(sans visuel)</span></td>
+          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fed7aa;color:#9a3412">TEST</span></td>
+          <td style="padding:6px 6px;font-size:11px">contact@presence-ia.com</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td style="padding:6px 6px;font-size:11px">Mende</td>
+          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
+          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Chef cuisinier événementiel</td>
+          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+          <td></td>
+          <td style="padding:6px 6px;white-space:nowrap">
+            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
+            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
+            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
+            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
+          </td>
+        </tr>
+        <tr style="border-bottom:3px solid #e5e7eb"><td colspan="11"></td></tr>
+        <!-- Contacts DB -->
+        {rows if rows else '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -497,7 +509,7 @@ async function _pollLeads() {{
 document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
 
 async function testProfile(btn, email, profession, city, action) {{
-  const resCell = btn.closest('tr').querySelector('.test-res');
+  const resCell = btn.closest('td').querySelector('.test-res');
   resCell.textContent = '…'; resCell.style.color = '#6b7280';
   if (action === 'email') {{
     const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
