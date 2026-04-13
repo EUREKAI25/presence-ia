@@ -150,14 +150,14 @@ _DEFAULT_EMAIL_SUBJECT = "Les IA suggèrent vos concurrents"
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
-    "Lorsque vos éventuels clients demandent à leur IA préférée quel {metier} choisir à {ville}, "
+    "**Lorsque vos éventuels clients demandent à leur IA préférée quel {metier} choisir à {ville},** "
     "plusieurs entreprises apparaissent.\n\n"
     "Pas la vôtre.\n\n"
     "Nous avons analysé votre visibilité réelle dans les réponses des IA, "
     "ainsi que celle de vos concurrents.\n\n"
     "Le résultat est assez parlant...\n\n"
-    "Si vous voulez voir concrètement ce que ça donne : {landing_url}\n\n"
-    "— Nathalie\n"
+    "Si vous voulez voir concrètement ce que ça donne : {landing_url}\n\n\n"
+    "Nathalie\n"
     "Présence IA"
 )
 
@@ -169,16 +169,17 @@ _DEFAULT_SMS_TEMPLATE = (
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
                      template: Optional[str] = None) -> str:
     tpl = template or _DEFAULT_EMAIL_TEMPLATE
+    ville   = city.title() if city else city
     metier  = profession.lower()
     metiers = metier + "s" if not metier.endswith("s") else metier
     try:
-        return tpl.format(name=name, ville=city, metier=metier, metiers=metiers,
+        return tpl.format(name=name, ville=ville, metier=metier, metiers=metiers,
                           landing_url=landing_url,
-                          city=city, profession=profession)  # compat anciens templates
+                          city=ville, profession=profession)  # compat anciens templates
     except Exception:
-        return _DEFAULT_EMAIL_TEMPLATE.format(name=name, ville=city, metier=metier,
+        return _DEFAULT_EMAIL_TEMPLATE.format(name=name, ville=ville, metier=metier,
                                               metiers=metiers, landing_url=landing_url,
-                                              city=city, profession=profession)
+                                              city=ville, profession=profession)
 
 def _contact_message_sms(name: str, city: str, profession: str, landing_url: str,
                          template: Optional[str] = None) -> str:
@@ -291,12 +292,21 @@ def _scrape_site(url: str) -> dict:
 
 def _body_to_html(plain: str, landing_url: str = "", delivery_id: str = "") -> str:
     """Convertit le corps texte en HTML avec tracking pixel et lien cliquable."""
-    import html as _html
+    import html as _html, re as _re
     tracked_url = landing_url
     if delivery_id and landing_url:
         from urllib.parse import quote as _q
         tracked_url = f"{BASE_URL}/l/track/click/{delivery_id}?url={_q(landing_url, safe='')}"
-    lines = _html.escape(plain).replace("\n", "<br>\n")
+    # Extraire les segments **gras** avant l'échappement HTML
+    bold_map: dict = {}
+    def _store_bold(m):
+        key = f"\x00BOLD{len(bold_map)}\x00"
+        bold_map[key] = f"<strong>{_html.escape(m.group(1))}</strong>"
+        return key
+    plain_marked = _re.sub(r'\*\*(.+?)\*\*', _store_bold, plain)
+    lines = _html.escape(plain_marked).replace("\n", "<br>\n")
+    for key, tag in bold_map.items():
+        lines = lines.replace(_html.escape(key), tag)
     if delivery_id and landing_url:
         escaped_orig = _html.escape(landing_url)
         escaped_tracked = _html.escape(tracked_url)
