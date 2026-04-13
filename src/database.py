@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB, SireneSegmentDB, IaSnapshotDB
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB, SireneSegmentDB, IaSnapshotDB, RefCityDB  # noqa: F401
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -45,6 +45,8 @@ def init_db():
             ("v3_prospects", "email_bounced_at DATETIME"),
             ("v3_prospects", "email_clicked_at DATETIME"),
             ("v3_prospects", "email_booked_at DATETIME"),
+            ("v3_prospects", "city_reference VARCHAR"),
+            ("scoring_config", "outbound_refs_only INTEGER DEFAULT 1"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col}"))
@@ -81,6 +83,20 @@ def init_db():
     # Seed scoring config par défaut
     with SessionLocal() as db:
         _seed_scoring_config(db)
+    # Seed villes de référence + backfill city_reference
+    try:
+        from .ref_cities_seed import seed_ref_cities, backfill_city_reference
+        with SessionLocal() as _db:
+            n_cities = seed_ref_cities(_db)
+            n_refs   = backfill_city_reference(_db)
+            if n_cities or n_refs:
+                import logging
+                logging.getLogger(__name__).info(
+                    "ref_cities: %d villes insérées, %d prospects backfillés", n_cities, n_refs
+                )
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning("ref_cities seed: %s", _e)
 
 
 def get_db():

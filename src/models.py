@@ -365,6 +365,7 @@ class V3ProspectDB(Base):
     email_bounced_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     email_clicked_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     email_booked_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    city_reference:   Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True, index=True)
 
 
 class V3CityImageDB(Base):
@@ -454,11 +455,12 @@ class ScoringConfigDB(Base):
     """Pondération du score global de prospection (configurable admin)."""
     __tablename__ = "scoring_config"
     id             : Mapped[str]   = mapped_column(sa.String, primary_key=True, default="default")
-    w_visibilite   : Mapped[float] = mapped_column(sa.Float, default=0.40)
-    w_conseil_ia   : Mapped[float] = mapped_column(sa.Float, default=0.30)
-    w_concurrence  : Mapped[float] = mapped_column(sa.Float, default=0.15)
-    w_valeur       : Mapped[float] = mapped_column(sa.Float, default=0.15)
-    updated_at     : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    w_visibilite       : Mapped[float] = mapped_column(sa.Float, default=0.40)
+    w_conseil_ia       : Mapped[float] = mapped_column(sa.Float, default=0.30)
+    w_concurrence      : Mapped[float] = mapped_column(sa.Float, default=0.15)
+    w_valeur           : Mapped[float] = mapped_column(sa.Float, default=0.15)
+    outbound_refs_only : Mapped[bool]  = mapped_column(sa.Boolean, default=True)
+    updated_at         : Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class SireneSegmentDB(Base):
@@ -595,3 +597,11 @@ class PipelineHistoryLogDB(Base):
     statut                : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # running/idle/saturated/top_up
     cap_genere            : Mapped[Optional[int]]  = mapped_column(sa.Integer, nullable=True)
     source_slots          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # calendly / config
+
+
+class RefCityDB(Base):
+    """Villes de référence (préfectures / sous-préfectures) pour la prospection."""
+    __tablename__ = "ref_cities"
+    city_name        : Mapped[str]            = mapped_column(sa.String, primary_key=True)   # UPPERCASE normalisé
+    city_type        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)      # "prefecture" | "sous_prefecture" | null
+    header_image_url : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)

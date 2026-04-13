@@ -1277,6 +1277,20 @@ def landing_v3(token: str):
                     header = db_get_header(db, prefecture.lower().strip().replace(" ", "-"))
         base_url = os.getenv("BASE_URL", "https://presence-ia.com")
         city_image_url = (header.url if header.url.startswith("http") else base_url + header.url) if header else ""
+        # Chercher d'abord l'image de la ville de référence (RefCityDB)
+        _header_img = None
+        try:
+            from ...models import RefCityDB
+            _ref = db.query(RefCityDB).filter_by(city_name=(p.city or "").upper()).first()
+            if _ref:
+                _header_img = _ref.header_image_url
+                if not _header_img:
+                    from ...city_images import fetch_city_header_image
+                    _header_img = fetch_city_header_image(p.city)
+        except Exception:
+            pass
+        if _header_img:
+            city_image_url = _header_img
         competitors    = json.loads(p.competitors) if p.competitors else []
         if not competitors:
             others = db.query(V3ProspectDB).filter(

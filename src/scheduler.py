@@ -1772,7 +1772,7 @@ def _job_outbound(force: bool = False):
     import os, random, requests as _req
     from datetime import datetime
     from .database import SessionLocal
-    from .models import V3ProspectDB
+    from .models import V3ProspectDB, ScoringConfigDB
 
     dry_run = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"  # SÉCURITÉ : défaut=true, activation explicite requise
     cap     = int(os.getenv("OUTBOUND_CAP", "10"))
@@ -1850,6 +1850,16 @@ def _job_outbound(force: bool = False):
     log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
              _active["profession"], _active["city"], _active.get("score", 0))
 
+    # ── Lire le flag refs_only depuis ScoringConfigDB ─────────────────────────
+    refs_only = True  # fallback
+    try:
+        with SessionLocal() as _db_cfg:
+            _cfg_refs = _db_cfg.query(ScoringConfigDB).filter_by(id="default").first()
+            if _cfg_refs and hasattr(_cfg_refs, "outbound_refs_only"):
+                refs_only = bool(_cfg_refs.outbound_refs_only)
+    except Exception:
+        pass
+
     # ── Sélection email + SMS ─────────────────────────────────────────────────
     _base_filter = [
         V3ProspectDB.city       == _active["city"],
@@ -1857,6 +1867,10 @@ def _job_outbound(force: bool = False):
         V3ProspectDB.ia_results.isnot(None),
         V3ProspectDB.sent_at.is_(None),
     ]
+    # Si refs_only : uniquement les prospects avec city_reference renseignée
+    if refs_only:
+        _base_filter.append(V3ProspectDB.city_reference.isnot(None))
+
     with SessionLocal() as db:
         # Email : priorité
         has_email = (
@@ -1940,7 +1954,7 @@ def _job_outbound(force: bool = False):
         ]
         idx         = (sent + would_send) % len(_OUTBOUND_SENDERS)
         sender, sender_name = _OUTBOUND_SENDERS[idx]
-        city_display = (prospect.city or "").title()
+        city_display = (prospect.city_reference or prospect.city or "").title()
 
         # Résoudre le terme de recherche réaliste depuis ProfessionDB
         _terme_display = None
