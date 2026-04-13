@@ -364,9 +364,9 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 
 _PROMPTS_FILE = Path(__file__).resolve().parents[2] / "ia_prompts.json"
 _DEFAULT_PROMPTS = [
-    "{terme} à {city}, tu as des recommandations ?",
-    "Je cherche {terme} à {city}, quelle entreprise tu conseilles ?",
-    "Tu peux me recommander une entreprise pour {terme} à {city} ?",
+    "Tu me recommandes qui comme {terme} autour de {city} ?",
+    "Des avis sur des {terme} près de {city} ?",
+    "Qui est sérieux comme {terme} à {city} ?",
 ]
 
 def _load_prompts() -> list:
@@ -378,9 +378,9 @@ def _load_prompts() -> list:
 
 
 _GEMINI_PROMPTS = [
-    "Donne-moi une liste d'entreprises pour {terme} à {city}.",
-    "Liste des professionnels que tu connais pour {terme} à {city}.",
-    "Quels professionnels travaillent sur {terme} à {city} ? Donne une liste.",
+    "Qui recommandes-tu comme {terme} autour de {city} ? Donne des noms.",
+    "Liste des {terme} avec bons avis près de {city}.",
+    "Quels {terme} sont réputés sérieux à {city} ? Donne une liste.",
 ]
 
 
