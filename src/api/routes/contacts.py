@@ -172,13 +172,13 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         _ctype       = ref_city_types.get(city_upper, "")
         if _ctype == "prefecture":
             ref_badge = '<span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span>'
-            has_ref   = "1"
+            has_p = "1"; has_sp = "0"
         elif _ctype == "sous_prefecture":
             ref_badge = '<span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span>'
-            has_ref   = "1"
+            has_p = "0"; has_sp = "1"
         else:
             ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
-            has_ref   = "0"
+            has_p = "0"; has_sp = "0"
         trk = tracking.get(c.id)
         def _trk_icon(val, emoji, label):
             if not val:
@@ -190,7 +190,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
             _trk_icon(getattr(trk, "landing_visited_at", None) if trk else None, "🏠", "Landing visitée") + " " +
             _trk_icon(getattr(trk, "calendly_clicked_at", None) if trk else None, "📅", "Calendly cliqué")
         ) if True else ""
-        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-ref="{has_ref}" data-img-ready="{img_attr}" style="{row_style}">
+        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
@@ -325,9 +325,10 @@ tr:hover td{{background:#fafafa}}
     <span style="font-size:11px;color:#6b7280;font-weight:600">Sélectionner</span>
     <input type="number" id="bulk-qty" min="1" max="9999" placeholder="max" title="Nombre max à sélectionner (vide = tous)"
            style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
-    <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Avec email</button>
-    <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Avec mobile</button>
-    <button onclick="selectByType('ref')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 Préfecture</button>
+    <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Email</button>
+    <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Mobile</button>
+    <button onclick="selectByType('p')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 P</button>
+    <button onclick="selectByType('sp')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
     <button onclick="selectAll()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button onclick="selectNone()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
     <div style="flex:1"></div>
@@ -525,12 +526,14 @@ function selectByType(type) {{
   document.querySelectorAll('.row-cb').forEach(cb => {{
     const tr = cb.closest('tr');
     const matches = tr && tr.dataset[key] === '1';
+    tr.style.display = matches ? '' : 'none';
     cb.checked = matches && n < qty;
-    if(matches && n < qty) n++;
+    if (matches && n < qty) n++;
   }});
   _updateBulkBar();
 }}
 function selectAll() {{
+  document.querySelectorAll('.row-cb').forEach(cb => {{ cb.closest('tr').style.display = ''; }});
   const qty = _getQty();
   let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{
@@ -540,8 +543,11 @@ function selectAll() {{
   _updateBulkBar();
 }}
 function selectNone() {{
-  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
-  _updateBulkBar();  // met le count à 0, mais la barre reste visible
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    cb.closest('tr').style.display = '';
+    cb.checked = false;
+  }});
+  _updateBulkBar();
 }}
 function _selectedIds() {{ return [...document.querySelectorAll('.row-cb:checked')].map(cb=>cb.dataset.cid); }}
 
