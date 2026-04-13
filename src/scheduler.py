@@ -368,23 +368,43 @@ def _upsert_cited_companies(db, profession: str, city: str, cited: dict):
 
 
 def _job_refresh_ia():
-    """Relance les tests IA (ChatGPT + Gemini + Claude) uniquement pour la paire
-    active — lun/jeu/dim à 9h30, 15h, 18h30 UTC. 3 appels API par run.
+    """Relance les tests IA (ChatGPT + Gemini + Claude) pour :
+    - la paire active (active_pair_state.json) — dès activation, avant tout envoi
+    - toutes les paires en prospection (sent_at dans les 30 derniers jours)
+    lun/jeu/dim à 9h30, 15h, 18h30 UTC. 3 appels API par paire.
     Alimente ia_cited_companies.
     """
     try:
         import time as _time, json as _json
+        from datetime import timedelta
         from .database import SessionLocal
         from .api.routes.v3 import _run_ia_test, V3ProspectDB
         from .active_pair import get_active_pair
 
+        active_pairs = set()
+
+        # 1. Paire active (peut n'avoir aucun envoi encore)
         active = get_active_pair()
-        if not active:
-            log.info("refresh_ia : aucune paire active — skip")
+        if active:
+            active_pairs.add((active["city"], active["profession"]))
+
+        # 2. Paires en prospection (au moins 1 envoi dans les 30j)
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        with SessionLocal() as db:
+            rows = (
+                db.query(V3ProspectDB.city, V3ProspectDB.profession)
+                .filter(V3ProspectDB.sent_at >= cutoff)
+                .distinct()
+                .all()
+            )
+        for r in rows:
+            active_pairs.add((r.city, r.profession))
+
+        if not active_pairs:
+            log.info("refresh_ia : aucune paire active ou en prospection — skip")
             return
 
-        active_pairs = [(active["city"], active["profession"])]
-        log.info("refresh_ia : paire active — %s / %s", active["profession"], active["city"])
+        log.info("refresh_ia : %d paire(s) à tester", len(active_pairs))
         for city, profession in active_pairs:
             try:
                 ia_data = _run_ia_test(profession, city)
