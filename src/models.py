@@ -366,6 +366,7 @@ class V3ProspectDB(Base):
     email_clicked_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     email_booked_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     city_reference:   Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True, index=True)
+    is_test:          Mapped[bool]               = mapped_column(sa.Boolean, default=False, server_default="0")
 
 
 class V3CityImageDB(Base):

@@ -46,6 +46,7 @@ def init_db():
             ("v3_prospects", "email_clicked_at DATETIME"),
             ("v3_prospects", "email_booked_at DATETIME"),
             ("v3_prospects", "city_reference VARCHAR"),
+            ("v3_prospects", "is_test INTEGER DEFAULT 0"),
             ("scoring_config", "outbound_refs_only INTEGER DEFAULT 1"),
         ]:
             try:
@@ -97,6 +98,29 @@ def init_db():
     except Exception as _e:
         import logging
         logging.getLogger(__name__).warning("ref_cities seed: %s", _e)
+    # Seed profils test V3 (is_test=True)
+    try:
+        from .models import V3ProspectDB
+        _TEST_PROFILES = [
+            ("__test__pisciniste_paris__",       "Prospect Test",   "PARIS",    "Pisciniste",                    "nathalie.brigitte@gmail.com",  None),
+            ("__test__fleuriste_bordeaux__",     "Prospect Test",   "BORDEAUX", "Fleuriste événementiel",        "nathaliecbrigitte@gmail.com",  None),
+            ("__test__consultant_antibes__",     "Prospect Test",   "ANTIBES",  "Consultant en communication",   "contact@nathaliebrigitte.com", None),
+            ("__test__cuisinier_mende__",        "Prospect Test",   "MENDE",    "Chef cuisinier événementiel",   "contact@presence-ia.com",      None),
+        ]
+        with SessionLocal() as _db:
+            for tok, name, city, prof, email, phone in _TEST_PROFILES:
+                if not _db.query(V3ProspectDB).filter_by(token=tok).first():
+                    _db.add(V3ProspectDB(
+                        token=tok, name=name, city=city, profession=prof,
+                        email=email, phone=phone,
+                        landing_url=f"/v3/landing/{tok}",
+                        city_reference=city,
+                        is_test=True,
+                    ))
+            _db.commit()
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning("test profiles seed: %s", _e)
 
 
 def get_db():

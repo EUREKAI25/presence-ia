@@ -102,6 +102,49 @@ def _prof_options(db) -> str:
     return "".join(f'<option value="{p.id}">{p.label}</option>' for p in profs)
 
 
+def _build_test_rows(test_prospects, ref_types: dict, token: str) -> str:
+    """Génère les lignes HTML pour les profils test depuis V3ProspectDB."""
+    import json
+    html = ""
+    for p in test_prospects:
+        ctype = ref_types.get((p.city or "").upper(), "")
+        if ctype == "prefecture":
+            ref_badge = '<span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span>'
+        elif ctype == "sous_prefecture":
+            ref_badge = '<span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span>'
+        else:
+            ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
+        ia_count = 0
+        try:
+            ia_count = len(json.loads(p.ia_results or "[]"))
+        except Exception:
+            pass
+        ia_badge = (f'<span style="font-size:9px;background:#dcfce7;color:#166534;padding:1px 4px;border-radius:3px">'
+                    f'IA:{ia_count}</span>' if ia_count
+                    else '<span style="font-size:9px;color:#f59e0b">IA:—</span>')
+        label = f"{p.profession} · {p.city.title()}"
+        # SMS test phone vient du champ HTML, transmis via JS
+        html += f"""<tr style="background:#fefce8;border-top:1px solid #fde68a">
+  <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+  <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">{label}</td>
+  <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
+  <td style="padding:6px 6px;font-size:11px">{p.email or '<span style="color:#d1d5db">—</span>'}</td>
+  <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
+  <td style="padding:6px 6px;font-size:11px">{p.city.title()}</td>
+  <td style="padding:6px 6px;text-align:center">{ref_badge}</td>
+  <td style="padding:6px 6px;font-size:11px;color:#6b7280">{p.profession}</td>
+  <td style="padding:6px 6px;text-align:center">{ia_badge}</td>
+  <td></td>
+  <td style="padding:6px 6px;white-space:nowrap">
+    <button onclick="runOutboundTest(this,'{p.token}','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
+    <button onclick="runOutboundTest(this,'{p.token}','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
+    <button onclick="runOutboundTest(this,'{p.token}','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
+    <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
+  </td>
+</tr>"""
+    return html or '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:8px;font-size:11px">Aucun profil test en DB</td></tr>'
+
+
 STATUS_BADGE = {
     "SUSPECT":  ("background:#fef9c3;color:#854d0e", "Suspect"),
     "PROSPECT": ("background:#dbeafe;color:#1e40af", "Prospect"),
@@ -112,6 +155,12 @@ STATUS_BADGE = {
 def contacts_page(request: Request, db: Session = Depends(get_db),
                   status_filter: str = "", search: str = ""):
     token = _check_token(request)
+
+    # Profils test depuis V3ProspectDB (is_test=True)
+    from ...models import V3ProspectDB as _V3P, RefCityDB as _RefCityDB
+    test_prospects = db.query(_V3P).filter_by(is_test=True).order_by(_V3P.created_at).all()
+    _ref_types = {r.city_name: r.city_type for r in db.query(_RefCityDB).all()}
+
     contacts = [c for c in db_list_contacts(db)
                 if "[TEST]" not in (c.company_name or "").upper()]
 
@@ -328,84 +377,13 @@ tr:hover td{{background:#fafafa}}
         <th style="text-align:center" title="👁 Email ouvert · 🏠 Landing visitée · 📅 Calendly cliqué">Tracking</th><th></th>
       </tr></thead>
       <tbody>
-        <!-- Profils de test (hors DB) -->
+        <!-- Profils de test (V3ProspectDB is_test=True) -->
         <tr style="background:#f1f5f9">
           <td colspan="11" style="padding:4px 10px;font-size:10px;color:#64748b;font-weight:700;letter-spacing:.05em">
             TEST — SMS : <input id="test-phone" type="text" placeholder="06…" style="font-size:10px;padding:2px 6px;width:110px;border:1px solid #cbd5e1;border-radius:4px;margin-left:4px">
           </td>
         </tr>
-        <tr style="background:#fefce8;border-top:1px solid #fde68a">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Pisciniste · Paris</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
-          <td style="padding:6px 6px;font-size:11px">nathalie.brigitte@gmail.com</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td style="padding:6px 6px;font-size:11px">Paris</td>
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Pisciniste</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td></td>
-          <td style="padding:6px 6px;white-space:nowrap">
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
-            <button onclick="testProfile(this,'nathalie.brigitte@gmail.com','Pisciniste','Paris','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
-            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
-          </td>
-        </tr>
-        <tr style="background:#fefce8;border-top:1px solid #fde68a">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Fleuriste événementiel · Bordeaux</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
-          <td style="padding:6px 6px;font-size:11px">nathaliecbrigitte@gmail.com</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td style="padding:6px 6px;font-size:11px">Bordeaux</td>
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Fleuriste événementiel</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td></td>
-          <td style="padding:6px 6px;white-space:nowrap">
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
-            <button onclick="testProfile(this,'nathaliecbrigitte@gmail.com','Fleuriste événementiel','Bordeaux','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
-            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
-          </td>
-        </tr>
-        <tr style="background:#fefce8;border-top:1px solid #fde68a">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Consultant communication · Antibes</td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
-          <td style="padding:6px 6px;font-size:11px">contact@nathaliebrigitte.com</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td style="padding:6px 6px;font-size:11px">Antibes</td>
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span></td>
-          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Consultant en communication</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td></td>
-          <td style="padding:6px 6px;white-space:nowrap">
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
-            <button onclick="testProfile(this,'contact@nathaliebrigitte.com','Consultant en communication','Antibes','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
-            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
-          </td>
-        </tr>
-        <tr style="background:#fefce8;border-top:1px solid #fde68a">
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
-          <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">Chef cuisinier · Mende <span style="font-size:9px;font-weight:400;color:#9ca3af">(sans visuel)</span></td>
-          <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
-          <td style="padding:6px 6px;font-size:11px">contact@presence-ia.com</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td style="padding:6px 6px;font-size:11px">Mende</td>
-          <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span></td>
-          <td style="padding:6px 6px;font-size:11px;color:#6b7280">Chef cuisinier événementiel</td>
-          <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-          <td></td>
-          <td style="padding:6px 6px;white-space:nowrap">
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
-            <button onclick="testProfile(this,'contact@presence-ia.com','Chef cuisinier événementiel','Mende','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
-            <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
-          </td>
-        </tr>
+        {_build_test_rows(test_prospects, _ref_types, token)}
         <tr style="border-bottom:3px solid #e5e7eb"><td colspan="11"></td></tr>
         <!-- Contacts DB -->
         {rows if rows else '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
@@ -509,55 +487,37 @@ async function _pollLeads() {{
 document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
 
 function _fmtTestResult(d, label) {{
-  const ia   = 'IA: '+d.ia_ok+'/'+d.ia_total;
-  const img  = 'img: '+(d.has_image ? (d.img_source==='cache'?'✓cache':'✓Unsplash') : '✗');
-  const trm  = d.terme ? 'terme: <em>'+d.terme+'</em>' : '';
+  const ia  = 'IA: '+d.ia_ok+'/'+d.ia_total;
+  const img = 'img: '+(d.has_image ? (d.img_source==='cache'?'✓cache':'✓Unsplash') : '✗');
+  const trm = d.terme ? 'terme: <em>'+d.terme+'</em>' : '';
   return label + ' · ' + ia + ' · ' + img + (trm ? ' · '+trm : '');
 }}
-async function testProfile(btn, email, profession, city, action) {{
+async function runOutboundTest(btn, tok, action) {{
   const resCell = btn.closest('td').querySelector('.test-res');
-  resCell.innerHTML = '⏳ IA en cours…'; resCell.style.color = '#6b7280';
-  if (action === 'email') {{
-    const r = await fetch('/admin/contacts/test/send-email?token='+T, {{
-      method:'POST', headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{email, profession, city}})
-    }});
-    const d = await r.json();
-    if (d.ok) {{
-      resCell.innerHTML = _fmtTestResult(d, '✓ Envoyé');
-      resCell.style.color = '#16a34a';
-    }} else {{
-      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur'));
-      resCell.style.color = '#dc2626';
-    }}
-  }} else if (action === 'sms') {{
-    const phone = document.getElementById('test-phone').value.trim();
-    if (!phone) {{ resCell.innerHTML = '⚠ Numéro requis'; resCell.style.color='#f59e0b'; return; }}
-    const r = await fetch('/admin/contacts/test/send-sms?token='+T, {{
-      method:'POST', headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{phone, profession, city}})
-    }});
-    const d = await r.json();
-    if (d.ok) {{
-      resCell.innerHTML = _fmtTestResult(d, '✓ SMS envoyé');
-      resCell.style.color = '#16a34a';
-    }} else {{
-      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur'));
-      resCell.style.color = '#dc2626';
-    }}
-  }} else {{
-    const r = await fetch('/admin/contacts/test/preview-sms?token='+T, {{
-      method:'POST', headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{profession, city}})
-    }});
-    const d = await r.json();
-    if (d.preview) {{
+  resCell.innerHTML = '⏳ IA + image en cours…'; resCell.style.color = '#6b7280';
+  const phone = document.getElementById('test-phone').value.trim();
+  if (action === 'sms' && !phone) {{
+    resCell.innerHTML = '⚠ Numéro requis'; resCell.style.color='#f59e0b'; return;
+  }}
+  const r = await fetch('/admin/contacts/test/outbound/'+tok+'?token='+T, {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{action, phone}})
+  }});
+  const d = await r.json();
+  if (action === 'preview') {{
+    if (d.body) {{
       resCell.innerHTML = _fmtTestResult(d, '📋')
-        + '<br><strong>Message :</strong> ' + d.preview.split('\\n').join('<br>');
+        + '<br><strong>Message :</strong> ' + d.body.split('\\n').join('<br>');
       resCell.style.color = '#374151';
     }} else {{
-      resCell.innerHTML = '✗ '+(d.error||'erreur');
-      resCell.style.color = '#dc2626';
+      resCell.innerHTML = '✗ '+(d.error||'erreur'); resCell.style.color='#dc2626';
+    }}
+  }} else {{
+    const lbl = action==='sms' ? '✓ SMS envoyé' : '✓ Email envoyé';
+    if (d.ok) {{
+      resCell.innerHTML = _fmtTestResult(d, lbl); resCell.style.color='#16a34a';
+    }} else {{
+      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur')); resCell.style.color='#dc2626';
     }}
   }}
 }}
@@ -780,52 +740,42 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.post("/admin/contacts/test/send-email")
-async def contact_test_email(request: Request, db: Session = Depends(get_db)):
+@router.post("/admin/contacts/test/outbound/{tok}")
+async def contact_test_outbound(tok: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Pipeline outbound complet sur un profil test V3ProspectDB (is_test=True).
+    Même code que le scheduler. Lance IA + image si absents, puis envoie.
+    action = email | sms | preview
+    """
     _check_token(request)
-    data       = await request.json()
-    email      = data.get("email", "").strip()
-    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
-    city       = data.get("city", "Paris").strip() or "Paris"
-    if not email:
-        return JSONResponse({"ok": False, "error": "email requis"})
-    from ...scheduler import _outbound_send_one
-    result = _outbound_send_one(profession, city, email=email, dry_run=False)
-    return JSONResponse(result)
+    data           = await request.json()
+    action         = data.get("action", "preview")
+    phone_override = data.get("phone", "").strip()
 
+    from ...models import V3ProspectDB as _V3P
+    from ...scheduler import _outbound_send_prospect
 
-@router.post("/admin/contacts/test/preview-sms")
-async def contact_preview_sms(request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
-    data       = await request.json()
-    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
-    city       = data.get("city", "Paris").strip() or "Paris"
-    from ...scheduler import _outbound_send_one
-    # dry_run=True : pipeline complet (IA + image + formatage), sans envoi
-    result = _outbound_send_one(profession, city, email="preview@test", dry_run=True)
-    return JSONResponse({
-        "preview":       result.get("body", ""),
-        "chars":         len(result.get("body", "")),
-        "ia_ok":         result.get("ia_ok", 0),
-        "ia_total":      result.get("ia_total", 0),
-        "ia_errors":     result.get("ia_errors", []),
-        "has_image":     result.get("has_image", False),
-        "img_source":    result.get("img_source"),
-        "terme":         result.get("terme", ""),
-    })
+    p = db.query(_V3P).filter_by(token=tok, is_test=True).first()
+    if not p:
+        return JSONResponse({"ok": False, "error": "Profil test introuvable"})
 
+    if action == "sms":
+        if not phone_override:
+            return JSONResponse({"ok": False, "error": "Numéro requis pour le test SMS"})
+        # Proxy : même prospect mais canal forcé SMS vers le numéro test
+        class _Proxy:
+            pass
+        proxy = _Proxy()
+        for attr in ["token","name","city","profession","city_reference","ia_results","is_test"]:
+            setattr(proxy, attr, getattr(p, attr, None))
+        proxy.email = None
+        proxy.phone = phone_override
+        result = _outbound_send_prospect(proxy, dry_run=False)
+    elif action == "preview":
+        result = _outbound_send_prospect(p, dry_run=True)
+    else:  # email
+        result = _outbound_send_prospect(p, dry_run=False)
 
-@router.post("/admin/contacts/test/send-sms")
-async def contact_test_sms(request: Request, db: Session = Depends(get_db)):
-    _check_token(request)
-    data       = await request.json()
-    phone      = data.get("phone", "").strip()
-    profession = data.get("profession", "Pisciniste").strip() or "Pisciniste"
-    city       = data.get("city", "Paris").strip() or "Paris"
-    if not phone:
-        return JSONResponse({"ok": False, "error": "phone requis"})
-    from ...scheduler import _outbound_send_one
-    result = _outbound_send_one(profession, city, phone=phone, dry_run=False)
     return JSONResponse(result)
 
 

@@ -1492,104 +1492,142 @@ _OUTBOUND_SENDERS = [
 ]
 
 
-def _outbound_send_one(profession: str, city: str,
-                       email: str = None, phone: str = None,
-                       dry_run: bool = True) -> dict:
+def _outbound_send_prospect(p, dry_run: bool = False,
+                            brevo_key: str = None, sent_idx: int = 0) -> dict:
     """
-    Pipeline outbound complet pour UNE cible (test ou envoi réel unitaire).
-    Exécute dans l'ordre :
-      1. Requêtes IA (ChatGPT + Gemini + Claude) via _run_ia_test
-      2. Image ville (cache RefCityDB ou fetch Unsplash)
-      3. Formatage du message (_OUTBOUND_BODY / _OUTBOUND_SMS)
-      4. Envoi Brevo (email ou SMS) — sauf si dry_run=True
+    Pipeline outbound complet pour UN V3ProspectDB.
+    Utilisé par _job_outbound (boucle) ET par les boutons test admin.
 
-    Retourne dict : ok, ia_ok, ia_total, ia_errors, has_image, img_source,
-                    terme, channel, body, error
+    Étapes :
+      1. ia_results absent → lance _run_ia_test et stocke en DB
+      2. Image ville absente → fetch Unsplash (fallback 3 niveaux) et stocke
+      3. Formate le message (_OUTBOUND_BODY / _OUTBOUND_SMS)
+      4. Envoie via Brevo — sauf si dry_run=True
+      5. Marque sent_at/email_status — SAUF si p.is_test (profil réutilisable)
+
+    Retourne dict : ok, ia_ok, ia_total, has_image, img_source, terme, channel, body, error
     """
-    import os, requests as _req, random
+    import os, json, requests as _req, random
+    from datetime import datetime
     from .api.routes.v3 import _run_ia_test, _resolve_termes
-    from .models import RefCityDB
     from .city_images import fetch_city_header_image
+    from .models import RefCityDB, V3ProspectDB
     from .database import SessionLocal
 
-    brevo_key = os.getenv("BREVO_API_KEY", "")
+    if brevo_key is None:
+        brevo_key = os.getenv("BREVO_API_KEY", "")
 
-    # 1. Terme de recherche — même logique que la boucle outbound
-    termes = _resolve_termes(profession)
-    terme = termes[0] if termes else profession.lower()
-    city_display = city.title()
+    # ── 1. Enrichissement IA si absent ───────────────────────────────────────
+    ia_results_list = []
+    if p.ia_results:
+        try:
+            ia_results_list = json.loads(p.ia_results)
+        except Exception:
+            pass
 
-    # 2. Requêtes IA
-    ia_data    = _run_ia_test(profession, city)
-    ia_results = ia_data.get("results", [])
-    ia_ok      = len([r for r in ia_results if r.get("ok")])
-    ia_total   = len(ia_results)
-    ia_errors  = [f"{e.get('model','?')}: {e.get('error','?')}" for e in ia_data.get("errors", [])]
+    if not ia_results_list:
+        log.info("[OUTBOUND] ia_results absent pour %s/%s — lancement requêtes IA",
+                 p.profession, p.city)
+        ia_data = _run_ia_test(p.profession, p.city)
+        ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) \
+                          if ia_data.get("results") else None
+        if ia_results_json:
+            with SessionLocal() as _db:
+                _p2 = _db.query(V3ProspectDB).filter_by(token=p.token).first()
+                if _p2:
+                    _p2.ia_results = ia_results_json
+                    _db.commit()
+            try:
+                ia_results_list = json.loads(ia_results_json)
+            except Exception:
+                pass
 
-    # 3. Image ville
+    ia_ok    = len([r for r in ia_results_list if r.get("ok")])
+    ia_total = len(ia_results_list)
+
+    # ── 2. Image ville obligatoire ────────────────────────────────────────────
     with SessionLocal() as _db:
-        _ref = _db.query(RefCityDB).filter_by(city_name=city.upper()).first()
-        if _ref and _ref.header_image_url:
-            has_image = True; img_source = "cache"
-        else:
-            img_url   = fetch_city_header_image(city)
-            has_image = bool(img_url); img_source = "unsplash" if img_url else None
+        _ref = _db.query(RefCityDB).filter_by(city_name=(p.city or "").upper()).first()
+        has_image  = bool(_ref and _ref.header_image_url)
+        img_source = "cache" if has_image else None
 
-    # 4. Formatage
-    channel = "email" if email else "sms"
+    if not has_image:
+        log.info("[OUTBOUND] Image absente pour %s — fetch Unsplash…", p.city)
+        img_url   = fetch_city_header_image(p.city)
+        has_image = bool(img_url)
+        img_source = "unsplash" if has_image else None
+
+    if not has_image and not dry_run:
+        return {"ok": False, "ia_ok": ia_ok, "ia_total": ia_total,
+                "has_image": False, "img_source": None,
+                "error": f"Aucune image pour {p.city} — envoi bloqué"}
+
+    # ── 3. Terme + formatage ──────────────────────────────────────────────────
+    city_display = (p.city_reference or p.city or "").title()
+    termes = _resolve_termes(p.profession)
+    terme  = termes[0] if termes else (p.profession or "professionnel").lower()
+
+    channel = "email" if p.email else "sms"
     subject = random.choice(_OUTBOUND_SUBJECTS)
     body    = (_OUTBOUND_BODY if channel == "email" else _OUTBOUND_SMS).format(
         terme=terme, ville=city_display
     )
-    sender, sender_name = _OUTBOUND_SENDERS[0]  # sender fixe pour les tests
+    idx = sent_idx % len(_OUTBOUND_SENDERS)
+    sender, sender_name = _OUTBOUND_SENDERS[idx]
 
-    base = {"ia_ok": ia_ok, "ia_total": ia_total, "ia_errors": ia_errors,
-            "has_image": has_image, "img_source": img_source,
-            "terme": terme, "channel": channel, "body": body}
+    base = {"ia_ok": ia_ok, "ia_total": ia_total, "has_image": has_image,
+            "img_source": img_source, "terme": terme, "channel": channel, "body": body}
 
     if dry_run:
-        log.info("[OUTBOUND_TEST][DRY_RUN] %s — %s/%s — ia=%d/%d — img=%s",
-                 channel.upper(), profession, city, ia_ok, ia_total, has_image)
+        log.info("[OUTBOUND][DRY_RUN] %s — %s/%s — ia=%d/%d — img=%s",
+                 channel.upper(), p.profession, p.city, ia_ok, ia_total, has_image)
         return {**base, "ok": True, "dry_run": True, "error": None}
 
-    # 5. Bloquer si aucune image — la landing page serait sans visuel
-    if not has_image:
-        log.warning("[OUTBOUND_TEST] Envoi bloqué — aucune image pour %s", city)
-        return {**base, "ok": False,
-                "error": f"Aucune image trouvée pour {city} (Unsplash indisponible ?) — envoi bloqué"}
-
-    # 6. Envoi réel
+    # ── 4. Envoi Brevo ────────────────────────────────────────────────────────
     if not brevo_key:
         return {**base, "ok": False, "error": "BREVO_API_KEY manquant"}
+
     try:
-        if channel == "email" and email:
+        if channel == "email" and p.email:
             resp = _req.post(
                 "https://api.brevo.com/v3/smtp/email",
                 headers={"api-key": brevo_key, "Content-Type": "application/json"},
                 json={
                     "sender":      {"name": sender_name, "email": sender},
-                    "to":          [{"email": email, "name": "Test"}],
-                    "subject":     f"[TEST] {subject}",
+                    "to":          [{"email": p.email, "name": p.name}],
+                    "subject":     subject,
                     "textContent": body,
                 },
                 timeout=15,
             )
-        elif channel == "sms" and phone:
-            phone_e164 = _outbound_normalize_phone(phone)
+        elif channel == "sms" and p.phone:
+            phone_e164 = _outbound_normalize_phone(p.phone)
             if not phone_e164:
-                return {**base, "ok": False, "error": f"Numéro invalide : {phone}"}
+                return {**base, "ok": False, "error": f"Numéro invalide : {p.phone}"}
             resp = _req.post(
                 "https://api.brevo.com/v3/transactionalSms/send",
                 headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                json={"sender": "PresenceIA", "recipient": phone_e164,
-                      "content": f"[TEST] {body}"},
+                json={"sender": "PresenceIA", "recipient": phone_e164, "content": body},
                 timeout=15,
             )
         else:
-            return {**base, "ok": False, "error": "email ou phone requis"}
+            return {**base, "ok": False, "error": "Ni email ni téléphone"}
+
         ok = resp.status_code in (200, 201, 202)
-        return {**base, "ok": ok,
-                "error": None if ok else f"Brevo HTTP {resp.status_code}"}
+
+        # ── 5. Marquer envoyé (sauf profils test — réutilisables) ────────────
+        if ok and not getattr(p, "is_test", False):
+            with SessionLocal() as _db:
+                _p2 = _db.query(V3ProspectDB).filter_by(token=p.token).first()
+                if _p2:
+                    _p2.sent_at     = datetime.utcnow()
+                    _p2.sent_method = channel
+                    if channel == "email":
+                        _p2.email_status  = "sent"
+                        _p2.email_sent_at = datetime.utcnow()
+                    _db.commit()
+
+        return {**base, "ok": ok, "error": None if ok else f"Brevo HTTP {resp.status_code}"}
     except Exception as exc:
         return {**base, "ok": False, "error": str(exc)}
 
@@ -1998,6 +2036,8 @@ def _job_outbound(force: bool = False):
         V3ProspectDB.ia_results.isnot(None),
         V3ProspectDB.sent_at.is_(None),
     ]
+    # Exclure les profils test (gérés manuellement)
+    _base_filter.append(V3ProspectDB.is_test.isnot(True))
     # Si refs_only : uniquement les prospects avec city_reference renseignée
     if refs_only:
         _base_filter.append(V3ProspectDB.city_reference.isnot(None))
@@ -2067,98 +2107,33 @@ def _job_outbound(force: bool = False):
 
         selected += 1
 
-        # Scoring
-        cited = _outbound_is_cited(prospect.name, prospect.ia_results or "[]")
-        if cited:
+        # Scoring — skip si déjà cité par les IA
+        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
             skipped += 1
             log.info("[OUTBOUND] SKIP cité — %-40s  %-20s  %s",
                      prospect.name[:40], prospect.city or "", prospect.email)
             continue
 
-        # Préparer l'envoi — rotation sur domaines dédiés avec prénoms humains
-        idx         = (sent + would_send) % len(_OUTBOUND_SENDERS)
-        sender, sender_name = _OUTBOUND_SENDERS[idx]
-        city_display = (prospect.city_reference or prospect.city or "").title()
-
-        # Résoudre le terme de recherche réaliste depuis ProfessionDB
-        _terme_display = None
-        try:
-            from .api.routes.v3 import _resolve_termes as _rt
-            _terme_display = _rt(prospect.profession or "")[0]
-        except Exception:
-            pass
-        if not _terme_display:
-            _terme_display = (prospect.profession or "professionnel").lower()
-
-        # Canal : email prioritaire, SMS si pas d'email
-        channel = "email" if prospect.email else "sms"
-        subject = random.choice(_OUTBOUND_SUBJECTS)
-        body    = _OUTBOUND_BODY.format(terme=_terme_display, ville=city_display)
-        sms_txt = _OUTBOUND_SMS.format(terme=_terme_display, ville=city_display)
+        result = _outbound_send_prospect(
+            prospect, dry_run=dry_run,
+            brevo_key=brevo_key,
+            sent_idx=sent + would_send,
+        )
 
         if dry_run:
             would_send += 1
-            if channel == "email":
-                log.info(
-                    "[OUTBOUND][DRY_RUN] ══ EMAIL #%d\n"
-                    "  To      : %s <%s>\n  From    : %s\n  Subject : %s\n  Body    :\n%s",
-                    would_send, prospect.name, prospect.email, sender, subject,
-                    "\n".join("  " + l for l in body.splitlines()),
-                )
-            else:
-                phone_e164 = _outbound_normalize_phone(prospect.phone)
-                log.info(
-                    "[OUTBOUND][DRY_RUN] ══ SMS #%d\n"
-                    "  To  : %s %s\n  Msg : %s",
-                    would_send, prospect.name, phone_e164, sms_txt,
-                )
+            log.info("[OUTBOUND][DRY_RUN] ══ %s #%d\n  To: %s <%s>\n  Body: %s",
+                     result.get("channel","?").upper(), would_send,
+                     prospect.name, prospect.email or prospect.phone,
+                     (result.get("body","")[:80]))
+        elif result.get("ok"):
+            sent += 1
+            log.info("[OUTBOUND] %s envoyé — %s (%s / %s)",
+                     result.get("channel","?").upper(), prospect.name,
+                     prospect.profession, prospect.city)
         else:
-            try:
-                if channel == "email":
-                    resp = _req.post(
-                        "https://api.brevo.com/v3/smtp/email",
-                        headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                        json={
-                            "sender":      {"name": sender_name, "email": sender},
-                            "to":          [{"email": prospect.email, "name": prospect.name}],
-                            "subject":     subject,
-                            "textContent": body,
-                        },
-                        timeout=15,
-                    )
-                else:
-                    phone_e164 = _outbound_normalize_phone(prospect.phone)
-                    resp = _req.post(
-                        "https://api.brevo.com/v3/transactionalSms/send",
-                        headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                        json={
-                            "sender":    "PresenceIA",
-                            "recipient": phone_e164,
-                            "content":   sms_txt,
-                        },
-                        timeout=15,
-                    )
-
-                if resp.status_code in (200, 201, 202):
-                    with SessionLocal() as db:
-                        p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
-                        if p:
-                            p.sent_at     = datetime.utcnow()
-                            p.sent_method = channel
-                            if channel == "email":
-                                p.email_status  = "sent"
-                                p.email_sent_at = datetime.utcnow()
-                            db.commit()
-                    sent += 1
-                    log.info("[OUTBOUND] %s envoyé — %s (%s / %s)",
-                             channel.upper(), prospect.name, prospect.profession, prospect.city)
-                else:
-                    errors += 1
-                    log.warning("[OUTBOUND] %s HTTP %s — %s",
-                                channel.upper(), resp.status_code, prospect.name)
-            except Exception as e:
-                errors += 1
-                log.warning("[OUTBOUND] erreur %s %s : %s", channel, prospect.name, e)
+            errors += 1
+            log.warning("[OUTBOUND] erreur — %s : %s", prospect.name, result.get("error"))
 
     if dry_run:
         log.info("[OUTBOUND][DRY_RUN] terminé — sélectionnés=%d  skipped(cités)=%d  would_send=%d  (0 envoi réel, 0 écriture DB)",
