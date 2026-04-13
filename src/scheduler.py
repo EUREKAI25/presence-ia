@@ -1468,7 +1468,7 @@ def run_sirene_qualify(profession_ids: list = None, max_per_naf: int = 200):
 # ── OUTBOUND ─────────────────────────────────────────────────────────────────
 
 _OUTBOUND_SUBJECTS = [
-    "Votre nom n'est pas sorti",
+    "Vous n'êtes pas recommandé par les IA",
 ]
 
 _OUTBOUND_BODY = """\
