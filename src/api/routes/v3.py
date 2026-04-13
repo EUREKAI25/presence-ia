@@ -146,7 +146,7 @@ def _normalize_phone(phone: str) -> str:
         p = "+33" + p[1:]
     return p
 
-_DEFAULT_EMAIL_SUBJECT = "Votre visibilité IA à {ville} — résultat personnalisé"
+_DEFAULT_EMAIL_SUBJECT = "Les IA suggèrent vos concurrents"
 
 _DEFAULT_EMAIL_TEMPLATE = (
     "Bonjour,\n\n"
@@ -156,8 +156,9 @@ _DEFAULT_EMAIL_TEMPLATE = (
     "Nous avons analysé votre visibilité réelle dans les réponses des IA, "
     "ainsi que celle de vos concurrents.\n\n"
     "Le résultat est assez parlant...\n\n"
-    "👉 Voir l'analyse :\n"
-    "{landing_url}"
+    "Si vous voulez voir concrètement ce que ça donne : {landing_url}\n\n"
+    "— Nathalie\n"
+    "Présence IA"
 )
 
 _DEFAULT_SMS_TEMPLATE = (
