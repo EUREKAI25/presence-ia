@@ -71,14 +71,15 @@ def _progress_bar(pct, color="#6366f1", height=6):
 
 def _seg_badge(num, status):
     cfg = {
-        "done":    ("#d1fae5", "#065f46", "✓"),
-        "running": ("#fef3c7", "#92400e", "⟳"),
-        "pending": ("#f3f4f6", "#9ca3af", "○"),
+        "done":    ("#d1fae5", "#065f46", "✓"),   # extrait SIRENE
+        "running": ("#fef3c7", "#92400e", "⟳"),   # extraction en cours
+        "pending": ("#f3f4f6", "#9ca3af", "○"),   # à extraire
         "error":   ("#fee2e2", "#991b1b", "✕"),
     }.get(status, ("#f3f4f6", "#9ca3af", "?"))
+    status_label = {"done": "extrait", "running": "en cours", "pending": "à traiter", "error": "erreur"}.get(status, status)
     bg, fg, icon = cfg
     return (
-        f'<span title="{status}" style="display:inline-flex;align-items:center;'
+        f'<span title="{status_label}" style="display:inline-flex;align-items:center;'
         f'justify-content:center;width:28px;height:28px;border-radius:4px;'
         f'background:{bg};color:{fg};font-size:11px;font-weight:700;'
         f'margin:2px;cursor:default">{num}{icon}</span>'
@@ -161,12 +162,14 @@ def pipeline_pairs(request: Request):
             .all()
         )
         # Index : prof_id → dept → list of (num, segment)
+        # Numérotation locale par (profession_id, departement) — repart de 1 par dept
         segs_by_prof: dict = defaultdict(lambda: defaultdict(list))
-        prof_seg_counter: dict = defaultdict(int)
+        dept_seg_counter: dict = defaultdict(int)  # clé : (prof_id, dept)
         for seg in segs_rows:
-            prof_seg_counter[seg.profession_id] += 1
+            key = (seg.profession_id, seg.departement)
+            dept_seg_counter[key] += 1
             segs_by_prof[seg.profession_id][seg.departement].append(
-                (prof_seg_counter[seg.profession_id], seg)
+                (dept_seg_counter[key], seg)
             )
 
         # ── Suspects SIRENE total par profession_id ───────────────────────────
@@ -287,19 +290,23 @@ def pipeline_pairs(request: Request):
             dept_pct   = _pct(n_done, n_total)
 
             # Résumé texte
+            # "extrait" = suspects SIRENE insérés en base (pas encore prospecté)
+            # "traité"  = prospection exécutée (email/SMS envoyé) — calculé sur V3
             parts = []
             if done:
-                if len(done) == 1:
-                    parts.append(f"Seg. {done[0]} traité")
+                nums = sorted(done)
+                if len(nums) == 1:
+                    parts.append(f"Seg. {nums[0]} extrait")
                 else:
-                    parts.append(f"Seg. {done[0]}–{done[-1]} traités")
+                    parts.append(f"Seg. {nums[0]}–{nums[-1]} extraits ({len(nums)})")
             if running:
-                parts.append(f"{running[0]} en cours")
+                parts.append(f"Seg. {running[0]} en cours")
             if pending:
-                if len(pending) == 1:
-                    parts.append(f"{pending[0]} à traiter")
+                nums = sorted(pending)
+                if len(nums) == 1:
+                    parts.append(f"Seg. {nums[0]} à traiter")
                 else:
-                    parts.append(f"{pending[0]}–{pending[-1]} à traiter")
+                    parts.append(f"Seg. {nums[0]}–{nums[-1]} à traiter ({len(nums)})")
             if error:
                 parts.append(f"{len(error)} erreur(s)")
             seg_summary_text = " · ".join(parts) if parts else "Aucun segment"
@@ -323,7 +330,7 @@ def pipeline_pairs(request: Request):
                 f'{dept_label} <span style="color:#9ca3af;font-weight:400">'
                 f'(dept. {dept})</span></div>'
                 f'<div style="font-size:11px;color:#6b7280">'
-                f'{n_done}/{n_total} segments · {seg_summary_text} · '
+                f'{n_done}/{n_total} extraits · {seg_summary_text} · '
                 f'{total_inserted:,} suspects insérés</div>'
                 f'{_progress_bar(dept_pct, "#8b5cf6", 4)}'
                 f'</div>'
