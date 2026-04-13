@@ -1481,6 +1481,23 @@ Aujourd'hui, beaucoup de gens passent par là avant d'appeler.
 Vous avez déjà regardé ce que ça donne de votre côté ?
 """
 
+_OUTBOUND_SMS = "Bonjour, on a cherché « {terme} {ville} » sur ChatGPT. Votre entreprise n'apparaît pas. Vous avez regardé ce que ça donne ?"
+
+
+def _outbound_normalize_phone(phone: str) -> str | None:
+    """Normalise un numéro français en format international +33..."""
+    import re
+    if not phone:
+        return None
+    digits = re.sub(r"[\s.\-()]", "", phone.strip())
+    if digits.startswith("+33") and len(digits) == 12:
+        return digits
+    if digits.startswith("0033") and len(digits) == 13:
+        return "+" + digits[2:]
+    if digits.startswith("0") and len(digits) == 10 and digits[1] in "67":
+        return "+33" + digits[1:]
+    return None  # non mobile ou format inconnu
+
 
 _EMAIL_RE = None  # compilé une fois à la première utilisation
 
@@ -1833,52 +1850,73 @@ def _job_outbound(force: bool = False):
     log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
              _active["profession"], _active["city"], _active.get("score", 0))
 
-    # ── Sélection : ia_results + email non null + non encore envoyés ──────────
+    # ── Sélection email + SMS ─────────────────────────────────────────────────
+    _base_filter = [
+        V3ProspectDB.city       == _active["city"],
+        V3ProspectDB.profession == _active["profession"],
+        V3ProspectDB.ia_results.isnot(None),
+        V3ProspectDB.sent_at.is_(None),
+    ]
     with SessionLocal() as db:
+        # Email : priorité
         has_email = (
             db.query(V3ProspectDB)
             .filter(
-                V3ProspectDB.city       == _active["city"],
-                V3ProspectDB.profession == _active["profession"],
-                V3ProspectDB.ia_results.isnot(None),
-                V3ProspectDB.sent_at.is_(None),
+                *_base_filter,
                 V3ProspectDB.email.isnot(None),
+                (V3ProspectDB.email_status.is_(None) |
+                 V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
             )
-            .limit(cap * 20)   # sur-sélection pour absorber invalides + cités
+            .limit(cap * 20)
+            .all()
+        )
+        # SMS : uniquement si pas d'email
+        has_sms = (
+            db.query(V3ProspectDB)
+            .filter(
+                *_base_filter,
+                V3ProspectDB.phone.isnot(None),
+                V3ProspectDB.email.is_(None),
+            )
+            .limit(cap * 20)
             .all()
         )
 
-    # ── Filtre email valide ────────────────────────────────────────────────────
     valid_email   = [p for p in has_email if _outbound_is_valid_email(p.email)]
     invalid_email = [p for p in has_email if not _outbound_is_valid_email(p.email)]
+    valid_sms     = [p for p in has_sms if _outbound_normalize_phone(p.phone)]
+    invalid_sms   = [p for p in has_sms if not _outbound_normalize_phone(p.phone)]
 
-    total_with_results = len(has_email)
-    no_email           = []   # filtrés en amont par la requête
+    # Fusionner : email d'abord, SMS ensuite
+    candidates = valid_email + valid_sms
 
-    log.info("[OUTBOUND] sélection — total=%d  sans_email=%d  email_invalide=%d  email_valide=%d",
-             total_with_results, len(no_email), len(invalid_email), len(valid_email))
+    log.info("[OUTBOUND] sélection — email_valide=%d  sms_valide=%d  email_invalide=%d  sms_invalide=%d",
+             len(valid_email), len(valid_sms), len(invalid_email), len(invalid_sms))
 
     if dry_run and invalid_email:
         for p in invalid_email:
             log.info("[OUTBOUND][DRY_RUN] EMAIL_INVALIDE — %-40s  %s", p.name[:40], p.email)
+    if dry_run and invalid_sms:
+        for p in invalid_sms:
+            log.info("[OUTBOUND][DRY_RUN] SMS_INVALIDE — %-40s  %s", p.name[:40], p.phone)
 
     # ── Scoring comparatif (dry_run uniquement) ────────────────────────────────
     if dry_run:
-        cited_count     = sum(1 for p in valid_email if _outbound_is_cited(p.name, p.ia_results or "[]"))
-        not_cited_count = len(valid_email) - cited_count
-        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d emails valides :", len(valid_email))
+        cited_count     = sum(1 for p in candidates if _outbound_is_cited(p.name, p.ia_results or "[]"))
+        not_cited_count = len(candidates) - cited_count
+        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d candidats :", len(candidates))
         log.info("[OUTBOUND][DRY_RUN]   avec scoring  — would_send=%d  would_skip=%d",
                  not_cited_count, cited_count)
-        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d", len(valid_email))
+        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d", len(candidates))
 
-    # ── Boucle principale (emails valides uniquement) ──────────────────────────
+    # ── Boucle principale ─────────────────────────────────────────────────────
     selected    = 0
     skipped     = 0
     would_send  = 0
     sent        = 0
     errors      = 0
 
-    for prospect in valid_email:
+    for prospect in candidates:
         if (sent if not dry_run else would_send) >= cap:
             break
 
@@ -1914,59 +1952,75 @@ def _job_outbound(force: bool = False):
         if not _terme_display:
             _terme_display = (prospect.profession or "professionnel").lower()
 
+        # Canal : email prioritaire, SMS si pas d'email
+        channel = "email" if prospect.email else "sms"
         subject = random.choice(_OUTBOUND_SUBJECTS)
-        body = _OUTBOUND_BODY.format(
-            terme=_terme_display,
-            ville=city_display,
-        )
+        body    = _OUTBOUND_BODY.format(terme=_terme_display, ville=city_display)
+        sms_txt = _OUTBOUND_SMS.format(terme=_terme_display, ville=city_display)
 
         if dry_run:
             would_send += 1
-            log.info(
-                "[OUTBOUND][DRY_RUN] ══════════════════════════════════════\n"
-                "  #%d\n"
-                "  To      : %s <%s>\n"
-                "  From    : %s\n"
-                "  Subject : %s\n"
-                "  Body    :\n%s",
-                would_send,
-                prospect.name, prospect.email,
-                sender,
-                subject,
-                "\n".join("  " + l for l in body.splitlines()),
-            )
+            if channel == "email":
+                log.info(
+                    "[OUTBOUND][DRY_RUN] ══ EMAIL #%d\n"
+                    "  To      : %s <%s>\n  From    : %s\n  Subject : %s\n  Body    :\n%s",
+                    would_send, prospect.name, prospect.email, sender, subject,
+                    "\n".join("  " + l for l in body.splitlines()),
+                )
+            else:
+                phone_e164 = _outbound_normalize_phone(prospect.phone)
+                log.info(
+                    "[OUTBOUND][DRY_RUN] ══ SMS #%d\n"
+                    "  To  : %s %s\n  Msg : %s",
+                    would_send, prospect.name, phone_e164, sms_txt,
+                )
         else:
             try:
-                resp = _req.post(
-                    "https://api.brevo.com/v3/smtp/email",
-                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                    json={
-                        "sender":      {"name": sender_name, "email": sender},
-                        "to":          [{"email": prospect.email, "name": prospect.name}],
-                        "subject":     subject,
-                        "textContent": body,
-                    },
-                    timeout=15,
-                )
+                if channel == "email":
+                    resp = _req.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                        json={
+                            "sender":      {"name": sender_name, "email": sender},
+                            "to":          [{"email": prospect.email, "name": prospect.name}],
+                            "subject":     subject,
+                            "textContent": body,
+                        },
+                        timeout=15,
+                    )
+                else:
+                    phone_e164 = _outbound_normalize_phone(prospect.phone)
+                    resp = _req.post(
+                        "https://api.brevo.com/v3/transactionalSms/send",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                        json={
+                            "sender":    "PresenceIA",
+                            "recipient": phone_e164,
+                            "content":   sms_txt,
+                        },
+                        timeout=15,
+                    )
+
                 if resp.status_code in (200, 201, 202):
                     with SessionLocal() as db:
                         p = db.query(V3ProspectDB).filter_by(token=prospect.token).first()
                         if p:
-                            p.sent_at      = datetime.utcnow()
-                            p.sent_method  = "brevo"
-                            p.email_status = "sent"
-                            p.email_sent_at = datetime.utcnow()
+                            p.sent_at     = datetime.utcnow()
+                            p.sent_method = channel
+                            if channel == "email":
+                                p.email_status  = "sent"
+                                p.email_sent_at = datetime.utcnow()
                             db.commit()
                     sent += 1
-                    log.info("[OUTBOUND] envoyé — %s <%s> (%s / %s)",
-                             prospect.name, prospect.email, prospect.profession, prospect.city)
+                    log.info("[OUTBOUND] %s envoyé — %s (%s / %s)",
+                             channel.upper(), prospect.name, prospect.profession, prospect.city)
                 else:
                     errors += 1
-                    log.warning("[OUTBOUND] HTTP %s — %s <%s>",
-                                resp.status_code, prospect.name, prospect.email)
+                    log.warning("[OUTBOUND] %s HTTP %s — %s",
+                                channel.upper(), resp.status_code, prospect.name)
             except Exception as e:
                 errors += 1
-                log.warning("[OUTBOUND] erreur envoi %s : %s", prospect.email, e)
+                log.warning("[OUTBOUND] erreur %s %s : %s", channel, prospect.name, e)
 
     if dry_run:
         log.info("[OUTBOUND][DRY_RUN] terminé — sélectionnés=%d  skipped(cités)=%d  would_send=%d  (0 envoi réel, 0 écriture DB)",
