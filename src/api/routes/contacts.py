@@ -325,12 +325,12 @@ tr:hover td{{background:#fafafa}}
     <span style="font-size:11px;color:#6b7280;font-weight:600">Sélectionner</span>
     <input type="number" id="bulk-qty" min="1" max="9999" placeholder="max" title="Nombre max à sélectionner (vide = tous)"
            style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
-    <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Email</button>
-    <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Mobile</button>
-    <button onclick="selectByType('p')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 P</button>
-    <button onclick="selectByType('sp')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
-    <button onclick="selectAll()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
-    <button onclick="selectNone()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
+    <button id="fbtn-email" onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Email</button>
+    <button id="fbtn-mob"   onclick="selectByType('mob')"   class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Mobile</button>
+    <button id="fbtn-p"     onclick="selectByType('p')"     class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 P</button>
+    <button id="fbtn-sp"    onclick="selectByType('sp')"    class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
+    <button id="fbtn-all"   onclick="selectAll()"           class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
+    <button id="fbtn-none"  onclick="selectNone()"          class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
     <div style="flex:1"></div>
     <span id="bulk-count" style="font-size:12px;color:#6b7280">0 sélectionné(s)</span>
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
@@ -519,7 +519,20 @@ function _getQty() {{
   const v = parseInt(document.getElementById('bulk-qty').value);
   return (v > 0) ? v : Infinity;
 }}
+const _FILTER_BTNS = ['email','mob','p','sp','all','none'];
+function _setActiveBtn(active) {{
+  _FILTER_BTNS.forEach(id => {{
+    const b = document.getElementById('fbtn-'+id);
+    if (!b) return;
+    if (id === active) {{
+      b.style.background = '#1e40af'; b.style.color = '#fff'; b.style.borderColor = '#1e40af';
+    }} else {{
+      b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+    }}
+  }});
+}}
 function selectByType(type) {{
+  _setActiveBtn(type);
   // Réinitialiser toutes les lignes avant de filtrer
   document.querySelectorAll('.row-cb').forEach(cb => {{
     cb.closest('tr').style.display = '';
@@ -538,6 +551,7 @@ function selectByType(type) {{
   _updateBulkBar();
 }}
 function selectAll() {{
+  _setActiveBtn('all');
   document.querySelectorAll('.row-cb').forEach(cb => {{ cb.closest('tr').style.display = ''; }});
   const qty = _getQty();
   let n = 0;
@@ -548,6 +562,7 @@ function selectAll() {{
   _updateBulkBar();
 }}
 function selectNone() {{
+  _setActiveBtn('none');
   document.querySelectorAll('.row-cb').forEach(cb => {{
     cb.closest('tr').style.display = '';
     cb.checked = false;
