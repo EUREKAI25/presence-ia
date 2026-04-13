@@ -179,34 +179,7 @@ def pipeline_pairs(request: Request):
         sus_by_prof = {r.profession_id: r for r in sus_rows}
 
     # ── Rendu HTML ────────────────────────────────────────────────────────────
-    # Banner paire active
-    if active:
-        active_city = active.get("city", "?")
-        active_prof = active.get("profession", "?")
-        active_score = active.get("score", 0)
-        started = active.get("started_at", "")[:16].replace("T", " ")
-        override_badge = (
-            ' <span style="background:#fef3c7;color:#92400e;font-size:10px;'
-            'padding:1px 6px;border-radius:3px;font-weight:600">FORCÉE</span>'
-            if active.get("override") else ""
-        )
-        banner = (
-            f'<div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;'
-            f'padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">'
-            f'<span style="font-size:18px">📍</span>'
-            f'<div><strong style="color:#065f46">{active_prof} / {active_city}</strong>'
-            f'{override_badge}'
-            f'<span style="color:#6b7280;font-size:12px;margin-left:8px">'
-            f'score {active_score} · depuis {started}</span></div>'
-            f'</div>'
-        )
-    else:
-        banner = (
-            '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;'
-            'padding:12px 16px;margin-bottom:20px">'
-            '<strong style="color:#991b1b">⚠ Aucune paire active</strong>'
-            ' — le job outbound sera annulé jusqu\'à sélection automatique.</div>'
-        )
+    banner = ""  # La paire active est marquée 📍 dans l'accordéon
 
     # Accordéons professions
     prof_blocks = []

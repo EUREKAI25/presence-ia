@@ -80,8 +80,15 @@ def select_next_pair(db) -> dict | None:
 
     cfg = db.query(ScoringConfigDB).filter_by(id="default").first()
 
-    # Toutes les paires ayant du stock outbound dispo
-    pairs = (
+    # Index profession : id ET label → ProfessionDB (gère slug et label)
+    all_profs = db.query(ProfessionDB).filter(ProfessionDB.actif == True).all()
+    _prof_idx: dict = {}
+    for p in all_profs:
+        _prof_idx[p.id.strip().lower()]    = p
+        _prof_idx[p.label.strip().lower()] = p
+
+    # Stock email dispo
+    email_pairs = (
         db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
         .filter(
             V3ProspectDB.email.isnot(None),
@@ -96,28 +103,48 @@ def select_next_pair(db) -> dict | None:
         .all()
     )
 
-    if not pairs:
+    # Stock SMS dispo (phone sans email)
+    sms_pairs = (
+        db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
+        .filter(
+            V3ProspectDB.phone.isnot(None),
+            V3ProspectDB.email.is_(None),
+            V3ProspectDB.sent_at.is_(None),
+            V3ProspectDB.ia_results.isnot(None),
+        )
+        .group_by(V3ProspectDB.city, V3ProspectDB.profession)
+        .all()
+    )
+
+    # Fusionner email + SMS par (city, profession)
+    stock: dict = {}
+    for r in email_pairs:
+        stock[(r.city, r.profession)] = stock.get((r.city, r.profession), 0) + r.n
+    for r in sms_pairs:
+        stock[(r.city, r.profession)] = stock.get((r.city, r.profession), 0) + r.n
+
+    if not stock:
         log.info("active_pair: aucune paire disponible dans V3ProspectDB")
         return None
 
     # Score combiné = score_métier (0-10) × 2  +  log(stock)
     scored = []
-    for p in pairs:
-        prof       = db.query(ProfessionDB).filter(ProfessionDB.label == p.profession).first()
+    for (city, profession), n in stock.items():
+        prof       = _prof_idx.get(profession.strip().lower())
         prof_score = db_score_global(prof, cfg) if (prof and cfg) else 0.0
-        combined   = prof_score * 2 + math.log1p(p.n)
-        scored.append((p, prof_score, combined))
+        combined   = prof_score * 2 + math.log1p(n)
+        scored.append(((city, profession, n), prof_score, combined))
 
     scored.sort(key=lambda x: x[2], reverse=True)
-    best, best_prof_score, _ = scored[0]
+    (best_city, best_profession, best_n), best_prof_score, _ = scored[0]
 
     log.info(
         "active_pair: %d paires dispo — meilleure = %s / %s (stock=%d, score=%.1f)",
-        len(pairs), best.profession, best.city, best.n, best_prof_score,
+        len(stock), best_profession, best_city, best_n, best_prof_score,
     )
     return set_active_pair(
-        city=best.city,
-        profession=best.profession,
+        city=best_city,
+        profession=best_profession,
         score=best_prof_score,
         target_id="auto",
     )
@@ -149,17 +176,24 @@ def check_saturation(db) -> dict | None:
 
 
 def _available_count(db, city: str, profession: str) -> int:
-    """Nombre de prospects disponibles pour outbound sur cette paire."""
+    """Nombre de prospects disponibles pour outbound (email + SMS) sur cette paire."""
     from src.models import V3ProspectDB
     from sqlalchemy import or_
-    return db.query(V3ProspectDB).filter(
+    email_count = db.query(V3ProspectDB).filter(
         V3ProspectDB.city       == city,
         V3ProspectDB.profession == profession,
         V3ProspectDB.email.isnot(None),
         V3ProspectDB.sent_at.is_(None),
-        # NULL NOT IN (...) = NULL en SQL → exclut à tort les lignes sans statut
         or_(
             V3ProspectDB.email_status.is_(None),
             V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
         ),
     ).count()
+    sms_count = db.query(V3ProspectDB).filter(
+        V3ProspectDB.city       == city,
+        V3ProspectDB.profession == profession,
+        V3ProspectDB.phone.isnot(None),
+        V3ProspectDB.email.is_(None),
+        V3ProspectDB.sent_at.is_(None),
+    ).count()
+    return email_count + sms_count
