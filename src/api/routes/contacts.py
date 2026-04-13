@@ -298,14 +298,16 @@ tr:hover td{{background:#fafafa}}
     <span id="test-result" style="font-size:11px;color:#6b7280;padding-top:16px;max-width:280px"></span>
   </div>
 
-  <!-- Barre actions groupées -->
-  <div id="bulk-bar" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <!-- Barre actions groupées — toujours visible -->
+  <div id="bulk-bar" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <span id="bulk-count" style="font-size:12px;color:#6b7280;margin-right:4px">0 sélectionné(s)</span>
     <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Avec email</button>
     <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Avec mobile</button>
     <button onclick="selectAll()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button onclick="selectNone()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
     <div style="flex:1"></div>
+    <input type="number" id="bulk-qty" min="1" max="9999" placeholder="Qté" title="Limiter l'envoi à N contacts"
+           style="width:64px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
     <button onclick="bulkSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Envoyer SMS</button>
     <div id="bulk-progress" style="font-size:11px;color:#6b7280;display:none"></div>
@@ -478,29 +480,48 @@ async function testPreviewSMS() {{
 function _updateBulkBar() {{
   const checked = document.querySelectorAll('.row-cb:checked');
   document.getElementById('bulk-count').textContent = checked.length + ' sélectionné(s)';
-  document.getElementById('bulk-bar').style.display = checked.length > 0 ? 'flex' : 'none';
+  // La barre reste toujours visible — pas de masquage
 }}
 document.addEventListener('change', function(e) {{
   if(e.target.id === 'cb-all') {{
     document.querySelectorAll('.row-cb').forEach(cb => cb.checked = e.target.checked);
   }}
-  _updateBulkBar();
+  if(e.target.classList.contains('row-cb') || e.target.id === 'cb-all') _updateBulkBar();
 }});
+function _getQty() {{
+  const v = parseInt(document.getElementById('bulk-qty').value);
+  return (v > 0) ? v : Infinity;
+}}
 function selectByType(type) {{
+  const qty = _getQty();
+  let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{
     const tr = cb.closest('tr');
-    cb.checked = tr && tr.dataset['has'+type.charAt(0).toUpperCase()+type.slice(1)] === '1';
+    const matches = tr && tr.dataset['has'+type.charAt(0).toUpperCase()+type.slice(1)] === '1';
+    cb.checked = matches && n < qty;
+    if(matches && n < qty) n++;
   }});
   _updateBulkBar();
 }}
-function selectAll()  {{ document.querySelectorAll('.row-cb').forEach(cb => cb.checked=true);  _updateBulkBar(); }}
-function selectNone() {{ document.querySelectorAll('.row-cb').forEach(cb => cb.checked=false); _updateBulkBar(); }}
+function selectAll() {{
+  const qty = _getQty();
+  let n = 0;
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    cb.checked = n < qty;
+    n++;
+  }});
+  _updateBulkBar();
+}}
+function selectNone() {{
+  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+  _updateBulkBar();  // met le count à 0, mais la barre reste visible
+}}
 function _selectedIds() {{ return [...document.querySelectorAll('.row-cb:checked')].map(cb=>cb.dataset.cid); }}
 
 async function bulkSendEmail() {{
   const ids = _selectedIds();
-  if(!ids.length) return;
-  if(!confirm("Envoyer un email a " + ids.length + " contact(s) ?")) return;
+  if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
+  if(!confirm('Envoyer un email à ' + ids.length + ' contact(s) ?')) return;
   const prog = document.getElementById('bulk-progress');
   prog.style.display='inline'; prog.textContent='Envoi en cours…';
   let ok=0, err=0;
@@ -511,14 +532,14 @@ async function bulkSendEmail() {{
       if(d.ok) ok++; else err++;
     }} catch(e) {{ err++; }}
     prog.textContent = ok+' envoyés, '+err+' erreurs…';
-    await new Promise(r=>setTimeout(r,500));
+    await new Promise(r=>setTimeout(r,300));
   }}
   prog.textContent = 'Terminé — '+ok+' envoyés, '+err+' erreurs';
 }}
 async function bulkSendSMS() {{
   const ids = _selectedIds();
-  if(!ids.length) return;
-  if(!confirm("Envoyer un SMS a " + ids.length + " contact(s) ?")) return;
+  if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
+  if(!confirm('Envoyer un SMS à ' + ids.length + ' contact(s) ?')) return;
   const prog = document.getElementById('bulk-progress');
   prog.style.display='inline'; prog.textContent='Envoi SMS en cours…';
   let ok=0, err=0;
@@ -529,7 +550,7 @@ async function bulkSendSMS() {{
       if(d.ok) ok++; else err++;
     }} catch(e) {{ err++; }}
     prog.textContent = ok+' envoyés, '+err+' erreurs…';
-    await new Promise(r=>setTimeout(r,500));
+    await new Promise(r=>setTimeout(r,300));
   }}
   prog.textContent = 'Terminé — '+ok+' envoyés, '+err+' erreurs';
 }}
