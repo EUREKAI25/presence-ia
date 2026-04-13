@@ -87,8 +87,13 @@ def select_next_pair(db) -> dict | None:
         _prof_idx[p.id.strip().lower()]    = p
         _prof_idx[p.label.strip().lower()] = p
 
+    # Vérifier si refs_only est actif (défaut True)
+    refs_only = True
+    if cfg and hasattr(cfg, "outbound_refs_only"):
+        refs_only = bool(cfg.outbound_refs_only)
+
     # Stock email dispo
-    email_pairs = (
+    _email_q = (
         db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
         .filter(
             V3ProspectDB.email.isnot(None),
@@ -99,12 +104,13 @@ def select_next_pair(db) -> dict | None:
                 V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
             ),
         )
-        .group_by(V3ProspectDB.city, V3ProspectDB.profession)
-        .all()
     )
+    if refs_only:
+        _email_q = _email_q.filter(V3ProspectDB.city_reference.isnot(None))
+    email_pairs = _email_q.group_by(V3ProspectDB.city, V3ProspectDB.profession).all()
 
     # Stock SMS dispo (phone sans email)
-    sms_pairs = (
+    _sms_q = (
         db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
         .filter(
             V3ProspectDB.phone.isnot(None),
@@ -112,9 +118,10 @@ def select_next_pair(db) -> dict | None:
             V3ProspectDB.sent_at.is_(None),
             V3ProspectDB.ia_results.isnot(None),
         )
-        .group_by(V3ProspectDB.city, V3ProspectDB.profession)
-        .all()
     )
+    if refs_only:
+        _sms_q = _sms_q.filter(V3ProspectDB.city_reference.isnot(None))
+    sms_pairs = _sms_q.group_by(V3ProspectDB.city, V3ProspectDB.profession).all()
 
     # Fusionner email + SMS par (city, profession)
     stock: dict = {}
@@ -177,9 +184,14 @@ def check_saturation(db) -> dict | None:
 
 def _available_count(db, city: str, profession: str) -> int:
     """Nombre de prospects disponibles pour outbound (email + SMS) sur cette paire."""
-    from src.models import V3ProspectDB
+    from src.models import V3ProspectDB, ScoringConfigDB
     from sqlalchemy import or_
-    email_count = db.query(V3ProspectDB).filter(
+    cfg = db.query(ScoringConfigDB).filter_by(id="default").first()
+    refs_only = True
+    if cfg and hasattr(cfg, "outbound_refs_only"):
+        refs_only = bool(cfg.outbound_refs_only)
+
+    email_q = db.query(V3ProspectDB).filter(
         V3ProspectDB.city       == city,
         V3ProspectDB.profession == profession,
         V3ProspectDB.email.isnot(None),
@@ -188,12 +200,15 @@ def _available_count(db, city: str, profession: str) -> int:
             V3ProspectDB.email_status.is_(None),
             V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
         ),
-    ).count()
-    sms_count = db.query(V3ProspectDB).filter(
+    )
+    sms_q = db.query(V3ProspectDB).filter(
         V3ProspectDB.city       == city,
         V3ProspectDB.profession == profession,
         V3ProspectDB.phone.isnot(None),
         V3ProspectDB.email.is_(None),
         V3ProspectDB.sent_at.is_(None),
-    ).count()
-    return email_count + sms_count
+    )
+    if refs_only:
+        email_q = email_q.filter(V3ProspectDB.city_reference.isnot(None))
+        sms_q   = sms_q.filter(V3ProspectDB.city_reference.isnot(None))
+    return email_q.count() + sms_q.count()
