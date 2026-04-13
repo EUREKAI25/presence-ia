@@ -519,30 +519,37 @@ function _getQty() {{
   const v = parseInt(document.getElementById('bulk-qty').value);
   return (v > 0) ? v : Infinity;
 }}
-// ── Filtres cumulables (toggles) ─────────────────────────────────────────────
-const _activeFilters = new Set();
-const _TOGGLE_BTNS = ['email','mob','p','sp'];
+// ── Filtres toggles — deux groupes indépendants ───────────────────────────────
+// Groupe GEO  (P, SP)      : OU entre eux
+// Groupe CTCT (email, mob) : OU entre eux
+// Entre groupes actifs     : ET
+const _geoF  = new Set();   // 'p', 'sp'
+const _ctctF = new Set();   // 'email', 'mob'
+const _GEO_IDS  = ['p','sp'];
+const _CTCT_IDS = ['email','mob'];
 
 function _refreshBtn(id) {{
   const b = document.getElementById('fbtn-'+id);
   if (!b) return;
-  const on = _activeFilters.has(id);
-  b.style.background   = on ? '#1e40af' : '';
-  b.style.color        = on ? '#fff'    : '';
-  b.style.borderColor  = on ? '#1e40af' : '';
-  b.style.fontWeight   = on ? '700'     : '';
+  const on = _geoF.has(id) || _ctctF.has(id);
+  b.style.background  = on ? '#1e40af' : '';
+  b.style.color       = on ? '#fff'    : '';
+  b.style.borderColor = on ? '#1e40af' : '';
+  b.style.fontWeight  = on ? '700'     : '';
+}}
+
+function _rowMatches(tr) {{
+  const geoOk  = _geoF.size  === 0 || [..._geoF].some(t  => tr.dataset['has'+t.charAt(0).toUpperCase()+t.slice(1)] === '1');
+  const ctctOk = _ctctF.size === 0 || [..._ctctF].some(t => tr.dataset['has'+t.charAt(0).toUpperCase()+t.slice(1)] === '1');
+  return geoOk && ctctOk;
 }}
 
 function _applyFilters() {{
-  const qty = _getQty();
-  let n = 0;
+  const qty = _getQty(); let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{
     cb.checked = false;
     const tr = cb.closest('tr');
-    const visible = _activeFilters.size === 0 || [..._activeFilters].every(type => {{
-      const key = 'has' + type.charAt(0).toUpperCase() + type.slice(1);
-      return tr.dataset[key] === '1';
-    }});
+    const visible = _rowMatches(tr);
     tr.style.display = visible ? '' : 'none';
     if (visible && n < qty) {{ cb.checked = true; n++; }}
   }});
@@ -550,28 +557,28 @@ function _applyFilters() {{
 }}
 
 function selectByType(type) {{
-  if (_activeFilters.has(type)) {{ _activeFilters.delete(type); }}
-  else {{ _activeFilters.add(type); }}
+  const set = _GEO_IDS.includes(type) ? _geoF : _ctctF;
+  if (set.has(type)) set.delete(type); else set.add(type);
   _refreshBtn(type);
   _applyFilters();
 }}
 
-function selectAll() {{
-  _activeFilters.clear();
-  _TOGGLE_BTNS.forEach(id => _refreshBtn(id));
+function _clearFilters() {{
+  _geoF.clear(); _ctctF.clear();
+  [..._GEO_IDS, ..._CTCT_IDS].forEach(id => _refreshBtn(id));
   document.querySelectorAll('.row-cb').forEach(cb => {{ cb.closest('tr').style.display = ''; }});
+}}
+
+function selectAll() {{
+  _clearFilters();
   const qty = _getQty(); let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{ cb.checked = n < qty; n++; }});
   _updateBulkBar();
 }}
 
 function selectNone() {{
-  _activeFilters.clear();
-  _TOGGLE_BTNS.forEach(id => _refreshBtn(id));
-  document.querySelectorAll('.row-cb').forEach(cb => {{
-    cb.closest('tr').style.display = '';
-    cb.checked = false;
-  }});
+  _clearFilters();
+  document.querySelectorAll('.row-cb').forEach(cb => {{ cb.checked = false; }});
   _updateBulkBar();
 }}
 function _selectedIds() {{ return [...document.querySelectorAll('.row-cb:checked')].map(cb=>cb.dataset.cid); }}
