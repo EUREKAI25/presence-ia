@@ -162,8 +162,8 @@ _DEFAULT_EMAIL_TEMPLATE = (
 )
 
 _DEFAULT_SMS_TEMPLATE = (
-    "les IA recommandent d'autres {metiers} que vous a {ville} : "
-    "regardez plutot {landing_url}"
+    "Les IA recommandent d'autres {metiers} que vous à {ville}\n"
+    "Regardez plutôt : {landing_url}"
 )
 
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
@@ -171,7 +171,7 @@ def _contact_message(name: str, city: str, profession: str, landing_url: str,
     tpl = template or _DEFAULT_EMAIL_TEMPLATE
     ville   = city.title() if city else city
     metier  = profession.lower()
-    metiers = metier + "s" if not metier.endswith("s") else metier
+    metiers = _pluriel_metier(metier)
     try:
         return tpl.format(name=name, ville=ville, metier=metier, metiers=metiers,
                           landing_url=landing_url,
@@ -181,19 +181,42 @@ def _contact_message(name: str, city: str, profession: str, landing_url: str,
                                               metiers=metiers, landing_url=landing_url,
                                               city=ville, profession=profession)
 
+def _pluriel_metier(metier: str) -> str:
+    """Retourne le pluriel d'un métier depuis ProfessionDB.label_pluriel.
+    Fallback : + 's' sur le premier mot uniquement."""
+    if not metier:
+        return metier
+    try:
+        from ...models import ProfessionDB as _PDB
+        with SessionLocal() as _db:
+            p = _db.query(_PDB).filter(
+                (_PDB.label.ilike(metier.strip())) | (_PDB.id == metier.strip().lower())
+            ).first()
+            if p and p.label_pluriel:
+                return p.label_pluriel.lower()
+    except Exception:
+        pass
+    # Fallback : pluriel sur le premier mot uniquement
+    words = metier.split(" ", 1)
+    first = words[0]
+    rest  = (" " + words[1]) if len(words) > 1 else ""
+    return (first + "s" if not first.endswith("s") else first) + rest
+
+
 def _contact_message_sms(name: str, city: str, profession: str, landing_url: str,
                          template: Optional[str] = None) -> str:
-    tpl = template or _DEFAULT_SMS_TEMPLATE
-    metier  = profession.lower() if profession else ""
-    metiers = metier + "s" if metier and not metier.endswith("s") else metier
+    tpl    = template or _DEFAULT_SMS_TEMPLATE
+    ville  = city.title() if city else city
+    metier = profession.lower() if profession else ""
+    metiers = _pluriel_metier(metier)
     try:
-        return tpl.format(name=name, ville=city, metier=metier, metiers=metiers,
+        return tpl.format(name=name, ville=ville, metier=metier, metiers=metiers,
                           landing_url=landing_url,
-                          city=city, profession=profession)  # compat anciens templates
+                          city=ville, profession=profession)
     except Exception:
-        return _DEFAULT_SMS_TEMPLATE.format(name=name, ville=city, metier=metier,
+        return _DEFAULT_SMS_TEMPLATE.format(name=name, ville=ville, metier=metier,
                                              metiers=metiers, landing_url=landing_url,
-                                             city=city, profession=profession)
+                                             city=ville, profession=profession)
 
 
 def _strip_markdown(text: str) -> str:
