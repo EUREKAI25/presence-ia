@@ -520,6 +520,11 @@ function _getQty() {{
   return (v > 0) ? v : Infinity;
 }}
 function selectByType(type) {{
+  // Réinitialiser toutes les lignes avant de filtrer
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    cb.closest('tr').style.display = '';
+    cb.checked = false;
+  }});
   const qty = _getQty();
   let n = 0;
   const key = 'has' + type.charAt(0).toUpperCase() + type.slice(1);
