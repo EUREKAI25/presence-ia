@@ -313,7 +313,7 @@ tr:hover td{{background:#fafafa}}
         <th style="padding:3px 8px;min-width:200px">Résultat</th>
       </tr></thead>
       <tbody>
-        <tr style="border-top:1px solid #e5e7eb">
+        <tr style="border-top:1px solid #e5e7eb;background:#eff6ff">
           <td style="padding:4px 8px;color:#374151">nathalie.brigitte@gmail.com</td>
           <td style="padding:4px 8px">Pisciniste</td>
           <td style="padding:4px 8px">Paris</td>
@@ -325,7 +325,7 @@ tr:hover td{{background:#fafafa}}
           </td>
           <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
         </tr>
-        <tr style="border-top:1px solid #e5e7eb">
+        <tr style="border-top:1px solid #e5e7eb;background:#f0fdf4">
           <td style="padding:4px 8px;color:#374151">nathaliecbrigitte@gmail.com</td>
           <td style="padding:4px 8px">Fleuriste événementiel</td>
           <td style="padding:4px 8px">Bordeaux</td>
@@ -337,7 +337,7 @@ tr:hover td{{background:#fafafa}}
           </td>
           <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
         </tr>
-        <tr style="border-top:1px solid #e5e7eb">
+        <tr style="border-top:1px solid #e5e7eb;background:#faf5ff">
           <td style="padding:4px 8px;color:#374151">contact@nathaliebrigitte.com</td>
           <td style="padding:4px 8px">Consultant en communication</td>
           <td style="padding:4px 8px">Antibes</td>
@@ -349,7 +349,7 @@ tr:hover td{{background:#fafafa}}
           </td>
           <td style="padding:4px 8px;color:#6b7280;font-size:10px" class="test-res"></td>
         </tr>
-        <tr style="border-top:1px solid #e5e7eb">
+        <tr style="border-top:1px solid #e5e7eb;background:#fff7ed">
           <td style="padding:4px 8px;color:#374151">contact@presence-ia.com</td>
           <td style="padding:4px 8px">Chef cuisinier événementiel</td>
           <td style="padding:4px 8px">Mende <span style="color:#9ca3af;font-size:9px">(sans visuel)</span></td>
