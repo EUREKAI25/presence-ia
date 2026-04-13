@@ -990,7 +990,7 @@ def _render_landing(
             )
 
     from ._gtm import gtm_head, gtm_body, gtm_push
-    _calendly_tracked = f"/l/track/calendly/{p.token}"
+    _calendly_tracked = f"/l/{p.token}/book"
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 {gtm_head()}
@@ -1244,11 +1244,181 @@ def track_click(delivery_id: str, url: str = ""):
 
 # ── Route publique ────────────────────────────────────────────────────────────
 
+# ── Filtrage progressif des créneaux Calendly ─────────────────────────────────
+
+_SLOT_LIMITS: dict[int, tuple[int, int]] = {
+    0: (0, 0), 1: (0, 1),           # J+0/J+1 : quasi fermé
+    2: (3, 5), 3: (3, 5), 4: (2, 4),# J+2→4   : fenêtre principale
+    5: (2, 3), 6: (1, 2), 7: (1, 2),# J+5→7   : ouverture partielle
+}
+_SLOT_LIMIT_DEFAULT = (1, 2)         # J+8+     : très limité
+
+_JOURS_FR = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
+_MOIS_FR  = ["","janvier","février","mars","avril","mai","juin",
+              "juillet","août","septembre","octobre","novembre","décembre"]
+
+
+def _fetch_calendly_slots(days: int = 14) -> list:
+    """Interroge Calendly API. Retourne [] si token absent ou erreur."""
+    import requests as _req
+    from datetime import timezone, timedelta
+    token = os.getenv("CALENDLY_TOKEN", "")
+    if not token:
+        return []
+    org = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
+    now = datetime.now(timezone.utc)
+    end = now + timedelta(days=days, hours=23, minutes=59)
+    hdrs = {"Authorization": f"Bearer {token}"}
+    try:
+        r = _req.get("https://api.calendly.com/event_types",
+                     params={"organization": org, "active": "true", "count": 10},
+                     headers=hdrs, timeout=8)
+        if r.status_code != 200:
+            return []
+        slots = []
+        for et in r.json().get("collection", []):
+            uri = et.get("uri", "")
+            if not uri:
+                continue
+            r2 = _req.get("https://api.calendly.com/event_type_available_times",
+                          params={"event_type": uri,
+                                  "start_time": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                  "end_time":   end.strftime("%Y-%m-%dT%H:%M:%SZ")},
+                          headers=hdrs, timeout=8)
+            if r2.status_code == 200:
+                for t in r2.json().get("collection", []):
+                    if t.get("status") == "available":
+                        slots.append({"start": t["start_time"], "end": t["end_time"]})
+        return slots
+    except Exception as e:
+        log.warning("_fetch_calendly_slots: %s", e)
+        return []
+
+
+def _fallback_slots(today) -> list:
+    """Créneaux synthétiques si Calendly API indisponible."""
+    from datetime import date, timedelta
+    hours = [9, 10, 11, 14, 15, 16, 17]
+    slots = []
+    for delta in range(0, 15):
+        d = today + timedelta(days=delta)
+        if d.weekday() >= 5:
+            continue
+        for h in hours:
+            dt_s = datetime(d.year, d.month, d.day, h, 0)
+            dt_e = datetime(d.year, d.month, d.day, h, 20)
+            slots.append({"start": dt_s.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          "end":   dt_e.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    return slots
+
+
+def _filter_slots(all_slots: list, today, seed: str) -> list:
+    """
+    Sélection progressive + variabilité déterministe (même token = même sélection le même jour).
+    Ne modifie PAS les données Calendly.
+    """
+    import random, hashlib
+    from datetime import date, timedelta
+    rng = random.Random(hashlib.md5((seed + today.isoformat()).encode()).hexdigest())
+
+    by_delta: dict[int, list] = {}
+    for slot in all_slots:
+        try:
+            dt = datetime.fromisoformat(slot["start"].replace("Z", "+00:00"))
+            delta = (dt.date() - today).days
+            by_delta.setdefault(delta, []).append((dt, slot))
+        except Exception:
+            continue
+
+    result = []
+    for delta in sorted(by_delta.keys()):
+        if delta < 0:
+            continue
+        day_slots = sorted(by_delta[delta], key=lambda x: x[0])
+        min_n, max_n = _SLOT_LIMITS.get(delta, _SLOT_LIMIT_DEFAULT)
+        n = rng.randint(min_n, max_n)
+        if n == 0 or not day_slots:
+            continue
+        chosen = rng.sample(day_slots, min(n, len(day_slots)))
+        chosen.sort(key=lambda x: x[0])
+        for dt, slot in chosen:
+            result.append({**slot, "_dt": dt, "_delta": delta})
+    return result
+
+
+def _render_book_page(token: str, filtered: list) -> str:
+    """HTML de la page de sélection de créneaux filtrés."""
+    from datetime import date
+    from collections import defaultdict
+    by_date: dict[date, list] = defaultdict(list)
+    for s in filtered:
+        by_date[s["_dt"].date()].append(s)
+
+    cards = ""
+    for d in sorted(by_date.keys()):
+        label = f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month]}"
+        date_url = f"{CALENDLY_URL}?date={d.isoformat()}&hide_gdpr_banner=1"
+        btns = "".join(
+            f'<a href="{date_url}" target="_blank" rel="noopener" class="sb">{s["_dt"].strftime("%H:%M")}</a>'
+            for s in by_date[d]
+        )
+        cards += f'<div class="dc"><div class="dl">{label}</div><div class="sr">{btns}</div></div>'
+
+    if not cards:
+        cards = (f'<p class="ns">Aucun créneau — '
+                 f'<a href="{CALENDLY_URL}" target="_blank">accès direct →</a></p>')
+
+    return f"""<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choisir un créneau — Présence IA</title>
+<link rel="icon" href="/assets/favicon.svg">
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:52px 20px}}
+.wrap{{max-width:520px;width:100%}}
+.logo{{text-align:center;margin-bottom:40px}}
+.logo img{{height:38px;width:auto}}
+h1{{font-size:1.35rem;font-weight:700;color:#fff;text-align:center;margin-bottom:8px;letter-spacing:-.02em}}
+.sub{{color:#94a3b8;font-size:.88rem;text-align:center;margin-bottom:28px;line-height:1.7}}
+.badge{{display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(153,103,16,.12);border:1px solid rgba(153,103,16,.28);color:#c9a04a;font-size:.75rem;font-weight:600;letter-spacing:.05em;padding:5px 14px;border-radius:100px;margin-bottom:28px}}
+.dc{{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px 20px;margin-bottom:10px}}
+.dl{{font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px}}
+.sr{{display:flex;flex-wrap:wrap;gap:8px}}
+.sb{{display:inline-block;padding:8px 16px;background:rgba(153,103,16,.14);border:1px solid rgba(153,103,16,.32);color:#c9a04a;font-size:.88rem;font-weight:600;border-radius:7px;text-decoration:none;transition:all .15s}}
+.sb:hover{{background:rgba(153,103,16,.26);border-color:rgba(153,103,16,.55);color:#e0b86a;transform:translateY(-1px)}}
+.sb:active{{transform:translateY(0)}}
+.ns{{color:#64748b;text-align:center;padding:28px 0;font-size:.9rem}}
+.ns a{{color:#c9a04a}}
+.note{{margin-top:28px;color:#475569;font-size:.76rem;text-align:center;line-height:1.7}}
+</style></head><body>
+<div class="wrap">
+  <div class="logo"><a href="/"><img src="/assets/logo-white.svg" alt="Présence IA"></a></div>
+  <h1>Choisissez votre créneau</h1>
+  <p class="sub">Audit de visibilité IA · 20 min · Sans engagement</p>
+  <div class="badge">⏳ Disponibilités limitées cette semaine</div>
+  {cards}
+  <p class="note">En cliquant sur un créneau, vous accédez à notre système de réservation.<br>La confirmation est envoyée par email.</p>
+</div>
+</body></html>"""
+
+
+@router.get("/l/{token}/book", response_class=HTMLResponse)
+def prospect_book(token: str):
+    """Page de réservation — affichage progressif et filtré. Aucune modification Calendly."""
+    from datetime import date, timezone, timedelta
+    _mkt.record_calendly_click(token)          # tracking conservé
+    today = date.today()
+    raw = _fetch_calendly_slots(14)
+    if not raw:
+        raw = _fallback_slots(today)
+    filtered = _filter_slots(raw, today, seed=token)
+    return HTMLResponse(_render_book_page(token, filtered))
+
+
 @router.get("/l/track/calendly/{token}")
 def track_calendly(token: str):
-    """Tracking clic Calendly + redirect."""
-    _mkt.record_calendly_click(token)
-    return RedirectResponse(CALENDLY_URL, status_code=302)
+    """Tracking clic Calendly + redirect (legacy — redirige vers la page de réservation filtrée)."""
+    return RedirectResponse(f"/l/{token}/book", status_code=302)
 
 
 @router.get("/l/{token}", response_class=HTMLResponse)
