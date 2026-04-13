@@ -4,87 +4,60 @@
   <defs>
     <style>
       .st0 {
-        letter-spacing: 0em;
-      }
-
-      .st0, .st1, .st2, .st3 {
         fill: #fff;
-      }
-
-      .st0, .st4 {
-        font-size: 230px;
-      }
-
-      .st1, .st5, .st3 {
-        font-size: 271.79px;
-      }
-
-      .st2 {
         stroke: #fff;
         stroke-linecap: round;
         stroke-miterlimit: 10;
         stroke-width: 26px;
       }
 
-      .st6 {
+      .st1 {
+        font-family: GillSans-Bold, 'Gill Sans';
+        font-size: 230px;
+        font-weight: 700;
+        letter-spacing: -.03em;
+      }
+
+      .st2 {
         fill: #ffbd5c;
         font-family: STHeitiSC-Light, 'Heiti SC';
-        font-size: 98.08px;
+        font-size: 360.02px;
         font-weight: 300;
         letter-spacing: 0em;
       }
 
-      .st4 {
-        letter-spacing: -.03em;
-      }
-
-      .st4, .st7 {
-        font-family: GillSans-Bold, 'Gill Sans';
-        font-weight: 700;
-      }
-
-      .st5 {
-        fill: #7f8284;
-        letter-spacing: -.05em;
-      }
-
       .st3 {
-        letter-spacing: -.03em;
-      }
-
-      .st8 {
         fill: #996d2e;
       }
 
-      .st9 {
+      .st4 {
         fill: #616466;
       }
     </style>
   </defs>
-  <rect x="0" width="2222.73" height="710.75"/>
+  <rect x="0" y="-4.6" width="2222.73" height="710.75"/>
   <g>
     <g>
       <g>
-        <line class="st2" x1="223.53" y1="235.68" x2="223.53" y2="173.09"/>
-        <line class="st2" x1="291.93" y1="264.3" x2="331.63" y2="224.6"/>
-        <line class="st2" x1="155.13" y1="264.3" x2="115.43" y2="224.6"/>
+        <line class="st0" x1="223.53" y1="235.68" x2="223.53" y2="173.09"/>
+        <line class="st0" x1="291.93" y1="264.3" x2="331.63" y2="224.6"/>
+        <line class="st0" x1="155.13" y1="264.3" x2="115.43" y2="224.6"/>
       </g>
-      <rect class="st9" x="85.87" y="360.46" width="165.96" height="14.86" transform="translate(-118.13 82.41) rotate(-20.5)"/>
-      <rect class="st9" x="197.52" y="360.46" width="165.96" height="14.86" transform="translate(414.43 810.71) rotate(-159.5)"/>
-      <rect class="st9" x="142.02" y="420.62" width="165.96" height="14.86" transform="translate(-203.05 653.05) rotate(-90)"/>
+      <rect class="st4" x="85.87" y="360.46" width="165.96" height="14.86" transform="translate(-118.13 82.41) rotate(-20.5)"/>
+      <rect class="st4" x="197.52" y="360.46" width="165.96" height="14.86" transform="translate(414.43 810.71) rotate(-159.5)"/>
+      <rect class="st4" x="142.02" y="420.62" width="165.96" height="14.86" transform="translate(-203.05 653.05) rotate(-90)"/>
       <g>
-        <rect class="st9" x="218.75" y="481.31" width="165.96" height="18.67" transform="translate(-251.22 329.33) rotate(-42.15)"/>
-        <rect class="st9" x="60.73" y="481.31" width="165.96" height="18.67" transform="translate(-78.97 950.87) rotate(-137.85)"/>
+        <rect class="st4" x="218.75" y="481.31" width="165.96" height="18.67" transform="translate(-251.22 329.33) rotate(-42.15)"/>
+        <rect class="st4" x="60.73" y="481.31" width="165.96" height="18.67" transform="translate(-78.97 950.87) rotate(-137.85)"/>
       </g>
-      <circle class="st8" cx="221.57" cy="367.89" r="106.13"/>
-      <circle class="st9" cx="223.53" cy="564.77" r="52"/>
+      <circle class="st3" cx="221.57" cy="367.89" r="106.13"/>
+      <circle class="st4" cx="223.53" cy="564.77" r="52"/>
       <g>
-        <circle class="st9" cx="52" cy="402.77" r="52"/>
-        <circle class="st9" cx="397.5" cy="404.27" r="50.5"/>
+        <circle class="st4" cx="52" cy="402.77" r="52"/>
+        <circle class="st4" cx="397.5" cy="404.27" r="50.5"/>
       </g>
     </g>
-    <text class="st7" transform="translate(515.68 537.65)"><tspan class="st3" x="0" y="0">Présence</tspan><tspan class="st1" x="1199.22" y="0"> </tspan><tspan class="st5" x="1279.91" y="0">IA</tspan><tspan class="st0" x="1581.32" y="0">.</tspan></text>
-    <text class="st4" transform="translate(5808.31 2606.19)"><tspan x="0" y="0">Lorem ipsum</tspan></text>
+    <text class="st1" transform="translate(5808.31 2606.19)"><tspan x="0" y="0">Lorem ipsum</tspan></text>
   </g>
-  <text class="st6" transform="translate(1781.82 682.3)"><tspan x="0" y="0">ADMIN</tspan></text>
+  <text class="st2" transform="translate(649.95 553.25)"><tspan x="0" y="0">ADMIN</tspan></text>
 </svg>
