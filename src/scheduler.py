@@ -1552,7 +1552,13 @@ def _outbound_send_one(profession: str, city: str,
                  channel.upper(), profession, city, ia_ok, ia_total, has_image)
         return {**base, "ok": True, "dry_run": True, "error": None}
 
-    # 5. Envoi réel
+    # 5. Bloquer si aucune image — la landing page serait sans visuel
+    if not has_image:
+        log.warning("[OUTBOUND_TEST] Envoi bloqué — aucune image pour %s", city)
+        return {**base, "ok": False,
+                "error": f"Aucune image trouvée pour {city} (Unsplash indisponible ?) — envoi bloqué"}
+
+    # 6. Envoi réel
     if not brevo_key:
         return {**base, "ok": False, "error": "BREVO_API_KEY manquant"}
     try:
@@ -1953,6 +1959,27 @@ def _job_outbound(force: bool = False):
         return
     log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
              _active["profession"], _active["city"], _active.get("score", 0))
+
+    # ── Image obligatoire pour la paire active ───────────────────────────────
+    try:
+        from .city_images import fetch_city_header_image
+        from .models import RefCityDB as _RefCityDB
+        with SessionLocal() as _db_img:
+            _ref_img = _db_img.query(_RefCityDB).filter_by(
+                city_name=(_active["city"] or "").upper()
+            ).first()
+            _has_img = bool(_ref_img and _ref_img.header_image_url)
+        if not _has_img:
+            log.info("[OUTBOUND] Image absente pour %s — fetch Unsplash (fallback)…",
+                     _active["city"])
+            _img_url = fetch_city_header_image(_active["city"])
+            if not _img_url:
+                log.warning("[OUTBOUND] Aucune image pour %s — job annulé (landing sans visuel)",
+                            _active["city"])
+                return
+            log.info("[OUTBOUND] Image récupérée pour %s : %s", _active["city"], _img_url[:60])
+    except Exception as _ie:
+        log.warning("[OUTBOUND] Vérification image échouée : %s — on continue", _ie)
 
     # ── Lire le flag refs_only depuis ScoringConfigDB ─────────────────────────
     refs_only = True  # fallback
