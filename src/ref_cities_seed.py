@@ -82,9 +82,11 @@ def seed_ref_cities(db) -> int:
     from .models import RefCityDB
     existing = {r.city_name for r in db.query(RefCityDB.city_name).all()}
     inserted = 0
+    seen_in_run: set = set()
     for city_name, city_type in REF_CITIES:
-        if city_name not in existing:
+        if city_name not in existing and city_name not in seen_in_run:
             db.add(RefCityDB(city_name=city_name, city_type=city_type))
+            seen_in_run.add(city_name)
             inserted += 1
     if inserted:
         db.commit()
