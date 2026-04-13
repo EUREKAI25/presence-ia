@@ -41,8 +41,8 @@ def admin_nav(token: str, active: str = "") -> str:
 
     def _link(slug, label):
         is_active = slug == active
-        bg     = "#fef2f4" if is_active else "transparent"
-        color  = "#e94560" if is_active else "#374151"
+        bg     = "#1f0a0e" if is_active else "transparent"
+        color  = "#e94560" if is_active else "#c9d1d9"
         weight = "600"     if is_active else "400"
         border = "3px solid #e94560" if is_active else "3px solid transparent"
         return (
@@ -62,11 +62,11 @@ def admin_nav(token: str, active: str = "") -> str:
         sections_html += (
             f'<details{open_attr} class="pres-acc" style="margin-bottom:2px">'
             f'<summary style="cursor:pointer;padding:8px 10px;font-size:10px;font-weight:700;'
-            f'color:#9ca3af;letter-spacing:.08em;list-style:none;display:flex;align-items:center;'
+            f'color:#6b7280;letter-spacing:.08em;list-style:none;display:flex;align-items:center;'
             f'justify-content:space-between;border-radius:4px;user-select:none;'
             f'background:transparent;outline:none" '
-            f'onmouseover="this.style.color=\'#6b7280\'" '
-            f'onmouseout="this.style.color=\'#9ca3af\'">'
+            f'onmouseover="this.style.color=\'#9ca3af\'" '
+            f'onmouseout="this.style.color=\'#6b7280\'">'
             f'{sec_label} <span style="font-size:9px">▾</span></summary>'
             f'<div style="padding:2px 0 6px 4px">{links}</div>'
             f'</details>'
@@ -100,19 +100,24 @@ def admin_nav(token: str, active: str = "") -> str:
         f'this.classList.remove(\'show\')'
         f'"></div>'
         f'<nav class="pres-sidebar" style="position:fixed;top:0;left:0;width:180px;height:100vh;'
-        f'background:#fff;border-right:1px solid #e5e7eb;overflow-y:auto;z-index:1000;'
+        f'background:#000;border-right:1px solid #1f2937;overflow-y:auto;z-index:1000;'
         f'padding-bottom:24px;display:flex;flex-direction:column">'
         f'<a href="/admin?token={token}" '
         f'style="display:flex;align-items:center;justify-content:center;'
-        f'padding:14px 12px;border-bottom:1px solid #e5e7eb;text-decoration:none;flex-shrink:0">'
-        f'<img src="/assets/logo.svg" alt="PRESENCE_IA" style="width:148px;height:auto"></a>'
+        f'padding:14px 12px;border-bottom:1px solid #1f2937;text-decoration:none;flex-shrink:0">'
+        f'<img src="/assets/logoadmin.svg" alt="PRESENCE_IA" style="width:148px;height:auto"></a>'
         f'<div style="padding:10px 8px;flex:1">'
         f'{sections_html}'
         f'</div>'
-        f'<div style="padding:8px;border-top:1px solid #f3f4f6;flex-shrink:0">'
+        f'<div style="padding:8px;border-top:1px solid #1f2937;flex-shrink:0">'
+        f'<a href="https://presence-ia.com" target="_blank" rel="noopener" '
+        f'style="display:block;width:100%;padding:7px 8px;background:transparent;border:1px solid #374151;'
+        f'border-radius:5px;font-size:11px;color:#9ca3af;cursor:pointer;text-align:left;'
+        f'text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+        f'margin-bottom:6px;box-sizing:border-box">🌐 Voir le site</a>'
         f'<button onclick="pipelineHistoryOpen(\'{token}\')" '
-        f'style="width:100%;padding:7px 8px;background:#f9fafb;border:1px solid #e5e7eb;'
-        f'border-radius:5px;font-size:11px;color:#6b7280;cursor:pointer;text-align:left;'
+        f'style="width:100%;padding:7px 8px;background:transparent;border:1px solid #374151;'
+        f'border-radius:5px;font-size:11px;color:#9ca3af;cursor:pointer;text-align:left;'
         f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis" '
         f'title="Journal des décisions de pilotage outbound">'
         f'📋 Journal pilotage</button>'
