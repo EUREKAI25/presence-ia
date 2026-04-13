@@ -536,7 +536,7 @@ async function testProfile(btn, email, profession, city, action) {{
     }});
     const d = await r.json();
     resCell.innerHTML = d.preview
-      ? '<strong style="color:#7c3aed">Aperçu ('+d.chars+' car.) :</strong> ' + d.preview.replace(/\n/g,'<br>')
+      ? '<strong style="color:#7c3aed">Aperçu ('+d.chars+' car.) :</strong> ' + d.preview.split('\n').join('<br>')
       : '✗ '+(d.error||'erreur');
     resCell.style.color = '#374151';
   }}
