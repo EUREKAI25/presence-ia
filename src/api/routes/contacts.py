@@ -102,54 +102,6 @@ def _prof_options(db) -> str:
     return "".join(f'<option value="{p.id}">{p.label}</option>' for p in profs)
 
 
-def _build_test_rows(test_prospects, ref_types: dict, token: str) -> str:
-    """Génère les lignes HTML pour les profils test depuis V3ProspectDB.
-    Les lignes ont les mêmes attributs que les vraies lignes (checkbox, data-*)
-    pour être sélectionnables par la barre bulk."""
-    import json
-    html = ""
-    for p in test_prospects:
-        ctype = ref_types.get((p.city or "").upper(), "")
-        if ctype == "prefecture":
-            ref_badge = '<span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span>'
-            has_p = "1"; has_sp = "0"
-        elif ctype == "sous_prefecture":
-            ref_badge = '<span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span>'
-            has_p = "0"; has_sp = "1"
-        else:
-            ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
-            has_p = "0"; has_sp = "0"
-        has_email = "1" if p.email else "0"
-        ia_count = 0
-        try:
-            ia_count = len(json.loads(p.ia_results or "[]"))
-        except Exception:
-            pass
-        ia_badge = (f'<span style="font-size:9px;background:#dcfce7;color:#166534;padding:1px 4px;border-radius:3px">'
-                    f'IA:{ia_count}</span>' if ia_count
-                    else '<span style="font-size:9px;color:#f59e0b">IA:—</span>')
-        label = f"{p.profession} · {p.city.title()}"
-        html += f"""<tr id="row-{p.token}" data-cid="{p.token}" data-has-email="{has_email}" data-has-mob="0" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="1" style="background:#fefce8;border-top:1px solid #fde68a">
-  <td style="padding:6px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{p.token}" style="cursor:pointer"></td>
-  <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">{label}</td>
-  <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
-  <td style="padding:6px 6px;font-size:11px">{p.email or '<span style="color:#d1d5db">—</span>'}</td>
-  <td style="padding:6px 6px;font-size:11px;color:#9ca3af">—</td>
-  <td style="padding:6px 6px;font-size:11px">{p.city.title()}</td>
-  <td style="padding:6px 6px;text-align:center">{ref_badge}</td>
-  <td style="padding:6px 6px;font-size:11px;color:#6b7280">{p.profession}</td>
-  <td style="padding:6px 6px;text-align:center">{ia_badge}</td>
-  <td></td>
-  <td style="padding:6px 6px;white-space:nowrap">
-    <button onclick="runOutboundTest(this,'{p.token}','email')"   class="btn" style="background:#2563eb;padding:2px 7px;font-size:10px;margin-right:2px">✉</button>
-    <button onclick="runOutboundTest(this,'{p.token}','sms')"     class="btn" style="background:#7c3aed;padding:2px 7px;font-size:10px;margin-right:2px">💬</button>
-    <button onclick="runOutboundTest(this,'{p.token}','preview')" class="btn" style="background:#374151;padding:2px 7px;font-size:10px">📋</button>
-    <span class="test-res" style="display:block;font-size:9px;color:#6b7280;margin-top:2px"></span>
-  </td>
-</tr>"""
-    return html or '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:8px;font-size:11px">Aucun profil test en DB</td></tr>'
-
-
 STATUS_BADGE = {
     "SUSPECT":  ("background:#fef9c3;color:#854d0e", "Suspect"),
     "PROSPECT": ("background:#dbeafe;color:#1e40af", "Prospect"),
@@ -161,13 +113,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
                   status_filter: str = "", search: str = ""):
     token = _check_token(request)
 
-    # Profils test depuis V3ProspectDB (is_test=True)
-    from ...models import V3ProspectDB as _V3P, RefCityDB as _RefCityDB
-    test_prospects = db.query(_V3P).filter_by(is_test=True).order_by(_V3P.created_at).all()
-    _ref_types = {r.city_name: r.city_type for r in db.query(_RefCityDB).all()}
-
-    contacts = [c for c in db_list_contacts(db)
-                if "[TEST]" not in (c.company_name or "").upper()]
+    contacts = list(db_list_contacts(db))
 
     # Filtres
     if status_filter:
@@ -219,8 +165,9 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         has_mob      = "1" if (phone_raw and is_mob) else "0"
         city_l       = (c.city or "").lower()
         img_ready    = city_l in ready_cities
-        is_test      = "TEST" in (c.company_name or "").upper()
-        row_style    = "border-bottom:1px solid #f3f4f6" + ("" if (img_ready or is_test) else ";opacity:.45")
+        is_test      = getattr(c, "is_test", False)
+        row_style    = ("background:#fefce8;border-bottom:1px solid #fde68a" if is_test
+                        else "border-bottom:1px solid #f3f4f6" + ("" if img_ready else ";opacity:.45"))
         img_attr     = "1" if img_ready else "0"
         # Badge P / SP
         city_upper   = (c.city or "").strip().upper()
@@ -245,10 +192,13 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
             _trk_icon(getattr(trk, "landing_visited_at", None) if trk else None, "🏠", "Landing visitée") + " " +
             _trk_icon(getattr(trk, "calendly_clicked_at", None) if trk else None, "📅", "Calendly cliqué")
         ) if True else ""
+        status_cell = ('<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span>'
+                       if is_test else
+                       f'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span>')
         rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
-  <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
+  <td style="padding:8px 6px">{status_cell}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{phone_display}{mobile_tag}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
@@ -382,15 +332,6 @@ tr:hover td{{background:#fafafa}}
         <th style="text-align:center" title="👁 Email ouvert · 🏠 Landing visitée · 📅 Calendly cliqué">Tracking</th><th></th>
       </tr></thead>
       <tbody>
-        <!-- Profils de test (V3ProspectDB is_test=True) -->
-        <tr style="background:#f1f5f9">
-          <td colspan="11" style="padding:4px 10px;font-size:10px;color:#64748b;font-weight:700;letter-spacing:.05em">
-            TEST — SMS : <input id="test-phone" type="text" placeholder="06…" style="font-size:10px;padding:2px 6px;width:110px;border:1px solid #cbd5e1;border-radius:4px;margin-left:4px">
-          </td>
-        </tr>
-        {_build_test_rows(test_prospects, _ref_types, token)}
-        <tr style="border-bottom:3px solid #e5e7eb"><td colspan="11"></td></tr>
-        <!-- Contacts DB -->
         {rows if rows else '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
       </tbody>
     </table>
@@ -483,49 +424,6 @@ async function _pollLeads() {{
     }}
   }} catch(e) {{}}
 }})();
-
-// ── Mode test ─────────────────────────────────────────────────────────────────
-(function() {{
-  const ph = localStorage.getItem('test_phone') || '';
-  document.getElementById('test-phone').value = ph;
-}})();
-document.getElementById('test-phone').addEventListener('change', function() {{ localStorage.setItem('test_phone', this.value); }});
-
-function _fmtTestResult(d, label) {{
-  const ia  = 'IA: '+d.ia_ok+'/'+d.ia_total;
-  const img = 'img: '+(d.has_image ? (d.img_source==='cache'?'✓cache':'✓Unsplash') : '✗');
-  const trm = d.terme ? 'terme: <em>'+d.terme+'</em>' : '';
-  return label + ' · ' + ia + ' · ' + img + (trm ? ' · '+trm : '');
-}}
-async function runOutboundTest(btn, tok, action) {{
-  const resCell = btn.closest('td').querySelector('.test-res');
-  resCell.innerHTML = '⏳ IA + image en cours…'; resCell.style.color = '#6b7280';
-  const phone = document.getElementById('test-phone').value.trim();
-  if (action === 'sms' && !phone) {{
-    resCell.innerHTML = '⚠ Numéro requis'; resCell.style.color='#f59e0b'; return;
-  }}
-  const r = await fetch('/admin/contacts/test/outbound/'+tok+'?token='+T, {{
-    method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{action, phone}})
-  }});
-  const d = await r.json();
-  if (action === 'preview') {{
-    if (d.body) {{
-      resCell.innerHTML = _fmtTestResult(d, '📋')
-        + '<br><strong>Message :</strong> ' + d.body.split('\\n').join('<br>');
-      resCell.style.color = '#374151';
-    }} else {{
-      resCell.innerHTML = '✗ '+(d.error||'erreur'); resCell.style.color='#dc2626';
-    }}
-  }} else {{
-    const lbl = action==='sms' ? '✓ SMS envoyé' : '✓ Email envoyé';
-    if (d.ok) {{
-      resCell.innerHTML = _fmtTestResult(d, lbl); resCell.style.color='#16a34a';
-    }} else {{
-      resCell.innerHTML = _fmtTestResult(d, '✗ '+(d.error||'erreur')); resCell.style.color='#dc2626';
-    }}
-  }}
-}}
 
 // ── Checkboxes + sélection ────────────────────────────────────────────────────
 function _updateBulkBar() {{
@@ -629,14 +527,12 @@ async function bulkSendSMS() {{
   const ids = _selectedIds();
   if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
   if(!confirm('Envoyer un SMS à ' + ids.length + ' contact(s) ?')) return;
-  const testPhone = document.getElementById('test-phone').value.trim();
   const prog = document.getElementById('bulk-progress');
   prog.style.display='inline'; prog.textContent='Envoi SMS en cours…';
   let ok=0, err=0;
   for(const id of ids) {{
     try {{
-      const body = id.startsWith('__test__') ? JSON.stringify({{phone: testPhone}}) : '{{}}';
-      const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body}});
+      const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
       const d = await r.json();
       if(d.ok) ok++; else err++;
     }} catch(e) {{ err++; }}
@@ -747,56 +643,9 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.post("/admin/contacts/test/outbound/{tok}")
-async def contact_test_outbound(tok: str, request: Request, db: Session = Depends(get_db)):
-    """
-    Pipeline outbound complet sur un profil test V3ProspectDB (is_test=True).
-    Même code que le scheduler. Lance IA + image si absents, puis envoie.
-    action = email | sms | preview
-    """
-    _check_token(request)
-    data           = await request.json()
-    action         = data.get("action", "preview")
-    phone_override = data.get("phone", "").strip()
-
-    from ...models import V3ProspectDB as _V3P
-    from ...scheduler import _outbound_send_prospect
-
-    p = db.query(_V3P).filter_by(token=tok, is_test=True).first()
-    if not p:
-        return JSONResponse({"ok": False, "error": "Profil test introuvable"})
-
-    if action == "sms":
-        if not phone_override:
-            return JSONResponse({"ok": False, "error": "Numéro requis pour le test SMS"})
-        # Proxy : même prospect mais canal forcé SMS vers le numéro test
-        class _Proxy:
-            pass
-        proxy = _Proxy()
-        for attr in ["token","name","city","profession","city_reference","ia_results","is_test"]:
-            setattr(proxy, attr, getattr(p, attr, None))
-        proxy.email = None
-        proxy.phone = phone_override
-        result = _outbound_send_prospect(proxy, dry_run=False)
-    elif action == "preview":
-        result = _outbound_send_prospect(p, dry_run=True)
-    else:  # email
-        result = _outbound_send_prospect(p, dry_run=False)
-
-    return JSONResponse(result)
-
-
 @router.post("/admin/contacts/{cid}/send-email")
 async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    # Profil test V3 ? (token commence par __test__)
-    from ...models import V3ProspectDB as _V3P
-    v3_test = db.query(_V3P).filter_by(token=cid, is_test=True).first()
-    if v3_test:
-        from ...scheduler import _outbound_send_prospect
-        result = _outbound_send_prospect(v3_test, dry_run=False)
-        return JSONResponse(result)
-
     c = db_get_contact(db, cid)
     if not c: raise HTTPException(404)
     if not c.email:
@@ -829,28 +678,6 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
 @router.post("/admin/contacts/{cid}/send-sms")
 async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    # Profil test V3 ? → pipeline outbound (SMS vers numéro test du champ HTML)
-    from ...models import V3ProspectDB as _V3P
-    v3_test = db.query(_V3P).filter_by(token=cid, is_test=True).first()
-    if v3_test:
-        data = {}
-        try:
-            data = await request.json()
-        except Exception:
-            pass
-        phone_override = data.get("phone", "").strip()
-        if not phone_override:
-            return JSONResponse({"ok": False, "error": "Numéro requis pour le test SMS"})
-        from ...scheduler import _outbound_send_prospect
-        class _Proxy:
-            pass
-        proxy = _Proxy()
-        for attr in ["token","name","city","profession","city_reference","ia_results","is_test"]:
-            setattr(proxy, attr, getattr(v3_test, attr, None))
-        proxy.email = None
-        proxy.phone = phone_override
-        return JSONResponse(_outbound_send_prospect(proxy, dry_run=False))
-
     c = db_get_contact(db, cid)
     if not c: raise HTTPException(404)
     if not c.phone:

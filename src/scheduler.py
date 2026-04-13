@@ -1479,6 +1479,11 @@ On a cherché « {terme} {ville} » sur ChatGPT. Votre entreprise n'apparaît pa
 Aujourd'hui, beaucoup de gens passent par là avant d'appeler.
 
 Vous avez déjà regardé ce que ça donne de votre côté ?
+
+Si vous voulez voir concrètement ce que ça donne : {landing_url}
+
+— Nathalie
+Présence IA
 """
 
 _OUTBOUND_SMS = "Bonjour, on a cherché « {terme} {ville} » sur ChatGPT. Votre entreprise n'apparaît pas. Vous avez regardé ce que ça donne ?"
@@ -1569,8 +1574,11 @@ def _outbound_send_prospect(p, dry_run: bool = False,
 
     channel = "email" if p.email else "sms"
     subject = random.choice(_OUTBOUND_SUBJECTS)
+    _base_url    = os.getenv("BASE_URL", "https://presence-ia.com").rstrip("/")
+    _landing_rel = getattr(p, "landing_url", None) or ""
+    landing_url  = (_base_url + _landing_rel) if _landing_rel else _base_url
     body    = (_OUTBOUND_BODY if channel == "email" else _OUTBOUND_SMS).format(
-        terme=terme, ville=city_display
+        terme=terme, ville=city_display, landing_url=landing_url
     )
     idx = sent_idx % len(_OUTBOUND_SENDERS)
     sender, sender_name = _OUTBOUND_SENDERS[idx]
