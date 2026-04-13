@@ -519,50 +519,55 @@ function _getQty() {{
   const v = parseInt(document.getElementById('bulk-qty').value);
   return (v > 0) ? v : Infinity;
 }}
-const _FILTER_BTNS = ['email','mob','p','sp','all','none'];
-function _setActiveBtn(active) {{
-  _FILTER_BTNS.forEach(id => {{
-    const b = document.getElementById('fbtn-'+id);
-    if (!b) return;
-    if (id === active) {{
-      b.style.background = '#1e40af'; b.style.color = '#fff'; b.style.borderColor = '#1e40af';
-    }} else {{
-      b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
-    }}
-  }});
+// ── Filtres cumulables (toggles) ─────────────────────────────────────────────
+const _activeFilters = new Set();
+const _TOGGLE_BTNS = ['email','mob','p','sp'];
+
+function _refreshBtn(id) {{
+  const b = document.getElementById('fbtn-'+id);
+  if (!b) return;
+  const on = _activeFilters.has(id);
+  b.style.background   = on ? '#1e40af' : '';
+  b.style.color        = on ? '#fff'    : '';
+  b.style.borderColor  = on ? '#1e40af' : '';
+  b.style.fontWeight   = on ? '700'     : '';
 }}
-function selectByType(type) {{
-  _setActiveBtn(type);
-  // Réinitialiser toutes les lignes avant de filtrer
+
+function _applyFilters() {{
+  const qty = _getQty();
+  let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{
-    cb.closest('tr').style.display = '';
     cb.checked = false;
-  }});
-  const qty = _getQty();
-  let n = 0;
-  const key = 'has' + type.charAt(0).toUpperCase() + type.slice(1);
-  document.querySelectorAll('.row-cb').forEach(cb => {{
     const tr = cb.closest('tr');
-    const matches = tr && tr.dataset[key] === '1';
-    tr.style.display = matches ? '' : 'none';
-    cb.checked = matches && n < qty;
-    if (matches && n < qty) n++;
+    const visible = _activeFilters.size === 0 || [..._activeFilters].every(type => {{
+      const key = 'has' + type.charAt(0).toUpperCase() + type.slice(1);
+      return tr.dataset[key] === '1';
+    }});
+    tr.style.display = visible ? '' : 'none';
+    if (visible && n < qty) {{ cb.checked = true; n++; }}
   }});
   _updateBulkBar();
 }}
+
+function selectByType(type) {{
+  if (_activeFilters.has(type)) {{ _activeFilters.delete(type); }}
+  else {{ _activeFilters.add(type); }}
+  _refreshBtn(type);
+  _applyFilters();
+}}
+
 function selectAll() {{
-  _setActiveBtn('all');
+  _activeFilters.clear();
+  _TOGGLE_BTNS.forEach(id => _refreshBtn(id));
   document.querySelectorAll('.row-cb').forEach(cb => {{ cb.closest('tr').style.display = ''; }});
-  const qty = _getQty();
-  let n = 0;
-  document.querySelectorAll('.row-cb').forEach(cb => {{
-    cb.checked = n < qty;
-    n++;
-  }});
+  const qty = _getQty(); let n = 0;
+  document.querySelectorAll('.row-cb').forEach(cb => {{ cb.checked = n < qty; n++; }});
   _updateBulkBar();
 }}
+
 function selectNone() {{
-  _setActiveBtn('none');
+  _activeFilters.clear();
+  _TOGGLE_BTNS.forEach(id => _refreshBtn(id));
   document.querySelectorAll('.row-cb').forEach(cb => {{
     cb.closest('tr').style.display = '';
     cb.checked = false;
