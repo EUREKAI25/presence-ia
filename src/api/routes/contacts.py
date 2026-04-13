@@ -103,17 +103,23 @@ def _prof_options(db) -> str:
 
 
 def _build_test_rows(test_prospects, ref_types: dict, token: str) -> str:
-    """Génère les lignes HTML pour les profils test depuis V3ProspectDB."""
+    """Génère les lignes HTML pour les profils test depuis V3ProspectDB.
+    Les lignes ont les mêmes attributs que les vraies lignes (checkbox, data-*)
+    pour être sélectionnables par la barre bulk."""
     import json
     html = ""
     for p in test_prospects:
         ctype = ref_types.get((p.city or "").upper(), "")
         if ctype == "prefecture":
             ref_badge = '<span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span>'
+            has_p = "1"; has_sp = "0"
         elif ctype == "sous_prefecture":
             ref_badge = '<span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span>'
+            has_p = "0"; has_sp = "1"
         else:
             ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
+            has_p = "0"; has_sp = "0"
+        has_email = "1" if p.email else "0"
         ia_count = 0
         try:
             ia_count = len(json.loads(p.ia_results or "[]"))
@@ -123,9 +129,8 @@ def _build_test_rows(test_prospects, ref_types: dict, token: str) -> str:
                     f'IA:{ia_count}</span>' if ia_count
                     else '<span style="font-size:9px;color:#f59e0b">IA:—</span>')
         label = f"{p.profession} · {p.city.title()}"
-        # SMS test phone vient du champ HTML, transmis via JS
-        html += f"""<tr style="background:#fefce8;border-top:1px solid #fde68a">
-  <td style="padding:6px 6px;text-align:center"><span style="font-size:9px;background:#92400e;color:#fff;padding:1px 4px;border-radius:3px">T</span></td>
+        html += f"""<tr id="row-{p.token}" data-cid="{p.token}" data-has-email="{has_email}" data-has-mob="0" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="1" style="background:#fefce8;border-top:1px solid #fde68a">
+  <td style="padding:6px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{p.token}" style="cursor:pointer"></td>
   <td style="padding:6px 10px;font-size:11px;font-weight:600;color:#78350f">{label}</td>
   <td style="padding:6px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span></td>
   <td style="padding:6px 6px;font-size:11px">{p.email or '<span style="color:#d1d5db">—</span>'}</td>
@@ -624,12 +629,14 @@ async function bulkSendSMS() {{
   const ids = _selectedIds();
   if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
   if(!confirm('Envoyer un SMS à ' + ids.length + ' contact(s) ?')) return;
+  const testPhone = document.getElementById('test-phone').value.trim();
   const prog = document.getElementById('bulk-progress');
   prog.style.display='inline'; prog.textContent='Envoi SMS en cours…';
   let ok=0, err=0;
   for(const id of ids) {{
     try {{
-      const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
+      const body = id.startsWith('__test__') ? JSON.stringify({{phone: testPhone}}) : '{{}}';
+      const r = await fetch('/admin/contacts/'+id+'/send-sms?token='+T, {{method:'POST',headers:{{'Content-Type':'application/json'}},body}});
       const d = await r.json();
       if(d.ok) ok++; else err++;
     }} catch(e) {{ err++; }}
@@ -782,6 +789,14 @@ async def contact_test_outbound(tok: str, request: Request, db: Session = Depend
 @router.post("/admin/contacts/{cid}/send-email")
 async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
+    # Profil test V3 ? (token commence par __test__)
+    from ...models import V3ProspectDB as _V3P
+    v3_test = db.query(_V3P).filter_by(token=cid, is_test=True).first()
+    if v3_test:
+        from ...scheduler import _outbound_send_prospect
+        result = _outbound_send_prospect(v3_test, dry_run=False)
+        return JSONResponse(result)
+
     c = db_get_contact(db, cid)
     if not c: raise HTTPException(404)
     if not c.email:
@@ -798,7 +813,6 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     metiers    = metier + "s" if metier and not metier.endswith("s") else metier
     subj = subj_tpl.format(ville=city, metier=metier, metiers=metiers,
                            city=city, profession=profession, name=name)
-    # Cherche un prospect V3 associé pour la landing personnalisée
     v3 = db.query(V3ProspectDB).filter(
         (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
     ).first()
@@ -815,6 +829,28 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
 @router.post("/admin/contacts/{cid}/send-sms")
 async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
+    # Profil test V3 ? → pipeline outbound (SMS vers numéro test du champ HTML)
+    from ...models import V3ProspectDB as _V3P
+    v3_test = db.query(_V3P).filter_by(token=cid, is_test=True).first()
+    if v3_test:
+        data = {}
+        try:
+            data = await request.json()
+        except Exception:
+            pass
+        phone_override = data.get("phone", "").strip()
+        if not phone_override:
+            return JSONResponse({"ok": False, "error": "Numéro requis pour le test SMS"})
+        from ...scheduler import _outbound_send_prospect
+        class _Proxy:
+            pass
+        proxy = _Proxy()
+        for attr in ["token","name","city","profession","city_reference","ia_results","is_test"]:
+            setattr(proxy, attr, getattr(v3_test, attr, None))
+        proxy.email = None
+        proxy.phone = phone_override
+        return JSONResponse(_outbound_send_prospect(proxy, dry_run=False))
+
     c = db_get_contact(db, cid)
     if not c: raise HTTPException(404)
     if not c.phone:
