@@ -436,8 +436,8 @@ html{scroll-behavior:smooth}
 body{font-family:-apple-system,'Segoe UI',sans-serif;color:var(--t);line-height:1.6;background:#fff}
 a{color:inherit}
 /* NAV */
-.nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:64px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:20}
-.nav__brand{font-weight:800;font-size:1.05rem;color:var(--dark);text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:64px;background:var(--dark);border-bottom:1px solid rgba(255,255,255,.06);position:sticky;top:0;z-index:20;backdrop-filter:blur(12px)}
+.nav__brand{font-weight:800;font-size:1.05rem;color:#fff;text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
 .nav__brand-dot{width:8px;height:8px;background:var(--blue);border-radius:50%;display:inline-block}
 .nav__cta{background:var(--blue);color:#fff;padding:10px 24px;border-radius:8px;font-weight:600;font-size:.875rem;text-decoration:none;transition:background .15s;white-space:nowrap}
 .nav__cta:hover{background:#3d6a9a}
@@ -514,7 +514,7 @@ footer a{color:#9ca3af;text-decoration:underline}
 {gtm_push("page_view", page_type="home")}
 
 <nav class="nav">
-  <a class="nav__brand" href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;display:block"></a>
+  <a class="nav__brand" href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/assets/logo-white.svg" alt="Présence IA" style="height:44px;display:block"></a>
   <a class="nav__cta" href="#contact">Réserver mon audit gratuit</a>
 </nav>
 
