@@ -126,6 +126,14 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
     tracking = _tracking_map([c.id for c in contacts])
     ready_cities, city_to_dept = _image_readiness(db, contacts)
 
+    # Préfectures / sous-préfectures
+    ref_city_types: dict = {}
+    try:
+        from ...models import RefCityDB
+        ref_city_types = {r.city_name: r.city_type for r in db.query(RefCityDB).all()}
+    except Exception:
+        pass
+
     # Images manquantes
     missing_cities = []
     for c in contacts:
@@ -156,8 +164,21 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         has_mob      = "1" if (phone_raw and is_mob) else "0"
         city_l       = (c.city or "").lower()
         img_ready    = city_l in ready_cities
-        row_style    = "border-bottom:1px solid #f3f4f6" + ("" if img_ready else ";opacity:.45")
+        is_test      = "TEST" in (c.company_name or "").upper()
+        row_style    = "border-bottom:1px solid #f3f4f6" + ("" if (img_ready or is_test) else ";opacity:.45")
         img_attr     = "1" if img_ready else "0"
+        # Badge P / SP
+        city_upper   = (c.city or "").strip().upper()
+        _ctype       = ref_city_types.get(city_upper, "")
+        if _ctype == "prefecture":
+            ref_badge = '<span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px;font-weight:700">P</span>'
+            has_ref   = "1"
+        elif _ctype == "sous_prefecture":
+            ref_badge = '<span style="font-size:9px;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px">SP</span>'
+            has_ref   = "1"
+        else:
+            ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
+            has_ref   = "0"
         trk = tracking.get(c.id)
         def _trk_icon(val, emoji, label):
             if not val:
@@ -169,13 +190,14 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
             _trk_icon(getattr(trk, "landing_visited_at", None) if trk else None, "🏠", "Landing visitée") + " " +
             _trk_icon(getattr(trk, "calendly_clicked_at", None) if trk else None, "📅", "Calendly cliqué")
         ) if True else ""
-        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-img-ready="{img_attr}" style="{row_style}">
+        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-ref="{has_ref}" data-img-ready="{img_attr}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
   <td style="padding:8px 6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span></td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{phone_display}{mobile_tag}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
+  <td style="padding:8px 6px;text-align:center">{ref_badge}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.profession or "—"}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
   <td style="padding:8px 6px;text-align:center;white-space:nowrap">{trk_html}</td>
@@ -300,14 +322,16 @@ tr:hover td{{background:#fafafa}}
 
   <!-- Barre actions groupées — toujours visible -->
   <div id="bulk-bar" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <span id="bulk-count" style="font-size:12px;color:#6b7280;margin-right:4px">0 sélectionné(s)</span>
+    <span style="font-size:11px;color:#6b7280;font-weight:600">Sélectionner</span>
+    <input type="number" id="bulk-qty" min="1" max="9999" placeholder="max" title="Nombre max à sélectionner (vide = tous)"
+           style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
     <button onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Avec email</button>
     <button onclick="selectByType('mob')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Avec mobile</button>
+    <button onclick="selectByType('ref')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 Préfecture</button>
     <button onclick="selectAll()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button onclick="selectNone()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
     <div style="flex:1"></div>
-    <input type="number" id="bulk-qty" min="1" max="9999" placeholder="Qté" title="Limiter l'envoi à N contacts"
-           style="width:64px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
+    <span id="bulk-count" style="font-size:12px;color:#6b7280">0 sélectionné(s)</span>
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
     <button onclick="bulkSendSMS()" class="btn" style="background:#7c3aed;padding:5px 12px;font-size:11px">💬 Envoyer SMS</button>
     <div id="bulk-progress" style="font-size:11px;color:#6b7280;display:none"></div>
@@ -320,11 +344,13 @@ tr:hover td{{background:#fafafa}}
         <th style="padding:10px 6px;text-align:center;width:32px"><input type="checkbox" id="cb-all" title="Tout sélectionner" style="cursor:pointer"></th>
         <th style="padding:10px 10px">Entreprise</th>
         <th>Statut</th><th>Email</th><th>Téléphone</th>
-        <th>Ville</th><th>Métier</th><th>Ajouté</th>
+        <th>Ville</th>
+        <th style="text-align:center;width:36px" title="P = préfecture · SP = sous-préfecture">P/SP</th>
+        <th>Métier</th><th>Ajouté</th>
         <th style="text-align:center" title="👁 Email ouvert · 🏠 Landing visitée · 📅 Calendly cliqué">Tracking</th><th></th>
       </tr></thead>
       <tbody>
-        {rows if rows else '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
+        {rows if rows else '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:40px">Aucun contact</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -495,9 +521,10 @@ function _getQty() {{
 function selectByType(type) {{
   const qty = _getQty();
   let n = 0;
+  const key = 'has' + type.charAt(0).toUpperCase() + type.slice(1);
   document.querySelectorAll('.row-cb').forEach(cb => {{
     const tr = cb.closest('tr');
-    const matches = tr && tr.dataset['has'+type.charAt(0).toUpperCase()+type.slice(1)] === '1';
+    const matches = tr && tr.dataset[key] === '1';
     cb.checked = matches && n < qty;
     if(matches && n < qty) n++;
   }});
