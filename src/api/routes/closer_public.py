@@ -928,9 +928,13 @@ async def closer_recruit_submit(request: Request):
             out_dir = Path(__file__).parent.parent.parent.parent / "dist" / "closer-audio"
             out_dir.mkdir(parents=True, exist_ok=True)
             content = await audio_file.read()
-            if len(content) <= 5 * 1024 * 1024:  # 5 Mo max
-                (out_dir / fn).write_bytes(content)
-                audio_url = f"/dist/closer-audio/{fn}"
+            if len(content) > 50 * 1024 * 1024:  # 50 Mo max
+                return JSONResponse(
+                    {"ok": False, "error": "Fichier trop volumineux (50 Mo max)."},
+                    status_code=400,
+                )
+            (out_dir / fn).write_bytes(content)
+            audio_url = f"/dist/closer-audio/{fn}"
 
         video_url = form.get("video_url", "").strip() or None
         if not video_url and not audio_url:

@@ -92,13 +92,12 @@ def select_next_pair(db) -> dict | None:
     if cfg and hasattr(cfg, "outbound_refs_only"):
         refs_only = bool(cfg.outbound_refs_only)
 
-    # Stock email dispo
+    # Stock email dispo (ia_results non requis — sera initialisé par _job_outbound)
     _email_q = (
         db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
         .filter(
             V3ProspectDB.email.isnot(None),
             V3ProspectDB.sent_at.is_(None),
-            V3ProspectDB.ia_results.isnot(None),
             or_(
                 V3ProspectDB.email_status.is_(None),
                 V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"]),
@@ -109,14 +108,13 @@ def select_next_pair(db) -> dict | None:
         _email_q = _email_q.filter(V3ProspectDB.city_reference.isnot(None))
     email_pairs = _email_q.group_by(V3ProspectDB.city, V3ProspectDB.profession).all()
 
-    # Stock SMS dispo (phone sans email)
+    # Stock SMS dispo (phone sans email — ia_results non requis)
     _sms_q = (
         db.query(V3ProspectDB.city, V3ProspectDB.profession, func.count().label("n"))
         .filter(
             V3ProspectDB.phone.isnot(None),
             V3ProspectDB.email.is_(None),
             V3ProspectDB.sent_at.is_(None),
-            V3ProspectDB.ia_results.isnot(None),
         )
     )
     if refs_only:
@@ -208,6 +206,7 @@ def _available_count(db, city: str, profession: str) -> int:
         V3ProspectDB.email.is_(None),
         V3ProspectDB.sent_at.is_(None),
     )
+    # Remarque : ia_results non requis ici — initialisé par _job_outbound avant envoi
     if refs_only:
         email_q = email_q.filter(V3ProspectDB.city_reference.isnot(None))
         sms_q   = sms_q.filter(V3ProspectDB.city_reference.isnot(None))
