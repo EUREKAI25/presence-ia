@@ -314,12 +314,15 @@ def _scrape_site(url: str) -> dict:
 # ── Brevo sending ─────────────────────────────────────────────────────────────
 
 def _body_to_html(plain: str, landing_url: str = "", delivery_id: str = "") -> str:
-    """Convertit le corps texte en HTML avec tracking pixel et lien cliquable."""
+    """Convertit le corps texte en HTML simple.
+    Le tracking (open + click) est enregistré à l'ouverture de la landing page
+    via ?d={delivery_id} — pas de pixel ni de redirect dans l'email."""
     import html as _html, re as _re
-    tracked_url = landing_url
+    # URL directe avec delivery_id en paramètre pour tracking côté landing
+    tracked_landing = landing_url
     if delivery_id and landing_url:
-        from urllib.parse import quote as _q
-        tracked_url = f"{BASE_URL}/l/track/click/{delivery_id}?url={_q(landing_url, safe='')}"
+        sep = "&" if "?" in landing_url else "?"
+        tracked_landing = f"{landing_url}{sep}d={delivery_id}"
     # Extraire les segments **gras** avant l'échappement HTML
     bold_map: dict = {}
     def _store_bold(m):
@@ -330,17 +333,13 @@ def _body_to_html(plain: str, landing_url: str = "", delivery_id: str = "") -> s
     lines = _html.escape(plain_marked).replace("\n", "<br>\n")
     for key, tag in bold_map.items():
         lines = lines.replace(_html.escape(key), tag)
-    if delivery_id and landing_url:
+    if landing_url:
         escaped_orig = _html.escape(landing_url)
-        escaped_tracked = _html.escape(tracked_url)
+        escaped_dest  = _html.escape(tracked_landing)
         lines = lines.replace(escaped_orig,
-                              f'<a href="{escaped_tracked}">{escaped_orig}</a>')
-    pixel = ""
-    if delivery_id:
-        pixel = (f'<img src="{BASE_URL}/l/track/open/{delivery_id}" '
-                 f'width="1" height="1" alt="" style="display:none">')
+                              f'<a href="{escaped_dest}">{escaped_orig}</a>')
     return (f'<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;color:#333">'
-            f'{lines}{pixel}</body></html>')
+            f'{lines}</body></html>')
 
 
 def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str,
@@ -1458,10 +1457,17 @@ def track_calendly(token: str):
 
 
 @router.get("/l/{token}", response_class=HTMLResponse)
-def landing_v3(token: str):
+def landing_v3(token: str, d: str = ""):
     from ...models import CityEvidenceDB
     # Tracking landing visit (silencieux)
     _mkt.record_landing_visit(token)
+    # Tracking email open+click via delivery_id passé en ?d=
+    if d:
+        try:
+            _mkt.record_open(d)
+            _mkt.record_click(d)
+        except Exception:
+            pass
     with SessionLocal() as db:
         p = db.get(V3ProspectDB, token)
         if not p:
