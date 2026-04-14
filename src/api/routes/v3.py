@@ -398,9 +398,9 @@ def _send_brevo_sms(to_phone: str, message: str) -> bool:
 
 _PROMPTS_FILE = Path(__file__).resolve().parents[2] / "ia_prompts.json"
 _DEFAULT_PROMPTS = [
-    "Tu me recommandes qui comme {terme} autour de {city} ?",
-    "Des avis sur des {terme} près de {city} ?",
-    "Qui est sérieux comme {terme} à {city} ?",
+    "Je cherche un {terme} à {city}, tu as des recommandations ?",
+    "Qui recommandes-tu comme {terme} à {city} ?",
+    "Trouve-moi un bon {terme} à {city}.",
 ]
 
 def _load_prompts() -> list:
