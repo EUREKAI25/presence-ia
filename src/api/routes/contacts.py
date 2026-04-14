@@ -665,11 +665,12 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
             (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
         ).first()
         landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
-    # Gmail + mobile → forcer SMS
+    # Gmail + mobile → forcer SMS (même contenu que contact_send_sms)
     if _is_gmail(c.email) and c.phone:
-        tpl = lt.sms_template if lt and lt.sms_template else None
-        msg = _contact_message_sms(name, city, profession, landing_url, tpl)
+        msg = _contact_message_sms(name, city, profession, landing_url)
+        delivery_id = _mkt.create_sms_delivery(c.id)
         ok  = _send_brevo_sms(c.phone, msg)
+        _mkt.mark_sent(delivery_id, ok)
         if ok:
             db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
         return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error", "method_used": "sms"})
