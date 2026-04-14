@@ -1422,11 +1422,11 @@ def _render_book_page(token: str, filtered: list) -> str:
             if past:
                 cols += f'<div class="wc wc--past"><div class="wh">{day_label}</div></div>'
                 continue
-            date_url = f"{CALENDLY_URL}?date={d.isoformat()}&hide_gdpr_banner=1"
             slots    = sorted(by_date.get(d, []), key=lambda s: s["_dt"])
             if slots:
+                from urllib.parse import quote as _q
                 btns = "".join(
-                    f'<a href="{date_url}" target="_blank" rel="noopener" class="sb">{s["_dt"].strftime("%H:%M")}</a>'
+                    f'<button class="sb" onclick="openSlot(\'{CALENDLY_URL}?start_time={_q(s["_dt"].strftime("%Y-%m-%dT%H:%M:%S+00:00"))}&hide_event_type_details=1&hide_gdpr_banner=1\')">{s["_dt"].strftime("%H:%M")}</button>'
                     for s in slots
                 )
                 cols += f'<div class="wc"><div class="wh">{day_label}</div><div class="ws">{btns}</div></div>'
@@ -1487,8 +1487,17 @@ h1{{font-size:1.25rem;font-weight:700;color:#fff;text-align:center;margin-bottom
     <button id="btn-next" onclick="changeWeek(1)">Suiv. →</button>
   </div>
   {weeks_html}
-  <p class="note">En cliquant sur un créneau, vous confirmez sur notre système de réservation.<br>La confirmation est envoyée par email.</p>
+  <p class="note">La confirmation est envoyée par email.</p>
 </div>
+
+<!-- Modal Calendly -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;padding:16px">
+  <div style="position:relative;width:100%;max-width:480px;height:620px;background:#fff;border-radius:16px;overflow:hidden">
+    <button onclick="closeSlot()" style="position:absolute;top:10px;right:12px;z-index:10;background:rgba(0,0,0,.15);border:none;color:#333;font-size:1.1rem;width:30px;height:30px;border-radius:50%;cursor:pointer;line-height:1">✕</button>
+    <iframe id="cal-frame" src="" style="width:100%;height:100%;border:none"></iframe>
+  </div>
+</div>
+
 <script>
 const WEEKS = [{{"label":"Semaine du {monday.day} {_MOIS_FR[monday.month]}","idx":0}},{{"label":"Semaine du {(monday + timedelta(weeks=1)).day} {_MOIS_FR[(monday + timedelta(weeks=1)).month]}","idx":1}}];
 let cur = 0;
@@ -1501,6 +1510,21 @@ function changeWeek(dir) {{
   document.getElementById('btn-next').disabled = cur === WEEKS.length - 1;
 }}
 document.getElementById('week-label').textContent = WEEKS[0].label;
+
+function openSlot(url) {{
+  document.getElementById('cal-frame').src = url;
+  const m = document.getElementById('modal');
+  m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}}
+function closeSlot() {{
+  document.getElementById('modal').style.display = 'none';
+  document.getElementById('cal-frame').src = '';
+  document.body.style.overflow = '';
+}}
+document.getElementById('modal').addEventListener('click', function(e) {{
+  if (e.target === this) closeSlot();
+}});
 </script>
 </body></html>"""
 
