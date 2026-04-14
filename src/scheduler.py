@@ -77,14 +77,14 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
-    # Job 7 : enrichissement Google Places automatique — vérification toutes les heures
-    _scheduler.add_job(
-        _job_auto_enrich,
-        trigger=IntervalTrigger(hours=1),
-        id="auto_enrich",
-        replace_existing=True,
-        misfire_grace_time=300,
-    )
+    # Job 7 : enrichissement Google Places automatique — DÉSACTIVÉ (coût Gemini search)
+    # _scheduler.add_job(
+    #     _job_auto_enrich,
+    #     trigger=IntervalTrigger(hours=1),
+    #     id="auto_enrich",
+    #     replace_existing=True,
+    #     misfire_grace_time=300,
+    # )
 
     # Job 8 : fourniture leads — vérification toutes les heures
     _scheduler.add_job(
