@@ -650,19 +650,14 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     if not c: raise HTTPException(404)
     if not c.email:
         return JSONResponse({"ok": False, "error": "Pas d'email"})
-    from .v3 import _send_brevo_email, _contact_message, _DEFAULT_EMAIL_SUBJECT, BASE_URL
+    from .v3 import (_send_brevo_email, _send_brevo_sms, _is_gmail,
+                     _contact_message, _contact_message_sms,
+                     _DEFAULT_EMAIL_SUBJECT, BASE_URL)
     from ...models import V3LandingTextDB, V3ProspectDB
     lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
-    tpl      = lt.email_template if lt and lt.email_template else None
-    subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    metier     = profession.lower()
-    metiers    = metier + "s" if metier and not metier.endswith("s") else metier
-    ville      = city.title()
-    subj = subj_tpl.format(ville=ville, metier=metier, metiers=metiers,
-                           city=ville, profession=profession, name=name)
     if c.landing_url:
         landing_url = (BASE_URL.rstrip("/") + c.landing_url) if c.landing_url.startswith("/") else c.landing_url
     else:
@@ -670,6 +665,21 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
             (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
         ).first()
         landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
+    # Gmail + mobile → forcer SMS
+    if _is_gmail(c.email) and c.phone:
+        tpl = lt.sms_template if lt and lt.sms_template else None
+        msg = _contact_message_sms(name, city, profession, landing_url, tpl)
+        ok  = _send_brevo_sms(c.phone, msg)
+        if ok:
+            db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+        return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error", "method_used": "sms"})
+    tpl      = lt.email_template if lt and lt.email_template else None
+    subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
+    metier   = profession.lower()
+    metiers  = metier + "s" if metier and not metier.endswith("s") else metier
+    ville    = city.title()
+    subj = subj_tpl.format(ville=ville, metier=metier, metiers=metiers,
+                           city=ville, profession=profession, name=name)
     msg  = _contact_message(name, city, profession, landing_url, tpl)
     delivery_id = _mkt.create_delivery(c.id)
     ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "", landing_url=landing_url)
