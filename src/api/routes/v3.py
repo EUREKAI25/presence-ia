@@ -1454,40 +1454,43 @@ def _render_book_page(token: str, filtered: list, prefill: dict = {}) -> str:
 <link rel="icon" href="/assets/favicon.svg">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:44px 16px}}
+body{{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column}}
+/* Header */
+.hdr{{display:flex;align-items:center;padding:0 24px;height:56px;background:#0f172a;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}}
+.hdr img{{height:32px;width:auto}}
+/* Contenu */
+.page{{flex:1;display:flex;flex-direction:column;align-items:center;padding:32px 16px 40px}}
 .wrap{{max-width:680px;width:100%}}
-.logo{{text-align:center;margin-bottom:32px}}
-.logo img{{height:36px;width:auto}}
-h1{{font-size:1.25rem;font-weight:700;color:#fff;text-align:center;margin-bottom:6px;letter-spacing:-.02em}}
-.sub{{color:#94a3b8;font-size:.85rem;text-align:center;margin-bottom:24px;line-height:1.6}}
+h1{{font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:4px;letter-spacing:-.02em}}
+.sub{{color:#94a3b8;font-size:.82rem;margin-bottom:24px;line-height:1.5}}
 /* Navigation semaine */
-.week-nav{{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px}}
-.week-nav button{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:.82rem;transition:all .15s}}
+.week-nav{{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}}
+.week-nav button{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;padding:6px 13px;border-radius:7px;cursor:pointer;font-size:.8rem;transition:all .15s}}
 .week-nav button:hover:not(:disabled){{background:rgba(255,255,255,.12);color:#e2e8f0}}
 .week-nav button:disabled{{opacity:.3;cursor:default}}
-.week-label{{color:#e2e8f0;font-size:.88rem;font-weight:600;text-align:center;flex:1}}
-/* Grille */
-.week-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}}
-.wc{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 6px;min-height:80px}}
-.wc--past{{opacity:.3}}
-.wc--empty{{opacity:.5}}
-.wh{{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;text-align:center;margin-bottom:8px;line-height:1.4}}
-.dn{{font-size:.68rem;font-weight:400;color:#475569;text-transform:none;letter-spacing:0}}
-.ws{{display:flex;flex-direction:column;gap:5px;align-items:center}}
-.sb{{display:block;width:100%;text-align:center;padding:7px 4px;background:rgba(153,103,16,.14);border:1px solid rgba(153,103,16,.32);color:#c9a04a;font-size:.82rem;font-weight:600;border-radius:6px;text-decoration:none;transition:all .15s}}
-.sb:hover{{background:rgba(153,103,16,.28);color:#e0b86a;transform:translateY(-1px)}}
-.no-slot{{color:#334155;font-size:.8rem}}
-.ns{{color:#64748b;text-align:center;padding:20px 0;font-size:.85rem;grid-column:1/-1}}
-.ns a{{color:#c9a04a}}
-.note{{margin-top:24px;color:#475569;font-size:.74rem;text-align:center;line-height:1.7}}
-@media(max-width:480px){{
-  .week-grid{{grid-template-columns:repeat(5,1fr);gap:4px}}
-  .sb{{padding:6px 2px;font-size:.75rem}}
-  .wh{{font-size:.65rem}}
+.week-label{{color:#e2e8f0;font-size:.85rem;font-weight:600;text-align:center;flex:1}}
+/* Zone calendrier */
+.cal-card{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px}}
+.week-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}}
+.wc{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 5px;min-height:72px}}
+.wc--past{{opacity:.25}}
+.wc--empty{{opacity:.45}}
+.wh{{font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;text-align:center;margin-bottom:8px;line-height:1.4}}
+.dn{{font-size:.66rem;font-weight:400;color:#475569;text-transform:none;letter-spacing:0;display:block}}
+.ws{{display:flex;flex-direction:column;gap:4px;align-items:center}}
+.sb{{display:block;width:100%;text-align:center;padding:7px 3px;background:rgba(153,103,16,.16);border:1px solid rgba(153,103,16,.35);color:#c9a04a;font-size:.8rem;font-weight:600;border-radius:6px;cursor:pointer;transition:all .15s}}
+.sb:hover{{background:rgba(153,103,16,.3);color:#e0b86a;transform:translateY(-1px)}}
+.no-slot{{color:#334155;font-size:.75rem}}
+.ns{{color:#64748b;text-align:center;padding:18px 0;font-size:.82rem;grid-column:1/-1}}
+.note{{margin-top:16px;color:#475569;font-size:.72rem;text-align:center;line-height:1.6}}
+@media(max-width:500px){{
+  .week-grid{{gap:3px}}
+  .sb{{padding:6px 2px;font-size:.72rem}}
+  .wh{{font-size:.62rem}}
 }}
 </style></head><body>
-<div class="wrap">
-  <div class="logo"><a href="/"><img src="/assets/logo-white.svg" alt="Présence IA"></a></div>
+<header class="hdr"><a href="/"><img src="/assets/logo-white.svg" alt="Présence IA"></a></header>
+<div class="page"><div class="wrap">
   <h1>Choisissez votre créneau</h1>
   <p class="sub">Audit de visibilité IA · 20 min · Sans engagement</p>
   <div class="week-nav">
@@ -1495,29 +1498,34 @@ h1{{font-size:1.25rem;font-weight:700;color:#fff;text-align:center;margin-bottom
     <span class="week-label" id="week-label"></span>
     <button id="btn-next" onclick="changeWeek(1)">Suiv. →</button>
   </div>
-  {weeks_html}
+  <div class="cal-card">
+    {weeks_html}
+  </div>
   <p class="note">La confirmation est envoyée par email.</p>
-</div>
+</div></div>
 
 <!-- Modal formulaire -->
 <div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;padding:16px">
-  <div style="background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px;width:100%;max-width:400px;position:relative">
-    <button onclick="closeModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer">✕</button>
-    <h2 style="color:#fff;font-size:1.1rem;font-weight:700;margin-bottom:4px" id="modal-slot-label"></h2>
-    <p style="color:#64748b;font-size:.82rem;margin-bottom:20px">Audit de visibilité IA · 20 min</p>
+  <div style="background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:24px 24px 20px;width:100%;max-width:380px;position:relative">
+    <button onclick="closeModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#94a3b8;font-size:1.1rem;cursor:pointer;line-height:1">✕</button>
+    <p style="color:#c9a04a;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Créneau sélectionné</p>
+    <h2 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:20px" id="modal-slot-label"></h2>
     <div id="form-step">
-      <input id="f-name"  type="text"  placeholder="Votre nom / entreprise" value="{prefill.get('name','')}"  style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:10px;outline:none">
-      <input id="f-email" type="email" placeholder="Votre email"             value="{prefill.get('email','')}" style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:10px;outline:none">
-      <input id="f-phone" type="tel"   placeholder="Téléphone (optionnel)"   style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:18px;outline:none">
-      <p id="form-error" style="color:#f87171;font-size:.8rem;margin-bottom:10px;display:none"></p>
-      <button onclick="submitBooking()" style="width:100%;padding:12px;background:#c9a04a;border:none;border-radius:8px;color:#0f172a;font-weight:700;font-size:.95rem;cursor:pointer">Confirmer le créneau →</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input id="f-firstname" type="text"  placeholder="Prénom *"  style="padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e2e8f0;font-size:.85rem;outline:none;width:100%">
+        <input id="f-lastname"  type="text"  placeholder="Nom *"     style="padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e2e8f0;font-size:.85rem;outline:none;width:100%">
+      </div>
+      <input id="f-email"   type="email" placeholder="Email *"        value="{prefill.get('email','')}"   style="width:100%;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e2e8f0;font-size:.85rem;margin-bottom:8px;outline:none">
+      <input id="f-phone"   type="tel"   placeholder="Téléphone *"    value="{prefill.get('phone','')}"   style="width:100%;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e2e8f0;font-size:.85rem;margin-bottom:8px;outline:none">
+      <input id="f-website" type="url"   placeholder="Site web *"     value="{prefill.get('website','')}" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e2e8f0;font-size:.85rem;margin-bottom:14px;outline:none">
+      <p id="form-error" style="color:#f87171;font-size:.78rem;margin-bottom:8px;display:none"></p>
+      <button onclick="submitBooking()" style="width:100%;padding:11px;background:#c9a04a;border:none;border-radius:8px;color:#0f172a;font-weight:700;font-size:.9rem;cursor:pointer">Confirmer le créneau →</button>
     </div>
-    <div id="success-step" style="display:none;text-align:center">
-      <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
-      <h3 style="color:#fff;margin-bottom:8px">C'est confirmé !</h3>
-      <p style="color:#94a3b8;font-size:.85rem;margin-bottom:20px">Un email de confirmation vous a été envoyé.</p>
-      <a id="gcal-link" href="#" target="_blank" style="display:block;padding:10px;background:#4285f4;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.88rem;margin-bottom:10px">Ajouter à Google Agenda</a>
-      <a id="ics-link"  href="#" style="display:block;padding:10px;background:rgba(255,255,255,.08);color:#e2e8f0;border-radius:8px;text-decoration:none;font-weight:600;font-size:.88rem">Télécharger .ics (Apple / Outlook)</a>
+    <div id="success-step" style="display:none;text-align:center;padding:8px 0">
+      <div style="font-size:2.2rem;margin-bottom:10px">✅</div>
+      <h3 style="color:#fff;font-size:1rem;margin-bottom:6px">C'est confirmé !</h3>
+      <p style="color:#94a3b8;font-size:.82rem;margin-bottom:18px">Un email de confirmation vous a été envoyé.</p>
+      <a id="gcal-link" href="#" target="_blank" style="display:block;padding:10px;background:#4285f4;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.85rem">Ajouter à Google Agenda</a>
     </div>
   </div>
 </div>
@@ -1553,11 +1561,15 @@ function closeModal() {{
 document.getElementById('modal').addEventListener('click', function(e) {{ if(e.target===this) closeModal(); }});
 
 async function submitBooking() {{
-  const name  = document.getElementById('f-name').value.trim();
-  const email = document.getElementById('f-email').value.trim();
-  const phone = document.getElementById('f-phone').value.trim();
-  const err   = document.getElementById('form-error');
-  if (!name || !email) {{ err.textContent='Nom et email requis.'; err.style.display=''; return; }}
+  const first_name = document.getElementById('f-firstname').value.trim();
+  const last_name  = document.getElementById('f-lastname').value.trim();
+  const email      = document.getElementById('f-email').value.trim();
+  const phone      = document.getElementById('f-phone').value.trim();
+  const website    = document.getElementById('f-website').value.trim();
+  const err        = document.getElementById('form-error');
+  if (!first_name || !last_name || !email || !phone || !website) {{
+    err.textContent = 'Tous les champs sont requis.'; err.style.display = ''; return;
+  }}
   if (!/\S+@\S+\.\S+/.test(email)) {{ err.textContent='Email invalide.'; err.style.display=''; return; }}
   err.style.display = 'none';
   const btn = document.querySelector('#form-step button');
@@ -1565,12 +1577,11 @@ async function submitBooking() {{
   try {{
     const resp = await fetch('/l/{token}/book', {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{name, email, phone, start_iso:_startIso, end_iso:_endIso}})
+      body: JSON.stringify({{first_name, last_name, email, phone, website, start_iso:_startIso, end_iso:_endIso}})
     }});
     const d = await resp.json();
     if (d.ok) {{
       document.getElementById('gcal-link').href = d.google_add_url;
-      document.getElementById('ics-link').href  = d.ics_url;
       document.getElementById('form-step').style.display = 'none';
       document.getElementById('success-step').style.display = '';
     }} else {{
@@ -1598,12 +1609,17 @@ def prospect_book(token: str):
     if not raw:
         raw = _fallback_slots(today)
     filtered = _filter_slots(raw, today, seed=token)
-    # Pré-remplir nom/email depuis v3_prospects si dispo
+    # Pré-remplir depuis v3_prospects si dispo
     prefill = {}
     with SessionLocal() as db:
         p = db.get(V3ProspectDB, token)
         if p:
-            prefill = {"name": p.name or "", "email": p.email or ""}
+            prefill = {
+                "name":    p.name    or "",
+                "email":   p.email   or "",
+                "phone":   p.phone   or "",
+                "website": p.website or "",
+            }
     return HTMLResponse(_render_book_page(token, filtered, prefill=prefill))
 
 
@@ -1615,14 +1631,17 @@ async def prospect_book_submit(token: str, request: Request):
     from ...models import V3BookingDB
 
     data       = await request.json()
-    name       = (data.get("name") or "").strip()
-    email      = (data.get("email") or "").strip()
-    phone      = (data.get("phone") or "").strip()
-    start_iso  = (data.get("start_iso") or "").strip()   # "2026-04-15T10:00:00"
-    end_iso    = (data.get("end_iso") or "").strip()
+    first_name = (data.get("first_name") or "").strip()
+    last_name  = (data.get("last_name")  or "").strip()
+    name       = f"{first_name} {last_name}".strip()
+    email      = (data.get("email")      or "").strip()
+    phone      = (data.get("phone")      or "").strip()
+    website    = (data.get("website")    or "").strip()
+    start_iso  = (data.get("start_iso")  or "").strip()
+    end_iso    = (data.get("end_iso")    or "").strip()
 
-    if not all([name, email, start_iso, end_iso]):
-        return JSONResponse({"ok": False, "error": "Champs manquants"}, status_code=400)
+    if not all([first_name, last_name, email, phone, website, start_iso, end_iso]):
+        return JSONResponse({"ok": False, "error": "Tous les champs sont requis"}, status_code=400)
 
     # Infos prospect
     with SessionLocal() as db:
@@ -1659,8 +1678,11 @@ async def prospect_book_submit(token: str, request: Request):
             id             = booking_id,
             prospect_token = token,
             name           = name,
+            first_name     = first_name,
+            last_name      = last_name,
             email          = email,
             phone          = phone or None,
+            website        = website or None,
             start_iso      = start_iso,
             end_iso        = end_iso,
             gcal_event_id  = gcal_result.get("id"),

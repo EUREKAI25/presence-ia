@@ -619,6 +619,9 @@ class V3BookingDB(Base):
     phone          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     start_iso      : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "2026-04-15T10:00:00"
     end_iso        : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "2026-04-15T10:20:00"
+    first_name     : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    last_name      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    website        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
     gcal_event_id  : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # ID Google Calendar
     gcal_event_url : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # lien GCal
     ics_uid        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # UID iCal
