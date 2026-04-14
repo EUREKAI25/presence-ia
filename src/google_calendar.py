@@ -69,8 +69,7 @@ def gcal_create_event(
         "start":       {"dateTime": start_iso, "timeZone": TIMEZONE},
         "end":         {"dateTime": end_iso,   "timeZone": TIMEZONE},
         "reminders":   {"useDefault": False, "overrides": [
-            {"method": "email",  "minutes": 60},
-            {"method": "popup",  "minutes": 15},
+            {"method": "popup", "minutes": 15},
         ]},
         "status": "confirmed",
         "sendUpdates": "none",

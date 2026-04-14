@@ -1691,8 +1691,8 @@ async def prospect_book_submit(token: str, request: Request):
         ))
         db.commit()
 
-    # Liens calendrier pour le prospect
-    google_add_url = gcal_google_add_url(title, start_iso, end_iso, description)
+    # Liens calendrier pour le prospect (description neutre — pas d'URL interne)
+    google_add_url = gcal_google_add_url(title, start_iso, end_iso, "Audit de visibilité IA — 20 min")
 
     # Email de confirmation au prospect
     _send_booking_confirmation(
