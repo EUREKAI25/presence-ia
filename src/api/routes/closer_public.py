@@ -47,24 +47,26 @@ def closer_presentation():
 <title>Devenez Closer — Présence IA</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0;min-height:100vh}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0d1421;color:#e2e8f5;min-height:100vh;-webkit-font-smoothing:antialiased}
 a{text-decoration:none}
-.btn-primary{display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+.btn-primary{display:inline-block;background:#527fb3;
   color:#fff;padding:15px 44px;border-radius:50px;font-weight:700;font-size:1rem;
-  box-shadow:0 4px 24px #6366f140;transition:transform .15s,box-shadow .15s}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px #6366f160}
-.btn-sec{display:inline-block;background:transparent;color:#9ca3af;padding:14px 32px;
-  border-radius:50px;font-weight:600;font-size:.95rem;border:1px solid #2a2a4e;transition:border-color .15s,color .15s}
-.btn-sec:hover{border-color:#6366f1;color:#fff}
+  box-shadow:0 4px 20px rgba(82,127,179,.35);transition:transform .15s,box-shadow .15s,background .15s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(82,127,179,.5);background:#3d6494;color:#fff}
+.btn-sec{display:inline-block;background:transparent;color:#7d94b0;padding:14px 32px;
+  border-radius:50px;font-weight:600;font-size:.95rem;border:1px solid #2a3d5a;transition:border-color .15s,color .15s}
+.btn-sec:hover{border-color:#527fb3;color:#e2e8f5}
 </style>
 </head><body>
 
 <!-- HEADER -->
-<header style="position:sticky;top:0;z-index:100;background:#fff;
-  border-bottom:1px solid #e5e7eb;padding:0 24px">
-  <div style="max-width:1000px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
-    <a href="/closer/recruit" class="btn-primary" style="padding:10px 28px;font-size:.9rem">Postuler →</a>
+<header style="position:sticky;top:0;z-index:100;
+  background:rgba(13,20,33,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;
+  box-shadow:0 2px 20px rgba(0,0,0,.35)">
+  <div style="max-width:1000px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo-white.svg" alt="Présence IA" style="height:36px">
+    <a href="/closer/recruit" class="btn-primary" style="padding:9px 24px;font-size:.85rem">Postuler →</a>
   </div>
 </header>
 
@@ -218,30 +220,40 @@ def closer_recruit_form():
 <title>Postuler — Closer Présence IA</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0d1421;color:#e2e8f5;-webkit-font-smoothing:antialiased}
 .wrap{max-width:640px;margin:0 auto;padding:48px 20px}
 h1{color:#fff;font-size:1.8rem;margin-bottom:8px}
-.sub{color:#9ca3af;margin-bottom:32px}
+.sub{color:#7d94b0;margin-bottom:32px}
 .field{margin-bottom:20px}
-label{display:block;color:#9ca3af;font-size:12px;font-weight:600;
+label{display:block;color:#7d94b0;font-size:12px;font-weight:600;
       letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
-input,textarea,select{width:100%;background:#1a1a2e;border:1px solid #2a2a4e;
-  border-radius:6px;padding:10px 12px;color:#e8e8f0;font-size:14px;outline:none}
-input:focus,textarea:focus{border-color:#6366f1}
+input,textarea,select{width:100%;background:rgba(255,255,255,.04);border:1px solid #2a3d5a;
+  border-radius:6px;padding:10px 12px;color:#e2e8f5;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus,select:focus{border-color:#527fb3;box-shadow:0 0 0 3px rgba(82,127,179,.18)}
 textarea{resize:vertical;min-height:120px}
-.btn{width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;
-     padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px}
-.btn:hover{background:#5254cc}
-.section-title{color:#fff;font-size:14px;font-weight:600;margin:40px 0 18px;padding-top:20px;border-top:1px solid #2a2a4e;
-               padding-bottom:8px;border-bottom:1px solid #2a2a4e}
-.hint{color:#555;font-size:11px;margin-top:4px}
+.btn{width:100%;background:#527fb3;color:#fff;border:none;border-radius:8px;
+     padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px;
+     box-shadow:0 4px 16px rgba(82,127,179,.3);transition:background .15s,box-shadow .15s}
+.btn:hover{background:#3d6494;box-shadow:0 6px 24px rgba(82,127,179,.45)}
+.section-title{color:#e2e8f5;font-size:13px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;margin:36px 0 16px;padding-top:20px;
+  border-top:1px solid #2a3d5a;padding-bottom:8px;border-bottom:1px solid #2a3d5a;
+  color:#7d94b0}
+.hint{color:#4a627e;font-size:11px;margin-top:4px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 </style>
 </head><body>
-<header style="position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px">
-  <div style="max-width:680px;margin:0 auto;height:68px;display:flex;align-items:center;justify-content:space-between">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:44px">
-    <a href="/closer" style="color:#6b7280;font-size:13px;font-weight:500">← Programme closer</a>
+<header style="position:sticky;top:0;z-index:100;
+  background:rgba(13,20,33,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;
+  box-shadow:0 2px 20px rgba(0,0,0,.35)">
+  <div style="max-width:680px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
+    <img src="/assets/logo-white.svg" alt="Présence IA" style="height:34px">
+    <a href="/closer" style="color:#7d94b0;font-size:13px;font-weight:500;
+      padding:6px 14px;border:1px solid #2a3d5a;border-radius:6px;
+      transition:border-color .15s,color .15s"
+      onmouseover="this.style.borderColor='#527fb3';this.style.color='#e2e8f5'"
+      onmouseout="this.style.borderColor='#2a3d5a';this.style.color='#7d94b0'">← Programme closer</a>
   </div>
 </header>
 <div class="wrap" style="padding-top:48px;padding-bottom:60px">
@@ -326,6 +338,8 @@ const form = document.getElementById('form');
 const videoInput = document.getElementById('video_url');
 const audioInput = document.getElementById('audio_file');
 
+const MAX_FILE_MB = 50;
+
 function updateMediaReq() {
   const hasVideo = videoInput.value.trim().length > 0;
   const hasAudio = audioInput.files && audioInput.files.length > 0;
@@ -333,14 +347,32 @@ function updateMediaReq() {
   if (req) req.style.display = (hasVideo || hasAudio) ? 'none' : 'inline';
 }
 videoInput.addEventListener('input', updateMediaReq);
-audioInput.addEventListener('change', updateMediaReq);
+audioInput.addEventListener('change', function() {
+  updateMediaReq();
+  const errEl = document.getElementById('media-error');
+  if (audioInput.files && audioInput.files[0]) {
+    const mb = audioInput.files[0].size / 1024 / 1024;
+    if (mb > MAX_FILE_MB) {
+      errEl.textContent = `Fichier trop volumineux (${mb.toFixed(0)} Mo) — 50 Mo maximum.`;
+      errEl.style.display = 'block';
+    } else {
+      errEl.style.display = 'none';
+    }
+  }
+});
 
 form.addEventListener('submit', async function(e) {
   e.preventDefault();
   const hasVideo = videoInput.value.trim().length > 0;
   const hasAudio = audioInput.files && audioInput.files.length > 0;
   const errEl = document.getElementById('media-error');
+  if (hasAudio && audioInput.files[0].size / 1024 / 1024 > MAX_FILE_MB) {
+    errEl.textContent = `Fichier trop volumineux (${(audioInput.files[0].size/1024/1024).toFixed(0)} Mo) — 50 Mo maximum.`;
+    errEl.style.display = 'block';
+    return;
+  }
   if (!hasVideo && !hasAudio) {
+    errEl.textContent = 'Merci de fournir au moins un fichier ou un lien de présentation.';
     errEl.style.display = 'block';
     return;
   }
