@@ -285,7 +285,7 @@ tr:hover td{{background:#fafafa}}
 
 
   <!-- Filtres -->
-  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <input type="text" placeholder="Rechercher…" id="q" value="{search}"
       onkeydown="if(event.key==='Enter')applyFilter()"
       style="flex:1;min-width:160px;max-width:300px">
@@ -295,6 +295,10 @@ tr:hover td{{background:#fafafa}}
       <option value="PROSPECT" {"selected" if status_filter=="PROSPECT" else ""}>Prospects</option>
       <option value="CLIENT"   {"selected" if status_filter=="CLIENT"   else ""}>Clients</option>
     </select>
+    <button onclick="toggleTest()" id="btn-test"
+      style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:6px;border:1px solid {'#f59e0b' if show_test else '#d1d5db'};background:{'#fef3c7' if show_test else '#fff'};color:{'#92400e' if show_test else '#6b7280'};cursor:pointer">
+      🧪 TEST{"  ✓" if show_test else ""}
+    </button>
   </div>
 
   <!-- Formulaire ajout manuel -->
@@ -353,10 +357,17 @@ tr:hover td{{background:#fafafa}}
 
 <script>
 const T = '{token}';
+let _showTest = {'1' if show_test else '0'};
 function applyFilter() {{
   const q  = document.getElementById('q').value;
   const sf = document.getElementById('sf').value;
-  location.href = '/admin/contacts?token='+T+'&search='+encodeURIComponent(q)+'&status_filter='+sf;
+  location.href = '/admin/contacts?token='+T+'&search='+encodeURIComponent(q)+'&status_filter='+sf+(_showTest==='1'?'&show_test=1':'');
+}}
+function toggleTest() {{
+  _showTest = _showTest === '1' ? '0' : '1';
+  const q  = document.getElementById('q').value;
+  const sf = document.getElementById('sf').value;
+  location.href = '/admin/contacts?token='+T+'&search='+encodeURIComponent(q)+'&status_filter='+sf+(_showTest==='1'?'&show_test=1':'');
 }}
 async function deleteContact(id, btn) {{
   if(!confirm('Supprimer ce contact ?')) return;
