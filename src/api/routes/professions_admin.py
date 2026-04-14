@@ -228,18 +228,18 @@ def professions_page(token: str = "", cat: str = "", q: str = "", actif: str = "
     enrich_active_checked = "checked" if enrich_cfg_active else ""
 
     # Panneau config provisioning
-    from ...models import ContactDB as _CDB
+    from ...models import V3ProspectDB as _V3P
     with SessionLocal() as db_prov:
         last_lead_name = ""
         if prov_cfg and prov_cfg.last_run:
             last_lead = (
-                db_prov.query(_CDB)
-                .filter(_CDB.notes.like("SIRENE auto%"))
-                .order_by(_CDB.date_added.desc())
+                db_prov.query(_V3P)
+                .filter(_V3P.notes.like("SIRENE auto%"))
+                .order_by(_V3P.created_at.desc())
                 .first()
             )
             if last_lead:
-                last_lead_name = last_lead.company_name
+                last_lead_name = last_lead.name
 
     if not prov_cfg:
         prov_cfg_active = False
@@ -395,7 +395,7 @@ async function runEnrichNow(btn){{
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
     <div>
       <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;color:#111">Fourniture automatique de leads</h2>
-      <p style="font-size:12px;color:#6b7280;margin:0">Alimente ContactDB chaque jour à HH:00 UTC — segments par score décroissant</p>
+      <p style="font-size:12px;color:#6b7280;margin:0">Alimente V3ProspectDB chaque jour à HH:00 UTC — segments par score décroissant</p>
       <div style="font-size:11px;color:#9ca3af;margin-top:6px">
         Dernier run : <strong>{prov_cfg_last}</strong> — {prov_cfg_count} lead(s) fourni(s){f' &nbsp;❯ <strong style="color:#374151">{last_lead_name}</strong>' if last_lead_name else ''}
       </div>

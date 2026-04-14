@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContactDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB, SireneSegmentDB, IaSnapshotDB, RefCityDB  # noqa: F401
+from .models import Base, CampaignDB, ProspectDB, TestRunDB, ProspectStatus, JobDB, JobStatus, CityEvidenceDB, CityHeaderDB, ContentBlockDB, CmsBlockDB, ThemeConfigDB, MessageTemplateDB, MetierConfigDB, IAQueryTemplateDB, ProfessionDB, ScoringConfigDB, SireneSuspectDB, SireneSegmentDB, IaSnapshotDB, RefCityDB  # noqa: F401
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -47,8 +47,12 @@ def init_db():
             ("v3_prospects", "email_booked_at DATETIME"),
             ("v3_prospects", "city_reference VARCHAR"),
             ("v3_prospects", "is_test INTEGER DEFAULT 0"),
-            ("contacts", "is_test INTEGER DEFAULT 0"),
-            ("contacts", "landing_url TEXT"),
+            ("v3_prospects", "status TEXT DEFAULT 'PROSPECT'"),
+            ("v3_prospects", "paid INTEGER DEFAULT 0"),
+            ("v3_prospects", "offer_selected TEXT"),
+            ("v3_prospects", "acquisition_cost REAL"),
+            ("v3_prospects", "campaign_id TEXT"),
+            ("v3_prospects", "date_payment DATETIME"),
             ("scoring_config", "outbound_refs_only INTEGER DEFAULT 1"),
         ]:
             try:
@@ -100,8 +104,9 @@ def init_db():
     except Exception as _e:
         import logging
         logging.getLogger(__name__).warning("ref_cities seed: %s", _e)
-    # Seed profils de test dans ContactDB (is_test=True)
+    # Seed profils de test dans V3ProspectDB (is_test=True)
     try:
+        import secrets as _secrets
         _TEST_CONTACTS = [
             ("Pisciniste Paris TEST",         "PARIS",    "Pisciniste",                  "nathalie.brigitte@gmail.com",  "+393514459617"),
             ("Fleuriste Bordeaux TEST",       "BORDEAUX", "Fleuriste événementiel",      "nathaliecbrigitte@gmail.com",  "+33660474292"),
@@ -111,20 +116,16 @@ def init_db():
         from .models import V3ProspectDB as _V3P
         with SessionLocal() as _db:
             for name, city, prof, email, phone in _TEST_CONTACTS:
-                # Chercher une landing V3 existante pour cette paire ville+profession
-                v3 = _db.query(_V3P).filter_by(city=city, profession=prof).first()
-                landing = v3.landing_url if v3 else None
-                exists = _db.query(ContactDB).filter_by(company_name=name, is_test=True).first()
+                exists = _db.query(_V3P).filter_by(name=name, is_test=True).first()
                 if not exists:
-                    _db.add(ContactDB(
-                        company_name=name, city=city, profession=prof,
+                    _tok = _secrets.token_hex(16)
+                    _db.add(_V3P(
+                        token=_tok, name=name, city=city, profession=prof,
                         email=email, phone=phone, status="PROSPECT",
-                        is_test=True, landing_url=landing,
+                        is_test=True, landing_url=f"/l/{_tok}",
                     ))
                 else:
                     exists.phone = phone
-                    if landing:
-                        exists.landing_url = landing
             _db.commit()
     except Exception as _e:
         import logging
@@ -210,27 +211,6 @@ def db_get_evidence(db: Session, profession: str, city: str) -> Optional[CityEvi
 def new_session() -> Session:
     """Session indépendante pour les tâches en arrière-plan."""
     return SessionLocal()
-
-
-# ── Contacts ──
-def db_list_contacts(db: Session) -> list:
-    contacts = db.query(ContactDB).order_by(ContactDB.date_added.desc()).all()
-    contacts.sort(key=lambda c: 0 if (c.company_name or "").startswith("[TEST]") else 1)
-    return contacts
-
-def db_get_contact(db: Session, cid: str) -> Optional[ContactDB]:
-    return db.query(ContactDB).filter_by(id=cid).first()
-
-def db_create_contact(db: Session, obj: ContactDB) -> ContactDB:
-    db.add(obj); db.commit(); db.refresh(obj); return obj
-
-def db_update_contact(db: Session, contact: ContactDB, **kwargs) -> ContactDB:
-    for k, v in kwargs.items():
-        setattr(contact, k, v)
-    db.commit(); db.refresh(contact); return contact
-
-def db_delete_contact(db: Session, contact: ContactDB):
-    db.delete(contact); db.commit()
 
 
 # ── ContentBlocks ──

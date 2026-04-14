@@ -1,5 +1,5 @@
 """
-Leads Runner — pipeline unifié : qualification SIRENE + enrichissement → ContactDB
+Leads Runner — pipeline unifié : qualification SIRENE + enrichissement → V3ProspectDB
 
 POST /admin/leads/run    { profession_id, qty, dept? }
 GET  /admin/leads/status → état en temps réel
@@ -204,7 +204,7 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
     """Enrichit les suspects enrichi_at IS NULL jusqu'à qty contacts créés."""
     from ...gemini_places import fetch_company_info
     from ...enrich import enrich_website
-    from ...models import V3ProspectDB, ContactDB, ProfessionDB, SireneSuspectDB
+    from ...models import V3ProspectDB, ProfessionDB, SireneSuspectDB
     from ...api.routes.enrich_admin import _valid_email, _is_mobile
 
     gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -307,11 +307,7 @@ def _phase2_enrich(profession_id: str, qty: int, dept: Optional[str]):
                             rating=details.get("rating"),
                             reviews_count=details.get("user_ratings_total"),
                             landing_url=f"/l/{tok}", scrape_status="done",
-                        ))
-                        db2.add(ContactDB(
-                            company_name=raison_sociale, email=email,
-                            phone=mobile or fixe, city=ville_str,
-                            profession=prof_label, status="PROSPECT",
+                            status="PROSPECT",
                             notes=f"siret:{s_id} | dept:{s_dept or ''} | web:{website or ''}"
                                   + (f" | mobile:{mobile}" if mobile else "")
                                   + (f" | fixe:{fixe}" if fixe else ""),

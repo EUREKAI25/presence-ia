@@ -232,41 +232,10 @@ class PageLayoutDB(Base):
     updated_at:      Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class ContactStatus(str, Enum):
-    SUSPECT   = "SUSPECT"
-    PROSPECT  = "PROSPECT"
-    CLIENT    = "CLIENT"
-
-
 class OfferKey(str, Enum):
     FLASH         = "FLASH"
     KIT           = "KIT"
     DONE_FOR_YOU  = "DONE_FOR_YOU"
-
-
-class ContactDB(Base):
-    """Contact commercial — pipeline SUSPECT → PROSPECT → CLIENT."""
-    __tablename__ = "contacts"
-    id:                Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    company_name:      Mapped[str]            = mapped_column(sa.String, nullable=False)
-    email:             Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
-    phone:             Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
-    city:              Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
-    profession:        Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
-    status:            Mapped[str]            = mapped_column(sa.String, default="SUSPECT")
-    message_sent:      Mapped[bool]           = mapped_column(sa.Boolean, default=False)
-    message_read:      Mapped[bool]           = mapped_column(sa.Boolean, default=False)
-    paid:              Mapped[bool]           = mapped_column(sa.Boolean, default=False)
-    offer_selected:    Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # FLASH/KIT/DONE_FOR_YOU
-    acquisition_cost:  Mapped[Optional[float]]= mapped_column(sa.Float, nullable=True)
-    campaign_id:       Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
-    notes:             Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
-    date_added:        Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
-    date_message_sent: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
-    date_message_read: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
-    date_payment:      Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
-    landing_url:       Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)
-    is_test:           Mapped[bool]               = mapped_column(sa.Boolean, default=False, server_default="0")
 
 
 class JobStatus(str, Enum):
@@ -368,6 +337,13 @@ class V3ProspectDB(Base):
     email_booked_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     city_reference:   Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True, index=True)
     is_test:          Mapped[bool]               = mapped_column(sa.Boolean, default=False, server_default="0")
+    # Pipeline commercial (migré depuis ContactDB)
+    status:           Mapped[str]                = mapped_column(sa.String, default="PROSPECT")      # SUSPECT/PROSPECT/CLIENT
+    paid:             Mapped[bool]               = mapped_column(sa.Boolean, default=False)
+    offer_selected:   Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)           # FLASH/KIT/DONE_FOR_YOU
+    acquisition_cost: Mapped[Optional[float]]    = mapped_column(sa.Float, nullable=True)
+    campaign_id:      Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)
+    date_payment:     Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
 
 
 class V3CityImageDB(Base):

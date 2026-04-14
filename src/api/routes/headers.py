@@ -124,15 +124,15 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
     token = _check_token(request)
     headers = db_list_headers(db)
 
-    # Villes manquantes : dans ContactDB mais sans header (ni directe ni préfecture)
-    from ...models import ContactDB, CityHeaderDB
+    # Villes manquantes : dans V3ProspectDB mais sans header (ni directe ni préfecture)
+    from ...models import V3ProspectDB, CityHeaderDB
     try:
         from ...api.routes.v3 import DEPT_PREFECTURE
     except Exception:
         DEPT_PREFECTURE = {}
     img_cities = {h.city for h in headers}
     contact_cities = {(c.city or "").lower().strip().replace(" ", "-")
-                      for c in db.query(ContactDB).all() if c.city}
+                      for c in db.query(V3ProspectDB).all() if c.city}
     # Dériver le département depuis le code postal
     def _dept_from_cp(cp: str) -> str:
         if not cp:
@@ -144,7 +144,7 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
             return "2A" if int(cp) < 20200 else "2B"
         return cp[:2]
 
-    from ...models import SireneSuspectDB, ContactDB as _CDB
+    from ...models import SireneSuspectDB
     city_dept: dict = {}
     for city_l in contact_cities:
         if city_l in img_cities:
@@ -176,10 +176,10 @@ def headers_admin_page(request: Request, db: Session = Depends(get_db)):
             if d:
                 city_dept[city_l] = d
                 continue
-        # 3. Via ContactDB.notes (format "dept:XX")
-        c_row = db.query(_CDB).filter(
-            _CDB.city.ilike(ville_search),
-            _CDB.notes.isnot(None),
+        # 3. Via V3ProspectDB.notes (format "dept:XX")
+        c_row = db.query(V3ProspectDB).filter(
+            V3ProspectDB.city.ilike(ville_search),
+            V3ProspectDB.notes.isnot(None),
         ).first()
         if c_row and c_row.notes:
             import re

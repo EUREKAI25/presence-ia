@@ -1272,7 +1272,7 @@ def _job_auto_enrich(force: bool = False):
 
 def _job_provision_leads(force: bool = False):
     """
-    Fourniture automatique de X leads en file ContactDB.
+    Fourniture automatique de X leads en file V3ProspectDB.
     Vérifie toutes les heures si la config (jour + heure UTC) correspond.
     Si force=True : ignore active/jour/heure (pour test manuel).
     Ordre : segments SireneSegmentDB par score DESC, suspects non encore provisionnés.
@@ -1280,7 +1280,7 @@ def _job_provision_leads(force: bool = False):
     try:
         from datetime import datetime, timedelta
         from .database import SessionLocal
-        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, ContactDB, IaCitedCompanyDB, V3ProspectDB
+        from .models import LeadProvisioningConfigDB, SireneSuspectDB, SireneSegmentDB, IaCitedCompanyDB, V3ProspectDB
         import unicodedata, re as _re
 
         _LEGAL_SUFFIXES = _re.compile(

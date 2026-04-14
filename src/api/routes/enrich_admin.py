@@ -270,7 +270,7 @@ def _is_mobile(phone: str) -> bool:
 def _run_enrich(profession_id: str, dept: Optional[str], qty: int):
     from ...google_places import fetch_text_search, fetch_place_details
     from ...enrich import enrich_website
-    from ...models import V3ProspectDB, ProfessionDB, ContactDB
+    from ...models import V3ProspectDB, ProfessionDB
 
     api_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
@@ -348,28 +348,18 @@ def _run_enrich(profession_id: str, dept: Optional[str], qty: int):
                             if has_contact:
                                 tok = secrets.token_hex(16)
                                 with SessionLocal() as db2:
-                                    # V3Prospect (landing personnalisée)
                                     v3 = V3ProspectDB(
                                         token=tok, name=s.raison_sociale,
                                         city=ville, profession=prof_label,
                                         phone=mobile or fixe, website=website, email=email,
                                         rating=rating, reviews_count=reviews,
-                                        landing_url=f"/v3/{tok}", scrape_status="done",
-                                    )
-                                    db2.add(v3)
-                                    # ContactDB (CRM)
-                                    contact = ContactDB(
-                                        company_name=s.raison_sociale,
-                                        email=email,
-                                        phone=mobile or fixe,
-                                        city=ville,
-                                        profession=prof_label,
+                                        landing_url=f"/l/{tok}", scrape_status="done",
                                         status="PROSPECT",
                                         notes=f"siret:{s.id} | web:{website}"
                                               + (f" | mobile:{mobile}" if mobile else "")
                                               + (f" | fixe:{fixe}" if fixe else ""),
                                     )
-                                    db2.add(contact)
+                                    db2.add(v3)
                                     db2.commit()
                                 contactable += 1
                                 with _LOCK:

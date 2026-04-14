@@ -23,42 +23,32 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db, db_get_by_token
-from ...models import ContactDB, ContactStatus
+from ...models import V3ProspectDB
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["Stripe"])
 
 
 def _convert_to_client(db: Session, p) -> None:
-    """Marque le prospect comme payé et crée/met à jour un ContactDB CLIENT."""
+    """Marque le prospect V3ProspectDB comme payé / CLIENT."""
     from datetime import datetime as _dt
-    p.paid = True
-    # Chercher un contact existant par email ou nom+ville
-    contact = None
+    # Lookup V3ProspectDB directement par email ou nom+ville
+    prospect = None
     if p.email:
-        contact = db.query(ContactDB).filter_by(email=p.email).first()
-    if not contact:
-        contact = db.query(ContactDB).filter_by(
-            company_name=p.name, city=p.city
-        ).first()
-    if contact:
-        contact.status = ContactStatus.CLIENT.value
-        contact.paid = True
-        contact.date_payment = _dt.utcnow()
-        log.info("Contact %s passe en CLIENT", contact.id)
+        prospect = db.query(V3ProspectDB).filter(V3ProspectDB.email == p.email).first()
+    if not prospect:
+        prospect = db.query(V3ProspectDB).filter_by(name=p.name, city=p.city).first()
+    if prospect:
+        prospect.status = "CLIENT"
+        prospect.paid = True
+        prospect.date_payment = _dt.utcnow()
+        log.info("V3Prospect %s passe en CLIENT", prospect.token)
     else:
-        db.add(ContactDB(
-            company_name=p.name,
-            email=p.email,
-            phone=p.phone,
-            city=p.city,
-            profession=p.profession,
-            status=ContactStatus.CLIENT.value,
-            paid=True,
-            date_payment=_dt.utcnow(),
-            campaign_id=p.campaign_id,
-        ))
-        log.info("Nouveau contact CLIENT cree pour %s", p.name)
+        # p est lui-même un V3ProspectDB — mise à jour directe
+        p.status = "CLIENT"
+        p.paid = True
+        p.date_payment = _dt.utcnow()
+        log.info("V3Prospect %s converti CLIENT (direct)", p.token)
 
 
 def _stripe():

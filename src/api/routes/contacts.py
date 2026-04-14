@@ -1,12 +1,12 @@
-"""Admin — onglet CONTACTS (SUSPECT/PROSPECT/CLIENT)."""
-import os, re
+"""Admin — onglet CONTACTS (SUSPECT/PROSPECT/CLIENT) — opère sur v3_prospects."""
+import os, re, secrets
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from ...database import get_db, db_list_contacts, db_get_contact, db_create_contact, db_update_contact, db_delete_contact, SessionLocal
-from ...models import ContactDB
+from ...database import get_db, SessionLocal
+from ...models import V3ProspectDB
 from ._nav import admin_nav
 from . import v3_mkt_bridge as _mkt
 from .v3 import DEPT_PREFECTURE
@@ -28,8 +28,18 @@ def _offer_labels(db: Session) -> dict:
     return {o.name: o.name for o in offers} if offers else {}
 
 
+def _list_prospects(db: Session) -> list:
+    """Liste tous les v3_prospects (vrais + tests), ordonnés par created_at desc."""
+    return db.query(V3ProspectDB).order_by(V3ProspectDB.created_at.desc()).all()
+
+
+def _get_prospect(db: Session, cid: str):
+    """Retourne un V3ProspectDB par token (= cid)."""
+    return db.query(V3ProspectDB).filter_by(token=cid).first()
+
+
 def _tracking_map(contact_ids: list) -> dict:
-    """Retourne {contact_id: delivery} avec opened_at/clicked_at/calendly_clicked_at."""
+    """Retourne {token: delivery} avec opened_at/clicked_at/calendly_clicked_at."""
     if not contact_ids:
         return {}
     try:
@@ -53,7 +63,7 @@ def _tracking_map(contact_ids: list) -> dict:
         return {}
 
 
-def _image_readiness(db, contacts) -> tuple[set, dict]:
+def _image_readiness(db, prospects) -> tuple[set, dict]:
     """
     Retourne (ready_cities, city_to_dept).
     Une seule requête IN pour toutes les villes — évite le N+1 sur SireneSuspectDB.
@@ -61,7 +71,7 @@ def _image_readiness(db, contacts) -> tuple[set, dict]:
     from ...models import CityHeaderDB, SireneSuspectDB
     img_cities = {h.city for h in db.query(CityHeaderDB).all()}
 
-    cities = {(c.city or "").lower() for c in contacts if c.city}
+    cities = {(c.city or "").lower() for c in prospects if c.city}
     if not cities:
         return set(), {}
 
@@ -110,21 +120,23 @@ STATUS_BADGE = {
 
 @router.get("/admin/contacts", response_class=HTMLResponse)
 def contacts_page(request: Request, db: Session = Depends(get_db),
-                  status_filter: str = "", search: str = ""):
+                  status_filter: str = "", search: str = "", show_test: str = ""):
     token = _check_token(request)
 
-    contacts = list(db_list_contacts(db))
+    contacts = list(_list_prospects(db))
 
     # Filtres
     if status_filter:
         contacts = [c for c in contacts if c.status == status_filter]
+    if not show_test:
+        contacts = [c for c in contacts if not c.is_test]
     if search:
         q = search.lower()
-        contacts = [c for c in contacts if q in (c.company_name or "").lower()
+        contacts = [c for c in contacts if q in (c.name or "").lower()
                     or q in (c.email or "").lower() or q in (c.city or "").lower()
                     or q in (c.profession or "").lower()]
 
-    tracking = _tracking_map([c.id for c in contacts])
+    tracking = _tracking_map([c.token for c in contacts])
     ready_cities, city_to_dept = _image_readiness(db, contacts)
 
     # Préfectures / sous-préfectures
@@ -154,18 +166,18 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         is_mob = bool(re.match(r"^(\+33[67]|0[67])", re.sub(r"[\s\.\-]", "", phone_raw)))
         phone_display = phone_raw or "—"
         mobile_tag = ' <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 4px;border-radius:3px">mob</span>' if (phone_raw and is_mob) else ""
-        sent_style = "background:#dcfce7;color:#166534" if c.message_sent else "background:#f3f4f6;color:#6b7280"
-        btn_email = (f'<button onclick="sendContactEmail(\'{c.id}\',this)" title="Envoyer email" '
+        sent_style = "background:#dcfce7;color:#166534" if c.contacted else "background:#f3f4f6;color:#6b7280"
+        btn_email = (f'<button onclick="sendContactEmail(\'{c.token}\',this)" title="Envoyer email" '
                      f'style="{sent_style};border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">✉</button>'
                      if c.email else "")
-        btn_sms = (f'<button onclick="sendContactSMS(\'{c.id}\',this)" title="Envoyer SMS" '
+        btn_sms = (f'<button onclick="sendContactSMS(\'{c.token}\',this)" title="Envoyer SMS" '
                    f'style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">💬</button>'
                    if (phone_raw and is_mob) else "")
         has_email    = "1" if c.email else "0"
         has_mob      = "1" if (phone_raw and is_mob) else "0"
         city_l       = (c.city or "").lower()
         img_ready    = city_l in ready_cities
-        is_test      = getattr(c, "is_test", False)
+        is_test      = c.is_test
         row_style    = ("background:#fefce8;border-bottom:1px solid #fde68a" if is_test
                         else "border-bottom:1px solid #f3f4f6" + ("" if img_ready else ";opacity:.45"))
         img_attr     = "1" if img_ready else "0"
@@ -181,7 +193,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         else:
             ref_badge = '<span style="color:#d1d5db;font-size:10px">—</span>'
             has_p = "0"; has_sp = "0"
-        trk = tracking.get(c.id)
+        trk = tracking.get(c.token)
         def _trk_icon(val, emoji, label):
             if not val:
                 return f'<span title="{label}" style="color:#d1d5db;font-size:13px">{emoji}</span>'
@@ -195,25 +207,26 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         status_cell = ('<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span>'
                        if is_test else
                        f'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span>')
-        rows += f"""<tr id="row-{c.id}" data-cid="{c.id}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" style="{row_style}">
-  <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.id}" style="cursor:pointer"></td>
-  <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.company_name}</td>
+        rows += f"""<tr id="row-{c.token}" data-cid="{c.token}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" style="{row_style}">
+  <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.token}" style="cursor:pointer"></td>
+  <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.name}</td>
   <td style="padding:8px 6px">{status_cell}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{phone_display}{mobile_tag}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.city or "—"}</td>
   <td style="padding:8px 6px;text-align:center">{ref_badge}</td>
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.profession or "—"}</td>
-  <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.date_added.strftime("%d/%m/%y") if c.date_added else "—"}</td>
+  <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.created_at.strftime("%d/%m/%y") if c.created_at else "—"}</td>
   <td style="padding:8px 6px;text-align:center;white-space:nowrap">{trk_html}</td>
   <td style="padding:8px 6px;text-align:right;white-space:nowrap">
-    {btn_email}{btn_sms}<button onclick="deleteContact('{c.id}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
+    {btn_email}{btn_sms}<button onclick="deleteContact('{c.token}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
   </td>
 </tr>"""
 
-    count_total    = len(db_list_contacts(db))
-    count_prospect = sum(1 for c in db_list_contacts(db) if c.status == "PROSPECT")
-    count_client   = sum(1 for c in db_list_contacts(db) if c.status == "CLIENT")
+    all_real = db.query(V3ProspectDB).filter_by(is_test=False).all()
+    count_total    = len(all_real)
+    count_prospect = sum(1 for c in all_real if c.status == "PROSPECT")
+    count_client   = sum(1 for c in all_real if c.status == "CLIENT")
 
     nav = admin_nav(token, "contacts")
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
@@ -579,45 +592,57 @@ async def contact_create_async(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     if not data.get("company_name"):
         raise HTTPException(400, "company_name requis")
-    c = ContactDB(
-        company_name=data["company_name"],
+    tok = secrets.token_hex(16)
+    c = V3ProspectDB(
+        token=tok,
+        name=data["company_name"],
         email=data.get("email"),
         phone=data.get("phone"),
-        city=data.get("city"),
-        profession=data.get("profession"),
+        city=data.get("city") or "",
+        profession=data.get("profession") or "",
         status=data.get("status", "SUSPECT"),
         offer_selected=data.get("offer_selected"),
         acquisition_cost=data.get("acquisition_cost"),
         notes=data.get("notes"),
+        landing_url=f"/l/{tok}",
     )
-    db_create_contact(db, c)
-    return {"id": c.id, "ok": True}
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return {"id": c.token, "ok": True}
 
 
 @router.post("/admin/contacts/{cid}/sent")
 def contact_mark_sent(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
-    db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+    c.contacted = True
+    c.email_sent_at = datetime.utcnow()
+    db.commit()
     return {"ok": True}
 
 
 @router.post("/admin/contacts/{cid}/read")
 def contact_mark_read(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
-    db_update_contact(db, c, message_read=True, date_message_read=datetime.utcnow())
+    if not c.email_opened_at:
+        c.email_opened_at = datetime.utcnow()
+        db.commit()
     return {"ok": True}
 
 
 @router.post("/admin/contacts/{cid}/paid")
 def contact_mark_paid(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
-    db_update_contact(db, c, paid=True, status="CLIENT", date_payment=datetime.utcnow())
+    c.paid = True
+    c.status = "CLIENT"
+    c.date_payment = datetime.utcnow()
+    db.commit()
     return {"ok": True}
 
 
@@ -628,49 +653,49 @@ async def contact_set_status(cid: str, request: Request, db: Session = Depends(g
     status = data.get("status", "").upper()
     if status not in ("SUSPECT", "PROSPECT", "CLIENT"):
         raise HTTPException(400, "Statut invalide")
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
-    db_update_contact(db, c, status=status)
+    c.status = status
+    db.commit()
     return {"ok": True}
 
 
 @router.post("/admin/contacts/{cid}/delete")
 def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
-    db_delete_contact(db, c)
+    db.delete(c)
+    db.commit()
     return {"ok": True}
 
 
 @router.post("/admin/contacts/{cid}/send-email")
 async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
     if not c.email:
         return JSONResponse({"ok": False, "error": "Pas d'email"})
     from .v3 import (_send_brevo_email, _send_brevo_sms, _is_gmail,
                      _contact_message, _contact_message_sms,
                      _DEFAULT_EMAIL_SUBJECT, BASE_URL)
-    from ...models import V3LandingTextDB, V3ProspectDB
+    from ...models import V3LandingTextDB
     lt = db.query(V3LandingTextDB).filter_by(id="__global__").first()
-    name       = c.company_name or ""
+    name       = c.name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    # URL dérivée de l'email du prospect — bloqué si aucun prospect correspondant
-    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.email else None
-    if not v3:
-        return JSONResponse({"ok": False, "error": f"Aucun prospect v3 trouvé pour {c.email} — envoi bloqué"}, status_code=400)
-    landing_url = f"{BASE_URL}/l/{v3.token}"
-    # Gmail + mobile → forcer SMS (même contenu que contact_send_sms)
+    landing_url = f"{BASE_URL}/l/{c.token}"
+    # Gmail + mobile → forcer SMS
     if _is_gmail(c.email) and c.phone:
         msg = _contact_message_sms(name, city, profession, landing_url)
-        delivery_id = _mkt.create_sms_delivery(c.id)
+        delivery_id = _mkt.create_sms_delivery(c.token)
         ok  = _send_brevo_sms(c.phone, msg)
         _mkt.mark_sent(delivery_id, ok)
         if ok:
-            db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+            c.contacted = True
+            c.email_sent_at = datetime.utcnow()
+            db.commit()
         return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error", "method_used": "sms"})
     tpl      = lt.email_template if lt and lt.email_template else None
     subj_tpl = lt.email_subject  if lt and lt.email_subject  else _DEFAULT_EMAIL_SUBJECT
@@ -680,36 +705,34 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     subj = subj_tpl.format(ville=ville, metier=metier, metiers=metiers,
                            city=ville, profession=profession, name=name)
     msg  = _contact_message(name, city, profession, landing_url, tpl)
-    delivery_id = _mkt.create_delivery(c.id)
+    delivery_id = _mkt.create_delivery(c.token)
     ok   = _send_brevo_email(c.email, name, subj, msg, delivery_id=delivery_id or "", landing_url=landing_url)
     _mkt.mark_sent(delivery_id, ok)
     if ok:
-        db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+        c.contacted = True
+        c.email_sent_at = datetime.utcnow()
+        db.commit()
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo API error"})
 
 
 @router.post("/admin/contacts/{cid}/send-sms")
 async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
-    c = db_get_contact(db, cid)
+    c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
     from .v3 import _send_brevo_sms, _contact_message_sms, BASE_URL
-    from ...models import V3ProspectDB
-    name       = c.company_name or ""
+    name       = c.name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    base_url   = BASE_URL
-    # URL dérivée de l'email du prospect — bloqué si aucun prospect correspondant
-    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.email else None
-    if not v3:
-        return JSONResponse({"ok": False, "error": f"Aucun prospect v3 trouvé pour {c.email} — envoi bloqué"}, status_code=400)
-    landing_url = f"{base_url}/l/{v3.token}"
+    landing_url = f"{BASE_URL}/l/{c.token}"
     msg = _contact_message_sms(name, city, profession, landing_url)
-    delivery_id = _mkt.create_sms_delivery(c.id)
+    delivery_id = _mkt.create_sms_delivery(c.token)
     ok  = _send_brevo_sms(c.phone, msg)
     _mkt.mark_sent(delivery_id, ok)
     if ok:
-        db_update_contact(db, c, message_sent=True, date_message_sent=datetime.utcnow())
+        c.contacted = True
+        c.email_sent_at = datetime.utcnow()
+        db.commit()
     return JSONResponse({"ok": ok, "error": None if ok else "Brevo SMS error"})

@@ -177,25 +177,10 @@ def record_click(delivery_id: str):
 
 def _resolve_prospect_id(v3_token: str) -> str:
     """
-    Les deliveries sont créées avec prospect_id = ContactDB.id.
-    Résout le token V3 → contact_id via presence.db.
-    Retourne le token tel quel si non trouvé (fallback).
+    Les deliveries sont créées avec prospect_id = V3ProspectDB.token.
+    Retourne directement le token (c'est l'identifiant unique).
     """
-    try:
-        from ...database import SessionLocal as MainSession
-        from ...models import V3ProspectDB, ContactDB
-        with MainSession() as mdb:
-            v3 = mdb.get(V3ProspectDB, v3_token)
-            if not v3:
-                return v3_token
-            c = mdb.query(ContactDB).filter(
-                (ContactDB.company_name == v3.name) |
-                (ContactDB.phone == (v3.phone or "___"))
-            ).first()
-            return c.id if c else v3_token
-    except Exception as e:
-        log.debug("_resolve_prospect_id: %s", e)
-        return v3_token
+    return v3_token
 
 
 def record_landing_visit(prospect_token: str):
