@@ -658,13 +658,9 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    if c.landing_url:
-        landing_url = (BASE_URL.rstrip("/") + c.landing_url) if c.landing_url.startswith("/") else c.landing_url
-    else:
-        v3 = db.query(V3ProspectDB).filter(
-            (V3ProspectDB.name == name) | (V3ProspectDB.phone == (c.phone or ""))
-        ).first()
-        landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
+    # URL toujours dérivée de l'email du prospect — jamais depuis landing_url stockée
+    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.email else None
+    landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
     # Gmail + mobile → forcer SMS (même contenu que contact_send_sms)
     if _is_gmail(c.email) and c.phone:
         msg = _contact_message_sms(name, city, profession, landing_url)
@@ -703,11 +699,9 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     city       = c.city or ""
     profession = c.profession or ""
     base_url   = BASE_URL
-    if c.landing_url:
-        landing_url = (base_url.rstrip("/") + c.landing_url) if c.landing_url.startswith("/") else c.landing_url
-    else:
-        v3 = db.query(V3ProspectDB).filter_by(name=name, city=city).first() if name else None
-        landing_url = (base_url + v3.landing_url) if v3 and v3.landing_url else base_url
+    # URL toujours dérivée de l'email du prospect — jamais depuis landing_url stockée
+    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.phone else None
+    landing_url = f"{base_url}/l/{v3.token}" if v3 else base_url
     msg = _contact_message_sms(name, city, profession, landing_url)
     delivery_id = _mkt.create_sms_delivery(c.id)
     ok  = _send_brevo_sms(c.phone, msg)
