@@ -1520,6 +1520,13 @@ def landing_v3(token: str):
                 ia_results_list = json.loads(p.ia_results)
             except Exception:
                 pass
+        # Si competitors vide, extraire depuis ia_results (premier résultat validé)
+        if not competitors and ia_results_list:
+            for _r in ia_results_list:
+                _names = _r.get("competitors") or []
+                if _names:
+                    competitors = _names[:3]
+                    break
     return HTMLResponse(_render_landing(p, competitors, city_image_url,
                                         ia_results_list, landing_text, evidence_images))
 
