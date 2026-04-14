@@ -607,3 +607,19 @@ class RefCityDB(Base):
     city_name        : Mapped[str]            = mapped_column(sa.String, primary_key=True)   # UPPERCASE normalisé
     city_type        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)      # "prefecture" | "sous_prefecture" | null
     header_image_url : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+
+
+class V3BookingDB(Base):
+    """Réservations d'audits — créées depuis la landing /l/{token}/book."""
+    __tablename__ = "v3_bookings"
+    id             : Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    prospect_token : Mapped[str]            = mapped_column(sa.String, nullable=False, index=True)
+    name           : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    email          : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    phone          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    start_iso      : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "2026-04-15T10:00:00"
+    end_iso        : Mapped[str]            = mapped_column(sa.String, nullable=False)   # "2026-04-15T10:20:00"
+    gcal_event_id  : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # ID Google Calendar
+    gcal_event_url : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # lien GCal
+    ics_uid        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # UID iCal
+    created_at     : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)

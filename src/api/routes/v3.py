@@ -1387,7 +1387,7 @@ def _filter_slots(all_slots: list, today, seed: str) -> list:
     return result
 
 
-def _render_book_page(token: str, filtered: list) -> str:
+def _render_book_page(token: str, filtered: list, prefill: dict = {}) -> str:
     """HTML de la page de réservation — vue semaine type Calendly."""
     from datetime import date, timedelta
     from collections import defaultdict
@@ -1424,11 +1424,20 @@ def _render_book_page(token: str, filtered: list) -> str:
                 continue
             slots    = sorted(by_date.get(d, []), key=lambda s: s["_dt"])
             if slots:
-                from urllib.parse import quote as _q
-                btns = "".join(
-                    f'<button class="sb" onclick="openSlot(\'{CALENDLY_URL}?start_time={_q(s["_dt"].strftime("%Y-%m-%dT%H:%M:%S+00:00"))}&hide_event_type_details=1&hide_gdpr_banner=1\')">{s["_dt"].strftime("%H:%M")}</button>'
-                    for s in slots
-                )
+                from zoneinfo import ZoneInfo as _ZI
+                _paris = _ZI("Europe/Paris")
+                def _slot_btn(s, d=d):
+                    dt_utc   = s["_dt"]
+                    dt_local = dt_utc.astimezone(_paris)
+                    start_local = dt_local.strftime("%Y-%m-%dT%H:%M:%S")
+                    end_local   = (dt_local.replace(minute=dt_local.minute+20) if dt_local.minute <= 39
+                                   else dt_local.replace(hour=dt_local.hour+1, minute=dt_local.minute-40)
+                                   ).strftime("%Y-%m-%dT%H:%M:%S")
+                    hhmm  = dt_local.strftime("%H:%M")
+                    label = f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month]} à {hhmm}"
+                    return (f'<button class="sb" onclick="openSlot(\'{start_local}\',\'{end_local}\',\'{label}\')">'
+                            f'{hhmm}</button>')
+                btns = "".join(_slot_btn(s) for s in slots)
                 cols += f'<div class="wc"><div class="wh">{day_label}</div><div class="ws">{btns}</div></div>'
             else:
                 cols += f'<div class="wc wc--empty"><div class="wh">{day_label}</div><div class="ws"><span class="no-slot">—</span></div></div>'
@@ -1490,11 +1499,33 @@ h1{{font-size:1.25rem;font-weight:700;color:#fff;text-align:center;margin-bottom
   <p class="note">La confirmation est envoyée par email.</p>
 </div>
 
-<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
-<script src="https://assets.calendly.com/assets/external/widget.js"></script>
+<!-- Modal formulaire -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px;width:100%;max-width:400px;position:relative">
+    <button onclick="closeModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer">✕</button>
+    <h2 style="color:#fff;font-size:1.1rem;font-weight:700;margin-bottom:4px" id="modal-slot-label"></h2>
+    <p style="color:#64748b;font-size:.82rem;margin-bottom:20px">Audit de visibilité IA · 20 min</p>
+    <div id="form-step">
+      <input id="f-name"  type="text"  placeholder="Votre nom / entreprise" value="{prefill.get('name','')}"  style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:10px;outline:none">
+      <input id="f-email" type="email" placeholder="Votre email"             value="{prefill.get('email','')}" style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:10px;outline:none">
+      <input id="f-phone" type="tel"   placeholder="Téléphone (optionnel)"   style="width:100%;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.9rem;margin-bottom:18px;outline:none">
+      <p id="form-error" style="color:#f87171;font-size:.8rem;margin-bottom:10px;display:none"></p>
+      <button onclick="submitBooking()" style="width:100%;padding:12px;background:#c9a04a;border:none;border-radius:8px;color:#0f172a;font-weight:700;font-size:.95rem;cursor:pointer">Confirmer le créneau →</button>
+    </div>
+    <div id="success-step" style="display:none;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
+      <h3 style="color:#fff;margin-bottom:8px">C'est confirmé !</h3>
+      <p style="color:#94a3b8;font-size:.85rem;margin-bottom:20px">Un email de confirmation vous a été envoyé.</p>
+      <a id="gcal-link" href="#" target="_blank" style="display:block;padding:10px;background:#4285f4;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.88rem;margin-bottom:10px">Ajouter à Google Agenda</a>
+      <a id="ics-link"  href="#" style="display:block;padding:10px;background:rgba(255,255,255,.08);color:#e2e8f0;border-radius:8px;text-decoration:none;font-weight:600;font-size:.88rem">Télécharger .ics (Apple / Outlook)</a>
+    </div>
+  </div>
+</div>
+
 <script>
 const WEEKS = [{{"label":"Semaine du {monday.day} {_MOIS_FR[monday.month]}","idx":0}},{{"label":"Semaine du {(monday + timedelta(weeks=1)).day} {_MOIS_FR[(monday + timedelta(weeks=1)).month]}","idx":1}}];
-let cur = 0;
+let cur = 0, _startIso = '', _endIso = '';
+
 function changeWeek(dir) {{
   document.querySelector('.week[data-week="'+cur+'"]').style.display='none';
   cur += dir;
@@ -1505,8 +1536,53 @@ function changeWeek(dir) {{
 }}
 document.getElementById('week-label').textContent = WEEKS[0].label;
 
-function openSlot(url) {{
-  Calendly.initPopupWidget({{url: url}});
+function openSlot(startIso, endIso, label) {{
+  _startIso = startIso; _endIso = endIso;
+  document.getElementById('modal-slot-label').textContent = label;
+  document.getElementById('form-step').style.display = '';
+  document.getElementById('success-step').style.display = 'none';
+  document.getElementById('form-error').style.display = 'none';
+  const m = document.getElementById('modal');
+  m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}}
+function closeModal() {{
+  document.getElementById('modal').style.display = 'none';
+  document.body.style.overflow = '';
+}}
+document.getElementById('modal').addEventListener('click', function(e) {{ if(e.target===this) closeModal(); }});
+
+async function submitBooking() {{
+  const name  = document.getElementById('f-name').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const err   = document.getElementById('form-error');
+  if (!name || !email) {{ err.textContent='Nom et email requis.'; err.style.display=''; return; }}
+  if (!/\S+@\S+\.\S+/.test(email)) {{ err.textContent='Email invalide.'; err.style.display=''; return; }}
+  err.style.display = 'none';
+  const btn = document.querySelector('#form-step button');
+  btn.disabled = true; btn.textContent = 'Confirmation…';
+  try {{
+    const resp = await fetch('/l/{token}/book', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{name, email, phone, start_iso:_startIso, end_iso:_endIso}})
+    }});
+    const d = await resp.json();
+    if (d.ok) {{
+      document.getElementById('gcal-link').href = d.google_add_url;
+      document.getElementById('ics-link').href  = d.ics_url;
+      document.getElementById('form-step').style.display = 'none';
+      document.getElementById('success-step').style.display = '';
+    }} else {{
+      err.textContent = d.error || 'Erreur — réessayez.';
+      err.style.display = '';
+      btn.disabled = false; btn.textContent = 'Confirmer le créneau →';
+    }}
+  }} catch(e) {{
+    err.textContent = 'Erreur réseau — réessayez.';
+    err.style.display = '';
+    btn.disabled = false; btn.textContent = 'Confirmer le créneau →';
+  }}
 }}
 </script>
 </body></html>"""
@@ -1514,15 +1590,195 @@ function openSlot(url) {{
 
 @router.get("/l/{token}/book", response_class=HTMLResponse)
 def prospect_book(token: str):
-    """Page de réservation — affichage progressif et filtré. Aucune modification Calendly."""
-    from datetime import date, timezone, timedelta
-    _mkt.record_calendly_click(token)          # tracking conservé
-    today = date.today()
-    raw = _fetch_calendly_slots(14)
+    """Page de réservation — vue semaine, formulaire custom → Google Calendar."""
+    from datetime import date
+    _mkt.record_calendly_click(token)
+    today   = date.today()
+    raw     = _fetch_calendly_slots(14)
     if not raw:
         raw = _fallback_slots(today)
     filtered = _filter_slots(raw, today, seed=token)
-    return HTMLResponse(_render_book_page(token, filtered))
+    # Pré-remplir nom/email depuis v3_prospects si dispo
+    prefill = {}
+    with SessionLocal() as db:
+        p = db.get(V3ProspectDB, token)
+        if p:
+            prefill = {"name": p.name or "", "email": p.email or ""}
+    return HTMLResponse(_render_book_page(token, filtered, prefill=prefill))
+
+
+@router.post("/l/{token}/book")
+async def prospect_book_submit(token: str, request: Request):
+    """Crée le RDV : Google Calendar + DB + email de confirmation."""
+    import uuid as _uuid
+    from ...google_calendar import gcal_create_event, gcal_generate_ics, gcal_google_add_url
+    from ...models import V3BookingDB
+
+    data       = await request.json()
+    name       = (data.get("name") or "").strip()
+    email      = (data.get("email") or "").strip()
+    phone      = (data.get("phone") or "").strip()
+    start_iso  = (data.get("start_iso") or "").strip()   # "2026-04-15T10:00:00"
+    end_iso    = (data.get("end_iso") or "").strip()
+
+    if not all([name, email, start_iso, end_iso]):
+        return JSONResponse({"ok": False, "error": "Champs manquants"}, status_code=400)
+
+    # Infos prospect
+    with SessionLocal() as db:
+        p = db.get(V3ProspectDB, token)
+    profession = p.profession if p else "votre secteur"
+    city       = p.city if p else ""
+
+    title       = f"Audit Présence IA — {name}"
+    description = (f"Audit de visibilité IA · 20 min\n"
+                   f"Entreprise : {name}\n"
+                   f"Ville : {city} · Secteur : {profession}\n"
+                   f"Landing : {BASE_URL}/l/{token}")
+
+    # Créer l'événement Google Calendar
+    gcal_result = {}
+    gcal_error  = ""
+    try:
+        gcal_result = gcal_create_event(
+            title=title,
+            start_iso=start_iso,
+            end_iso=end_iso,
+            attendee_email=email,
+            attendee_name=name,
+            description=description,
+        )
+    except Exception as e:
+        gcal_error = str(e)
+        log.error("gcal_create_event error: %s", e)
+
+    # Stocker en DB
+    booking_id = str(_uuid.uuid4())
+    with SessionLocal() as db:
+        db.add(V3BookingDB(
+            id             = booking_id,
+            prospect_token = token,
+            name           = name,
+            email          = email,
+            phone          = phone or None,
+            start_iso      = start_iso,
+            end_iso        = end_iso,
+            gcal_event_id  = gcal_result.get("id"),
+            gcal_event_url = gcal_result.get("html_link"),
+            ics_uid        = gcal_result.get("ics_uid"),
+        ))
+        db.commit()
+
+    # Liens calendrier pour le prospect
+    google_add_url = gcal_google_add_url(title, start_iso, end_iso, description)
+
+    # Email de confirmation au prospect
+    _send_booking_confirmation(
+        name=name, email=email,
+        start_iso=start_iso, end_iso=end_iso,
+        google_add_url=google_add_url,
+        booking_id=booking_id,
+        gcal_result=gcal_result,
+        description=description,
+        title=title,
+    )
+
+    return JSONResponse({
+        "ok":            True,
+        "booking_id":    booking_id,
+        "google_add_url": google_add_url,
+        "ics_url":       f"{BASE_URL}/l/{token}/book/{booking_id}/ics",
+        "gcal_ok":       bool(gcal_result),
+        "gcal_error":    gcal_error,
+    })
+
+
+@router.get("/l/{token}/book/{booking_id}/ics")
+def prospect_booking_ics(token: str, booking_id: str):
+    """Télécharge le fichier .ics pour ajouter le RDV à n'importe quel agenda."""
+    from ...google_calendar import gcal_generate_ics
+    from ...models import V3BookingDB
+    with SessionLocal() as db:
+        b = db.get(V3BookingDB, booking_id)
+        if not b or b.prospect_token != token:
+            raise HTTPException(404)
+    sender = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
+    ics = gcal_generate_ics(
+        title           = f"Audit Présence IA — {b.name}",
+        start_iso       = b.start_iso,
+        end_iso         = b.end_iso,
+        organizer_email = sender,
+        attendee_email  = b.email,
+        attendee_name   = b.name,
+        description     = "Audit de visibilité IA · 20 min",
+        uid             = b.ics_uid or "",
+    )
+    from starlette.responses import Response
+    return Response(
+        content=ics,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="rdv-presence-ia.ics"'},
+    )
+
+
+def _send_booking_confirmation(
+    name: str, email: str,
+    start_iso: str, end_iso: str,
+    google_add_url: str,
+    booking_id: str,
+    gcal_result: dict,
+    description: str,
+    title: str,
+):
+    """Envoie l'email de confirmation de RDV au prospect."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    try:
+        paris = ZoneInfo("Europe/Paris")
+        dt    = datetime.fromisoformat(start_iso).replace(tzinfo=ZoneInfo("Europe/Paris"))
+        date_label = dt.strftime("%A %d %B %Y à %Hh%M").capitalize()
+    except Exception:
+        date_label = start_iso
+
+    sender  = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
+    base    = BASE_URL
+    ics_url = f"{base}/l/booking/{booking_id}/ics"
+
+    meet_line = ""
+    if gcal_result.get("meet_link"):
+        meet_line = f'\n<p><a href="{gcal_result["meet_link"]}" style="color:#2563eb">Rejoindre Google Meet →</a></p>'
+
+    body_html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;color:#333;max-width:520px;margin:0 auto;padding:24px">
+<h2 style="color:#0f172a">C'est confirmé !</h2>
+<p>Bonjour {name},</p>
+<p>Votre audit de visibilité IA est réservé pour le <strong>{date_label}</strong>.</p>
+{meet_line}
+<p style="margin-top:20px">
+  <a href="{google_add_url}" style="display:inline-block;padding:10px 20px;background:#4285f4;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;margin-right:10px">Ajouter à Google Agenda</a>
+  <a href="{base}/l/booking/{booking_id}/ics" style="display:inline-block;padding:10px 20px;background:#f1f5f9;color:#334155;border-radius:6px;text-decoration:none;font-weight:600">Télécharger .ics</a>
+</p>
+<p style="margin-top:24px;color:#64748b;font-size:12px">Présence IA · <a href="{base}">presence-ia.com</a></p>
+</body></html>"""
+
+    _send_brevo_email(email, name, f"Votre audit Présence IA — {date_label}", "", landing_url="", delivery_id="")
+    # Envoi direct via Brevo (html only)
+    import requests as _req
+    api_key = os.getenv("BREVO_API_KEY", "")
+    if api_key:
+        try:
+            _req.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": api_key, "Content-Type": "application/json"},
+                json={
+                    "sender": {"name": os.getenv("SENDER_NAME", "Présence IA"), "email": sender},
+                    "to": [{"email": email, "name": name}],
+                    "subject": f"Votre audit Présence IA — {date_label}",
+                    "htmlContent": body_html,
+                },
+                timeout=10,
+            )
+        except Exception as e:
+            log.error("_send_booking_confirmation error: %s", e)
 
 
 @router.get("/l/track/calendly/{token}")
