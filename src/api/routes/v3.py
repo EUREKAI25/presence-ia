@@ -440,16 +440,13 @@ def _run_ia_test(profession: str, city: str) -> dict:
     """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
     city_cap = city.capitalize()
 
-    # 1 terme différent par prompt, cyclé sur termes_recherche de la profession
+    # Terme principal uniquement — la variation vient du phrasing, pas du terme
     termes = _resolve_termes(profession)
-    while len(termes) < 3:
-        termes.append(termes[0])
+    terme  = termes[0]
 
-    prompt_tpls  = _load_prompts()
-    prompts      = [t.format(terme=termes[i % len(termes)], city=city_cap)
-                    for i, t in enumerate(prompt_tpls)]
-    gemini_prompts = [t.format(terme=termes[i % len(termes)], city=city_cap)
-                      for i, t in enumerate(_GEMINI_PROMPTS)]
+    prompt_tpls    = _load_prompts()
+    prompts        = [t.format(terme=terme, city=city_cap) for t in prompt_tpls]
+    gemini_prompts = [t.format(terme=terme, city=city_cap) for t in _GEMINI_PROMPTS]
     results = []
 
     # ── Clients IA — modèles identiques aux versions web utilisées par les prospects ──
