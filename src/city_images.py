@@ -86,6 +86,8 @@ def fetch_city_header_image(city_name: str) -> str | None:
                 break
 
         if best_url:
+            # Forcer la haute résolution (1920px au lieu de 1080px par défaut)
+            best_url = best_url.replace("w=1080", "w=1920")
             ref.header_image_url = best_url
             db.commit()
         return best_url
