@@ -95,7 +95,14 @@ def start_scheduler():
         misfire_grace_time=300,
     )
 
-    # Job 9 : refresh IA désactivé — les tests IA sont lancés à la génération de leads (generate_v3)
+    # Job 9 : refresh IA — lun/jeu/dim à 9h30 UTC (3×/sem, toutes les paires actives ≤15j)
+    _scheduler.add_job(
+        _job_refresh_ia,
+        trigger=CronTrigger(day_of_week="mon,thu,sun", hour=9, minute=30, timezone="UTC"),
+        id="refresh_ia",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
 
     # Job 10 : monitoring clés API — toutes les 6h
     _scheduler.add_job(
@@ -126,6 +133,7 @@ def get_jobs_status() -> list[dict]:
         "auto_enrich":     ("Enrichissement SIRENE→Places", "toutes les heures"),
         "provision_leads": ("Provisioning leads", "toutes les heures"),
         "outbound":        ("Envoi emails outbound", "tous les jours à 9h UTC"),
+        "refresh_ia":      ("Refresh IA (paires actives)", "Lun/Jeu/Dim 9h30 UTC"),
         "auto_qualify":    ("Qualification SIRENE", "Lun/Mer/Ven 2h UTC"),
         "email_warming":   ("Email warming", "~toutes les 4h"),
         "check_api_keys":  ("Vérif. clés API", "toutes les 6h"),
@@ -369,14 +377,16 @@ def _upsert_cited_companies(db, profession: str, city: str, cited: dict):
 
 def _job_refresh_ia():
     """Relance les tests IA (ChatGPT + Gemini + Claude) pour :
-    - la paire active (active_pair_state.json) — dès activation, avant tout envoi
-    - toutes les paires en prospection (sent_at dans les 30 derniers jours)
-    lun/jeu/dim à 9h30, 15h, 18h30 UTC. 3 appels API par paire.
-    Alimente ia_cited_companies.
+    - la paire active (active_pair_state.json)
+    - toutes les paires avec activité dans les 15 derniers jours
+      (envoi, ouverture, clic, RDV — toute interaction repousse la fenêtre)
+    lun/jeu/dim à 9h30 UTC. 1 run (9 requêtes) par paire.
+    Alimente ia_cited_companies + ia_results sur tous les prospects de la paire.
     """
     try:
         import time as _time, json as _json
         from datetime import timedelta
+        from sqlalchemy import or_
         from .database import SessionLocal
         from .api.routes.v3 import _run_ia_test, V3ProspectDB
         from .active_pair import get_active_pair
@@ -388,12 +398,19 @@ def _job_refresh_ia():
         if active:
             active_pairs.add((active["city"], active["profession"]))
 
-        # 2. Paires en prospection (au moins 1 envoi dans les 30j)
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        # 2. Paires avec activité dans les 15 derniers jours
+        cutoff = datetime.utcnow() - timedelta(days=15)
         with SessionLocal() as db:
             rows = (
                 db.query(V3ProspectDB.city, V3ProspectDB.profession)
-                .filter(V3ProspectDB.sent_at >= cutoff)
+                .filter(
+                    or_(
+                        V3ProspectDB.sent_at         >= cutoff,
+                        V3ProspectDB.email_opened_at >= cutoff,
+                        V3ProspectDB.email_clicked_at >= cutoff,
+                        V3ProspectDB.email_booked_at  >= cutoff,
+                    )
+                )
                 .distinct()
                 .all()
             )
@@ -1504,7 +1521,7 @@ def _outbound_send_prospect(p, dry_run: bool = False,
     Utilisé par _job_outbound (boucle) ET par les boutons test admin.
 
     Étapes :
-      1. ia_results absent → lance _run_ia_test et stocke en DB
+      1. Lit ia_results (garantis au niveau paire par _job_outbound avant la boucle)
       2. Image ville absente → fetch Unsplash (fallback 3 niveaux) et stocke
       3. Formate le message (_OUTBOUND_BODY / _OUTBOUND_SMS)
       4. Envoie via Brevo — sauf si dry_run=True
@@ -1514,7 +1531,7 @@ def _outbound_send_prospect(p, dry_run: bool = False,
     """
     import os, json, requests as _req, random
     from datetime import datetime
-    from .api.routes.v3 import _run_ia_test, _resolve_termes
+    from .api.routes.v3 import _resolve_termes
     from .city_images import fetch_city_header_image
     from .models import RefCityDB, V3ProspectDB
     from .database import SessionLocal
@@ -1522,30 +1539,13 @@ def _outbound_send_prospect(p, dry_run: bool = False,
     if brevo_key is None:
         brevo_key = os.getenv("BREVO_API_KEY", "")
 
-    # ── 1. Enrichissement IA si absent ───────────────────────────────────────
+    # ── 1. Lecture ia_results (garantis au niveau paire avant la boucle d'envoi) ─
     ia_results_list = []
     if p.ia_results:
         try:
             ia_results_list = json.loads(p.ia_results)
         except Exception:
             pass
-
-    if not ia_results_list:
-        log.info("[OUTBOUND] ia_results absent pour %s/%s — lancement requêtes IA",
-                 p.profession, p.city)
-        ia_data = _run_ia_test(p.profession, p.city)
-        ia_results_json = json.dumps(ia_data.get("results", []), ensure_ascii=False) \
-                          if ia_data.get("results") else None
-        if ia_results_json:
-            with SessionLocal() as _db:
-                _p2 = _db.query(V3ProspectDB).filter_by(token=p.token).first()
-                if _p2:
-                    _p2.ia_results = ia_results_json
-                    _db.commit()
-            try:
-                ia_results_list = json.loads(ia_results_json)
-            except Exception:
-                pass
 
     ia_ok    = len([r for r in ia_results_list if r.get("ok")])
     ia_total = len(ia_results_list)
@@ -2005,6 +2005,40 @@ def _job_outbound(force: bool = False):
         return
     log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
              _active["profession"], _active["city"], _active.get("score", 0))
+
+    # ── Test IA au niveau paire si jamais testé ──────────────────────────────
+    # (une seule fois par paire nouvelle — le refresh 3×/sem prend le relais ensuite)
+    try:
+        from .api.routes.v3 import _run_ia_test
+        import json as _json_ia
+        with SessionLocal() as _db_ia:
+            _pair_has_ia = _db_ia.query(V3ProspectDB).filter(
+                V3ProspectDB.city       == _active["city"],
+                V3ProspectDB.profession == _active["profession"],
+                V3ProspectDB.ia_results.isnot(None),
+            ).first() is not None
+        if not _pair_has_ia:
+            log.info("[OUTBOUND] paire %s/%s — aucun ia_results → test IA avant envoi",
+                     _active["profession"], _active["city"])
+            _ia_data = _run_ia_test(_active["profession"], _active["city"])
+            if _ia_data and _ia_data.get("results"):
+                _ia_json  = _json_ia.dumps(_ia_data["results"], ensure_ascii=False)
+                _ia_cited = _extract_cited_names(_ia_data["results"])
+                with SessionLocal() as _db_ia2:
+                    for _p_ia in _db_ia2.query(V3ProspectDB).filter_by(
+                        city=_active["city"], profession=_active["profession"]
+                    ).all():
+                        _p_ia.ia_results   = _ia_json
+                        _p_ia.ia_tested_at = _ia_data.get("tested_at")
+                    _db_ia2.commit()
+                    _upsert_cited_companies(_db_ia2, _active["profession"], _active["city"], _ia_cited)
+                log.info("[OUTBOUND] ia_results initialisés pour %s/%s — %d cités",
+                         _active["profession"], _active["city"], len(_ia_cited))
+            else:
+                log.warning("[OUTBOUND] test IA vide pour %s/%s — envoi maintenu",
+                            _active["profession"], _active["city"])
+    except Exception as _e_ia:
+        log.error("[OUTBOUND] erreur test IA initial paire: %s", _e_ia)
 
     # ── Image obligatoire pour la paire active ───────────────────────────────
     try:

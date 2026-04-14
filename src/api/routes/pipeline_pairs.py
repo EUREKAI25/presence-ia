@@ -10,7 +10,7 @@ Accordéons imbriqués :
 import os
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -108,6 +108,17 @@ def pipeline_pairs(request: Request):
 
         cfg = db.query(ScoringConfigDB).filter_by(id="default").first()
 
+        # ── Fraîcheur IA de la paire active ──────────────────────────────────
+        active_ia_tested_at = None
+        if active:
+            from sqlalchemy import func as _func
+            _row = db.query(_func.max(V3ProspectDB.ia_tested_at)).filter(
+                V3ProspectDB.city       == active["city"],
+                V3ProspectDB.profession == active["profession"],
+                V3ProspectDB.ia_tested_at.isnot(None),
+            ).scalar()
+            active_ia_tested_at = _row
+
         # ── Professions actives triées par score desc ─────────────────────────
         profs = (
             db.query(ProfessionDB)
@@ -181,8 +192,105 @@ def pipeline_pairs(request: Request):
         ).group_by(SireneSuspectDB.profession_id).all()
         sus_by_prof = {r.profession_id: r for r in sus_rows}
 
+    # ── Prochaine paire (2e dans le classement, hors paire active) ───────────
+    next_pair = None
+    ranked_pairs = []
+    for p in scored_profs:
+        cities_data = v3_by_prof.get(p.id, {})
+        p_score = db_score_global(p, cfg) if cfg else 0.0
+        for city, cdata in cities_data.items():
+            n = cdata["dispo"]
+            if n > 0:
+                combined = p_score * 2 + math.log1p(n)
+                ranked_pairs.append((city, p.label, n, p_score, combined))
+    ranked_pairs.sort(key=lambda x: x[4], reverse=True)
+    for city_r, prof_r, n_r, score_r, _ in ranked_pairs:
+        is_current = (
+            active and
+            active.get("city", "").lower() == city_r.lower() and
+            active.get("profession", "").lower() == prof_r.lower()
+        )
+        if not is_current:
+            next_pair = {"city": city_r, "profession": prof_r, "n": n_r, "score": score_r}
+            break
+
+    # ── Bannière paire active ─────────────────────────────────────────────────
+    def _ia_freshness(tested_at):
+        """Retourne label + couleur selon fraîcheur du dernier test IA."""
+        if not tested_at:
+            return "Jamais testé", "#dc2626", "🔴"
+        if isinstance(tested_at, str):
+            try:
+                tested_at = datetime.fromisoformat(tested_at)
+            except Exception:
+                return "Date invalide", "#9ca3af", "⚪"
+        age_h = (datetime.utcnow() - tested_at).total_seconds() / 3600
+        if age_h < 24:
+            return f"Il y a {int(age_h)}h", "#10b981", "🟢"
+        age_d = int(age_h / 24)
+        if age_d <= 4:
+            return f"Il y a {age_d}j", "#10b981", "🟢"
+        if age_d <= 8:
+            return f"Il y a {age_d}j", "#f59e0b", "🟡"
+        return f"Il y a {age_d}j", "#dc2626", "🔴"
+
+    if active:
+        ia_label, ia_color, ia_dot = _ia_freshness(active_ia_tested_at)
+        started = active.get("started_at", "")[:10] if active.get("started_at") else "—"
+        banner = (
+            f'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;'
+            f'padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;'
+            f'gap:16px;flex-wrap:wrap">'
+            f'<div style="flex:1;min-width:200px">'
+            f'<div style="font-size:12px;font-weight:700;color:#065f46;'
+            f'text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Paire active</div>'
+            f'<div style="font-size:15px;font-weight:700;color:#111">'
+            f'{active["profession"]} — {active["city"]}</div>'
+            f'<div style="font-size:12px;color:#6b7280;margin-top:2px">'
+            f'Score {active.get("score", 0):.1f} &nbsp;·&nbsp; démarrée le {started}'
+            f'{"&nbsp;·&nbsp;<strong style=\"color:#7c3aed\">FORCÉE</strong>" if active.get("override") else ""}'
+            f'</div>'
+            f'</div>'
+            f'<div style="text-align:center">'
+            f'<div style="font-size:11px;color:#6b7280;margin-bottom:2px">Résultats IA</div>'
+            f'<div style="font-size:13px;font-weight:700;color:{ia_color}">'
+            f'{ia_dot} {ia_label}</div>'
+            f'</div>'
+            + (
+                f'<div style="border-left:1px solid #d1fae5;padding-left:16px;min-width:180px">'
+                f'<div style="font-size:12px;font-weight:700;color:#374151;'
+                f'text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prochaine paire</div>'
+                f'<div style="font-size:13px;font-weight:600;color:#374151">'
+                f'{next_pair["profession"]} — {next_pair["city"]}</div>'
+                f'<div style="font-size:11px;color:#6b7280">'
+                f'Score {next_pair["score"]:.1f} &nbsp;·&nbsp; {next_pair["n"]} dispo</div>'
+                f'</div>'
+                if next_pair else
+                f'<div style="border-left:1px solid #d1fae5;padding-left:16px">'
+                f'<div style="font-size:12px;color:#9ca3af">Aucune autre paire disponible</div>'
+                f'</div>'
+            )
+            + f'</div>'
+        )
+    else:
+        next_label = (
+            f'{next_pair["profession"]} — {next_pair["city"]} '
+            f'(score {next_pair["score"]:.1f} · {next_pair["n"]} dispo)'
+            if next_pair else "Aucune paire disponible"
+        )
+        banner = (
+            f'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;'
+            f'padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px">'
+            f'<span style="font-size:20px">⏸</span>'
+            f'<div>'
+            f'<div style="font-size:13px;font-weight:700;color:#92400e">Aucune paire active</div>'
+            f'<div style="font-size:12px;color:#6b7280">'
+            f'Prochaine : {next_label}</div>'
+            f'</div>'
+            f'</div>'
+        )
+
     # ── Rendu HTML ────────────────────────────────────────────────────────────
-    banner = ""  # La paire active est marquée 📍 dans l'accordéon
 
     # Accordéons professions
     prof_blocks = []
