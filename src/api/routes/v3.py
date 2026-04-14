@@ -2775,9 +2775,12 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
             abs_lu = landing_url or ""
             if abs_lu.startswith("/"): abs_lu = BASE_URL + abs_lu
             # Gmail + mobile → forcer SMS même si méthode demandée = email
-            force_sms = req.method == "email" and _is_gmail(email) and phone
+            # En mode test : vérifier l'adresse de destination réelle (test_email)
+            _email_dest = req.test_email if test_mode else email
+            _phone_dest = req.test_phone if test_mode else phone
+            force_sms = req.method == "email" and _is_gmail(_email_dest) and _phone_dest
             if force_sms or req.method == "sms":
-                dest = req.test_phone if test_mode else phone
+                dest = _phone_dest
                 msg  = _contact_message_sms(name, city, profession, abs_lu, sms_tpl)
                 delivery_id = _mkt.create_sms_delivery(tok) if not test_mode else None
                 ok   = _send_brevo_sms(dest, msg) if dest else False
