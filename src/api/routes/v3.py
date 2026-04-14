@@ -1766,13 +1766,13 @@ def _send_booking_confirmation(
     first_name = name.split()[0] if name else name
 
     body_html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:15px;color:#1e293b;max-width:520px;margin:0 auto;padding:32px 24px">
-<p style="font-size:16px">Bonjour {first_name},</p>
 <p>Votre rendez-vous est confirmé le <strong>{date_label}</strong>.</p>
-<p>Je vous appellerai au <strong>{phone}</strong> et nous vous montrerons concrètement pourquoi vos concurrents ressortent aujourd'hui dans les IA… et pas vous.</p>
+<p>Je vous appellerai au <strong>{phone}</strong> pour vous montrer concrètement pourquoi vos concurrents ressortent aujourd'hui dans les IA… et pas vous.</p>
+<p style="margin-top:24px">Nathalie<br>Présence IA</p>
 <p style="margin-top:28px">
   <a href="{google_add_url}" style="display:inline-block;padding:11px 22px;background:#4285f4;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Ajouter à mon agenda →</a>
 </p>
-<p style="margin-top:32px;color:#94a3b8;font-size:12px">Présence IA · <a href="{base}" style="color:#94a3b8">presence-ia.com</a></p>
+<p style="margin-top:32px;color:#94a3b8;font-size:12px"><a href="{base}" style="color:#94a3b8">presence-ia.com</a></p>
 </body></html>"""
 
     # Envoi direct via Brevo (html only)
