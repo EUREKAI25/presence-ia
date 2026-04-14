@@ -219,7 +219,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
   <td style="padding:8px 6px;font-size:11px;color:#6b7280">{c.created_at.strftime("%d/%m/%y") if c.created_at else "—"}</td>
   <td style="padding:8px 6px;text-align:center;white-space:nowrap">{trk_html}</td>
   <td style="padding:8px 6px;text-align:right;white-space:nowrap">
-    {btn_email}{btn_sms}<button onclick="deleteContact('{c.token}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
+    {btn_email}{btn_sms}<button onclick="runIATest('{c.token}',this)" title="Lancer test IA (ChatGPT+Gemini+Claude)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:11px;margin-right:2px">🤖</button><button onclick="deleteContact('{c.token}',this)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:3px 8px;color:#6b7280;font-size:11px">✕</button>
   </td>
 </tr>"""
 
@@ -575,6 +575,19 @@ async function sendContactSMS(id, btn) {{
     if(d.ok) {{ btn.style.background='#dcfce7'; btn.style.color='#166534'; btn.title='SMS envoyé'; }}
     else {{ alert('Erreur: '+(d.error||'inconnue')); btn.disabled=false; }}
   }} catch(e) {{ btn.disabled=false; alert('Erreur réseau'); }}
+}}
+async function runIATest(id, btn) {{
+  if(!confirm("Lancer le test IA ? (ChatGPT + Gemini + Claude — ~30 secondes)")) return;
+  btn.disabled = true; btn.textContent = '⏳';
+  try {{
+    const r = await fetch('/api/v3/prospect/'+id+'/run-ia-test', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{token: T}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{ btn.style.background='#dcfce7'; btn.style.color='#166534'; btn.textContent='🤖'; btn.title='IA testée — '+d.n_results+' résultats'; }}
+    else {{ alert('Erreur: '+(d.error||'inconnue')); btn.disabled=false; btn.textContent='🤖'; }}
+  }} catch(e) {{ btn.disabled=false; btn.textContent='🤖'; alert('Erreur réseau'); }}
 }}
 </script>
 </body></html>""")

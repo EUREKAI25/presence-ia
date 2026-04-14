@@ -3465,6 +3465,41 @@ def refresh_ia(token: str = "", city: str = "", profession: str = ""):
             "note": f"Refresh IA lancé pour {len(pairs)} paire(s) en background"}
 
 
+@router.post("/api/v3/prospect/{tok}/run-ia-test")
+async def run_ia_test_for_prospect(tok: str, request: Request):
+    """Lance / relance le test IA (ChatGPT + Gemini + Claude) pour un prospect."""
+    body = await request.json()
+    _require_admin(body.get("token", ""))
+    with SessionLocal() as db:
+        p = db.get(V3ProspectDB, tok)
+        if not p:
+            raise HTTPException(404)
+        profession = p.profession or ""
+        city       = p.city or ""
+    if not profession or not city:
+        return JSONResponse({"ok": False, "error": "Profession ou ville manquante"}, status_code=400)
+    try:
+        ia_data = _run_ia_test(profession, city)
+    except Exception as e:
+        log.error("run-ia-test %s: %s", tok, e)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    if not ia_data or not ia_data.get("results"):
+        return JSONResponse({"ok": False, "error": "Aucun résultat IA"}, status_code=502)
+    ia_results_json = json.dumps(ia_data["results"], ensure_ascii=False)
+    with SessionLocal() as db:
+        p = db.get(V3ProspectDB, tok)
+        if not p:
+            raise HTTPException(404)
+        p.ia_results   = ia_results_json
+        p.ia_prompt    = ia_data.get("prompt")
+        p.ia_response  = ia_data.get("response")
+        p.ia_model     = ia_data.get("model")
+        p.ia_tested_at = ia_data.get("tested_at")
+        db.commit()
+    n = len(ia_data["results"])
+    return JSONResponse({"ok": True, "n_results": n})
+
+
 @router.post("/api/v3/prospect/{tok}/contacted")
 async def mark_contacted(tok: str, request: Request):
     body = await request.json()
