@@ -629,7 +629,12 @@ def _validate_companies_batch(results: list, profession: str, city: str, anthrop
                 names = [line.strip().lstrip("•-– ") for line in raw.split("\n") if line.strip()]
                 # Filtrer phrases (> 5 mots) et plateformes connues
                 _bad = {"habitatpresto", "trustup", "travaux.com", "houzz", "pages jaunes",
-                        "habitatpresto.com", "google maps", "yelp", "annuaire"}
+                        "habitatpresto.com", "google maps", "yelp", "annuaire",
+                        "meteojob", "meteojob.com", "gralon", "gralon.net",
+                        "chef à domicile", "chef-domicile.fr", "chef-domicile",
+                        "indeed", "indeed.com", "pôle emploi", "pole emploi",
+                        "france travail", "jobteaser", "hellowork", "regionsjob",
+                        "cadremploi", "monster", "apec", "leboncoin"}
                 r["competitors"] = [
                     n for n in names
                     if n and len(n.split()) <= 5 and n.lower() not in _bad
