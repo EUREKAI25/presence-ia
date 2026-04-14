@@ -1696,13 +1696,11 @@ async def prospect_book_submit(token: str, request: Request):
 
     # Email de confirmation au prospect
     _send_booking_confirmation(
-        name=name, email=email,
+        name=name, email=email, phone=phone,
         start_iso=start_iso, end_iso=end_iso,
         google_add_url=google_add_url,
         booking_id=booking_id,
         gcal_result=gcal_result,
-        description=description,
-        title=title,
     )
 
     return JSONResponse({
@@ -1744,42 +1742,37 @@ def prospect_booking_ics(token: str, booking_id: str):
 
 
 def _send_booking_confirmation(
-    name: str, email: str,
+    name: str, email: str, phone: str,
     start_iso: str, end_iso: str,
     google_add_url: str,
     booking_id: str,
     gcal_result: dict,
-    description: str,
-    title: str,
 ):
     """Envoie l'email de confirmation de RDV au prospect."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
     try:
-        paris = ZoneInfo("Europe/Paris")
-        dt    = datetime.fromisoformat(start_iso).replace(tzinfo=ZoneInfo("Europe/Paris"))
-        date_label = dt.strftime("%A %d %B %Y à %Hh%M").capitalize()
+        dt = datetime.fromisoformat(start_iso).replace(tzinfo=ZoneInfo("Europe/Paris"))
+        jour   = _JOURS_FR[dt.weekday()]
+        mois   = _MOIS_FR[dt.month].capitalize()
+        heure  = dt.strftime("%Hh").lstrip("0") or "0h"
+        date_label = f"{jour} {dt.day} {mois} {dt.year} à {heure}"
     except Exception:
         date_label = start_iso
 
-    sender  = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
-    base    = BASE_URL
-    ics_url = f"{base}/l/booking/{booking_id}/ics"
+    sender = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
+    base   = BASE_URL
 
-    meet_line = ""
-    if gcal_result.get("meet_link"):
-        meet_line = f'\n<p><a href="{gcal_result["meet_link"]}" style="color:#2563eb">Rejoindre Google Meet →</a></p>'
+    first_name = name.split()[0] if name else name
 
-    body_html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;color:#333;max-width:520px;margin:0 auto;padding:24px">
-<h2 style="color:#0f172a">C'est confirmé !</h2>
-<p>Bonjour {name},</p>
-<p>Votre audit de visibilité IA est réservé pour le <strong>{date_label}</strong>.</p>
-{meet_line}
-<p style="margin-top:20px">
-  <a href="{google_add_url}" style="display:inline-block;padding:10px 20px;background:#4285f4;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;margin-right:10px">Ajouter à Google Agenda</a>
-  <a href="{base}/l/booking/{booking_id}/ics" style="display:inline-block;padding:10px 20px;background:#f1f5f9;color:#334155;border-radius:6px;text-decoration:none;font-weight:600">Télécharger .ics</a>
+    body_html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:15px;color:#1e293b;max-width:520px;margin:0 auto;padding:32px 24px">
+<p style="font-size:16px">Bonjour {first_name},</p>
+<p>Votre rendez-vous est confirmé le <strong>{date_label}</strong>.</p>
+<p>Je vous appellerai au <strong>{phone}</strong> et nous vous montrerons concrètement pourquoi vos concurrents ressortent aujourd'hui dans les IA… et pas vous.</p>
+<p style="margin-top:28px">
+  <a href="{google_add_url}" style="display:inline-block;padding:11px 22px;background:#4285f4;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Ajouter à mon agenda →</a>
 </p>
-<p style="margin-top:24px;color:#64748b;font-size:12px">Présence IA · <a href="{base}">presence-ia.com</a></p>
+<p style="margin-top:32px;color:#94a3b8;font-size:12px">Présence IA · <a href="{base}" style="color:#94a3b8">presence-ia.com</a></p>
 </body></html>"""
 
     # Envoi direct via Brevo (html only)

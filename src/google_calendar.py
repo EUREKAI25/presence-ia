@@ -68,13 +68,12 @@ def gcal_create_event(
         "description": description,
         "start":       {"dateTime": start_iso, "timeZone": TIMEZONE},
         "end":         {"dateTime": end_iso,   "timeZone": TIMEZONE},
-        "attendees":   [{"email": attendee_email, "displayName": attendee_name}],
         "reminders":   {"useDefault": False, "overrides": [
             {"method": "email",  "minutes": 60},
             {"method": "popup",  "minutes": 15},
         ]},
         "status": "confirmed",
-        "sendUpdates": "all",   # envoie l'invite au prospect
+        "sendUpdates": "none",
     }
 
     if add_meet:
