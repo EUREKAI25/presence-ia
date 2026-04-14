@@ -658,9 +658,11 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     name       = c.company_name or ""
     city       = c.city or ""
     profession = c.profession or ""
-    # URL toujours dérivée de l'email du prospect — jamais depuis landing_url stockée
+    # URL dérivée de l'email du prospect — bloqué si aucun prospect correspondant
     v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.email else None
-    landing_url = f"{BASE_URL}/l/{v3.token}" if v3 else BASE_URL
+    if not v3:
+        return JSONResponse({"ok": False, "error": f"Aucun prospect v3 trouvé pour {c.email} — envoi bloqué"}, status_code=400)
+    landing_url = f"{BASE_URL}/l/{v3.token}"
     # Gmail + mobile → forcer SMS (même contenu que contact_send_sms)
     if _is_gmail(c.email) and c.phone:
         msg = _contact_message_sms(name, city, profession, landing_url)
@@ -699,9 +701,11 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     city       = c.city or ""
     profession = c.profession or ""
     base_url   = BASE_URL
-    # URL toujours dérivée de l'email du prospect — jamais depuis landing_url stockée
-    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.phone else None
-    landing_url = f"{base_url}/l/{v3.token}" if v3 else base_url
+    # URL dérivée de l'email du prospect — bloqué si aucun prospect correspondant
+    v3 = db.query(V3ProspectDB).filter(V3ProspectDB.email == c.email).first() if c.email else None
+    if not v3:
+        return JSONResponse({"ok": False, "error": f"Aucun prospect v3 trouvé pour {c.email} — envoi bloqué"}, status_code=400)
+    landing_url = f"{base_url}/l/{v3.token}"
     msg = _contact_message_sms(name, city, profession, landing_url)
     delivery_id = _mkt.create_sms_delivery(c.id)
     ok  = _send_brevo_sms(c.phone, msg)
