@@ -1782,7 +1782,6 @@ def _send_booking_confirmation(
 <p style="margin-top:24px;color:#64748b;font-size:12px">Présence IA · <a href="{base}">presence-ia.com</a></p>
 </body></html>"""
 
-    _send_brevo_email(email, name, f"Votre audit Présence IA — {date_label}", "", landing_url="", delivery_id="")
     # Envoi direct via Brevo (html only)
     import requests as _req
     api_key = os.getenv("BREVO_API_KEY", "")
