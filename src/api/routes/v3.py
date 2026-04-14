@@ -342,6 +342,12 @@ def _body_to_html(plain: str, landing_url: str = "", delivery_id: str = "") -> s
             f'{lines}</body></html>')
 
 
+def _is_gmail(email: str) -> bool:
+    """Retourne True si l'adresse est Gmail/Googlemail."""
+    e = (email or "").lower()
+    return "@gmail." in e or "@googlemail." in e
+
+
 def _send_brevo_email(to_email: str, to_name: str, subject: str, body: str,
                       delivery_id: str = "", landing_url: str = "") -> bool:
     api_key = os.getenv("BREVO_API_KEY", "")
@@ -2672,11 +2678,22 @@ async def send_email_prospect(tok: str, request: Request):
         if not p.email:
             return JSONResponse({"ok": False, "error": "Pas d'email pour ce prospect"})
         lt_global = db.get(V3LandingTextDB, "__global__")
-        tpl       = lt_global.email_template if lt_global and lt_global.email_template else None
-        subj_tpl  = lt_global.email_subject  if lt_global and lt_global.email_subject  else _DEFAULT_EMAIL_SUBJECT
         abs_url   = (p.landing_url or "")
         if abs_url and abs_url.startswith("/"):
             abs_url = BASE_URL + abs_url
+        # Gmail + mobile → forcer SMS (évite l'onglet Promotions)
+        if _is_gmail(p.email) and p.phone:
+            tpl = lt_global.sms_template if lt_global and lt_global.sms_template else None
+            msg = _contact_message_sms(p.name, p.city, p.profession, abs_url, tpl)
+            ok  = _send_brevo_sms(p.phone, msg)
+            if ok:
+                p.sent_at     = datetime.utcnow()
+                p.sent_method = "sms"
+                p.contacted   = True
+                db.commit()
+            return {"ok": ok, "error": None if ok else "Brevo SMS error", "method_used": "sms", "reason": "gmail→sms"}
+        tpl       = lt_global.email_template if lt_global and lt_global.email_template else None
+        subj_tpl  = lt_global.email_subject  if lt_global and lt_global.email_subject  else _DEFAULT_EMAIL_SUBJECT
         msg   = _contact_message(p.name, p.city, p.profession, abs_url, tpl)
         metier = p.profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
         subj  = subj_tpl.format(ville=p.city, metier=metier, metiers=metiers,
@@ -2757,7 +2774,15 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
         for i, (tok, name, city, profession, email, phone, landing_url) in enumerate(tokens):
             abs_lu = landing_url or ""
             if abs_lu.startswith("/"): abs_lu = BASE_URL + abs_lu
-            if req.method == "email":
+            # Gmail + mobile → forcer SMS même si méthode demandée = email
+            force_sms = req.method == "email" and _is_gmail(email) and phone
+            if force_sms or req.method == "sms":
+                dest = req.test_phone if test_mode else phone
+                msg  = _contact_message_sms(name, city, profession, abs_lu, sms_tpl)
+                delivery_id = _mkt.create_sms_delivery(tok) if not test_mode else None
+                ok   = _send_brevo_sms(dest, msg) if dest else False
+                _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo SMS error")
+            elif req.method == "email":
                 dest   = req.test_email if test_mode else email
                 msg    = _contact_message(name, city, profession, abs_lu, email_tpl)
                 metier = profession.lower(); metiers = metier + "s" if not metier.endswith("s") else metier
@@ -2769,12 +2794,6 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                                            delivery_id=delivery_id or "",
                                            landing_url=abs_lu) if dest else False
                 _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo error")
-            elif req.method == "sms":
-                dest   = req.test_phone if test_mode else phone
-                msg    = _contact_message_sms(name, city, profession, abs_lu, sms_tpl)
-                delivery_id = _mkt.create_sms_delivery(tok) if not test_mode else None
-                ok     = _send_brevo_sms(dest, msg) if dest else False
-                _mkt.mark_sent(delivery_id, ok, error="" if ok else "Brevo SMS error")
             else:
                 ok = False
 
@@ -2785,7 +2804,7 @@ async def bulk_send(req: BulkSendRequest, token: str = ""):
                         p = db.get(V3ProspectDB, tok)
                         if p:
                             p.sent_at = datetime.utcnow()
-                            p.sent_method = req.method
+                            p.sent_method = "sms" if force_sms else req.method
                             p.contacted = True
                             db.commit()
             else:
