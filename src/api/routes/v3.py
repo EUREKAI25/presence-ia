@@ -1388,26 +1388,56 @@ def _filter_slots(all_slots: list, today, seed: str) -> list:
 
 
 def _render_book_page(token: str, filtered: list) -> str:
-    """HTML de la page de sélection de créneaux filtrés."""
-    from datetime import date
+    """HTML de la page de réservation — vue semaine type Calendly."""
+    from datetime import date, timedelta
     from collections import defaultdict
+
+    today = date.today()
+    # Lundi de la semaine courante
+    monday = today - timedelta(days=today.weekday())
+
+    # Grouper les créneaux par date
     by_date: dict[date, list] = defaultdict(list)
     for s in filtered:
         by_date[s["_dt"].date()].append(s)
 
-    cards = ""
-    for d in sorted(by_date.keys()):
-        label = f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month]}"
-        date_url = f"{CALENDLY_URL}?date={d.isoformat()}&hide_gdpr_banner=1"
-        btns = "".join(
-            f'<a href="{date_url}" target="_blank" rel="noopener" class="sb">{s["_dt"].strftime("%H:%M")}</a>'
-            for s in by_date[d]
-        )
-        cards += f'<div class="dc"><div class="dl">{label}</div><div class="sr">{btns}</div></div>'
+    # Générer les semaines (max 2 semaines)
+    weeks_html = ""
+    for week_offset in range(2):
+        wk_monday = monday + timedelta(weeks=week_offset)
+        wk_days   = [wk_monday + timedelta(days=i) for i in range(5)]  # Lun–Ven
+        hidden    = "style='display:none'" if week_offset > 0 else ""
+        has_slots = any(d in by_date for d in wk_days)
 
-    if not cards:
-        cards = (f'<p class="ns">Aucun créneau — '
-                 f'<a href="{CALENDLY_URL}" target="_blank">accès direct →</a></p>')
+        # Libellé semaine
+        wk_start_lbl = f"{wk_monday.day} {_MOIS_FR[wk_monday.month]}"
+        wk_end       = wk_days[-1]
+        wk_end_lbl   = f"{wk_end.day} {_MOIS_FR[wk_end.month]}"
+        wk_year      = wk_monday.year
+
+        cols = ""
+        for d in wk_days:
+            day_label = f"{_JOURS_FR[d.weekday()][:3]}<br><span class='dn'>{d.day} {_MOIS_FR[d.month][:3]}</span>"
+            past      = d < today
+            if past:
+                cols += f'<div class="wc wc--past"><div class="wh">{day_label}</div></div>'
+                continue
+            date_url = f"{CALENDLY_URL}?date={d.isoformat()}&hide_gdpr_banner=1"
+            slots    = sorted(by_date.get(d, []), key=lambda s: s["_dt"])
+            if slots:
+                btns = "".join(
+                    f'<a href="{date_url}" target="_blank" rel="noopener" class="sb">{s["_dt"].strftime("%H:%M")}</a>'
+                    for s in slots
+                )
+                cols += f'<div class="wc"><div class="wh">{day_label}</div><div class="ws">{btns}</div></div>'
+            else:
+                cols += f'<div class="wc wc--empty"><div class="wh">{day_label}</div><div class="ws"><span class="no-slot">—</span></div></div>'
+
+        weeks_html += f"""
+<div class="week" data-week="{week_offset}" {hidden}>
+  <div class="week-grid">{cols}</div>
+  {'<p class="ns">Aucun créneau cette semaine — <a href="' + CALENDLY_URL + '" target="_blank">accès direct →</a></p>' if not has_slots else ''}
+</div>"""
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1415,31 +1445,63 @@ def _render_book_page(token: str, filtered: list) -> str:
 <link rel="icon" href="/assets/favicon.svg">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:52px 20px}}
-.wrap{{max-width:520px;width:100%}}
-.logo{{text-align:center;margin-bottom:40px}}
-.logo img{{height:38px;width:auto}}
-h1{{font-size:1.35rem;font-weight:700;color:#fff;text-align:center;margin-bottom:8px;letter-spacing:-.02em}}
-.sub{{color:#94a3b8;font-size:.88rem;text-align:center;margin-bottom:28px;line-height:1.7}}
-.badge{{display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(153,103,16,.12);border:1px solid rgba(153,103,16,.28);color:#c9a04a;font-size:.75rem;font-weight:600;letter-spacing:.05em;padding:5px 14px;border-radius:100px;margin-bottom:28px}}
-.dc{{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px 20px;margin-bottom:10px}}
-.dl{{font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px}}
-.sr{{display:flex;flex-wrap:wrap;gap:8px}}
-.sb{{display:inline-block;padding:8px 16px;background:rgba(153,103,16,.14);border:1px solid rgba(153,103,16,.32);color:#c9a04a;font-size:.88rem;font-weight:600;border-radius:7px;text-decoration:none;transition:all .15s}}
-.sb:hover{{background:rgba(153,103,16,.26);border-color:rgba(153,103,16,.55);color:#e0b86a;transform:translateY(-1px)}}
-.sb:active{{transform:translateY(0)}}
-.ns{{color:#64748b;text-align:center;padding:28px 0;font-size:.9rem}}
+body{{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:44px 16px}}
+.wrap{{max-width:680px;width:100%}}
+.logo{{text-align:center;margin-bottom:32px}}
+.logo img{{height:36px;width:auto}}
+h1{{font-size:1.25rem;font-weight:700;color:#fff;text-align:center;margin-bottom:6px;letter-spacing:-.02em}}
+.sub{{color:#94a3b8;font-size:.85rem;text-align:center;margin-bottom:24px;line-height:1.6}}
+/* Navigation semaine */
+.week-nav{{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px}}
+.week-nav button{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:.82rem;transition:all .15s}}
+.week-nav button:hover:not(:disabled){{background:rgba(255,255,255,.12);color:#e2e8f0}}
+.week-nav button:disabled{{opacity:.3;cursor:default}}
+.week-label{{color:#e2e8f0;font-size:.88rem;font-weight:600;text-align:center;flex:1}}
+/* Grille */
+.week-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}}
+.wc{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 6px;min-height:80px}}
+.wc--past{{opacity:.3}}
+.wc--empty{{opacity:.5}}
+.wh{{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;text-align:center;margin-bottom:8px;line-height:1.4}}
+.dn{{font-size:.68rem;font-weight:400;color:#475569;text-transform:none;letter-spacing:0}}
+.ws{{display:flex;flex-direction:column;gap:5px;align-items:center}}
+.sb{{display:block;width:100%;text-align:center;padding:7px 4px;background:rgba(153,103,16,.14);border:1px solid rgba(153,103,16,.32);color:#c9a04a;font-size:.82rem;font-weight:600;border-radius:6px;text-decoration:none;transition:all .15s}}
+.sb:hover{{background:rgba(153,103,16,.28);color:#e0b86a;transform:translateY(-1px)}}
+.no-slot{{color:#334155;font-size:.8rem}}
+.ns{{color:#64748b;text-align:center;padding:20px 0;font-size:.85rem;grid-column:1/-1}}
 .ns a{{color:#c9a04a}}
-.note{{margin-top:28px;color:#475569;font-size:.76rem;text-align:center;line-height:1.7}}
+.note{{margin-top:24px;color:#475569;font-size:.74rem;text-align:center;line-height:1.7}}
+@media(max-width:480px){{
+  .week-grid{{grid-template-columns:repeat(5,1fr);gap:4px}}
+  .sb{{padding:6px 2px;font-size:.75rem}}
+  .wh{{font-size:.65rem}}
+}}
 </style></head><body>
 <div class="wrap">
   <div class="logo"><a href="/"><img src="/assets/logo-white.svg" alt="Présence IA"></a></div>
   <h1>Choisissez votre créneau</h1>
   <p class="sub">Audit de visibilité IA · 20 min · Sans engagement</p>
-  <div class="badge">⏳ Disponibilités limitées cette semaine</div>
-  {cards}
-  <p class="note">En cliquant sur un créneau, vous accédez à notre système de réservation.<br>La confirmation est envoyée par email.</p>
+  <div class="week-nav">
+    <button id="btn-prev" onclick="changeWeek(-1)" disabled>← Préc.</button>
+    <span class="week-label" id="week-label"></span>
+    <button id="btn-next" onclick="changeWeek(1)">Suiv. →</button>
+  </div>
+  {weeks_html}
+  <p class="note">En cliquant sur un créneau, vous confirmez sur notre système de réservation.<br>La confirmation est envoyée par email.</p>
 </div>
+<script>
+const WEEKS = [{{"label":"Semaine du {monday.day} {_MOIS_FR[monday.month]}","idx":0}},{{"label":"Semaine du {(monday + timedelta(weeks=1)).day} {_MOIS_FR[(monday + timedelta(weeks=1)).month]}","idx":1}}];
+let cur = 0;
+function changeWeek(dir) {{
+  document.querySelector('.week[data-week="'+cur+'"]').style.display='none';
+  cur += dir;
+  document.querySelector('.week[data-week="'+cur+'"]').style.display='';
+  document.getElementById('week-label').textContent = WEEKS[cur].label;
+  document.getElementById('btn-prev').disabled = cur === 0;
+  document.getElementById('btn-next').disabled = cur === WEEKS.length - 1;
+}}
+document.getElementById('week-label').textContent = WEEKS[0].label;
+</script>
 </body></html>"""
 
 
