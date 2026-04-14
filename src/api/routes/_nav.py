@@ -59,6 +59,7 @@ def admin_nav(token: str, active: str = "") -> str:
         is_open = any(slug == active for slug, _ in tabs)
         open_attr = " open" if is_open else ""
         links = "".join(_link(slug, label) for slug, label in tabs)
+        first_href = f'/admin/{tabs[0][0]}?token={token}'
         sections_html += (
             f'<details{open_attr} class="pres-acc" style="margin-bottom:2px">'
             f'<summary style="cursor:pointer;padding:8px 10px;font-size:10px;font-weight:700;'
@@ -67,7 +68,12 @@ def admin_nav(token: str, active: str = "") -> str:
             f'background:transparent;outline:none" '
             f'onmouseover="this.style.color=\'#9ca3af\'" '
             f'onmouseout="this.style.color=\'#6b7280\'">'
-            f'{sec_label} <span style="font-size:9px">▾</span></summary>'
+            f'<a href="{first_href}" onclick="event.stopPropagation()" '
+            f'style="flex:1;text-decoration:none;color:inherit;display:block">{sec_label}</a>'
+            f'<span onclick="event.stopPropagation();var d=this.closest(\'details\');'
+            f'd.hasAttribute(\'open\')?d.removeAttribute(\'open\'):d.setAttribute(\'open\',\'\');" '
+            f'style="font-size:9px;padding:0 4px;cursor:pointer">▾</span>'
+            f'</summary>'
             f'<div style="padding:2px 0 6px 4px">{links}</div>'
             f'</details>'
         )

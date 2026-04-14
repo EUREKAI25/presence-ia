@@ -35,6 +35,7 @@ def rdv_page(request: Request):
     token = _check_token(request)
 
     slots, closers_map, meetings, closers_list = [], {}, [], []
+    bookings = []
     try:
         from marketing_module.database import SessionLocal as MktSession, db_list_slots, db_list_closers
         from marketing_module.models import SlotStatus
@@ -56,6 +57,22 @@ def rdv_page(request: Request):
     except Exception as e:
         log.warning("rdv_page load: %s", e)
 
+    # ── Bookings landing page (v3_bookings) ──
+    try:
+        from ...database import SessionLocal as AppSession
+        from ...models import V3BookingDB
+        now_str  = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+        week_str = (datetime.utcnow() + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%S")
+        with AppSession() as db:
+            rows = (db.query(V3BookingDB)
+                    .filter(V3BookingDB.start_iso >= now_str[:10],
+                            V3BookingDB.start_iso <= week_str[:10] + "T23:59:59")
+                    .order_by(V3BookingDB.start_iso)
+                    .all())
+            bookings = [(b.id, b.name, b.phone or "", b.start_iso, b.end_iso, b.gcal_event_url or "") for b in rows]
+    except Exception as e:
+        log.warning("rdv_page bookings load: %s", e)
+
     STATUS_COLORS = {
         "available": ("#2ecc71", "Disponible"),
         "booked":    ("#8b5cf6", "Réservé"),
@@ -64,7 +81,35 @@ def rdv_page(request: Request):
         "cancelled": ("#e94560", "Annulé"),
     }
 
-    # ── Créneaux ──
+    # ── RDV confirmés (v3_bookings) ──
+    booking_rows = ""
+    for bid, bname, bphone, bstart, bend, bgcal in bookings:
+        try:
+            from zoneinfo import ZoneInfo
+            dt = datetime.fromisoformat(bstart).replace(tzinfo=ZoneInfo("Europe/Paris"))
+            start_label = dt.strftime("%d/%m %H:%M")
+            end_label   = datetime.fromisoformat(bend).replace(tzinfo=ZoneInfo("Europe/Paris")).strftime("%H:%M")
+        except Exception:
+            start_label = bstart[:16]
+            end_label   = bend[11:16]
+        gcal_link = (f'<a href="{bgcal}" target="_blank" style="color:#4285f4;font-size:10px">GCal</a>'
+                     if bgcal else "")
+        booking_rows += (
+            f'<tr>'
+            f'<td style="padding:8px 10px;font-size:12px">{start_label}</td>'
+            f'<td style="padding:8px 10px;font-size:12px">{end_label}</td>'
+            f'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#e8e8f0">{bname}</td>'
+            f'<td style="padding:8px 10px;font-size:11px;color:#9ca3af">{bphone}</td>'
+            f'<td style="padding:8px 10px">'
+            f'<span style="background:#8b5cf620;color:#8b5cf6;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px">CONFIRMÉ</span>'
+            f'</td>'
+            f'<td style="padding:8px 10px">{gcal_link}</td>'
+            f'</tr>'
+        )
+    if not booking_rows:
+        booking_rows = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#555">Aucun RDV sur les 14 prochains jours</td></tr>'
+
+    # ── Créneaux (marketing module) ──
     slot_rows = ""
     for s in slots:
         color, label = STATUS_COLORS.get(s.status, ("#555", s.status))
@@ -149,20 +194,33 @@ label{{display:block;color:#9ca3af;font-size:11px;margin-bottom:4px;margin-top:1
 <div style="max-width:1000px;margin:0 auto;padding:24px">
 <h1 style="color:#fff;font-size:18px;margin-bottom:24px">📅 RDV</h1>
 
-<!-- ── Créneaux ── -->
+<!-- ── RDV confirmés (landing page) ── -->
 <div class="panel">
   <div class="panel-head">
     <div>
-      <h2 style="margin:0">Agenda — {len(slots)} créneau(x) sur 14 jours</h2>
+      <h2 style="margin:0">Agenda — {len(bookings)} RDV sur 14 jours</h2>
       <div style="margin-top:6px">{gcal_badge}</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-ghost" onclick="syncCal()">↻ Sync Calendly</button>
-      <button class="btn btn-primary" onclick="document.getElementById('add-form').style.display='block'">+ Ajouter</button>
-    </div>
   </div>
+  <table>
+    <thead><tr>
+      <th {th2}>Début</th><th {th2}>Fin</th><th {th2}>Prospect</th>
+      <th {th2}>Téléphone</th><th {th2}>Statut</th><th {th2}>Agenda</th>
+    </tr></thead>
+    <tbody>{booking_rows}</tbody>
+  </table>
+</div>
+
+<!-- ── Créneaux (marketing module) ── -->
+<details style="margin-bottom:32px">
+  <summary style="cursor:pointer;color:#6b7280;font-size:12px;padding:8px 0;list-style:none;display:flex;align-items:center;gap:6px">
+    <span>▾</span> Créneaux marketing — {len(slots)} créneau(x) sur 14 jours
+    <button class="btn btn-ghost" onclick="event.stopPropagation();syncCal()" style="margin-left:12px;font-size:11px;padding:4px 10px">↻ Sync Calendly</button>
+    <button class="btn btn-primary" onclick="event.stopPropagation();document.getElementById('add-form').style.display='block'" style="font-size:11px;padding:4px 10px">+ Ajouter</button>
+  </summary>
+  <div class="panel" style="margin-top:8px">
   <div id="add-form">
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:16px">
       <div><label>Date/Heure début</label><input type="datetime-local" id="new-starts" style="width:180px"></div>
       <div><label>Note (optionnel)</label><input type="text" id="new-notes" placeholder="ex: Créneau dispo" style="width:200px"></div>
       <button class="btn btn-primary" onclick="addSlot()">Créer</button>
@@ -176,7 +234,8 @@ label{{display:block;color:#9ca3af;font-size:11px;margin-bottom:4px;margin-top:1
     </tr></thead>
     <tbody>{slot_rows}</tbody>
   </table>
-</div>
+  </div>
+</details>
 
 <!-- ── Résultats ── -->
 <div class="panel">
