@@ -447,7 +447,7 @@ a{color:inherit}
 .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(82,127,179,.35) 0%,transparent 70%);pointer-events:none}
 .hero__badge{display:inline-flex;align-items:center;gap:6px;background:rgba(82,127,179,.15);border:1px solid rgba(82,127,179,.3);color:#93c5fd;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:32px}
 .hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;max-width:820px;margin:0 auto 24px;letter-spacing:-.03em}
-.hero h1 em{font-style:normal;color:#60a5fa;display:block;font-size:1.25em;margin-top:15px}
+.hero h1 em{font-style:normal;color:#60a5fa;display:block;font-size:1.25em;margin-top:0.55em}
 .hero p{font-size:1.1rem;max-width:540px;margin:0 auto 44px;color:#94a3b8;line-height:1.8}
 .btn-hero{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#fff;font-weight:700;padding:16px 36px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(153,103,16,.35);transition:all .18s}
 .btn-hero:hover{background:var(--gold-hover);transform:translateY(-1px);box-shadow:0 8px 28px rgba(153,103,16,.45)}
@@ -520,6 +520,9 @@ footer a{color:#9ca3af;text-decoration:underline}
 </nav>
 
 <div class="hero">
+  <img src="/assets/logo_bck.svg" aria-hidden="true"
+    style="position:absolute;right:-2%;bottom:-8%;width:46%;max-width:520px;
+           opacity:.07;pointer-events:none;user-select:none;filter:invert(1) brightness(2)">
   <div class="hero__badge">Audit Présence IA</div>
   <h1>{hero_title}</h1>
   <p>{hero_subtitle}</p>
