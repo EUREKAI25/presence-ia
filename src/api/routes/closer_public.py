@@ -88,7 +88,6 @@ a{text-decoration:none}
     </p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <a href="/closer/recruit" class="btn-primary">Je postule maintenant →</a>
-      <a href="#comment" class="btn-sec">Comment ça marche</a>
     </div>
     <!-- Chiffres -->
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
