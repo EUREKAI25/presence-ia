@@ -425,7 +425,7 @@ _DEMO_MEETINGS = [
             ("📧", "Envoyé", "08/03 09:14", "#6b7280"),
             ("👁", "Ouvert", "08/03 11:32", "#f59e0b"),
             ("🌐", "Landing visitée", "08/03 11:34", "#2ecc71"),
-            ("📅", "Calendly cliqué", "08/03 11:37", "#6366f1"),
+            ("📅", "Calendly cliqué", "08/03 11:37", "#527fb3"),
         ],
     },
     {
@@ -459,7 +459,7 @@ _DEMO_MEETINGS = [
             ("📧", "Envoyé", "01/03 10:00", "#6b7280"),
             ("👁", "Ouvert", "01/03 12:15", "#f59e0b"),
             ("🌐", "Landing visitée", "01/03 12:18", "#2ecc71"),
-            ("📅", "Calendly cliqué", "02/03 09:30", "#6366f1"),
+            ("📅", "Calendly cliqué", "02/03 09:30", "#527fb3"),
         ],
     },
     {
@@ -514,7 +514,7 @@ def closer_demo_slots(request: Request):
         is_me = r["name"] == "Marie Martin"
         rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
         leaderboard_rows += (
-            f'<tr style="background:{"#6366f115" if is_me else "transparent"};'
+            f'<tr style="background:{"#527fb315" if is_me else "transparent"};'
             f'border-bottom:1px solid #1a1a2e">'
             f'<td style="padding:10px 14px;color:#9ca3af;'
             f'font-size:13px;font-weight:{"700" if is_me else "400"}">'
@@ -534,8 +534,8 @@ def closer_demo_slots(request: Request):
 
     STATUS_INFO = {
         "available":    ("#2ecc71", "Disponible", False),
-        "booked":       ("#8b5cf6", "Prospect inscrit", True),
-        "claimed_me":   ("#6366f1", "Pris par moi", False),
+        "booked":       ("#ffbd5c", "Prospect inscrit", True),
+        "claimed_me":   ("#527fb3", "Pris par moi", False),
         "claimed_other":("#374151", "Pris par un autre", False),
     }
 
@@ -557,7 +557,7 @@ def closer_demo_slots(request: Request):
 
             claim_btn = (
                 f'<button onclick="claimSlot(\'{s["id"]}\')" '
-                f'style="margin-top:8px;padding:5px 12px;background:#8b5cf6;border:none;'
+                f'style="margin-top:8px;padding:5px 12px;background:#ffbd5c;border:none;'
                 f'border-radius:4px;color:#fff;font-size:11px;font-weight:600;cursor:pointer">Prendre ce créneau</button>'
             ) if can_claim else ""
 
@@ -587,18 +587,21 @@ def closer_demo_slots(request: Request):
 <title>Créneaux disponibles — Aperçu</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
 </head><body>
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
-            display:flex;align-items:center;justify-content:space-between">
+<div style="position:sticky;top:0;z-index:100;background:rgba(13,20,33,.92);
+            backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+            border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;
+            box-shadow:0 2px 20px rgba(0,0,0,.35);
+            height:60px;display:flex;align-items:center;justify-content:space-between">
   <div style="display:flex;align-items:center;gap:10px">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+    <img src="/assets/logo-white.svg" alt="Présence IA" style="height:28px">
     <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
   </div>
   <a href="/closer/demo" style="color:#527FB3;font-size:12px;text-decoration:none">← Mon portail</a>
 </div>
 <div style="max-width:820px;margin:0 auto;padding:28px 20px">
 
-<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;
-  padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+<div style="background:#ffbd5c12;border:1px solid #ffbd5c35;border-radius:6px;
+  padding:10px 14px;margin-bottom:20px;font-size:12px;color:#ffbd5c">
   ⚠️ Aperçu admin — données fictives.
 </div>
 
@@ -609,11 +612,11 @@ def closer_demo_slots(request: Request):
     <span style="color:#9ca3af;font-size:11px">Disponible</span>
   </div>
   <div style="display:flex;align-items:center;gap:6px">
-    <span style="width:10px;height:10px;background:#8b5cf6;border-radius:50%;display:inline-block"></span>
+    <span style="width:10px;height:10px;background:#ffbd5c;border-radius:50%;display:inline-block"></span>
     <span style="color:#9ca3af;font-size:11px">Prospect inscrit</span>
   </div>
   <div style="display:flex;align-items:center;gap:6px">
-    <span style="width:10px;height:10px;background:#6366f1;border-radius:50%;display:inline-block"></span>
+    <span style="width:10px;height:10px;background:#527fb3;border-radius:50%;display:inline-block"></span>
     <span style="color:#9ca3af;font-size:11px">Pris par moi</span>
   </div>
   <div style="display:flex;align-items:center;gap:6px">
@@ -677,7 +680,7 @@ def closer_portal_demo(request: Request):
         f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{l}</div>'
         f'</div>'
         for v, l, c in [
-            (stats["scheduled"],          "RDV à venir",      "#6366f1"),
+            (stats["scheduled"],          "RDV à venir",      "#527fb3"),
             (stats["completed"],          "Signés",           "#2ecc71"),
             (stats["no_show"],            "No-show",          "#e94560"),
             (conv_rate,                   "Taux conversion",  "#e9a020"),
@@ -692,11 +695,11 @@ def closer_portal_demo(request: Request):
     def _upcoming_card(m):
         phone_btn = (
             f'<a href="tel:{m["phone"]}" style="display:inline-block;margin-top:8px;'
-            f'padding:5px 12px;background:#6366f120;border:1px solid #6366f140;'
-            f'border-radius:4px;color:#6366f1;font-size:11px;text-decoration:none">📞 Appeler</a>'
+            f'padding:5px 12px;background:#527fb320;border:1px solid #527fb340;'
+            f'border-radius:4px;color:#527fb3;font-size:11px;text-decoration:none">📞 Appeler</a>'
         ) if m["phone"] else ""
         return (
-            f'<div style="background:#1a1a2e;border:1px solid #6366f140;border-radius:10px;padding:16px;margin-bottom:12px">'
+            f'<div style="background:#1a1a2e;border:1px solid #527fb340;border-radius:10px;padding:16px;margin-bottom:12px">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
             f'  <div>'
             f'    <div style="color:#fff;font-size:14px;font-weight:600">{m["name"]}</div>'
@@ -704,7 +707,7 @@ def closer_portal_demo(request: Request):
             f'    {phone_btn}'
             f'  </div>'
             f'  <div style="text-align:right">'
-            f'    <div style="color:#6366f1;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
+            f'    <div style="color:#527fb3;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
             f'    <a href="/closer/demo/meeting/{m["id"]}" '
             f'    style="display:inline-block;margin-top:6px;color:#527FB3;font-size:11px;text-decoration:none">'
             f'    Fiche RDV →</a>'
@@ -737,13 +740,13 @@ def closer_portal_demo(request: Request):
 
     def _pre(text):
         return "<br>".join(
-            f'<span style="color:{"#6366f1" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
+            f'<span style="color:{"#527fb3" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
             if ln.strip() else '<span style="display:block;height:8px"></span>'
             for ln in (text or "").split("\n")
         )
 
     panel_rdv = f"""
-<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+<div style="background:#527fb315;border:1px solid #527fb330;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#93c5fd">
   ⚠️ Aperçu admin — données fictives. La vraie page s'affiche sur <code>/closer/{{token}}</code>
 </div>
 <h3 style="color:#fff;font-size:14px;margin-bottom:16px">RDV à venir ({len(upcoming)})</h3>
@@ -763,11 +766,11 @@ def closer_portal_demo(request: Request):
     _bonus_on   = content.get("bonus_enabled", False)
     _bonus_rate = float(content.get("bonus_rate", 0.04))
     _bonus_block = (
-        f'<div style="background:#6366f110;border:1px solid #6366f140;border-radius:8px;padding:14px 16px;margin-top:12px">'
-        f'<p style="color:#a5b4fc;font-size:11px;font-weight:700;margin-bottom:4px">BONUS MENSUEL ACTIF</p>'
+        f'<div style="background:#527fb310;border:1px solid #527fb340;border-radius:8px;padding:14px 16px;margin-top:12px">'
+        f'<p style="color:#93c5fd;font-size:11px;font-weight:700;margin-bottom:4px">BONUS MENSUEL ACTIF</p>'
         f'<p style="color:#ccc;font-size:12px;line-height:1.6">'
         f'Le top closer du mois reçoit +{int(_bonus_rate*100)}% rétroactif sur tous ses deals.<br>'
-        f'Taux effectif : <strong style="color:#a5b4fc">{int((0.18+_bonus_rate)*100)}%</strong> · '
+        f'Taux effectif : <strong style="color:#93c5fd">{int((0.18+_bonus_rate)*100)}%</strong> · '
         f'Max sur Domination : <strong style="color:#2ecc71">{int(9000*(0.18+_bonus_rate))}€</strong>'
         f'</p></div>'
     ) if _bonus_on else ""
@@ -779,7 +782,7 @@ def closer_portal_demo(request: Request):
     <div style="color:#9ca3af;font-size:11px;margin-top:4px">Gagné (tous temps)</div>
   </div>
   <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
-    <div style="font-size:2rem;font-weight:700;color:#6366f1">{stats["pending"]:.0f}€</div>
+    <div style="font-size:2rem;font-weight:700;color:#527fb3">{stats["pending"]:.0f}€</div>
     <div style="color:#9ca3af;font-size:11px;margin-top:4px">En attente</div>
   </div>
   <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;text-align:center">
@@ -793,7 +796,7 @@ def closer_portal_demo(request: Request):
 </div>
 {_bonus_block}"""
 
-    def _resource_block(title, text, color="#6366f1"):
+    def _resource_block(title, text, color="#527fb3"):
         return (
             f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">'
             f'<p style="color:{color};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">{title}</p>'
@@ -802,7 +805,7 @@ def closer_portal_demo(request: Request):
         )
 
     panel_offre      = _resource_block(content.get("offer_title","L'offre") + f' — {content.get("offer_price","")}', content.get("offer_pitch",""), "#2ecc71")
-    panel_script     = _resource_block("Script de vente", content.get("pitch_script",""), "#6366f1")
+    panel_script     = _resource_block("Script de vente", content.get("pitch_script",""), "#527fb3")
     panel_objections = _resource_block("Réponses aux objections", content.get("objections",""), "#e9a020")
 
     # Leaderboard démo
@@ -812,7 +815,7 @@ def closer_portal_demo(request: Request):
     # panel_rdv avec bouton Agenda (pointe vers le nouveau calendrier interactif)
     panel_rdv = (
         f'<div style="margin-bottom:20px">'
-        f'<a href="/closer/test-planning-2026/slots?demo=1" style="display:inline-block;background:#8b5cf6;'
+        f'<a href="/closer/test-planning-2026/slots?demo=1" style="display:inline-block;background:#ffbd5c;'
         f'color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">'
         f'📅 Agenda — voir les créneaux disponibles →</a>'
         f'</div>'
@@ -824,8 +827,8 @@ def closer_portal_demo(request: Request):
         a = slug == active
         return (f'<button onclick="switchTab(\'{slug}\')" id="tab-{slug}" '
                 f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;'
-                f'font-weight:{"700" if a else "400"};background:{"#6366f1" if a else "#1a1a2e"};'
-                f'color:{"#fff" if a else "#9ca3af"};border:1px solid {"#6366f1" if a else "#2a2a4e"}">{label}</button>')
+                f'font-weight:{"700" if a else "400"};background:{"#527fb3" if a else "#1a1a2e"};'
+                f'color:{"#fff" if a else "#9ca3af"};border:1px solid {"#527fb3" if a else "#2a2a4e"}">{label}</button>')
 
     tabs_html = f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">{"".join(_tab_btn(s,l) for s,l in TABS)}</div>'
 
@@ -838,10 +841,10 @@ def closer_portal_demo(request: Request):
 <title>Portail Closer — Aperçu</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}table{{width:100%;border-collapse:collapse}}tr:hover{{background:#111127}}</style>
 </head><body>
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
+<div style="position:sticky;top:0;z-index:100;background:rgba(13,20,33,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;box-shadow:0 2px 20px rgba(0,0,0,.35);height:60px;display:flex;align-items:center;justify-content:space-between">
   <div style="display:flex;align-items:center;gap:10px">
-    <img src="/assets/logo.svg" alt="Présence IA" style="height:26px">
-    <span style="color:#9ca3af;font-size:11px">Portail Closer</span>
+    <img src="/assets/logo-white.svg" alt="Présence IA" style="height:28px">
+    <span style="color:#7d94b0;font-size:11px">Portail Closer</span>
   </div>
   <span style="color:#fff;font-weight:600;font-size:14px">{name}</span>
 </div>
@@ -856,8 +859,8 @@ function switchTab(slug){{
   document.getElementById('tab-content').innerHTML=_panels[slug]||'';
   document.querySelectorAll('[id^="tab-"]').forEach(b=>{{
     const a=b.id==='tab-'+slug;
-    b.style.background=a?'#6366f1':'#1a1a2e';b.style.color=a?'#fff':'#9ca3af';
-    b.style.fontWeight=a?'700':'400';b.style.borderColor=a?'#6366f1':'#2a2a4e';
+    b.style.background=a?'#527fb3':'#161e2e';b.style.color=a?'#fff':'#7d94b0';
+    b.style.fontWeight=a?'700':'400';b.style.borderColor=a?'#527fb3':'#2a3d5a';
   }});
 }}
 </script>
@@ -871,7 +874,7 @@ def closer_meeting_demo(demo_id: str, request: Request):
     meeting  = next((m for m in _DEMO_MEETINGS if m["id"] == demo_id), _DEMO_MEETINGS[0])
 
     rdv_guide_lines = "".join(
-        f'<div style="padding:6px 0;border-bottom:1px solid #1a1a2e;color:{"#6366f1" if ln.startswith(("AVANT","PENDANT","FIN","1.","2.","3.","4.","5.","6.","7.","8.","9.")) else "#ccc"};font-size:12px;line-height:1.5">{ln}</div>'
+        f'<div style="padding:6px 0;border-bottom:1px solid #1a1a2e;color:{"#527fb3" if ln.startswith(("AVANT","PENDANT","FIN","1.","2.","3.","4.","5.","6.","7.","8.","9.")) else "#ccc"};font-size:12px;line-height:1.5">{ln}</div>'
         if ln.strip() else '<div style="height:6px"></div>'
         for ln in content.get("rdv_guide", "").split("\n")
     )
@@ -883,8 +886,8 @@ def closer_meeting_demo(demo_id: str, request: Request):
 
     phone_btn = (
         f'<a href="tel:{meeting["phone"]}" style="display:inline-block;margin-top:6px;padding:6px 14px;'
-        f'background:#6366f120;border:1px solid #6366f140;border-radius:4px;'
-        f'color:#6366f1;font-size:12px;text-decoration:none">📞 {meeting["phone"]}</a>'
+        f'background:#527fb320;border:1px solid #527fb340;border-radius:4px;'
+        f'color:#93c5fd;font-size:12px;text-decoration:none">📞 {meeting["phone"]}</a>'
     ) if meeting["phone"] else ""
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
@@ -892,13 +895,13 @@ def closer_meeting_demo(demo_id: str, request: Request):
 <title>Fiche RDV — {meeting["name"]}</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px}}.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}</style>
 </head><body>
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
-  <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+<div style="position:sticky;top:0;z-index:100;background:rgba(13,20,33,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;box-shadow:0 2px 20px rgba(0,0,0,.35);height:60px;display:flex;align-items:center;justify-content:space-between">
+  <img src="/assets/logo-white.svg" alt="Présence IA" style="height:28px">
   <a href="/closer/demo" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
 </div>
 <div style="max-width:780px;margin:0 auto;padding:28px 20px">
 
-<div style="background:#6366f115;border:1px solid #6366f130;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
+<div style="background:#ffbd5c12;border:1px solid #ffbd5c35;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#ffbd5c">
   ⚠️ Aperçu admin — données fictives
 </div>
 
@@ -1200,7 +1203,7 @@ def closer_portal(token: str, request: Request):
         f'<div style="color:#9ca3af;font-size:11px;margin-top:3px">{l}</div>'
         f'</div>'
         for v, l, c in [
-            (stats["scheduled"],          "RDV à venir",      "#6366f1"),
+            (stats["scheduled"],          "RDV à venir",      "#527fb3"),
             (stats["completed"],          "Signés",           "#2ecc71"),
             (stats["no_show"],            "No-show",          "#e94560"),
             (conv_rate,                   "Taux conversion",  "#e9a020"),
@@ -1213,11 +1216,11 @@ def closer_portal(token: str, request: Request):
     def _upcoming_card(m):
         phone_btn = (
             f'<a href="tel:{m["phone"]}" style="display:inline-block;margin-top:8px;'
-            f'padding:5px 12px;background:#6366f120;border:1px solid #6366f140;'
-            f'border-radius:4px;color:#6366f1;font-size:11px;text-decoration:none">📞 Appeler</a>'
+            f'padding:5px 12px;background:#527fb320;border:1px solid #527fb340;'
+            f'border-radius:4px;color:#527fb3;font-size:11px;text-decoration:none">📞 Appeler</a>'
         ) if m["phone"] else ""
         return (
-            f'<div style="background:#1a1a2e;border:1px solid #6366f140;border-radius:10px;'
+            f'<div style="background:#1a1a2e;border:1px solid #527fb340;border-radius:10px;'
             f'padding:16px;margin-bottom:12px">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
             f'  <div>'
@@ -1226,7 +1229,7 @@ def closer_portal(token: str, request: Request):
             f'    {phone_btn}'
             f'  </div>'
             f'  <div style="text-align:right">'
-            f'    <div style="color:#6366f1;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
+            f'    <div style="color:#527fb3;font-size:13px;font-weight:600">{m["scheduled_str"]}</div>'
             f'    <a href="/closer/{token}/meeting/{m["id"]}" '
             f'    style="display:inline-block;margin-top:6px;color:#527FB3;font-size:11px;text-decoration:none">'
             f'    Fiche RDV →</a>'
@@ -1278,8 +1281,8 @@ def closer_portal(token: str, request: Request):
                            ) if r["bonus"] else ""
             rank_icon = "🥇" if r["rank"] == 1 else ("🥈" if r["rank"] == 2 else "#" + str(r["rank"]))
             leaderboard_rows_real += (
-                f'<tr style="background:{"#6366f115" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
-                f'<td style="padding:10px 14px;color:{"#a5b4fc" if r["bonus"] else "#9ca3af"};font-size:13px">'
+                f'<tr style="background:{"#527fb315" if is_me else "transparent"};border-bottom:1px solid #1a1a2e">'
+                f'<td style="padding:10px 14px;color:{"#93c5fd" if r["bonus"] else "#9ca3af"};font-size:13px">'
                 f'{rank_icon}</td>'
                 f'<td style="padding:10px 14px;color:#fff;font-size:13px;font-weight:{"700" if is_me else "400"}">'
                 f'{r["name"]}{" (moi)" if is_me else ""}{bonus_badge}</td>'
@@ -1348,7 +1351,7 @@ async function requestPayment(){{
         r.get("status") == "pending" for r in payment_requests_closer
     )
     _request_btn_style = (
-        "background:#6366f1;color:#fff;cursor:pointer"
+        "background:#527fb3;color:#fff;cursor:pointer"
         if _can_request else
         "background:#2a2a4e;color:#555;cursor:not-allowed"
     )
@@ -1383,7 +1386,7 @@ async function requestPayment(){{
     <input id="iban-input" value="{closer_iban}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
       style="flex:1;min-width:240px;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
              padding:10px 14px;color:#e8e8f0;font-size:13px;font-family:monospace;outline:none">
-    <button onclick="saveIban()" style="padding:10px 20px;background:#6366f1;border:none;
+    <button onclick="saveIban()" style="padding:10px 20px;background:#527fb3;border:none;
       border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Enregistrer</button>
     <span id="iban-saved" style="color:#2ecc71;font-size:12px;display:none">IBAN enregistré ✓</span>
   </div>
@@ -1426,9 +1429,9 @@ async function requestPayment(){{
             f'<button onclick="switchTab(\'{slug}\')" id="tab-{slug}" '
             f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;'
             f'font-weight:{"700" if active else "400"};'
-            f'background:{"#6366f1" if active else "#1a1a2e"};'
+            f'background:{"#527fb3" if active else "#1a1a2e"};'
             f'color:{"#fff" if active else "#9ca3af"};'
-            f'border:1px solid {"#6366f1" if active else "#2a2a4e"}">'
+            f'border:1px solid {"#527fb3" if active else "#2a2a4e"}">'
             f'{label}</button>'
         )
 
@@ -1437,14 +1440,14 @@ async function requestPayment(){{
     def _pre(text):
         """Rendu texte brut en HTML lisible."""
         return "<br>".join(
-            f'<span style="color:{"#6366f1" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
+            f'<span style="color:{"#527fb3" if ln.startswith(tuple("123456789")) else "#ccc"}">{ln}</span>'
             if ln.strip() else '<span style="display:block;height:8px"></span>'
             for ln in (text or "").split("\n")
         )
 
     panel_rdv = f"""
 <div style="margin-bottom:20px">
-  <a href="/closer/{token}/slots" style="display:inline-block;background:#8b5cf6;
+  <a href="/closer/{token}/slots" style="display:inline-block;background:#ffbd5c;
     color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">
     📅 Agenda — voir les créneaux disponibles →</a>
 </div>
@@ -1468,7 +1471,7 @@ async function requestPayment(){{
     panel_commissions = f"""
 <div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:baseline">
   <h2 style="color:#fff;font-size:16px;font-weight:700">Ventes &amp; Commissions</h2>
-  <span style="color:#6366f1;font-size:12px;font-weight:600">{_month_label}</span>
+  <span style="color:#527fb3;font-size:12px;font-weight:600">{_month_label}</span>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">
@@ -1515,7 +1518,7 @@ async function requestPayment(){{
   <div style="color:#ccc;font-size:13px;line-height:1.8">{comm_info_html or '<span style="color:#555">Aucune règle définie — voir avec l\'équipe.</span>'}</div>
 </div>"""
 
-    def _resource_block(title, text, color="#6366f1"):
+    def _resource_block(title, text, color="#527fb3"):
         return (
             f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px">'
             f'<p style="color:{color};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">{title}</p>'
@@ -1529,7 +1532,7 @@ async function requestPayment(){{
     _offer_blocks = [b.strip() for b in _re_off.split(r'─{5,}', _pitch_raw) if b.strip()]
 
     _OFFER_META = [
-        {"slug": "o1", "label": "Offre 1", "color": "#6366f1", "bg": "#6366f115", "border": "#6366f130", "comm": "90€"},
+        {"slug": "o1", "label": "Offre 1", "color": "#527fb3", "bg": "#527fb315", "border": "#527fb330", "comm": "90€"},
         {"slug": "o2", "label": "Offre 2", "color": "#2ecc71", "bg": "#2ecc7115", "border": "#2ecc7130", "comm": "630€"},
         {"slug": "o3", "label": "Offre 3", "color": "#f59e0b", "bg": "#f59e0b15", "border": "#f59e0b30", "comm": "1 620€"},
     ]
@@ -1690,8 +1693,8 @@ function switchOffer(slug){{
                 continue
             if stripped.startswith('"') or stripped.startswith('\u201c'):
                 body_html += (
-                    f'<div style="border-left:2px solid #6366f1;padding:8px 12px;margin:8px 0;'
-                    f'background:#6366f108;border-radius:0 6px 6px 0">'
+                    f'<div style="border-left:2px solid #527fb3;padding:8px 12px;margin:8px 0;'
+                    f'background:#527fb308;border-radius:0 6px 6px 0">'
                     f'<span style="color:#e8e8f0;font-size:13px;font-style:italic">{stripped}</span>'
                     f'</div>'
                 )
@@ -1702,13 +1705,13 @@ function switchOffer(slug){{
             elif stripped.startswith("→") or stripped.startswith("Si ") or stripped.startswith("Ordre"):
                 body_html += (
                     f'<div style="display:flex;gap:8px;padding:4px 0">'
-                    f'<span style="color:#6366f1;flex-shrink:0">›</span>'
+                    f'<span style="color:#527fb3;flex-shrink:0">›</span>'
                     f'<span style="color:#ccc;font-size:13px">{stripped.lstrip("→").strip()}</span>'
                     f'</div>'
                 )
             elif stripped.isupper() and len(stripped) > 3:
                 body_html += (
-                    f'<p style="color:#a5b4fc;font-size:10px;font-weight:700;text-transform:uppercase;'
+                    f'<p style="color:#93c5fd;font-size:10px;font-weight:700;text-transform:uppercase;'
                     f'letter-spacing:.1em;margin:14px 0 6px">{stripped.rstrip(" :")}</p>'
                 )
             else:
@@ -1720,7 +1723,7 @@ function switchOffer(slug){{
             f'<details style="border:1px solid #2a2a4e;border-radius:8px;margin-bottom:8px;overflow:hidden">'
             f'<summary style="list-style:none;padding:14px 16px;cursor:pointer;display:flex;'
             f'align-items:center;gap:12px;background:#1a1a2e;user-select:none">'
-            f'<span style="background:#6366f120;color:#a5b4fc;font-size:10px;font-weight:700;'
+            f'<span style="background:#527fb320;color:#93c5fd;font-size:10px;font-weight:700;'
             f'padding:2px 7px;border-radius:10px;flex-shrink:0">{badge_num}</span>'
             f'<span style="color:#e8e8f0;font-size:13px;font-weight:600">{title_clean}</span>'
             f'<span style="margin-left:auto;color:#6b7280;font-size:16px">▾</span>'
@@ -1835,7 +1838,7 @@ tr:hover{{background:#111127}}
 .hdr{{background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}}
 .hdr-left{{display:flex;align-items:center;gap:10px}}
 .hdr-title{{font-size:14px;font-weight:700;color:#fff}}
-.hdr-back{{color:#6366f1;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#6366f112}}
+.hdr-back{{color:#527fb3;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#527fb312}}
 </style></head><body>
 
 <div class="hdr">
@@ -1874,10 +1877,10 @@ function switchTab(slug) {{
   document.getElementById('tab-content').innerHTML = _panels[slug] || '';
   document.querySelectorAll('[id^="tab-"]').forEach(b => {{
     const active = b.id === 'tab-' + slug;
-    b.style.background  = active ? '#6366f1' : '#1a1a2e';
+    b.style.background  = active ? '#527fb3' : '#1a1a2e';
     b.style.color       = active ? '#fff'    : '#9ca3af';
     b.style.fontWeight  = active ? '700'     : '400';
-    b.style.borderColor = active ? '#6366f1' : '#2a2a4e';
+    b.style.borderColor = active ? '#527fb3' : '#2a2a4e';
   }});
   history.replaceState(null,'',location.pathname + '?tab=' + slug);
 }}
@@ -1901,7 +1904,7 @@ def _meeting_badge(status: str, scheduled_at=None) -> str:
         "no_show":   ("#e94560", "No-show"),
         "cancelled": ("#9ca3af", "Annulé"),
     }
-    color, label = m.get(status, ("#6366f1", status))
+    color, label = m.get(status, ("#527fb3", status))
     return (f'<span style="background:{color}20;color:{color};font-size:10px;font-weight:600;'
             f'padding:2px 7px;border-radius:10px">{label}</span>')
 
@@ -2006,13 +2009,13 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
             lv = getattr(dv, "landing_visited_at", None)
             if lv:            timeline += f'<li style="color:#2ecc71">🌐 Landing visitée {_fmt(lv)}</li>'
             cc = getattr(dv, "calendly_clicked_at", None)
-            if cc:            timeline += f'<li style="color:#6366f1">📅 Calendly cliqué {_fmt(cc)}</li>'
+            if cc:            timeline += f'<li style="color:#527fb3">📅 Calendly cliqué {_fmt(cc)}</li>'
     except Exception:
         pass
 
     phone_btn = (
-        f'<a href="tel:{phone}" style="padding:6px 12px;background:#6366f120;border:1px solid #6366f140;'
-        f'border-radius:4px;color:#6366f1;font-size:12px;text-decoration:none">📞 {phone}</a>'
+        f'<a href="tel:{phone}" style="padding:6px 12px;background:#527fb320;border:1px solid #527fb340;'
+        f'border-radius:4px;color:#527fb3;font-size:12px;text-decoration:none">📞 {phone}</a>'
     ) if phone else ""
     land_btn = (
         f'<a href="https://presence-ia.com{land}" target="_blank" '
@@ -2038,7 +2041,7 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
             f'<div style="text-align:right">'
             f'<div style="color:#2ecc71;font-size:1.8rem;font-weight:900">{price}</div>'
             f'<button onclick="sendPaymentLink(event,\'{num}\')" style="margin-top:4px;padding:4px 10px;'
-            f'background:#6366f1;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer">'
+            f'background:#527fb3;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer">'
             f'Envoyer lien →</button></div></summary>'
             f'<div style="padding:0 16px 16px">'
             f'<pre id="ob{num}" style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7"></pre>'
@@ -2056,20 +2059,23 @@ body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
 .card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:14px}}
 .sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:block}}
 .rtab{{padding:7px 14px;border:1px solid #2a2a4e;border-radius:6px;background:#1a1a2e;color:#9ca3af;font-size:11px;cursor:pointer}}
-.active-rtab{{background:#6366f1;color:#fff;border-color:#6366f1}}
+.active-rtab{{background:#527fb3;color:#fff;border-color:#527fb3}}
 details>summary::-webkit-details-marker{{display:none}}
 textarea{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc;font-size:13px;
   padding:10px;width:100%;resize:vertical;min-height:80px;font-family:inherit;line-height:1.5}}
-textarea:focus{{outline:none;border-color:#6366f1}}
+textarea:focus{{outline:none;border-color:#527fb3}}
 .modal-bg{{display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center}}
 .modal-bg.open{{display:flex}}
 .modal{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:24px;max-width:480px;width:90%}}
 select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc;padding:8px 10px;width:100%;font-size:13px}}
 </style></head><body>
 
-<div style="background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:14px 24px;
-            display:flex;align-items:center;justify-content:space-between">
-  <img src="/assets/logo.svg" alt="Présence IA" style="height:24px">
+<div style="position:sticky;top:0;z-index:100;background:rgba(13,20,33,.92);
+            backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+            border-bottom:1px solid rgba(82,127,179,.15);padding:0 24px;
+            box-shadow:0 2px 20px rgba(0,0,0,.35);
+            height:60px;display:flex;align-items:center;justify-content:space-between">
+  <img src="/assets/logo-white.svg" alt="Présence IA" style="height:28px">
   <a href="/closer/{closer_token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Mes RDV</a>
 </div>
 
@@ -2086,7 +2092,7 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
     {phone_btn}
     {land_btn}
     <button onclick="document.getElementById('modal-complete').classList.add('open')"
-      style="padding:7px 14px;background:#6366f1;color:#fff;border:none;border-radius:6px;
+      style="padding:7px 14px;background:#527fb3;color:#fff;border:none;border-radius:6px;
              font-size:12px;cursor:pointer;font-weight:600">
       ✓ Clôturer ce RDV</button>
   </div>
@@ -2213,7 +2219,7 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
           style="padding:8px 16px;background:#1a1a2e;border:1px solid #2a2a4e;color:#9ca3af;
                  border-radius:6px;cursor:pointer;font-size:12px">Annuler</button>
         <button onclick="submitComplete()"
-          style="padding:8px 16px;background:#6366f1;border:none;color:#fff;
+          style="padding:8px 16px;background:#527fb3;border:none;color:#fff;
                  border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Enregistrer</button>
       </div>
     </div>
@@ -2647,7 +2653,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .hdr{background:#1a1a2e;border-bottom:1px solid #2a2a4e;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
 .hdr-left{display:flex;align-items:center;gap:10px}
 .hdr-title{font-size:14px;font-weight:700;color:#fff}
-.hdr-back{color:#6366f1;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#6366f112}
+.hdr-back{color:#527fb3;font-size:12px;text-decoration:none;padding:6px 10px;border-radius:6px;background:#527fb312}
 .main{max-width:560px;margin:0 auto;padding:20px 14px 60px}
 .sec-lbl{color:#4b5563;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px}
@@ -2669,7 +2675,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .day-past   {background:#1a1a2e!important;border:1px solid #1f2937!important;opacity:1!important;cursor:default!important}
 .day-past .day-num{color:#2d3748}
 .day-past .day-mon{color:#2d3748}
-.day-selected{box-shadow:0 0 0 2.5px #6366f1,0 0 0 5px #6366f125;transform:scale(1.07)!important}
+.day-selected{box-shadow:0 0 0 2.5px #527fb3,0 0 0 5px #527fb325;transform:scale(1.07)!important}
 .day-today::after{content:'';position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:rgba(255,255,255,.9);border-radius:50%}
 #day-heading{font-size:15px;font-weight:700;color:#fff;margin-top:28px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #1a1a2e}
 .day-empty-msg{color:#374151;font-size:13px;padding:28px 0;text-align:center}
@@ -2690,7 +2696,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .s-inaccessible:hover{opacity:.55}
 .s-claimed-me      {background:#2e106522;border-color:#7c3aed30}
 .s-claimed-other   {background:#78350f22;border-color:#f59e0b30;opacity:.8}
-.s-safety          {background:#2e106518;border-color:#a78bfa28;opacity:.7}
+.s-safety          {background:#2e106518;border-color:#93c5fd28;opacity:.7}
 .m-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:flex-end;justify-content:center}
 .m-overlay.open{display:flex}
 @media(min-width:500px){.m-overlay{align-items:center;padding:20px}}
@@ -2711,7 +2717,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .m-divider{height:1px;background:#1f2937;margin:16px 0}
 .m-datetime{font-size:12px;color:#6b7280;margin-bottom:18px;display:flex;align-items:center;gap:6px}
 .m-datetime::before{content:'📅'}
-.btn-claim{width:100%;padding:14px;background:#6366f1;border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:background .12s,transform .1s}
+.btn-claim{width:100%;padding:14px;background:#527fb3;border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:background .12s,transform .1s}
 .btn-claim:hover{background:#4f46e5}
 .btn-claim:active{transform:scale(.98)}
 .btn-claim:disabled{background:#1f2937;color:#4b5563;cursor:default;transform:none}
@@ -2854,7 +2860,7 @@ const STATUS = {
   inaccessible:      {dot:'#16a34a', label:'',                  cls:'s-inaccessible',arrow:true },
   claimed_me:        {dot:'#7c3aed', label:'Pris — moi',        cls:'s-claimed-me',  arrow:true },
   claimed_other:     {dot:'#f59e0b', label:'Attribué',          cls:'s-claimed-other',arrow:false},
-  safety_margin:     {dot:'#a78bfa', label:'Marge de sécurité', cls:'s-safety',      arrow:false},
+  safety_margin:     {dot:'#93c5fd', label:'Marge de sécurité', cls:'s-safety',      arrow:false},
 };
 
 function renderDay(iso) {
