@@ -217,10 +217,10 @@ def crm_page(request: Request, view: str = "table"):
         return f"{a/b*100:.0f}%" if b else "—"
 
     pipeline_html = "".join([
-        f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px 20px;text-align:center">'
+        f'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;text-align:center;box-shadow:0 1px 4px rgba(82,127,179,.07)">'
         f'<div style="font-size:1.8rem;font-weight:700;color:{c}">{v}</div>'
-        f'<div style="color:#ccc;font-size:11px;margin-top:4px">{l}</div>'
-        f'<div style="color:#555;font-size:10px">{s}</div></div>'
+        f'<div style="color:#6b7280;font-size:11px;margin-top:4px">{l}</div>'
+        f'<div style="color:#9ca3af;font-size:10px">{s}</div></div>'
         for v, l, s, c in [
             (n_sent,    "Contactés",      "landings envoyées",             "#527FB3"),
             (n_opened,  "Ont ouvert",     _pct(n_opened, n_sent),          "#6366f1"),
@@ -233,8 +233,8 @@ def crm_page(request: Request, view: str = "table"):
     # Tabs vue
     def _tab(slug, label, cur):
         active = slug == cur
-        bg  = "#6366f1" if active else "#1a1a2e"
-        col = "#fff"    if active else "#9ca3af"
+        bg  = "#527fb3" if active else "#f0f4f8"
+        col = "#fff"    if active else "#6b7280"
         return (f'<a href="/admin/crm?token={token}&view={slug}" '
                 f'style="padding:7px 16px;border-radius:6px;text-decoration:none;'
                 f'font-size:12px;font-weight:600;background:{bg};color:{col}">{label}</a>')
@@ -254,12 +254,12 @@ def crm_page(request: Request, view: str = "table"):
             deal = f' — {int(m["deal_value"])}€' if m.get("deal_value") else ""
             meeting_html = (
                 f'<div>{_status_badge(m["status"])}</div>'
-                f'<div style="color:#9ca3af;font-size:10px;margin-top:3px">{m["scheduled_at"]}{deal}</div>'
-                f'<div style="color:#555;font-size:10px">{m["notes"][:40] if m["notes"] else ""}</div>'
+                f'<div style="color:#6b7280;font-size:10px;margin-top:3px">{m["scheduled_at"]}{deal}</div>'
+                f'<div style="color:#9ca3af;font-size:10px">{m["notes"][:40] if m["notes"] else ""}</div>'
             )
             update_btn = (
                 f'<select onchange="updateMeeting(\'{m["id"]}\',this.value,\'{token}\')" '
-                f'style="font-size:10px;padding:2px 4px;background:#0f0f1a;color:#ccc;border:1px solid #2a2a4e;border-radius:4px;margin-top:4px">'
+                f'style="font-size:10px;padding:2px 4px;background:#fff;color:#394455;border:1px solid #d1d5db;border-radius:4px;margin-top:4px">'
                 f'<option value="">— statut —</option>'
                 f'<option value="completed">✓ Signé</option>'
                 f'<option value="no_show">✗ No-show</option>'
@@ -279,14 +279,14 @@ def crm_page(request: Request, view: str = "table"):
         )
 
         return (
-            f'<tr style="border-bottom:1px solid #1a1a2e">'
+            f'<tr style="border-bottom:1px solid #f0f4f8">'
             f'<td style="padding:10px 12px">'
             f'  <a href="/admin/crm/prospect/{r["token"]}?token={token}" '
-            f'style="color:#fff;font-size:13px;font-weight:500;text-decoration:none">{r["name"]}</a>'
+            f'style="color:#394455;font-size:13px;font-weight:500;text-decoration:none">{r["name"]}</a>'
             f'  <div style="color:#6b7280;font-size:11px">{r["city"]} · {r["profession"]}</div>'
-            f'  <div style="color:#444;font-size:10px">{r["email"]}</div>'
+            f'  <div style="color:#9ca3af;font-size:10px">{r["email"]}</div>'
             f'</td>'
-            f'<td style="padding:10px 12px;color:#9ca3af;font-size:11px">'
+            f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">'
             f'  {r["sent_at"]}<br>{r["sent_method"]}'
             f'</td>'
             f'<td style="padding:10px 12px">{delivery_badge}<br>{landing_link}</td>'
@@ -295,12 +295,12 @@ def crm_page(request: Request, view: str = "table"):
         )
 
     rows_html = "".join(_row(r) for r in rows) or (
-        '<tr><td colspan="4" style="padding:40px;text-align:center;color:#555">'
+        '<tr><td colspan="4" style="padding:40px;text-align:center;color:#9ca3af">'
         'Aucun prospect contacté pour l\'instant</td></tr>'
     )
 
     table_view = f"""
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table>
 <thead><tr>
   <th>Prospect</th>
@@ -335,14 +335,14 @@ def crm_page(request: Request, view: str = "table"):
             f'<div class="kcard" draggable="true" '
             f'data-token="{r["token"]}" data-stage="{_derive_stage(r)}" '
             f'onclick="window.location=\'/admin/crm/prospect/{r["token"]}?token={token}\'" '
-            f'style="background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;'
-            f'padding:10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s" '
-            f'onmouseover="this.style.borderColor=\'#6366f1\'" '
-            f'onmouseout="this.style.borderColor=\'#2a2a4e\'">'
-            f'<div style="color:#fff;font-size:12px;font-weight:600">{r["name"]}</div>'
+            f'style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;'
+            f'padding:10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;box-shadow:0 1px 3px rgba(82,127,179,.06)" '
+            f'onmouseover="this.style.borderColor=\'#527fb3\'" '
+            f'onmouseout="this.style.borderColor=\'#e2e8f0\'">'
+            f'<div style="color:#394455;font-size:12px;font-weight:600">{r["name"]}</div>'
             f'<div style="color:#6b7280;font-size:10px;margin-top:2px">{r["city"]} · {r["profession"]}</div>'
             f'{deal_str}'
-            f'<div style="color:#444;font-size:10px;margin-top:4px">{r["sent_at"]}</div>'
+            f'<div style="color:#9ca3af;font-size:10px;margin-top:4px">{r["sent_at"]}</div>'
             f'</div>'
         )
 
@@ -352,7 +352,7 @@ def crm_page(request: Request, view: str = "table"):
         cards_html = "".join(_kanban_card(r) for r in cards)
         kanban_cols += (
             f'<div class="kcol" data-stage="{stage_key}" '
-            f'style="flex:0 0 200px;background:#1a1a2e;border:1px solid #2a2a4e;'
+            f'style="flex:0 0 200px;background:#f8fafc;border:1px solid #e2e8f0;'
             f'border-radius:8px;padding:12px;min-height:400px" '
             f'ondragover="event.preventDefault()" '
             f'ondrop="dropCard(event,\'{stage_key}\')">'
@@ -379,19 +379,19 @@ def crm_page(request: Request, view: str = "table"):
 <title>CRM — PRESENCE_IA Admin</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 table{{width:100%;border-collapse:collapse}}
-th{{padding:10px 12px;text-align:left;color:#9ca3af;font-size:10px;font-weight:600;
-   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e}}
-tr:hover{{background:#111127}}
+th{{padding:10px 12px;text-align:left;color:#6b7280;font-size:10px;font-weight:600;
+   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #e2e8f0}}
+tr:hover{{background:#f0f4f8}}
 .kcard.dragging{{opacity:.5;transform:scale(.97)}}
 </style></head><body>
 {admin_nav(token, "crm")}
 <div style="max-width:1200px;margin:0 auto;padding:24px">
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-<h1 style="color:#fff;font-size:18px">CRM — Pipeline</h1>
-<a href="/admin/crm/closers?token={token}" style="color:#9ca3af;font-size:12px;text-decoration:none">Gérer les closers →</a>
+<h1 style="color:#394455;font-size:18px">CRM — Pipeline</h1>
+<a href="/admin/crm/closers?token={token}" style="color:#527fb3;font-size:12px;text-decoration:none">Gérer les closers →</a>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:32px">
@@ -505,43 +505,44 @@ def crm_prospect_detail(token: str, request: Request):
         return dt.strftime("%d/%m/%y %H:%M") if dt else "—"
 
     del_rows = "".join(
-        f'<tr style="border-bottom:1px solid #1a1a2e">'
-        f'<td style="padding:8px 12px;color:#ccc;font-size:12px">{_fmt(d.created_at)}</td>'
+        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<td style="padding:8px 12px;color:#394455;font-size:12px">{_fmt(d.created_at)}</td>'
         f'<td style="padding:8px 12px">{_delivery_badge({"delivery_status":d.delivery_status,"opened_at":d.opened_at,"clicked_at":d.clicked_at,"reply_status":d.reply_status,"bounce_type":d.bounce_type})}</td>'
-        f'<td style="padding:8px 12px;color:#9ca3af;font-size:11px">{_fmt(d.opened_at)}</td>'
-        f'<td style="padding:8px 12px;color:#9ca3af;font-size:11px">{_fmt(d.clicked_at)}</td>'
-        f'<td style="padding:8px 12px;color:#9ca3af;font-size:11px">{_fmt(getattr(d,"landing_visited_at",None))}</td>'
+        f'<td style="padding:8px 12px;color:#6b7280;font-size:11px">{_fmt(d.opened_at)}</td>'
+        f'<td style="padding:8px 12px;color:#6b7280;font-size:11px">{_fmt(d.clicked_at)}</td>'
+        f'<td style="padding:8px 12px;color:#6b7280;font-size:11px">{_fmt(getattr(d,"landing_visited_at",None))}</td>'
         f'</tr>'
         for d in deliveries
-    ) or '<tr><td colspan="5" style="padding:20px;color:#555;text-align:center">Aucune livraison</td></tr>'
+    ) or '<tr><td colspan="5" style="padding:20px;color:#9ca3af;text-align:center">Aucune livraison</td></tr>'
 
     mtg_rows = "".join(
-        f'<tr style="border-bottom:1px solid #1a1a2e">'
-        f'<td style="padding:8px 12px;color:#ccc;font-size:12px">{_fmt(m.scheduled_at)}</td>'
+        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<td style="padding:8px 12px;color:#394455;font-size:12px">{_fmt(m.scheduled_at)}</td>'
         f'<td style="padding:8px 12px">{_status_badge(m.status)}</td>'
-        f'<td style="padding:8px 12px;color:#9ca3af;font-size:11px">{m.deal_value or "—"}</td>'
-        f'<td style="padding:8px 12px;color:#9ca3af;font-size:11px">{getattr(m,"outcome","") or (m.notes or "—")}</td>'
+        f'<td style="padding:8px 12px;color:#6b7280;font-size:11px">{m.deal_value or "—"}</td>'
+        f'<td style="padding:8px 12px;color:#6b7280;font-size:11px">{getattr(m,"outcome","") or (m.notes or "—")}</td>'
         f'</tr>'
         for m in meetings
-    ) or '<tr><td colspan="4" style="padding:20px;color:#555;text-align:center">Aucun RDV</td></tr>'
+    ) or '<tr><td colspan="4" style="padding:20px;color:#9ca3af;text-align:center">Aucun RDV</td></tr>'
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>{p.name} — CRM</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 table{{width:100%;border-collapse:collapse}}
-th{{padding:8px 12px;text-align:left;color:#9ca3af;font-size:10px;
-   font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e}}
+th{{padding:8px 12px;text-align:left;color:#6b7280;font-size:10px;
+   font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #e2e8f0}}
+tr:hover{{background:#f0f4f8}}
 </style></head><body>
 {admin_nav(admin_token, "crm")}
 <div style="max-width:900px;margin:0 auto;padding:24px">
-<a href="/admin/crm?token={admin_token}" style="color:#527FB3;font-size:12px;text-decoration:none">← CRM</a>
-<h1 style="color:#fff;font-size:18px;margin:16px 0 4px">{p.name}</h1>
-<p style="color:#9ca3af;font-size:13px">{p.city} · {p.profession} · {p.email}</p>
-{f'<p style="color:#9ca3af;font-size:12px;margin-top:4px">📞 {p.phone}</p>' if p.phone else ""}
+<a href="/admin/crm?token={admin_token}" style="color:#527fb3;font-size:12px;text-decoration:none">← CRM</a>
+<h1 style="color:#394455;font-size:18px;margin:16px 0 4px">{p.name}</h1>
+<p style="color:#6b7280;font-size:13px">{p.city} · {p.profession} · {p.email}</p>
+{f'<p style="color:#6b7280;font-size:12px;margin-top:4px">📞 {p.phone}</p>' if p.phone else ""}
 
 <div style="margin:24px 0 16px">
-  <div style="color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Rapports IA</div>
+  <div style="color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Rapports IA</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <button onclick="iaAction('{p.token}','audit',this)"
       style="background:#e94560;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
@@ -572,14 +573,14 @@ th{{padding:8px 12px;text-align:left;color:#9ca3af;font-size:10px;
       🔗 Maillage interne
     </button>
   </div>
-  <div id="ia-result-{p.token}" style="margin-top:12px;display:none;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;padding:12px;font-size:13px"></div>
+  <div id="ia-result-{p.token}" style="margin-top:12px;display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-size:13px"></div>
 
   <!-- Credentials WP — visibles uniquement pour la publication -->
   <div id="wp-creds-{p.token}" style="margin-top:10px;display:none;flex-wrap:wrap;gap:8px;align-items:center">
     <input id="wp-user-{p.token}" placeholder="Identifiant WP"
-      style="padding:8px 12px;border-radius:6px;border:1px solid #3a3a6e;background:#0f0f1a;color:#e8e8f0;font-size:13px;width:160px">
+      style="padding:8px 12px;border-radius:6px;border:1px solid #d1d5db;background:#fff;color:#394455;font-size:13px;width:160px">
     <input id="wp-pass-{p.token}" placeholder="Application Password"
-      style="padding:8px 12px;border-radius:6px;border:1px solid #3a3a6e;background:#0f0f1a;color:#e8e8f0;font-size:13px;width:240px">
+      style="padding:8px 12px;border-radius:6px;border:1px solid #d1d5db;background:#fff;color:#394455;font-size:13px;width:240px">
     <button onclick="iaPublish('{p.token}',this)"
       style="background:#0e7490;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Publier</button>
     <span style="color:#6b7280;font-size:11px">WP → Profil → Application Passwords · Laisser vide pour package manuel</span>
@@ -722,13 +723,13 @@ async function iaMesh(token, btn) {{
 }}
 </script>
 
-<div style="margin:24px 0 12px;color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">Livraisons emails</div>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:24px">
+<div style="margin:24px 0 12px;color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">Livraisons emails</div>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:24px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr><th>Date</th><th>Statut</th><th>Ouverture</th><th>Clic</th><th>Landing</th></tr></thead>
 <tbody>{del_rows}</tbody></table></div>
 
-<div style="margin-bottom:12px;color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">RDV Calendly</div>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<div style="margin-bottom:12px;color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">RDV Calendly</div>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr><th>Date RDV</th><th>Statut</th><th>Deal</th><th>Résultat / Notes</th></tr></thead>
 <tbody>{mtg_rows}</tbody></table></div>
 </div></body></html>""")
@@ -755,10 +756,10 @@ def crm_closers(request: Request):
         pass
 
     closer_rows = "".join(
-        f'<tr style="border-bottom:1px solid #1a1a2e">'
-        f'<td style="padding:10px 12px;color:#fff;font-size:12px">{c.name}</td>'
-        f'<td style="padding:10px 12px;color:#9ca3af;font-size:11px">{c.email or "—"}</td>'
-        f'<td style="padding:10px 12px;color:#9ca3af;font-size:11px">{c.commission_rate*100:.0f}%</td>'
+        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<td style="padding:10px 12px;color:#394455;font-size:12px">{c.name}</td>'
+        f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{c.email or "—"}</td>'
+        f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{c.commission_rate*100:.0f}%</td>'
         f'<td style="padding:10px 12px">'
         f'{"<span style=\'color:#2ecc71\'>Actif</span>" if c.is_active else "<span style=\'color:#e94560\'>Inactif</span>"}'
         f'</td>'
@@ -767,15 +768,15 @@ def crm_closers(request: Request):
         f'</td>'
         f'</tr>'
         for c in closers
-    ) or '<tr><td colspan="5" style="padding:20px;color:#555;text-align:center">Aucun closer</td></tr>'
+    ) or '<tr><td colspan="5" style="padding:20px;color:#9ca3af;text-align:center">Aucun closer</td></tr>'
 
     app_rows = "".join(
-        f'<tr style="border-bottom:1px solid #1a1a2e">'
-        f'<td style="padding:10px 12px;color:#fff;font-size:12px">'
-        f'{(a.first_name or "") + " " + (a.last_name or "")}'.strip() + f' <span style="color:#444;font-size:10px">{a.city or ""}</span></td>'
-        f'<td style="padding:10px 12px;color:#9ca3af;font-size:11px">{a.email or "—"}</td>'
+        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<td style="padding:10px 12px;color:#394455;font-size:12px">'
+        f'{(a.first_name or "") + " " + (a.last_name or "")}'.strip() + f' <span style="color:#9ca3af;font-size:10px">{a.city or ""}</span></td>'
+        f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{a.email or "—"}</td>'
         f'<td style="padding:10px 12px">{_app_stage_badge(a.stage)}</td>'
-        f'<td style="padding:10px 12px;color:#9ca3af;font-size:11px">'
+        f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">'
         f'{a.applied_at.strftime("%d/%m/%y") if a.applied_at else "—"}'
         f'</td>'
         f'<td style="padding:10px 12px">'
@@ -783,66 +784,66 @@ def crm_closers(request: Request):
         f'</td>'
         f'</tr>'
         for a in applications
-    ) or '<tr><td colspan="5" style="padding:20px;color:#555;text-align:center">Aucune candidature</td></tr>'
+    ) or '<tr><td colspan="5" style="padding:20px;color:#9ca3af;text-align:center">Aucune candidature</td></tr>'
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Closers — CRM</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 table{{width:100%;border-collapse:collapse}}
-th{{padding:10px 12px;text-align:left;color:#9ca3af;font-size:10px;font-weight:600;
-   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #2a2a4e}}
-tr:hover{{background:#111127}}
+th{{padding:10px 12px;text-align:left;color:#6b7280;font-size:10px;font-weight:600;
+   letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #e2e8f0}}
+tr:hover{{background:#f0f4f8}}
 </style></head><body>
 {admin_nav(token, "crm")}
 <div style="max-width:1100px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-  <h1 style="color:#fff;font-size:18px">Closers</h1>
+  <h1 style="color:#394455;font-size:18px">Closers</h1>
   <div style="display:flex;gap:16px;align-items:center">
-    <a href="/admin/crm/closer-messages?token={token}" style="color:#6366f1;font-size:12px;text-decoration:none">Messages recrutement →</a>
-    <a href="/admin/crm?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← CRM</a>
+    <a href="/admin/crm/closer-messages?token={token}" style="color:#527fb3;font-size:12px;text-decoration:none">Messages recrutement →</a>
+    <a href="/admin/crm?token={token}" style="color:#527fb3;font-size:12px;text-decoration:none">← CRM</a>
   </div>
 </div>
 
 <!-- Aperçu pages publiques -->
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:14px 16px;margin-bottom:24px">
-  <p style="color:#9ca3af;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Aperçu pages closer</p>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
+  <p style="color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Aperçu pages closer</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a href="/closer/" target="_blank"
-       style="padding:7px 14px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;
-              color:#9ca3af;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+       style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+              color:#6b7280;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
       🌐 Page de présentation
     </a>
     <a href="/closer/recruit" target="_blank"
-       style="padding:7px 14px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;
-              color:#9ca3af;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+       style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+              color:#6b7280;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
       📝 Formulaire candidature
     </a>
     <a href="/closer/demo" target="_blank"
-       style="padding:7px 14px;background:#6366f115;border:1px solid #6366f140;border-radius:6px;
-              color:#a5b4fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+       style="padding:7px 14px;background:#527fb310;border:1px solid #527fb330;border-radius:6px;
+              color:#527fb3;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
       👤 Portail closer — aperçu
     </a>
     <a href="/closer/demo/meeting/demo-1" target="_blank"
-       style="padding:7px 14px;background:#6366f115;border:1px solid #6366f140;border-radius:6px;
-              color:#a5b4fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
+       style="padding:7px 14px;background:#527fb310;border:1px solid #527fb330;border-radius:6px;
+              color:#527fb3;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
       📋 Fiche RDV — aperçu
     </a>
     <a href="/closer/demo/meeting/demo-3" target="_blank"
-       style="padding:7px 14px;background:#2ecc7115;border:1px solid #2ecc7140;border-radius:6px;
+       style="padding:7px 14px;background:#2ecc7110;border:1px solid #2ecc7140;border-radius:6px;
               color:#2ecc71;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
       ✅ Fiche RDV signé — aperçu
     </a>
   </div>
 </div>
 
-<h2 style="color:#9ca3af;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Closers actifs</h2>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden;margin-bottom:32px">
+<h2 style="color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Closers actifs</h2>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:32px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr><th>Nom</th><th>Email</th><th>Commission</th><th>Statut</th><th></th></tr></thead>
 <tbody>{closer_rows}</tbody></table></div>
 
-<h2 style="color:#9ca3af;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Candidatures</h2>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<h2 style="color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Candidatures</h2>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr><th>Candidat</th><th>Email</th><th>Statut</th><th>Date</th><th></th></tr></thead>
 <tbody>{app_rows}</tbody></table></div>
 </div></body></html>""")
@@ -1528,7 +1529,7 @@ tr:hover{{background:#111127}}
 
 <!-- Historique -->
 <h2 style="color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Historique paiements</h2>
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr>
   <th>Closer</th><th>Montant</th><th>IBAN</th><th>Date demande</th><th>Versé le</th>
 </tr></thead>
@@ -1963,7 +1964,7 @@ input:focus{{border-color:#6366f1}}
   </div>
 </div>
 
-<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;overflow:hidden">
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table>
 <thead><tr>
   <th style="padding:8px 12px;text-align:left;color:#555;font-size:10px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2a2a4e">Début</th>
