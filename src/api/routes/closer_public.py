@@ -1050,8 +1050,7 @@ async def closer_recruit_submit(request: Request):
                         "htmlContent": f"""<p>Bonjour {_prenom or _name_c},</p>
                         <p>Nous avons bien reçu votre candidature au programme Closer Présence IA.</p>
                         <p>Nous l'étudions avec attention et vous répondrons <strong>sous 48h</strong>.</p>
-                        <p>En attendant, vous pouvez consulter la page du programme : 
-                        <a href="https://presence-ia.com/closer">presence-ia.com/closer</a></p>
+                        <p>À bientôt !</p>
                         <p style="color:#999;font-size:12px">— L'équipe Présence IA</p>""",
                     },
                     timeout=8,
