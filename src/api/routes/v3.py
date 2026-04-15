@@ -525,7 +525,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
                             "recherche et liste de vraies entreprises locales avec leurs noms."
                         )}]},
                         "contents": [{"parts": [{"text": gemini_query}]}],
-                        "tools": [{"googleSearch": {}}],
+                        "tools": [{"google_search": {}}],
                     },
                     timeout=30,
                 )
