@@ -123,7 +123,7 @@ def _build_demo_slots():
 _HTML = r"""<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Agenda — Présence IA</title>
 <style>

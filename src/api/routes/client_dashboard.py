@@ -203,7 +203,7 @@ def client_dashboard(prospect_id: str, t: str = "", db: Session = Depends(get_db
 
     return f"""<!DOCTYPE html>
 <html lang="fr"><head>
-<meta charset="UTF-8">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mon espace — {p.name}</title>
 <style>

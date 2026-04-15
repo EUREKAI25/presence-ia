@@ -43,7 +43,7 @@ def closer_presentation():
     _display_max   = f"{_max_with_bonus:,}€".replace(",", " ") if _bonus_enabled else "2 000€"
     _display_sub   = f"par deal signé · dont {int(_bonus_rate*100)}% bonus top closer" if _bonus_enabled else "par deal signé"
     _html = """<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Devenez Closer — Présence IA</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -217,7 +217,7 @@ a{text-decoration:none}
 @router.get("/closer/recruit", response_class=HTMLResponse)
 def closer_recruit_form():
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Postuler — Closer Présence IA</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -583,7 +583,7 @@ def closer_demo_slots(request: Request):
         )
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Créneaux disponibles — Aperçu</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}</style>
 </head><body>
@@ -837,7 +837,7 @@ def closer_portal_demo(request: Request):
     panels_js = {k: v.replace("`","\\`").replace("${","\\${") for k,v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portail Closer — Aperçu</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}table{{width:100%;border-collapse:collapse}}tr:hover{{background:#111127}}</style>
 </head><body>
@@ -891,7 +891,7 @@ def closer_meeting_demo(demo_id: str, request: Request):
     ) if meeting["phone"] else ""
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fiche RDV — {meeting["name"]}</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}.card{{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-bottom:16px}}.sec{{color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}</style>
 </head><body>
@@ -1828,7 +1828,7 @@ details summary::-webkit-details-marker{{display:none}}
     panels_js = {k: v.replace("`", "\\`").replace("${", "\\${").replace("</script>", "<\\/script>") for k, v in panels.items()}
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{name} — Portail Closer</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -2051,7 +2051,7 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     script_text = content.get("pitch_script", "")
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fiche RDV — {name}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -2644,7 +2644,7 @@ def closer_slots(token: str, request: Request):
     _html = """<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Agenda — __NAME__</title>
 <style>

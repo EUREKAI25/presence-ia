@@ -40,6 +40,10 @@ def admin_nav(token: str, active: str = "") -> str:
             ("recrutement",       "Recrutement"),
             ("crm/paiements",     "Paiements"),
         ]),
+        ("COMMERCIAL", [
+            ("offers",   "Offres & Tarifs"),
+            ("content",  "Contenus"),
+        ]),
         ("FINANCES", [
             ("finances",    "Revenus & Coûts"),
             ("analytics",   "Stats ventes"),

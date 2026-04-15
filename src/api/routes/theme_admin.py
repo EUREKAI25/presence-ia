@@ -48,7 +48,7 @@ def admin_theme(request: Request):
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <title>Admin — Thème</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}

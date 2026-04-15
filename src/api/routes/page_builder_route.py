@@ -489,8 +489,8 @@ a{color:inherit}
 .cta-section::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 70% 80% at 50% 110%,rgba(82,127,179,.3) 0%,transparent 70%)}
 .cta-section h2{font-size:clamp(1.8rem,3vw,2.5rem);font-weight:800;margin-bottom:16px;letter-spacing:-.03em;position:relative}
 .cta-section p{font-size:1rem;color:#94a3b8;margin:0 auto 40px;max-width:480px;line-height:1.75;position:relative}
-.btn-cta{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:700;padding:18px 44px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 4px 24px rgba(82,127,179,.4);position:relative;transition:all .15s}
-.btn-cta:hover{background:#3d6a9a;transform:translateY(-1px)}
+.btn-cta{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#996d2e,#ffbd5c);color:#fff;font-weight:700;padding:18px 44px;border-radius:10px;text-decoration:none;font-size:1rem;box-shadow:0 6px 28px rgba(153,109,46,.45),0 2px 8px rgba(0,0,0,.15);position:relative;transition:all .18s}
+.btn-cta:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(153,109,46,.55)}
 /* FOOTER */
 footer{background:#111827;padding:32px 24px;text-align:center;color:#6b7280;font-size:11px;letter-spacing:.3px}
 footer a{color:#9ca3af;text-decoration:underline}
@@ -507,7 +507,7 @@ footer a{color:#9ca3af;text-decoration:underline}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Présence IA — Audit de visibilité sur ChatGPT, Gemini et Claude</title>
   <meta name="description" content="Découvrez si votre entreprise apparaît dans les réponses de ChatGPT, Gemini et Claude et pourquoi vos concurrents sont recommandés.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='3.5' fill='%232563eb'/><circle cx='16' cy='16' r='8' stroke='%232563eb' stroke-width='1.5' fill='none' opacity='.65'/><circle cx='16' cy='16' r='13' stroke='%232563eb' stroke-width='1' fill='none' opacity='.35'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <style>{css}</style>
 </head>
 <body>

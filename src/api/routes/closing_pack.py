@@ -95,7 +95,7 @@ def confirmation():
     return HTMLResponse("""<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rendez-vous confirmé — Présence IA</title>
   <style>

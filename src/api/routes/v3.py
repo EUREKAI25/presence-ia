@@ -1050,12 +1050,12 @@ a{{color:inherit;text-decoration:none}}
 @media(max-width:640px){{.sn-cta{{font-size:11px;padding:6px 12px}}}}
 .hero{{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;background-size:cover;background-position:center;padding:120px 24px 64px;position:relative}}
 .hero::after{{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#fff);pointer-events:none}}
-.hero-pill{{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:6px 18px;border-radius:30px;border:1px solid rgba(255,255,255,.25);margin-bottom:28px}}
+.hero-pill{{display:inline-block;background:rgba(255,255,255,.28);backdrop-filter:blur(10px);color:#fff;font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:7px 20px;border-radius:30px;border:1px solid rgba(255,255,255,.50);margin-bottom:28px;text-shadow:0 1px 3px rgba(0,0,0,.3)}}
 .hero h1{{font-size:clamp(22px,3.8vw,42px);font-weight:800;color:#fff;max-width:820px;margin:0 auto 36px;letter-spacing:-.8px;line-height:1.25;text-shadow:0 2px 12px rgba(0,0,0,.5)}}
 .hero h1 em{{font-style:normal;color:#93c5fd}}
 .hero h1 em:last-child{{font-style:normal;color:#fff;font-size:.85em;display:block;margin-top:8px}}
-.hero-cta{{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--txt);font-weight:700;font-size:14px;padding:14px 30px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,.25);cursor:pointer;border:none;transition:transform .2s,box-shadow .2s}}
-.hero-cta:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.3)}}
+.hero-cta{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#996d2e,#ffbd5c);color:#fff;font-weight:700;font-size:14px;padding:14px 30px;border-radius:50px;box-shadow:0 6px 24px rgba(153,109,46,.45),0 2px 8px rgba(0,0,0,.2);cursor:pointer;border:none;transition:transform .2s,box-shadow .2s}}
+.hero-cta:hover{{transform:translateY(-2px);box-shadow:0 10px 32px rgba(153,109,46,.55),0 4px 12px rgba(0,0,0,.25)}}
 section{{padding:80px 0}}
 .sect-label{{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}}
 section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);letter-spacing:-.4px;margin-bottom:12px;line-height:1.15}}
@@ -1094,8 +1094,8 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .ia-mention{{text-align:center;font-size:11.5px;color:var(--muted);margin:6px 0 28px;letter-spacing:.2px}}
 .ia-demo-cta{{text-align:center;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}}
 .ia-demo-cta__limit{{font-size:12px;color:var(--muted);margin-top:14px;font-style:italic}}
-.btn-pitch{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:700;font-size:15px;padding:16px 40px;border-radius:50px;text-decoration:none;box-shadow:0 4px 20px rgba(232,53,90,.35);transition:all .2s;cursor:pointer;border:none}}
-.btn-pitch:hover{{transform:translateY(-2px);box-shadow:0 8px 28px rgba(232,53,90,.45)}}
+.btn-pitch{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#996d2e,#ffbd5c);color:#fff;font-weight:700;font-size:15px;padding:16px 40px;border-radius:50px;text-decoration:none;box-shadow:0 6px 24px rgba(153,109,46,.45),0 2px 8px rgba(0,0,0,.15);transition:all .2s;cursor:pointer;border:none}}
+.btn-pitch:hover{{transform:translateY(-2px);box-shadow:0 10px 32px rgba(153,109,46,.55)}}
 .sect-pre-faq{{background:linear-gradient(135deg,#0d0820 0%,#0a1840 100%);padding:72px 24px}}
 .pre-faq-title{{font-size:clamp(22px,3.5vw,34px);font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-.3px;line-height:1.2}}
 .pre-faq-text{{font-size:15px;color:#94a3b8;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.7}}
@@ -1115,7 +1115,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 {gtm_push("landing_visit", page_type="prospect_landing", city=p.city, profession=p.profession)}
 
 <nav class="sticky-nav">
-  <a class="sn-logo" href="/"><img src="/assets/logo-white.svg" alt="Présence IA" style="height:44px;width:auto;display:block;filter:brightness(0) invert(1)"></a>
+  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
   <a class="sn-cta" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit</a>
 </nav>
 

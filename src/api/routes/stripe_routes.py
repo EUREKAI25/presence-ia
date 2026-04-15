@@ -163,7 +163,7 @@ def success_page(session_id: str, token: str = "", db: Session = Depends(get_db)
             log.info("Prospect %s converti CLIENT via success page", p.prospect_id)
 
     return HTMLResponse("""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><title>Merci !</title>
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><title>Merci !</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;
 background:#0f0f1a;color:#e8e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}
 .card{background:#1a1a2e;border:1px solid #2ecc71;border-radius:16px;padding:60px 40px;text-align:center;max-width:520px}
