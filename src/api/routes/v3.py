@@ -970,7 +970,7 @@ def _render_landing(
         f'Mais pas vous.'
     )
 
-    _bg_style = f"background-image:linear-gradient(to bottom,rgba(0,0,15,.15) 0%,rgba(0,0,15,.50) 45%,rgba(0,0,15,.72) 100%),url('{city_image_url}')" if city_image_url else ""
+    _bg_style = f"background-image:linear-gradient(to bottom,rgba(0,0,15,.42) 0%,rgba(0,0,15,.58) 50%,rgba(0,0,15,.74) 100%),url('{city_image_url}')" if city_image_url else ""
     hero_html = (
         f'<div class="hero" style="{_bg_style}">'
         f'<div class="c">'
