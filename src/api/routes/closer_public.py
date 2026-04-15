@@ -77,7 +77,7 @@ a{text-decoration:none}
     <span style="display:inline-block;background:#6366f115;border:1px solid #6366f130;
       color:#a5b4fc;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
       padding:6px 16px;border-radius:20px;margin-bottom:24px">Programme closer · 100% télétravail · Zéro prospection</span>
-    <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);color:#fff;line-height:1.15;margin-bottom:20px;
+    <h1 style="font-size:clamp(1.8rem,4vw,3rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
       Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
       -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
@@ -135,7 +135,7 @@ a{text-decoration:none}
 
 <!-- COMMENT ÇA MARCHE -->
 <section id="comment" style="padding:72px 20px;max-width:900px;margin:0 auto">
-  <h2 style="color:#fff;font-size:1.8rem;font-weight:700;text-align:center;margin-bottom:8px">Comment ça marche</h2>
+  <h2 style="color:#fff;font-size:clamp(1.5rem,3vw,1.8rem);font-weight:700;text-align:center;margin-bottom:8px">Comment ça marche</h2>
   <p style="color:#9ca3af;text-align:center;margin-bottom:48px">3 étapes, pas de surprise</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px">
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px;position:relative">
@@ -167,7 +167,7 @@ a{text-decoration:none}
 
 <!-- CE QU'ON FOURNIT -->
 <section style="padding:0 20px 72px;max-width:900px;margin:0 auto">
-  <h2 style="color:#fff;font-size:1.8rem;font-weight:700;text-align:center;margin-bottom:48px">Ce qu'on vous fournit</h2>
+  <h2 style="color:#fff;font-size:clamp(1.5rem,3vw,1.8rem);font-weight:700;text-align:center;margin-bottom:48px">Ce qu'on vous fournit</h2>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
     <div style="background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:20px;display:flex;gap:12px;align-items:flex-start">
       <span style="font-size:1.3rem">📋</span>
@@ -196,7 +196,7 @@ a{text-decoration:none}
 <section style="padding:0 20px 80px">
   <div style="max-width:620px;margin:0 auto;background:linear-gradient(135deg,#1a1a2e,#16162a);
     border:1px solid #2a2a4e;border-radius:20px;padding:48px 40px;text-align:center">
-    <h2 style="color:#fff;font-size:1.6rem;font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
+    <h2 style="color:#fff;font-size:clamp(1.5rem,3vw,1.6rem);font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
     <p style="color:#9ca3af;margin-bottom:32px;line-height:1.6">
       Candidature rapide. Pas de SIRET ni de statut requis à cette étape.<br>Réponse sous 48h.
     </p>
