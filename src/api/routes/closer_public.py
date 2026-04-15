@@ -49,13 +49,13 @@ def closer_presentation():
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0d1421;color:#e2e8f5;min-height:100vh;-webkit-font-smoothing:antialiased}
 a{text-decoration:none}
-.btn-primary{display:inline-block;background:#527fb3;
+.btn-primary{display:inline-block;background:linear-gradient(135deg,#996d2e,#ffbd5c);
   color:#fff;padding:15px 44px;border-radius:50px;font-weight:700;font-size:1rem;
-  box-shadow:0 4px 20px rgba(82,127,179,.35);transition:transform .15s,box-shadow .15s,background .15s}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(82,127,179,.5);background:#3d6494;color:#fff}
+  box-shadow:0 4px 20px rgba(153,109,46,.40);transition:transform .15s,box-shadow .15s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(153,109,46,.55);color:#fff}
 .btn-sec{display:inline-block;background:transparent;color:#7d94b0;padding:14px 32px;
   border-radius:50px;font-weight:600;font-size:.95rem;border:1px solid #2a3d5a;transition:border-color .15s,color .15s}
-.btn-sec:hover{border-color:#527fb3;color:#e2e8f5}
+.btn-sec:hover{border-color:#ffbd5c;color:#ffbd5c}
 </style>
 </head><body>
 
@@ -66,20 +66,20 @@ a{text-decoration:none}
   box-shadow:0 2px 20px rgba(0,0,0,.35)">
   <div style="max-width:1000px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between">
     <img src="/assets/logo-white.svg" alt="Présence IA" style="height:36px">
-    <a href="/closer/recruit" class="btn-primary" style="padding:9px 24px;font-size:.85rem">Postuler →</a>
+    <a href="/closer/recruit" class="btn-primary" style="padding:9px 24px;font-size:.85rem;letter-spacing:.02em">Postuler →</a>
   </div>
 </header>
 
 <!-- HERO -->
 <section style="padding:80px 20px 60px;text-align:center;position:relative;overflow:hidden">
-  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 0%,#6366f118,transparent);pointer-events:none"></div>
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 0%,#ffbd5c14,transparent);pointer-events:none"></div>
   <div style="max-width:760px;margin:0 auto;position:relative">
-    <span style="display:inline-block;background:#6366f115;border:1px solid #6366f130;
-      color:#a5b4fc;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    <span style="display:inline-block;background:#ffbd5c12;border:1px solid #ffbd5c35;
+      color:#ffbd5c;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
       padding:6px 16px;border-radius:20px;margin-bottom:24px">Programme closer · 100% télétravail · Zéro prospection</span>
     <h1 style="font-size:clamp(1.8rem,4vw,3rem);color:#fff;line-height:1.15;margin-bottom:20px;
       font-weight:800;letter-spacing:-.02em">
-      Gagnez <span style="background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;
+      Gagnez <span style="background:linear-gradient(135deg,#ffbd5c,#996d2e);-webkit-background-clip:text;
       -webkit-text-fill-color:transparent">18% de commission</span><br>sur chaque deal que vous signez
     </h1>
     <p style="color:#9ca3af;font-size:1.1rem;line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto">
@@ -92,8 +92,8 @@ a{text-decoration:none}
     </div>
     <!-- Chiffres -->
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:52px">
-      <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
-        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa">18%</div>
+      <div style="background:#1a1a2e;border:1px solid #ffbd5c30;border-radius:12px;padding:16px 24px;text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:#ffbd5c">18%</div>
         <div style="color:#6b7280;font-size:11px;margin-top:4px">de commission</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:12px;padding:16px 24px;text-align:center">
@@ -139,24 +139,24 @@ a{text-decoration:none}
   <p style="color:#9ca3af;text-align:center;margin-bottom:48px">3 étapes, pas de surprise</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px">
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px;position:relative">
-      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
-        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">1</div>
+      <div style="width:36px;height:36px;background:#ffbd5c18;border:1px solid #ffbd5c45;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#ffbd5c;font-weight:700;margin-bottom:16px">1</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous choisissez vos créneaux</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
         Des prospects qualifiés ont réservé un créneau. Vous accédez à la liste et choisissez librement ceux que vous voulez prendre. Aucune obligation de volume.
       </p>
     </div>
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
-      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
-        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">2</div>
+      <div style="width:36px;height:36px;background:#ffbd5c18;border:1px solid #ffbd5c45;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#ffbd5c;font-weight:700;margin-bottom:16px">2</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous closez</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
         Vous avez le script, les réponses aux objections, la fiche prospect. Vous faites le call et signez le deal.
       </p>
     </div>
     <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:14px;padding:28px">
-      <div style="width:36px;height:36px;background:#6366f120;border:1px solid #6366f140;border-radius:50%;
-        display:flex;align-items:center;justify-content:center;color:#a5b4fc;font-weight:700;margin-bottom:16px">3</div>
+      <div style="width:36px;height:36px;background:#ffbd5c18;border:1px solid #ffbd5c45;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#ffbd5c;font-weight:700;margin-bottom:16px">3</div>
       <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:8px">Vous êtes payé</h3>
       <p style="color:#6b7280;font-size:.9rem;line-height:1.6">
         Votre commission est calculée automatiquement sur chaque deal signé. Paiement immédiat sur demande selon le montant cumulé. Pas de plafond.
@@ -194,8 +194,9 @@ a{text-decoration:none}
 
 <!-- CTA FINAL -->
 <section style="padding:0 20px 80px">
-  <div style="max-width:620px;margin:0 auto;background:linear-gradient(135deg,#1a1a2e,#16162a);
-    border:1px solid #2a2a4e;border-radius:20px;padding:48px 40px;text-align:center">
+  <div style="max-width:620px;margin:0 auto;background:linear-gradient(135deg,#1a1525,#0d1421);
+    border:1px solid #ffbd5c30;border-radius:20px;padding:48px 40px;text-align:center;
+    box-shadow:0 0 60px rgba(255,189,92,.08)">
     <h2 style="color:#fff;font-size:clamp(1.5rem,3vw,1.6rem);font-weight:700;margin-bottom:12px">Prêt à nous rejoindre ?</h2>
     <p style="color:#9ca3af;margin-bottom:32px;line-height:1.6">
       Candidature rapide. Pas de SIRET ni de statut requis à cette étape.<br>Réponse sous 48h.
@@ -231,10 +232,10 @@ input,textarea,select{width:100%;background:rgba(255,255,255,.04);border:1px sol
   border-radius:6px;padding:10px 12px;color:#e2e8f5;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
 input:focus,textarea:focus,select:focus{border-color:#527fb3;box-shadow:0 0 0 3px rgba(82,127,179,.18)}
 textarea{resize:vertical;min-height:120px}
-.btn{width:100%;background:#527fb3;color:#fff;border:none;border-radius:8px;
+.btn{width:100%;background:linear-gradient(135deg,#996d2e,#ffbd5c);color:#fff;border:none;border-radius:8px;
      padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px;
-     box-shadow:0 4px 16px rgba(82,127,179,.3);transition:background .15s,box-shadow .15s}
-.btn:hover{background:#3d6494;box-shadow:0 6px 24px rgba(82,127,179,.45)}
+     box-shadow:0 4px 16px rgba(153,109,46,.35);transition:box-shadow .15s,transform .15s}
+.btn:hover{box-shadow:0 6px 24px rgba(153,109,46,.55);transform:translateY(-1px)}
 .section-title{color:#e2e8f5;font-size:13px;font-weight:700;letter-spacing:.04em;
   text-transform:uppercase;margin:36px 0 16px;padding-top:20px;
   border-top:1px solid #2a3d5a;padding-bottom:8px;border-bottom:1px solid #2a3d5a;
