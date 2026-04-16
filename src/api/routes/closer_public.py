@@ -1445,9 +1445,12 @@ async function requestPayment(){{
 
     panel_rdv = f"""
 <div style="margin-bottom:20px">
-  <a href="/closer/{token}/slots" style="display:inline-block;background:#ffbd5c;
-    color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600">
-    📅 Agenda — voir les créneaux disponibles →</a>
+  <a href="/closer/{token}/agenda" style="display:inline-block;background:#ffbd5c;
+    color:#394455;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600;margin-right:8px">
+    📅 Voir mon agenda →</a>
+  <a href="/closer/{token}/slots" style="display:inline-block;background:#1a1a2e;
+    color:#9ca3af;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;border:1px solid #2a2a4e">
+    ⚙️ Mes créneaux dispo</a>
 </div>
 <h3 style="color:#fff;font-size:14px;margin-bottom:16px">RDV à venir ({len(meetings_upcoming)})</h3>
 {upcoming_html}
