@@ -711,13 +711,16 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-def _preflight_ia_and_image(db, c) -> str | None:
+def _preflight_ia_and_image(token: str, profession: str, city: str) -> str | None:
     """
     Garantit que ia_results ET image header existent avant tout envoi.
+    Ouvre sa propre session DB (thread-safe pour run_in_executor).
     Retourne un message d'erreur si impossible, None si OK.
     """
     import json as _j
     from .v3 import _run_ia_test
+    from ...database import SessionLocal
+
     # ── 1. IA results — vérifie existence ET qualité (réponses non vides) ───
     def _ia_valid(ia_json):
         if not ia_json: return False
@@ -727,19 +730,25 @@ def _preflight_ia_and_image(db, c) -> str | None:
         except Exception:
             return False
 
-    if not _ia_valid(c.ia_results):
+    with SessionLocal() as db:
+        c = db.query(V3ProspectDB).filter_by(token=token).first()
+        if not c:
+            return "Contact introuvable"
+        ia_json_current = c.ia_results
+
+    if not _ia_valid(ia_json_current):
         try:
-            ia_data = _run_ia_test(c.profession or "", c.city or "")
+            ia_data = _run_ia_test(profession or "", city or "")
             if ia_data and ia_data.get("results"):
                 import json as _j
                 ia_json = _j.dumps(ia_data["results"], ensure_ascii=False)
-                # Mettre à jour tous les prospects de la même paire
-                for p in db.query(V3ProspectDB).filter_by(
-                    city=c.city, profession=c.profession
-                ).all():
-                    p.ia_results   = ia_json
-                    p.ia_tested_at = ia_data.get("tested_at")
-                db.commit()
+                with SessionLocal() as db:
+                    for p in db.query(V3ProspectDB).filter_by(
+                        city=city, profession=profession
+                    ).all():
+                        p.ia_results   = ia_json
+                        p.ia_tested_at = ia_data.get("tested_at")
+                    db.commit()
             else:
                 return "Requêtes IA vides — impossible de générer la landing"
         except Exception as e:
@@ -748,13 +757,13 @@ def _preflight_ia_and_image(db, c) -> str | None:
     try:
         from ...models import RefCityDB
         from ...city_images import fetch_city_header_image
-        ref = db.query(RefCityDB).filter_by(
-            city_name=(c.city or "").upper()
-        ).first()
-        if not ref or not ref.header_image_url:
-            img_url = fetch_city_header_image(c.city or "")
+        with SessionLocal() as db2:
+            ref = db2.query(RefCityDB).filter_by(city_name=(city or "").upper()).first()
+            has_image = bool(ref and ref.header_image_url)
+        if not has_image:
+            img_url = fetch_city_header_image(city or "")
             if not img_url:
-                return f"Image introuvable pour {c.city} — impossible de générer la landing"
+                return f"Image introuvable pour {city} — impossible de générer la landing"
     except Exception:
         pass  # image non bloquante si erreur réseau
     return None
@@ -770,9 +779,13 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
         return JSONResponse({"ok": False, "error": "Pas d'email"})
     # ── Preflight : IA + image obligatoires avant envoi ──────────────────────
     # run_in_executor → thread séparé, évite de bloquer l'event loop (et le 502)
-    err = await asyncio.get_event_loop().run_in_executor(None, _preflight_ia_and_image, db, c)
+    err = await asyncio.get_event_loop().run_in_executor(
+        None, _preflight_ia_and_image, c.token, c.profession or "", c.city or ""
+    )
     if err:
         return JSONResponse({"ok": False, "error": err})
+    # recharger c depuis DB (preflight a pu modifier ia_results)
+    c = _get_prospect(db, cid)
     from .v3 import (_send_brevo_email, _send_brevo_sms, _is_gmail,
                      _contact_message, _contact_message_sms,
                      _DEFAULT_EMAIL_SUBJECT, BASE_URL)
@@ -819,9 +832,12 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     if not c: raise HTTPException(404)
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
-    err = await asyncio.get_event_loop().run_in_executor(None, _preflight_ia_and_image, db, c)
+    err = await asyncio.get_event_loop().run_in_executor(
+        None, _preflight_ia_and_image, c.token, c.profession or "", c.city or ""
+    )
     if err:
         return JSONResponse({"ok": False, "error": err})
+    c = _get_prospect(db, cid)
     from .v3 import _send_brevo_sms, _contact_message_sms, BASE_URL
     name       = c.name or ""
     city       = c.city or ""
