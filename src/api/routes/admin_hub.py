@@ -317,6 +317,10 @@ def closers_hub(request: Request, db: Session = Depends(get_db)):
         from marketing_module.models import MeetingDB, MeetingStatus, CloserDB
         mdb = MktSess()
         try:
+            # Index id → name pour résoudre les UUIDs en noms lisibles
+            all_closers = mdb.query(CloserDB).filter_by(project_id="presence-ia").all()
+            closer_name_map = {c.id: (c.name or c.id) for c in all_closers}
+
             mtgs = mdb.query(MeetingDB).filter_by(project_id="presence-ia").all()
             for mt in mtgs:
                 if (mt.deal_value or 0) > 0:
@@ -325,13 +329,14 @@ def closers_hub(request: Request, db: Session = Depends(get_db)):
                         offer_breakdown[offer_name] = {"nb": 0, "ca": 0.0}
                     offer_breakdown[offer_name]["nb"]  += 1
                     offer_breakdown[offer_name]["ca"]  += mt.deal_value or 0
-                closer_id = getattr(mt, "closer_id", None) or "—"
-                if closer_id not in closer_perfs:
-                    closer_perfs[closer_id] = {"rdv": 0, "deals": 0, "ca": 0.0}
-                closer_perfs[closer_id]["rdv"] += 1
+                raw_cid = getattr(mt, "closer_id", None) or "—"
+                closer_label = closer_name_map.get(raw_cid, raw_cid)
+                if closer_label not in closer_perfs:
+                    closer_perfs[closer_label] = {"rdv": 0, "deals": 0, "ca": 0.0}
+                closer_perfs[closer_label]["rdv"] += 1
                 if (mt.deal_value or 0) > 0:
-                    closer_perfs[closer_id]["deals"] += 1
-                    closer_perfs[closer_id]["ca"]    += mt.deal_value or 0
+                    closer_perfs[closer_label]["deals"] += 1
+                    closer_perfs[closer_label]["ca"]    += mt.deal_value or 0
 
             try:
                 actifs = mdb.query(CloserDB).filter_by(project_id="presence-ia", status="active").count()
