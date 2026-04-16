@@ -429,7 +429,7 @@ def _load_prompts() -> list:
 
 _GEMINI_PROMPTS = [
     "Qui recommandes-tu comme {terme} autour de {city} ? Donne des noms.",
-    "Liste des {terme} avec bons avis près de {city}.",
+    "Qui sont les {terme} les plus fiables à {city} ? Donne des noms.",
     "Quels {terme} sont réputés sérieux à {city} ? Donne une liste.",
 ]
 
@@ -918,17 +918,21 @@ def _render_landing(
             _open = " open" if _i == 0 else ""
             _hidden = "" if _i == 0 else " hidden"
             _ts_span = f'<span class="acc-ts">{ts}</span>' if ts else ""
-            _chevron = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+            _chevron_left = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+            _chevron_down = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+            _hint = "" if _i == 0 else '<span class="acc-hint">Cliquez pour voir les réponses IA →</span>'
             if 'ia-col__empty' in cols:
                 _any_empty = True
             chat_html += (
                 f'<div class="acc-item{_open}">'
-                f'<button class="acc-q" onclick="toggleAcc(this)">'
+                f'<button class="acc-q" onclick="toggleAcc(this)" aria-expanded="{"true" if _i == 0 else "false"}">'
+                f'<span class="acc-chevron">{_chevron_left}</span>'
                 f'<span class="acc-main">'
                 f'{_ts_span}'
                 f'<span class="acc-text">« {prompt_text} »</span>'
+                f'{_hint}'
                 f'</span>'
-                f'<span class="acc-icon">{_chevron}</span>'
+                f'<span class="acc-icon">{_chevron_down}</span>'
                 f'</button>'
                 f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div></div>'
                 f'</div>'
@@ -1095,17 +1099,31 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .stats-bar .stat__lbl{{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}}
 @media(max-width:600px){{.stats-bar .stat{{border-right:none;border-bottom:1px solid var(--border);padding:20px 0}}.stats-bar .stat:last-child{{border-bottom:none}}}}
 .sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
-.ia-accordion{{margin-bottom:28px}}
-.acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
-.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:12px}}
-.acc-main{{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}}
-.acc-ts{{color:#94a3b8;font-size:12px;font-weight:400}}
-.acc-text{{font-style:italic;color:#f1f5f9;font-size:14px;font-weight:500;line-height:1.4}}
-.acc-icon{{color:#94a3b8;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;transition:all .15s}}
-.acc-icon svg{{transition:transform .2s}}
-.acc-item.open .acc-icon{{color:#60a5fa;background:rgba(96,165,250,.15);border-color:rgba(96,165,250,.5)}}
+.ia-accordion{{margin-bottom:32px}}
+.acc-item{{background:#1e293b;border-radius:12px;margin-bottom:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06);transition:border-color .2s,box-shadow .2s}}
+.acc-item:hover{{border-color:rgba(255,255,255,.16)}}
+.acc-item.open{{border-color:rgba(96,165,250,.35);box-shadow:0 0 0 1px rgba(96,165,250,.12),0 4px 16px rgba(0,0,0,.18)}}
+.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:18px 20px;display:flex;align-items:center;gap:14px}}
+.acc-q:focus-visible{{outline:2px solid rgba(96,165,250,.5);outline-offset:2px}}
+.acc-chevron{{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:26px;height:26px;color:rgba(148,163,184,.35);transition:color .2s,transform .0s}}
+.acc-chevron svg{{transition:transform .22s cubic-bezier(.4,0,.2,1)}}
+.acc-item:hover .acc-chevron{{color:rgba(148,163,184,.75)}}
+.acc-item.open .acc-chevron{{color:#60a5fa}}
+.acc-item.open .acc-chevron svg{{transform:rotate(90deg)}}
+.acc-main{{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}}
+.acc-ts{{color:#94a3b8;font-size:11.5px;font-weight:400;letter-spacing:.1px}}
+.acc-text{{font-style:italic;color:#e2e8f0;font-size:14px;font-weight:500;line-height:1.4}}
+.acc-item:not(.open) .acc-text{{color:#94a3b8}}
+.acc-item:hover:not(.open) .acc-text{{color:#cbd5e1}}
+.acc-hint{{font-size:11px;color:rgba(148,163,184,.55);margin-top:2px;font-style:normal}}
+.acc-item.open .acc-hint{{display:none}}
+.acc-icon{{color:#94a3b8;flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;transition:all .2s}}
+.acc-icon svg{{transition:transform .22s cubic-bezier(.4,0,.2,1)}}
+.acc-item.open .acc-icon{{color:#60a5fa;background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.45)}}
 .acc-item.open .acc-icon svg{{transform:rotate(180deg)}}
-.acc-body{{padding:0 16px 16px}}
+.acc-body{{padding:2px 20px 20px 60px}}
+.acc-cta-hint{{text-align:center;font-size:12px;color:rgba(148,163,184,.5);margin-bottom:6px;font-style:italic}}
+.ia-demo-transition{{max-width:560px;margin:0 auto 28px;text-align:center;color:#4b5563;font-size:14.5px;line-height:1.75}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
 @media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
 .ia-col{{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}}
@@ -1170,6 +1188,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
+      <p class="ia-demo-transition">Lors de ce rendez-vous, nous analysons rapidement votre situation et vous montrons comment les IA perçoivent aujourd'hui votre activité dans votre secteur et votre ville.<br><br>Vous repartez avec une vision claire de votre position actuelle et des premières actions à mettre en place pour commencer à apparaître dans les recommandations.</p>
       <a class="btn-pitch" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
@@ -1203,10 +1222,12 @@ function toggleAcc(btn) {{
   document.querySelectorAll('.acc-item').forEach(function(i) {{
     i.classList.remove('open');
     i.querySelector('.acc-body').hidden = true;
+    i.querySelector('.acc-q').setAttribute('aria-expanded','false');
   }});
   if (!isOpen) {{
     item.classList.add('open');
     item.querySelector('.acc-body').hidden = false;
+    btn.setAttribute('aria-expanded','true');
   }}
 }}
 function toggleFaq(btn) {{
@@ -1309,15 +1330,6 @@ def track_click(delivery_id: str, url: str = ""):
 
 # ── Route publique ────────────────────────────────────────────────────────────
 
-# ── Filtrage progressif des créneaux Calendly ─────────────────────────────────
-
-_SLOT_LIMITS: dict[int, tuple[int, int]] = {
-    0: (0, 0), 1: (0, 1),           # J+0/J+1 : quasi fermé
-    2: (3, 5), 3: (3, 5), 4: (2, 4),# J+2→4   : fenêtre principale
-    5: (2, 3), 6: (1, 2), 7: (1, 2),# J+5→7   : ouverture partielle
-}
-_SLOT_LIMIT_DEFAULT = (1, 2)         # J+8+     : très limité
-
 _JOURS_FR = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
 _MOIS_FR  = ["","janvier","février","mars","avril","mai","juin",
               "juillet","août","septembre","octobre","novembre","décembre"]
@@ -1358,16 +1370,37 @@ def _slots_from_db(days: int = 14) -> list:
 def _filter_slots(all_slots: list, today, seed: str) -> list:
     """
     Sélection progressive + variabilité déterministe (même token = même sélection le même jour).
-    Ne modifie PAS les données Calendly.
+
+    Env vars lues à chaque appel :
+      MAX_VISIBLE_SLOTS_PER_DAY  int   4      max créneaux affichés par jour
+      DAYS_VISIBLE_AHEAD         int   14     horizon prospect (jours)
+      LAUNCH_MODE                bool  false  J+1/J+2 plus ouverts au lancement
     """
     import random, hashlib
-    from datetime import date, timedelta
+    max_per_day = int(os.getenv("MAX_VISIBLE_SLOTS_PER_DAY", "4"))
+    days_ahead  = int(os.getenv("DAYS_VISIBLE_AHEAD", "14"))
+    launch_mode = os.getenv("LAUNCH_MODE", "false").lower() == "true"
+
+    # Limites (min, max) de créneaux affichés par delta (jours depuis aujourd'hui)
+    if launch_mode:
+        # Lancement : J+1 léger mais possible, J+2+ plein
+        _limits = {0: (0, 0), 1: (0, 2)}
+        _default = (1, max_per_day)
+    else:
+        # Régime normal : J+1 quasi fermé, J+2+ progressif
+        _limits = {
+            0: (0, 0), 1: (0, 1),
+            2: (1, max_per_day), 3: (2, max_per_day), 4: (1, max_per_day),
+            5: (1, min(max_per_day, 3)), 6: (1, min(max_per_day, 2)), 7: (1, min(max_per_day, 2)),
+        }
+        _default = (1, min(max_per_day, 2))
+
     rng = random.Random(hashlib.md5((seed + today.isoformat()).encode()).hexdigest())
 
     by_delta: dict[int, list] = {}
     for slot in all_slots:
         try:
-            dt = datetime.fromisoformat(slot["start"].replace("Z", "+00:00"))
+            dt    = datetime.fromisoformat(slot["start"].replace("Z", "+00:00"))
             delta = (dt.date() - today).days
             by_delta.setdefault(delta, []).append((dt, slot))
         except Exception:
@@ -1375,11 +1408,11 @@ def _filter_slots(all_slots: list, today, seed: str) -> list:
 
     result = []
     for delta in sorted(by_delta.keys()):
-        if delta < 0:
+        if delta < 0 or delta > days_ahead:
             continue
-        day_slots = sorted(by_delta[delta], key=lambda x: x[0])
-        min_n, max_n = _SLOT_LIMITS.get(delta, _SLOT_LIMIT_DEFAULT)
-        n = rng.randint(min_n, max_n)
+        day_slots     = sorted(by_delta[delta], key=lambda x: x[0])
+        min_n, max_n  = _limits.get(delta, _default)
+        n             = rng.randint(min_n, max_n)
         if n == 0 or not day_slots:
             continue
         chosen = rng.sample(day_slots, min(n, len(day_slots)))
