@@ -953,14 +953,32 @@ async def set_application_stage(app_id: str, request: Request):
             updates["reviewed_at"] = datetime.utcnow()
         with MktSession() as mdb:
             db_update_application(mdb, app_id, updates)
+            from marketing_module.models import CloserApplicationDB, CloserDB
+            app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
             # Email candidat sur décision finale
-            if stage in ("validated", "rejected", "waitlist"):
-                app = mdb.query(
-                    __import__("marketing_module.models", fromlist=["CloserApplicationDB"]).CloserApplicationDB
-                ).filter_by(id=app_id).first()
-                if app and app.email:
-                    _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
-                    _send_recruit_email(app.email, _name, stage)
+            if app and app.email and stage in ("validated", "rejected", "waitlist"):
+                _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
+                _send_recruit_email(app.email, _name, stage)
+            # Créer l'entrée CloserDB si validation
+            if stage == "validated" and app:
+                existing = mdb.query(CloserDB).filter_by(
+                    project_id=app.project_id, email=app.email
+                ).first()
+                if not existing:
+                    _full = f"{app.first_name or ''} {app.last_name or ''}".strip() or (app.email or "Closer")
+                    closer = CloserDB(
+                        project_id=app.project_id,
+                        name=_full,
+                        first_name=app.first_name,
+                        last_name=app.last_name,
+                        email=app.email,
+                        phone=app.phone,
+                        commission_rate=0.18,
+                        is_active=True,
+                        contact_id=app.contact_id,
+                    )
+                    mdb.add(closer)
+                    mdb.commit()
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
