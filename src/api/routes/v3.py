@@ -866,7 +866,10 @@ def _render_landing(
             ts = ""
             ts_raw = group["tested_at"]
             if ts_raw:
-                try:    ts = datetime.fromisoformat(str(ts_raw)).strftime("%d/%m/%Y à %Hh%M")
+                try:
+                    _dt = datetime.fromisoformat(str(ts_raw))
+                    _mc = {1:"jan",2:"fév",3:"mar",4:"avr",5:"mai",6:"jui",7:"jul",8:"aoû",9:"sep",10:"oct",11:"nov",12:"déc"}
+                    ts = f"Le {_dt.day} {_mc[_dt.month]} à {_dt.strftime('%H:%M')}"
                 except Exception: ts = str(ts_raw)[:16]
             model_map = {(r.get("model") or "").lower(): r for r in group["models"]}
             cols = ""
@@ -895,17 +898,19 @@ def _render_landing(
                     f'</div>'
                 )
             _open = " open" if _i == 0 else ""
-            _icon = "−" if _i == 0 else "+"
             _hidden = "" if _i == 0 else " hidden"
             _ts_span = f'<span class="acc-ts">{ts}</span>' if ts else ""
+            _chevron = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
             if 'ia-col__empty' in cols:
                 _any_empty = True
             chat_html += (
                 f'<div class="acc-item{_open}">'
                 f'<button class="acc-q" onclick="toggleAcc(this)">'
+                f'<span class="acc-main">'
                 f'{_ts_span}'
                 f'<span class="acc-text">« {prompt_text} »</span>'
-                f'<span class="acc-icon">{_icon}</span>'
+                f'</span>'
+                f'<span class="acc-icon">{_chevron}</span>'
                 f'</button>'
                 f'<div class="acc-body"{_hidden}><div class="ia-columns">{cols}</div></div>'
                 f'</div>'
@@ -1074,11 +1079,14 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .sect-ia-demo{{background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
 .ia-accordion{{margin-bottom:28px}}
 .acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
-.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
-.acc-ts{{color:#94a3b8;font-size:13px;white-space:nowrap;font-weight:600;flex-shrink:0}}
-.acc-text{{font-style:italic;color:#f1f5f9;font-size:15px;font-weight:500;flex:1}}
-.acc-icon{{color:#64748b;font-size:20px;font-weight:300;flex-shrink:0;margin-left:auto;transition:color .15s}}
-.acc-item.open .acc-icon{{color:#60a5fa}}
+.acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:12px}}
+.acc-main{{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}}
+.acc-ts{{color:#64748b;font-size:11px;font-weight:400}}
+.acc-text{{font-style:italic;color:#f1f5f9;font-size:14px;font-weight:500;line-height:1.4}}
+.acc-icon{{color:#475569;flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;transition:all .15s}}
+.acc-icon svg{{transition:transform .2s}}
+.acc-item.open .acc-icon{{color:#60a5fa;background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.25)}}
+.acc-item.open .acc-icon svg{{transform:rotate(180deg)}}
 .acc-body{{padding:0 16px 16px}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
 @media(max-width:680px){{.ia-columns{{grid-template-columns:1fr}}}}
@@ -1180,12 +1188,10 @@ function toggleAcc(btn) {{
   document.querySelectorAll('.acc-item').forEach(function(i) {{
     i.classList.remove('open');
     i.querySelector('.acc-body').hidden = true;
-    i.querySelector('.acc-icon').textContent = '+';
   }});
   if (!isOpen) {{
     item.classList.add('open');
     item.querySelector('.acc-body').hidden = false;
-    item.querySelector('.acc-icon').textContent = '−';
   }}
 }}
 function toggleFaq(btn) {{
