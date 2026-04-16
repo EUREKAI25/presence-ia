@@ -867,84 +867,84 @@ def crm_application_detail(app_id: str, request: Request):
 
     name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "—"
     _stage_opts = [
-        ("contacted", "Contacté",         "#9ca3af"),
-        ("applied",   "Candidature",      "#6366f1"),
-        ("reviewing", "En cours",         "#f59e0b"),
-        ("waitlist",  "⏳ Liste d'attente","#a78bfa"),
-        ("validated", "✓ Valider",        "#2ecc71"),
-        ("rejected",  "✗ Refuser",        "#e94560"),
+        ("contacted", "Contacté",    "#9ca3af"),
+        ("applied",   "Candidature", "#527fb3"),
+        ("reviewing", "En cours",    "#f59e0b"),
+        ("validated", "✓ Valider",   "#2ecc71"),
+        ("rejected",  "✗ Refuser",   "#e94560"),
     ]
     stage_btns = "".join(
-        f'<button onclick="setStage(\'{app.id}\',\'{s}\')" '
-        f'style="padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;'
-        f'background:{"transparent" if app.stage!=s else c+"30"};color:{c if app.stage!=s else c};'
-        f'border:1px solid {c if app.stage==s else "#2a2a4e"}">{l}</button>'
+        f'<a href="/admin/crm/application/{app.id}/set-stage/{s}?token={token}" '
+        f'style="display:inline-block;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;'
+        f'text-decoration:none;cursor:pointer;'
+        f'background:{c + "20" if app.stage == s else "#f8fafc"};'
+        f'color:{c};border:1px solid {c if app.stage == s else "#e2e8f0"}">{l}</a>'
         for s, l, c in _stage_opts
     )
 
     video_block = (f'<div style="margin-top:12px"><a href="{app.video_url}" target="_blank" '
-                   f'style="color:#527FB3">▶ Voir la vidéo</a></div>') if app.video_url else ""
+                   f'style="color:#527FB3;font-size:13px">▶ Voir la vidéo</a></div>') if app.video_url else ""
     audio_block = (f'<div style="margin-top:8px"><audio controls src="{app.audio_url}" '
                    f'style="width:100%"></audio></div>') if app.audio_url else ""
 
+    stage_label = dict((s, l) for s, l, c in _stage_opts).get(app.stage, app.stage)
+    stage_color = dict((s, c) for s, l, c in _stage_opts).get(app.stage, "#9ca3af")
+
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
-<meta charset="UTF-8"><title>{name} — Candidature</title>
+<meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<title>{name} — Candidature</title>
 <style>*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',sans-serif;background:#0f0f1a;color:#e8e8f0}}
+body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 </style></head><body>
 {admin_nav(token, "crm")}
 <div style="max-width:800px;margin:0 auto;padding:24px">
 <a href="/admin/crm/closers?token={token}" style="color:#527FB3;font-size:12px;text-decoration:none">← Closers</a>
-<h1 style="color:#fff;font-size:18px;margin:16px 0 4px">{name}</h1>
-<p style="color:#9ca3af;font-size:13px">{app.city or "—"} · {app.country or "FR"} · {app.email or "—"}</p>
-{f'<p style="color:#9ca3af;font-size:12px;margin-top:4px">📞 {app.phone}</p>' if app.phone else ""}
+<div style="margin:16px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <h1 style="color:#394455;font-size:18px">{name}</h1>
+  <span style="font-size:11px;font-weight:700;color:{stage_color};background:{stage_color}20;padding:3px 10px;border-radius:20px;border:1px solid {stage_color}40">{stage_label}</span>
+</div>
+<p style="color:#6b7280;font-size:13px">{app.city or "—"} · {app.country or "FR"} · {app.email or "—"}</p>
+{f'<p style="color:#6b7280;font-size:12px;margin-top:4px">📞 {app.phone}</p>' if app.phone else ""}
 {f'<p style="margin-top:8px"><a href="{app.linkedin_url}" target="_blank" style="color:#527FB3;font-size:12px">LinkedIn →</a></p>' if app.linkedin_url else ""}
 
 <div style="margin:24px 0 12px;display:flex;gap:8px;flex-wrap:wrap">
 {stage_btns}
 </div>
 
-{f'<div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px;margin-top:24px"><p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Message de présentation</p><p style="color:#ccc;font-size:13px;line-height:1.6">{app.message}</p></div>' if app.message else ""}
+{f'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-top:24px;box-shadow:0 1px 4px rgba(82,127,179,.07)"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Message de présentation</p><p style="color:#394455;font-size:13px;line-height:1.6">{app.message}</p></div>' if app.message else ""}
 
 {video_block}
 {audio_block}
 
-<div style="margin-top:24px;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:16px">
-<p style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Notes admin</p>
-<textarea id="notes" rows="4" style="width:100%;background:#0f0f1a;color:#ccc;border:1px solid #2a2a4e;border-radius:4px;padding:8px;font-size:13px;resize:vertical">{app.admin_notes or ""}</textarea>
-<button onclick="saveNotes()" style="margin-top:8px;padding:6px 14px;background:#6366f1;border:none;border-radius:4px;color:#fff;font-size:12px;cursor:pointer">Sauvegarder les notes</button>
+<div style="margin-top:24px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
+<p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Notes admin</p>
+<textarea id="notes" rows="4" style="width:100%;background:#f8fafc;color:#394455;border:1px solid #d1d5db;border-radius:4px;padding:8px;font-size:13px;resize:vertical">{app.admin_notes or ""}</textarea>
+<button onclick="saveNotes()" style="margin-top:8px;padding:6px 14px;background:linear-gradient(135deg,#996d2e,#ffbd5c);border:none;border-radius:4px;color:#fff;font-size:12px;cursor:pointer;font-weight:600">Sauvegarder les notes</button>
 </div>
 
 </div>
 <script>
-async function setStage(id, stage) {{
-  const r = await fetch('/admin/crm/application/' + id + '/stage?token={token}', {{
-    method: 'POST',
-    headers: {{'Content-Type': 'application/json'}},
-    body: JSON.stringify({{stage}})
-  }});
-  if (r.ok) location.reload();
-}}
 async function saveNotes() {{
   const notes = document.getElementById('notes').value;
-  await fetch('/admin/crm/application/{app.id}/notes?token={token}', {{
+  const r = await fetch('/admin/crm/application/{app.id}/notes?token={token}', {{
     method: 'POST',
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{notes}})
   }});
-  alert('Notes sauvegardées');
+  if (r.ok) alert('Notes sauvegardées');
 }}
 </script>
 </body></html>""")
 
 
-@router.post("/admin/crm/application/{app_id}/stage")
-async def set_application_stage(app_id: str, request: Request):
-    _check_token(request)
-    data = await request.json()
-    stage = data.get("stage")
+@router.get("/admin/crm/application/{app_id}/set-stage/{stage}")
+def set_application_stage_get(app_id: str, stage: str, request: Request):
+    """Validation candidature via lien direct (GET + redirect)."""
+    from fastapi.responses import RedirectResponse
+    token = _check_token(request)
     try:
         from marketing_module.database import SessionLocal as MktSession, db_update_application
+        from marketing_module.models import CloserApplicationDB, CloserDB
         from datetime import datetime
         updates = {"stage": stage}
         if stage == "validated":
@@ -953,13 +953,57 @@ async def set_application_stage(app_id: str, request: Request):
             updates["reviewed_at"] = datetime.utcnow()
         with MktSession() as mdb:
             db_update_application(mdb, app_id, updates)
-            from marketing_module.models import CloserApplicationDB, CloserDB
             app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
             # Email candidat sur décision finale
             if app and app.email and stage in ("validated", "rejected", "waitlist"):
                 _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
                 _send_recruit_email(app.email, _name, stage)
-            # Créer l'entrée CloserDB si validation
+            # Créer CloserDB si validation
+            if stage == "validated" and app:
+                existing = mdb.query(CloserDB).filter_by(
+                    project_id=app.project_id, email=app.email
+                ).first()
+                if not existing:
+                    _full = f"{app.first_name or ''} {app.last_name or ''}".strip() or (app.email or "Closer")
+                    closer = CloserDB(
+                        project_id=app.project_id,
+                        name=_full,
+                        first_name=app.first_name,
+                        last_name=app.last_name,
+                        email=app.email,
+                        phone=app.phone,
+                        commission_rate=0.18,
+                        is_active=True,
+                        contact_id=app.contact_id,
+                    )
+                    mdb.add(closer)
+                    mdb.commit()
+    except Exception:
+        pass
+    return RedirectResponse(f"/admin/crm/application/{app_id}?token={token}", status_code=303)
+
+
+@router.post("/admin/crm/application/{app_id}/stage")
+async def set_application_stage(app_id: str, request: Request):
+    """Kept for backward compat — delegates to GET handler logic."""
+    _check_token(request)
+    data = await request.json()
+    stage = data.get("stage", "")
+    try:
+        from marketing_module.database import SessionLocal as MktSession, db_update_application
+        from marketing_module.models import CloserApplicationDB, CloserDB
+        from datetime import datetime
+        updates = {"stage": stage}
+        if stage == "validated":
+            updates["validated_at"] = datetime.utcnow()
+        elif stage == "reviewing":
+            updates["reviewed_at"] = datetime.utcnow()
+        with MktSession() as mdb:
+            db_update_application(mdb, app_id, updates)
+            app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
+            if app and app.email and stage in ("validated", "rejected", "waitlist"):
+                _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
+                _send_recruit_email(app.email, _name, stage)
             if stage == "validated" and app:
                 existing = mdb.query(CloserDB).filter_by(
                     project_id=app.project_id, email=app.email
