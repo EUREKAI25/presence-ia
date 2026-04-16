@@ -208,7 +208,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
                        if is_test else
                        f'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span>')
         rows += f"""<tr id="row-{c.token}" data-cid="{c.token}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" data-is-test="{'1' if is_test else '0'}" style="{row_style}">
-  <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.token}" {'disabled title="Prospect TEST — exclu des envois"' if is_test else ''} style="cursor:{'not-allowed' if is_test else 'pointer'};opacity:{'0.35' if is_test else '1'}"></td>
+  <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.token}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.name}</td>
   <td style="padding:8px 6px">{status_cell}</td>
   <td style="padding:8px 6px;font-size:11px;color:#374151">{c.email or '<span style="color:#d1d5db">—</span>'}</td>
@@ -509,8 +509,6 @@ function selectAll() {{
   _clearFilters();
   const qty = _getQty(); let n = 0;
   document.querySelectorAll('.row-cb').forEach(cb => {{
-    const tr = cb.closest('tr');
-    if (tr.dataset.isTest === '1') {{ cb.checked = false; return; }}
     cb.checked = n < qty; n++;
   }});
   _updateBulkBar();
