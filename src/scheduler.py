@@ -376,52 +376,24 @@ def _upsert_cited_companies(db, profession: str, city: str, cited: dict):
 
 
 def _job_refresh_ia():
-    """Relance les tests IA (ChatGPT + Gemini + Claude) pour :
-    - la paire active (active_pair_state.json)
-    - toutes les paires avec activité dans les 15 derniers jours
-      (envoi, ouverture, clic, RDV — toute interaction repousse la fenêtre)
-    lun/jeu/dim à 9h30 UTC. 1 run (9 requêtes) par paire.
+    """Relance les tests IA (ChatGPT + Gemini + Claude) pour la paire active UNIQUEMENT.
+    lun/jeu/dim à 7h30 UTC. 1 run (9 requêtes max) par exécution.
     Alimente ia_cited_companies + ia_results sur tous les prospects de la paire.
     """
     try:
         import time as _time, json as _json
-        from datetime import timedelta
-        from sqlalchemy import or_
         from .database import SessionLocal
         from .api.routes.v3 import _run_ia_test, V3ProspectDB
         from .active_pair import get_active_pair
 
-        active_pairs = set()
-
-        # 1. Paire active (peut n'avoir aucun envoi encore)
+        # PAIRE ACTIVE UNIQUEMENT — jamais toutes les paires
         active = get_active_pair()
-        if active:
-            active_pairs.add((active["city"], active["profession"]))
-
-        # 2. Paires avec activité dans les 15 derniers jours
-        cutoff = datetime.utcnow() - timedelta(days=15)
-        with SessionLocal() as db:
-            rows = (
-                db.query(V3ProspectDB.city, V3ProspectDB.profession)
-                .filter(
-                    or_(
-                        V3ProspectDB.sent_at         >= cutoff,
-                        V3ProspectDB.email_opened_at >= cutoff,
-                        V3ProspectDB.email_clicked_at >= cutoff,
-                        V3ProspectDB.email_booked_at  >= cutoff,
-                    )
-                )
-                .distinct()
-                .all()
-            )
-        for r in rows:
-            active_pairs.add((r.city, r.profession))
-
-        if not active_pairs:
-            log.info("refresh_ia : aucune paire active ou en prospection — skip")
+        if not active:
+            log.info("refresh_ia : aucune paire active — skip")
             return
 
-        log.info("refresh_ia : %d paire(s) à tester", len(active_pairs))
+        active_pairs = [(active["city"], active["profession"])]
+        log.info("refresh_ia : paire active = %s / %s", active["city"], active["profession"])
         for city, profession in active_pairs:
             try:
                 ia_data = _run_ia_test(profession, city)
