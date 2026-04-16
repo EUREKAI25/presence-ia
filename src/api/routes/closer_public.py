@@ -2539,6 +2539,53 @@ def closer_slots(token: str, request: Request):
     except Exception:
         pass
 
+    # ── Fallback v3_bookings : si SlotDB vide, charger les vraies réservations ─
+    if not slot_data and not request.query_params.get("demo"):
+        try:
+            from ...database import SessionLocal as MainSession
+            from ...models import V3BookingDB, V3ProspectDB
+            with MainSession() as db:
+                vbookings = db.query(V3BookingDB).order_by(V3BookingDB.start_iso).all()
+                for b in vbookings:
+                    try:
+                        dt_s = _dt.datetime.fromisoformat(b.start_iso)
+                        dt_e = _dt.datetime.fromisoformat(b.end_iso)
+                    except Exception:
+                        continue
+                    delta_h = (dt_s - now).total_seconds() / 3600
+                    if delta_h < -2:   # passé depuis plus de 2h → skip
+                        continue
+                    _status = "accessible_urgent" if 0 <= delta_h < 48 else "accessible"
+                    prospect_info = None
+                    if b.prospect_token:
+                        p = db.query(V3ProspectDB).filter_by(token=b.prospect_token).first()
+                        if p:
+                            prospect_info = {
+                                "company":    p.name or b.name or "—",
+                                "city":       p.city or "—",
+                                "profession": p.profession or "—",
+                                "score":      0,
+                                "elements":   [],
+                            }
+                    if not prospect_info:
+                        prospect_info = {
+                            "company":    b.name or "—",
+                            "city":       "—",
+                            "profession": "—",
+                            "score":      0,
+                            "elements":   [],
+                        }
+                    slot_data.append({
+                        "id":         b.id,
+                        "date":       dt_s.strftime("%Y-%m-%d"),
+                        "time_start": dt_s.strftime("%H:%M"),
+                        "time_end":   dt_e.strftime("%H:%M"),
+                        "status":     _status,
+                        "prospect":   prospect_info,
+                    })
+        except Exception:
+            pass
+
     # ── Dataset mock : injecté si aucun slot réel ou ?demo=1 ──────────────────
     _demo = request.query_params.get("demo") or not slot_data
     if _demo:
