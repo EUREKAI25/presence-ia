@@ -762,13 +762,15 @@ def _preflight_ia_and_image(db, c) -> str | None:
 
 @router.post("/admin/contacts/{cid}/send-email")
 async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
+    import asyncio
     _check_token(request)
     c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
     if not c.email:
         return JSONResponse({"ok": False, "error": "Pas d'email"})
     # ── Preflight : IA + image obligatoires avant envoi ──────────────────────
-    err = _preflight_ia_and_image(db, c)
+    # run_in_executor → thread séparé, évite de bloquer l'event loop (et le 502)
+    err = await asyncio.get_event_loop().run_in_executor(None, _preflight_ia_and_image, db, c)
     if err:
         return JSONResponse({"ok": False, "error": err})
     from .v3 import (_send_brevo_email, _send_brevo_sms, _is_gmail,
@@ -811,12 +813,13 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
 
 @router.post("/admin/contacts/{cid}/send-sms")
 async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get_db)):
+    import asyncio
     _check_token(request)
     c = _get_prospect(db, cid)
     if not c: raise HTTPException(404)
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
-    err = _preflight_ia_and_image(db, c)
+    err = await asyncio.get_event_loop().run_in_executor(None, _preflight_ia_and_image, db, c)
     if err:
         return JSONResponse({"ok": False, "error": err})
     from .v3 import _send_brevo_sms, _contact_message_sms, BASE_URL
