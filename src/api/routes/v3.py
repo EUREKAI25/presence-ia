@@ -1418,36 +1418,57 @@ def _render_book_page(token: str, filtered: list, prefill: dict = {}) -> str:
         wk_end_lbl   = f"{wk_end.day} {_MOIS_FR[wk_end.month]}"
         wk_year      = wk_monday.year
 
-        cols = ""
+        from zoneinfo import ZoneInfo as _ZI
+        _paris = _ZI("Europe/Paris")
+
+        # Collecter toutes les heures de la semaine
+        all_hours: set = set()
         for d in wk_days:
-            day_label = f"{_JOURS_FR[d.weekday()][:3]}<br><span class='dn'>{d.day} {_MOIS_FR[d.month][:3]}</span>"
-            past      = d < today
-            if past:
-                cols += f'<div class="wc wc--past"><div class="wh">{day_label}</div></div>'
+            if d < today:
                 continue
-            slots    = sorted(by_date.get(d, []), key=lambda s: s["_dt"])
-            if slots:
-                from zoneinfo import ZoneInfo as _ZI
-                _paris = _ZI("Europe/Paris")
-                def _slot_btn(s, d=d):
-                    dt_utc   = s["_dt"]
-                    dt_local = dt_utc.astimezone(_paris)
-                    start_local = dt_local.strftime("%Y-%m-%dT%H:%M:%S")
-                    end_local   = (dt_local.replace(minute=dt_local.minute+20) if dt_local.minute <= 39
-                                   else dt_local.replace(hour=dt_local.hour+1, minute=dt_local.minute-40)
-                                   ).strftime("%Y-%m-%dT%H:%M:%S")
-                    hhmm  = dt_local.strftime("%H:%M")
-                    label = f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month]} à {hhmm}"
-                    return (f'<button class="sb" onclick="openSlot(\'{start_local}\',\'{end_local}\',\'{label}\')">'
-                            f'{hhmm}</button>')
-                btns = "".join(_slot_btn(s) for s in slots)
-                cols += f'<div class="wc"><div class="wh">{day_label}</div><div class="ws">{btns}</div></div>'
-            else:
-                cols += f'<div class="wc wc--empty"><div class="wh">{day_label}</div><div class="ws"><span class="no-slot">—</span></div></div>'
+            for s in by_date.get(d, []):
+                all_hours.add(s["_dt"].astimezone(_paris).hour)
+        hours_sorted = sorted(all_hours)
+
+        # En-tête jours
+        hdr_cells = '<div class="tg-cell tg-hour-lbl"></div>'
+        for d in wk_days:
+            past = d < today
+            cls  = " tg-past" if past else ""
+            hdr_cells += (f'<div class="tg-cell tg-day-hdr{cls}">'
+                          f'{_JOURS_FR[d.weekday()][:3]}'
+                          f'<span class="dn">{d.day} {_MOIS_FR[d.month][:3]}</span>'
+                          f'</div>')
+        grid_html = f'<div class="tg-row tg-head-row">{hdr_cells}</div>'
+
+        # Lignes par heure (alignées)
+        for h in hours_sorted:
+            row = f'<div class="tg-row"><div class="tg-cell tg-hour-lbl">{h:02d}h</div>'
+            for d in wk_days:
+                if d < today:
+                    row += '<div class="tg-cell tg-past"></div>'
+                    continue
+                slot_h = next((s for s in sorted(by_date.get(d, []), key=lambda x: x["_dt"])
+                               if s["_dt"].astimezone(_paris).hour == h), None)
+                if slot_h:
+                    dt_l  = slot_h["_dt"].astimezone(_paris)
+                    sl    = dt_l.strftime("%Y-%m-%dT%H:%M:%S")
+                    el    = (dt_l.replace(minute=dt_l.minute+20) if dt_l.minute <= 39
+                             else dt_l.replace(hour=dt_l.hour+1, minute=dt_l.minute-40)
+                             ).strftime("%Y-%m-%dT%H:%M:%S")
+                    hhmm  = dt_l.strftime("%H:%M")
+                    lbl   = f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month]} à {hhmm}"
+                    row  += (f'<div class="tg-cell">'
+                             f'<button class="sb" onclick="openSlot(\'{sl}\',\'{el}\',\'{lbl}\')">{hhmm}</button>'
+                             f'</div>')
+                else:
+                    row += '<div class="tg-cell tg-empty">—</div>'
+            row += '</div>'
+            grid_html += row
 
         weeks_html += f"""
 <div class="week" data-week="{week_offset}" {hidden}>
-  <div class="week-grid">{cols}</div>
+  <div class="time-grid">{grid_html}</div>
   {'<p class="ns">Aucun créneau cette semaine — <a href="' + CALENDLY_URL + '" target="_blank">accès direct →</a></p>' if not has_slots else ''}
 </div>"""
 
@@ -1468,28 +1489,30 @@ h1{{font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:4px;letter-spacing
 .sub{{color:#94a3b8;font-size:.82rem;margin-bottom:24px;line-height:1.5}}
 /* Navigation semaine */
 .week-nav{{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}}
-.week-nav button{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;padding:6px 13px;border-radius:7px;cursor:pointer;font-size:.8rem;transition:all .15s}}
-.week-nav button:hover:not(:disabled){{background:rgba(255,255,255,.12);color:#e2e8f0}}
-.week-nav button:disabled{{opacity:.3;cursor:default}}
+.week-nav button{{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#e2e8f0;width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;padding:0}}
+.week-nav button:hover:not(:disabled){{background:rgba(255,255,255,.18);color:#fff;transform:scale(1.08)}}
+.week-nav button:disabled{{opacity:.25;cursor:default}}
 .week-label{{color:#e2e8f0;font-size:.85rem;font-weight:600;text-align:center;flex:1}}
 /* Zone calendrier */
 .cal-card{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px}}
-.week-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}}
-.wc{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 5px;min-height:72px}}
-.wc--past{{opacity:.25}}
-.wc--empty{{opacity:.45}}
-.wh{{font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;text-align:center;margin-bottom:8px;line-height:1.4}}
-.dn{{font-size:.66rem;font-weight:400;color:#475569;text-transform:none;letter-spacing:0;display:block}}
-.ws{{display:flex;flex-direction:column;gap:4px;align-items:center}}
-.sb{{display:block;width:100%;text-align:center;padding:7px 3px;background:rgba(153,103,16,.16);border:1px solid rgba(153,103,16,.35);color:#c9a04a;font-size:.8rem;font-weight:600;border-radius:6px;cursor:pointer;transition:all .15s}}
+.time-grid{{width:100%}}
+.tg-row{{display:grid;grid-template-columns:36px repeat(5,1fr);gap:4px;margin-bottom:4px}}
+.tg-head-row{{margin-bottom:10px}}
+.tg-cell{{display:flex;align-items:center;justify-content:center}}
+.tg-hour-lbl{{color:#475569;font-size:.7rem;font-weight:600;justify-content:flex-end;padding-right:6px;white-space:nowrap}}
+.tg-day-hdr{{font-size:.65rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;flex-direction:column;gap:1px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.07)}}
+.tg-day-hdr.tg-past{{opacity:.3}}
+.dn{{font-size:.62rem;font-weight:400;color:#475569;text-transform:none;letter-spacing:0}}
+.tg-past{{opacity:.2}}
+.tg-empty{{color:#2d3d52;font-size:.7rem}}
+.sb{{display:block;width:100%;text-align:center;padding:8px 2px;background:rgba(153,103,16,.16);border:1px solid rgba(153,103,16,.35);color:#c9a04a;font-size:.79rem;font-weight:600;border-radius:7px;cursor:pointer;transition:all .15s}}
 .sb:hover{{background:rgba(153,103,16,.3);color:#e0b86a;transform:translateY(-1px)}}
-.no-slot{{color:#334155;font-size:.75rem}}
-.ns{{color:#64748b;text-align:center;padding:18px 0;font-size:.82rem;grid-column:1/-1}}
+.ns{{color:#64748b;text-align:center;padding:18px 0;font-size:.82rem}}
 .note{{margin-top:16px;color:#475569;font-size:.72rem;text-align:center;line-height:1.6}}
 @media(max-width:500px){{
-  .week-grid{{gap:3px}}
-  .sb{{padding:6px 2px;font-size:.72rem}}
-  .wh{{font-size:.62rem}}
+  .tg-row{{grid-template-columns:30px repeat(5,1fr);gap:2px}}
+  .sb{{padding:6px 1px;font-size:.7rem}}
+  .tg-hour-lbl{{font-size:.62rem;padding-right:3px}}
 }}
 </style></head><body>
 <header class="hdr"><a href="/"><img src="/assets/logo-white.svg" alt="Présence IA"></a></header>
@@ -1497,9 +1520,9 @@ h1{{font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:4px;letter-spacing
   <h1>Choisissez votre créneau</h1>
   <p class="sub">Audit de visibilité IA · 20 min · Sans engagement</p>
   <div class="week-nav">
-    <button id="btn-prev" onclick="changeWeek(-1)" disabled>← Préc.</button>
+    <button id="btn-prev" onclick="changeWeek(-1)" disabled aria-label="Semaine précédente"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
     <span class="week-label" id="week-label"></span>
-    <button id="btn-next" onclick="changeWeek(1)">Suiv. →</button>
+    <button id="btn-next" onclick="changeWeek(1)" aria-label="Semaine suivante"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
   </div>
   <div class="cal-card">
     {weeks_html}
