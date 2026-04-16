@@ -766,7 +766,8 @@ def crm_closers(request: Request):
         f'{"<span style=\'color:#2ecc71\'>Actif</span>" if c.is_active else "<span style=\'color:#e94560\'>Inactif</span>"}'
         f'</td>'
         f'<td style="padding:10px 12px">'
-        f'<a href="/closer/{getattr(c,"token",c.id) or c.id}?preview=1" target="_blank" style="color:#527FB3;font-size:10px">↗ Portail</a>'
+        f'<a href="/closer/{getattr(c,"token",c.id) or c.id}?preview=1" target="_blank" style="color:#527FB3;font-size:10px;margin-right:8px">↗ Portail</a>'
+        f'<a href="/closer/{getattr(c,"token",c.id) or c.id}/agenda" target="_blank" style="color:#996d2e;font-size:10px">📅 Agenda</a>'
         f'</td>'
         f'</tr>'
         for c in closers
