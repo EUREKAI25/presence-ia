@@ -641,12 +641,86 @@ def _build_page() -> str:
 
 @router.get("/closer/agenda", response_class=HTMLResponse)
 def closer_agenda_demo():
-    """Interface agenda visuel — données de test."""
-    return HTMLResponse(_build_page())
+    """Interface agenda — vrais RDV (vue admin sans token closer)."""
+    slots = _build_real_slots("")
+    if not slots:
+        slots = _build_demo_slots()  # fallback démo si aucun vrai RDV
+    today_str = date.today().isoformat()
+    page = _HTML.replace("__SLOTS__", json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
+    page = page.replace("__TODAY__", today_str)
+    return HTMLResponse(page)
+
+
+def _build_real_slots(closer_token: str) -> list:
+    """Charge les vrais RDV depuis v3_bookings pour ce closer."""
+    from ...database import SessionLocal
+    from ...models import V3BookingDB, V3ProspectDB
+    from marketing_module.database import SessionLocal as MktSession
+    from marketing_module.models import CloserDB as _CloserDB
+
+    slots = []
+    try:
+        # Trouver le closer par token (optionnel — pour affichage futur)
+        with MktSession() as mdb:
+            closer = mdb.query(_CloserDB).filter_by(token=closer_token).first()
+
+        # Charger tous les bookings (pour l'instant tous — à filtrer par closer quand multi-closers)
+        with SessionLocal() as db:
+            bookings = db.query(V3BookingDB).order_by(V3BookingDB.start_iso).all()
+            for i, b in enumerate(bookings):
+                # Extraire date et heure depuis start_iso / end_iso (format "2026-04-17T13:00:00")
+                try:
+                    dt_start = b.start_iso[:10]   # "2026-04-17"
+                    t_start  = b.start_iso[11:16]  # "13:00"
+                    t_end    = b.end_iso[11:16] if b.end_iso else ""
+                except Exception:
+                    continue
+
+                # Prospect associé
+                prospect = None
+                if b.prospect_token:
+                    p = db.query(V3ProspectDB).filter_by(token=b.prospect_token).first()
+                    if p:
+                        prospect = {
+                            "id":         b.prospect_token,
+                            "company":    p.name or b.name or "",
+                            "city":       p.city or "",
+                            "profession": p.profession or "",
+                            "score":      0,
+                            "elements":   [],
+                            "email":      b.email or "",
+                            "phone":      b.phone or "",
+                            "website":    b.website or "",
+                        }
+                if not prospect:
+                    prospect = {
+                        "id": b.id, "company": b.name or b.email or "—",
+                        "city": "", "profession": "", "score": 0, "elements": [],
+                        "email": b.email or "", "phone": b.phone or "", "website": b.website or "",
+                    }
+
+                slots.append({
+                    "id":         b.id,
+                    "date":       dt_start,
+                    "time_start": t_start,
+                    "time_end":   t_end,
+                    "status":     "claimed_me",
+                    "prospect":   prospect,
+                    "gcal_url":   b.gcal_event_url or "",
+                })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("_build_real_slots: %s", e)
+
+    return slots
 
 
 @router.get("/closer/{token}/agenda", response_class=HTMLResponse)
 def closer_agenda_token(token: str):
-    """Interface agenda visuel — token closer (à brancher sur vraies données)."""
-    # TODO: charger le vrai closer + ses vrais créneaux depuis marketing_module
-    return HTMLResponse(_build_page())
+    """Interface agenda visuel — vrais RDV depuis v3_bookings."""
+    slots = _build_real_slots(token)
+    # Si aucun vrai RDV, afficher quand même la page (vide)
+    today_str = date.today().isoformat()
+    page = _HTML.replace("__SLOTS__", json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
+    page = page.replace("__TODAY__", today_str)
+    return HTMLResponse(page)
