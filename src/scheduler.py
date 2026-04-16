@@ -95,10 +95,10 @@ def start_scheduler():
         misfire_grace_time=300,
     )
 
-    # Job 9 : refresh IA — lun/jeu/dim à 9h30 UTC (3×/sem, toutes les paires actives ≤15j)
+    # Job 9 : refresh IA — lun/jeu/dim à 7h30 UTC (AVANT outbound — toutes les paires actives ≤15j)
     _scheduler.add_job(
         _job_refresh_ia,
-        trigger=CronTrigger(day_of_week="mon,thu,sun", hour=9, minute=30, timezone="UTC"),
+        trigger=CronTrigger(day_of_week="mon,thu,sun", hour=7, minute=30, timezone="UTC"),
         id="refresh_ia",
         replace_existing=True,
         misfire_grace_time=3600,
@@ -113,7 +113,7 @@ def start_scheduler():
         misfire_grace_time=600,
     )
 
-    # Job 11 : outbound v3_prospects — tous les jours à 9h UTC
+    # Job 11 : outbound v3_prospects — tous les jours à 9h UTC (après refresh IA)
     _scheduler.add_job(
         _job_outbound,
         trigger=CronTrigger(hour=9, minute=0, timezone="UTC"),
