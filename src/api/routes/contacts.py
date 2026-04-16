@@ -551,7 +551,7 @@ async function bulkSendEmail() {{
   if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
   if(!confirm('Envoyer un email à ' + ids.length + ' contact(s) ?')) return;
   const prog = document.getElementById('bulk-progress');
-  prog.style.display='inline'; prog.textContent='Envoi en cours…';
+  prog.style.display='inline'; prog.textContent='Envoi email en cours…';
   let ok=0, err=0;
   for(const id of ids) {{
     try {{
