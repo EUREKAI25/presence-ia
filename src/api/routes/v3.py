@@ -36,7 +36,6 @@ from . import v3_mkt_bridge as _mkt
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-CALENDLY_URL  = "https://calendly.com/contact-presence-ia/20min"
 BASE_URL      = os.getenv("BASE_URL", "https://presence-ia.com")
 
 # Préfectures par département — fallback image si pas d'image spécifique à la ville
@@ -122,6 +121,18 @@ def _count_ia_competitors(ia_results_json: Optional[str]) -> tuple:
     except Exception:
         return (False, 0)
 
+def _title_city(city: str) -> str:
+    """Title case pour noms de villes françaises : capitalise chaque segment sauf prépositions."""
+    _PREP = {"sur","en","de","du","des","sous","par","et","au","aux","d","l","les","le","la","lès"}
+    segments = (city or "").lower().split("-")
+    out = []
+    for i, seg in enumerate(segments):
+        if i > 0 and seg.strip() in _PREP:
+            out.append(seg)
+        else:
+            out.append(" ".join(w.capitalize() for w in seg.split()))
+    return "-".join(out)
+
 def _city_image_key(city: str) -> str:
     return city.lower().strip()
 
@@ -169,7 +180,7 @@ _DEFAULT_SMS_TEMPLATE = (
 def _contact_message(name: str, city: str, profession: str, landing_url: str,
                      template: Optional[str] = None) -> str:
     tpl = template or _DEFAULT_EMAIL_TEMPLATE
-    ville   = city.title() if city else city
+    ville   = _title_city(city) if city else city
     metier  = profession.lower()
     metiers = _pluriel_metier(metier)
     try:
@@ -206,7 +217,7 @@ def _pluriel_metier(metier: str) -> str:
 def _contact_message_sms(name: str, city: str, profession: str, landing_url: str,
                          template: Optional[str] = None) -> str:
     tpl    = template or _DEFAULT_SMS_TEMPLATE
-    ville  = city.title() if city else city
+    ville  = _title_city(city) if city else city
     metier = profession.lower() if profession else ""
     metiers = _pluriel_metier(metier)
     try:
@@ -446,7 +457,7 @@ def _run_ia_test(profession: str, city: str) -> dict:
     RÈGLE ABSOLUE : appelé 1 fois par paire active, jamais en boucle sur toutes les paires.
     Le scheduler garantit max 1 paire par run via assert.
     """
-    city_cap = city.capitalize()
+    city_cap = _title_city(city)
 
     # Terme principal uniquement — la variation vient du phrasing, pas du terme
     termes = _resolve_termes(profession)
@@ -660,7 +671,7 @@ def _render_landing(
     evidence_images: Optional[list] = None,
 ) -> str:
     name       = p.name
-    city_cap   = p.city.capitalize()
+    city_cap   = _title_city(p.city)
     pro_label  = p.profession.lower()
 
     # Chercher label_pluriel + termes_recherche dans le référentiel
@@ -1039,7 +1050,7 @@ def _render_landing(
             )
 
     from ._gtm import gtm_head, gtm_body, gtm_push
-    _calendly_tracked = f"/l/{p.token}/book"
+    _book_url = f"/l/{p.token}/book"
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 {gtm_head()}
@@ -1081,11 +1092,11 @@ section h2{{font-size:clamp(24px,3.8vw,40px);font-weight:800;color:var(--txt);le
 .acc-item{{background:#1e293b;border-radius:10px;margin-bottom:10px;overflow:hidden}}
 .acc-q{{width:100%;text-align:left;background:transparent;border:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:12px}}
 .acc-main{{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}}
-.acc-ts{{color:#64748b;font-size:11px;font-weight:400}}
+.acc-ts{{color:#94a3b8;font-size:12px;font-weight:400}}
 .acc-text{{font-style:italic;color:#f1f5f9;font-size:14px;font-weight:500;line-height:1.4}}
-.acc-icon{{color:#475569;flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;transition:all .15s}}
+.acc-icon{{color:#94a3b8;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;transition:all .15s}}
 .acc-icon svg{{transition:transform .2s}}
-.acc-item.open .acc-icon{{color:#60a5fa;background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.25)}}
+.acc-item.open .acc-icon{{color:#60a5fa;background:rgba(96,165,250,.15);border-color:rgba(96,165,250,.5)}}
 .acc-item.open .acc-icon svg{{transform:rotate(180deg)}}
 .acc-body{{padding:0 16px 16px}}
 .ia-columns{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
@@ -1127,7 +1138,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 
 <nav class="sticky-nav">
   <a class="sn-logo" href="/"><img src="/assets/logo-nb.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
-  <a class="sn-cta" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit</a>
+  <a class="sn-cta" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit</a>
 </nav>
 
 {hero_html}
@@ -1152,7 +1163,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
+      <a class="btn-pitch" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -1162,7 +1173,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n'apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu'elles recommandent.</p>
-    <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
+    <a class="btn-pitch" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
   </div>
 </section>
 
@@ -1305,58 +1316,36 @@ _MOIS_FR  = ["","janvier","février","mars","avril","mai","juin",
               "juillet","août","septembre","octobre","novembre","décembre"]
 
 
-def _fetch_calendly_slots(days: int = 14) -> list:
-    """Interroge Calendly API. Retourne [] si token absent ou erreur."""
-    import requests as _req
+def _slots_from_db(days: int = 14) -> list:
+    """Charge les créneaux disponibles depuis SlotDB — source de vérité."""
     from datetime import timezone, timedelta
-    token = os.getenv("CALENDLY_TOKEN", "")
-    if not token:
-        return []
-    org = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
-    now = datetime.now(timezone.utc)
-    end = now + timedelta(days=days, hours=23, minutes=59)
-    hdrs = {"Authorization": f"Bearer {token}"}
     try:
-        r = _req.get("https://api.calendly.com/event_types",
-                     params={"organization": org, "active": "true", "count": 10},
-                     headers=hdrs, timeout=8)
-        if r.status_code != 200:
-            return []
-        slots = []
-        for et in r.json().get("collection", []):
-            uri = et.get("uri", "")
-            if not uri:
-                continue
-            r2 = _req.get("https://api.calendly.com/event_type_available_times",
-                          params={"event_type": uri,
-                                  "start_time": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                  "end_time":   end.strftime("%Y-%m-%dT%H:%M:%SZ")},
-                          headers=hdrs, timeout=8)
-            if r2.status_code == 200:
-                for t in r2.json().get("collection", []):
-                    if t.get("status") == "available":
-                        slots.append({"start": t["start_time"], "end": t["end_time"]})
-        return slots
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import SlotDB, SlotStatus
+        now = datetime.now(timezone.utc)
+        end = now + timedelta(days=days)
+        with MktSession() as mdb:
+            rows = (
+                mdb.query(SlotDB)
+                .filter(
+                    SlotDB.project_id == "presence-ia",
+                    SlotDB.status == SlotStatus.available,
+                    SlotDB.starts_at >= now,
+                    SlotDB.starts_at <= end,
+                )
+                .order_by(SlotDB.starts_at)
+                .all()
+            )
+        return [
+            {
+                "start": r.starts_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "end":   r.ends_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+            for r in rows
+        ]
     except Exception as e:
-        log.warning("_fetch_calendly_slots: %s", e)
+        log.warning("_slots_from_db: %s", e)
         return []
-
-
-def _fallback_slots(today) -> list:
-    """Créneaux synthétiques si Calendly API indisponible."""
-    from datetime import date, timedelta
-    hours = [9, 10, 11, 14, 15, 16, 17]
-    slots = []
-    for delta in range(0, 15):
-        d = today + timedelta(days=delta)
-        if d.weekday() >= 5:
-            continue
-        for h in hours:
-            dt_s = datetime(d.year, d.month, d.day, h, 0)
-            dt_e = datetime(d.year, d.month, d.day, h, 20)
-            slots.append({"start": dt_s.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          "end":   dt_e.strftime("%Y-%m-%dT%H:%M:%SZ")})
-    return slots
 
 
 def _filter_slots(all_slots: list, today, seed: str) -> list:
@@ -1472,7 +1461,7 @@ def _render_book_page(token: str, filtered: list, prefill: dict = {}) -> str:
         weeks_html += f"""
 <div class="week" data-week="{week_offset}" {hidden}>
   <div class="time-grid">{grid_html}</div>
-  {'<p class="ns">Aucun créneau cette semaine — <a href="' + CALENDLY_URL + '" target="_blank">accès direct →</a></p>' if not has_slots else ''}
+  {'<p class="ns">Aucun créneau disponible cette semaine.</p>' if not has_slots else ''}
 </div>"""
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
@@ -1632,11 +1621,8 @@ async function submitBooking() {{
 def prospect_book(token: str):
     """Page de réservation — vue semaine, formulaire custom → Google Calendar."""
     from datetime import date
-    _mkt.record_calendly_click(token)
-    today   = date.today()
-    raw     = _fetch_calendly_slots(14)
-    if not raw:
-        raw = _fallback_slots(today)
+    today    = date.today()
+    raw      = _slots_from_db(14)
     filtered = _filter_slots(raw, today, seed=token)
     # Pré-remplir depuis v3_prospects si dispo
     prefill = {}
@@ -3375,7 +3361,7 @@ def ia_test_debug(token: str = "", city: str = "Rennes", profession: str = "couv
     _require_admin(token)
     errors = []
     results = []
-    city_cap = city.capitalize()
+    city_cap = _title_city(city)
     prompt = f"Quels {profession}s recommandes-tu à {city_cap} ?"
 
     try:
