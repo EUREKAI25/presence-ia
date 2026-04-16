@@ -1488,3 +1488,14 @@ def pipeline_history(request: Request, db: Session = Depends(get_db)):
         "source_slots":        r.source_slots or "—",
     } for r in rows]
     return _JSONResponse({"rows": data})
+
+
+@router.post("/api/admin/trigger-outbound")
+def trigger_outbound(request: Request):
+    """Déclenche immédiatement le job outbound (sans attendre le cron 9h UTC)."""
+    if (r := _check_token(request)) is not None: return r
+    import threading
+    from ...scheduler import _job_outbound
+    t = threading.Thread(target=_job_outbound, kwargs={"force": False}, daemon=True)
+    t.start()
+    return _JSONResponse({"ok": True, "message": "Job outbound lancé en arrière-plan"})

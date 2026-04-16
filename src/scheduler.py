@@ -1789,7 +1789,8 @@ def compute_outbound_need() -> dict:
     from .models import V3ProspectDB
 
     # ── Verrou de lancement ───────────────────────────────────────────────────
-    LAUNCH_DATE = date(2026, 4, 20)
+    # Prospection démarre le 16/04 (J-4 avant les closers le 20/04)
+    LAUNCH_DATE = date(2026, 4, 16)
     today_local = datetime.now().date()
     if today_local < LAUNCH_DATE:
         log.info("compute_outbound_need: avant LAUNCH_DATE (%s) — pipeline en pause", LAUNCH_DATE)
@@ -1995,6 +1996,9 @@ def _job_outbound(force: bool = False):
             except Exception as _je:
                 log.debug("[OUTBOUND] pipeline_history_log: %s", _je)
             # ───────────────────────────────────────────────────────────────
+            if statut == "pre_launch":
+                log.info("[OUTBOUND] Pre-launch — pipeline bloqué jusqu'au 20/04/2026 — skip")
+                return
             if statut == "saturated":
                 log.info("[OUTBOUND] Saturé (%.0f%% > 85%%) — skip", need["taux_couverture"])
                 return
