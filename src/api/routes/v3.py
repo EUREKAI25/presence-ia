@@ -1126,8 +1126,8 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 {gtm_push("landing_visit", page_type="prospect_landing", city=p.city, profession=p.profession)}
 
 <nav class="sticky-nav">
-  <a class="sn-logo" href="/"><img src="/assets/logo.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
-  <a class="sn-cta" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit</a>
+  <a class="sn-logo" href="/"><img src="/assets/logo-nb.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
+  <a class="sn-cta" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit</a>
 </nav>
 
 {hero_html}
@@ -1152,7 +1152,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
     </div>
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
-      <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
+      <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -1162,7 +1162,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n'apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu'elles recommandent.</p>
-    <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
+    <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
   </div>
 </section>
 
@@ -1173,9 +1173,6 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">L'appel est-il payant ?<span class="faq-icon">+</span></button><div class="faq-a" hidden>Non. L'appel de 20 minutes et votre audit sont entièrement gratuits. Si vous souhaitez un accompagnement, nous vous proposerons une offre à l'issue de l'échange.</div></div>
 </div></div></section>
 
-<div style="text-align:center;padding:40px 24px 56px">
-  <a class="btn-pitch" href="{_calendly_tracked}" target="_blank" data-gtm-event="calendly_click">Réserver mon audit gratuit →</a>
-</div>
 
 <footer>
   © 2026 Présence IA &nbsp;·&nbsp;
