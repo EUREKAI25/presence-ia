@@ -442,7 +442,10 @@ def _resolve_termes(profession: str) -> list:
 
 
 def _run_ia_test(profession: str, city: str) -> dict:
-    """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max."""
+    """Interroge ChatGPT, Gemini et Claude sur les 3 prompts. Retourne 9 résultats max.
+    RÈGLE ABSOLUE : appelé 1 fois par paire active, jamais en boucle sur toutes les paires.
+    Le scheduler garantit max 1 paire par run via assert.
+    """
     city_cap = city.capitalize()
 
     # Terme principal uniquement — la variation vient du phrasing, pas du terme

@@ -392,6 +392,8 @@ def _job_refresh_ia():
             log.info("refresh_ia : aucune paire active — skip")
             return
 
+        # RÈGLE ABSOLUE : uniquement les paires issues de get_active_pair()
+        # Jamais de requête DB sur v3_prospects pour construire cette liste
         active_pairs = [(active["city"], active["profession"])]
         log.info("refresh_ia : paire active = %s / %s", active["city"], active["profession"])
         for city, profession in active_pairs:
