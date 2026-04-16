@@ -2539,8 +2539,8 @@ def closer_slots(token: str, request: Request):
     except Exception:
         pass
 
-    # ── Fallback v3_bookings : si SlotDB vide, charger les vraies réservations ─
-    if not slot_data and not request.query_params.get("demo"):
+    # ── v3_bookings : source principale — toujours fusionnée avec SlotDB ────────
+    if not request.query_params.get("demo"):
         try:
             from ...database import SessionLocal as MainSession
             from ...models import V3BookingDB, V3ProspectDB
