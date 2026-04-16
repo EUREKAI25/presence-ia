@@ -5,7 +5,7 @@ GET /closer/agenda           → interface démo (données de test)
 GET /closer/{token}/agenda   → même interface (à brancher sur vraies données)
 """
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
@@ -507,7 +507,7 @@ function openModal(slot) {
       <div style="text-align:center;padding:28px 12px">
         <div style="font-size:36px;margin-bottom:18px">🔒</div>
         <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6;margin-bottom:8px">
-          Vous devez prendre en priorité un rendez-vous urgent pour débloquer tout le calendrier.
+          Ce créneau est bloqué. Prenez d'abord en charge le rendez-vous urgent disponible.
         </p>
       </div>`;
   } else if (slot.status === 'claimed_other') {
@@ -604,7 +604,7 @@ function openLockModal() {
     <div style="text-align:center;padding:28px 12px">
       <div style="font-size:36px;margin-bottom:18px">🔒</div>
       <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6">
-        Vous devez prendre en priorité un rendez-vous urgent pour débloquer tout le calendrier.
+        Ce créneau est bloqué. Prenez d'abord en charge le rendez-vous urgent disponible.
       </p>
     </div>`;
   document.getElementById('m-overlay').classList.add('open');
@@ -699,12 +699,20 @@ def _build_real_slots(closer_token: str) -> list:
                         "email": b.email or "", "phone": b.phone or "", "website": b.website or "",
                     }
 
+                # Statut basé sur l'urgence temporelle (pas de claim tracking dans V3BookingDB)
+                try:
+                    dt_s = datetime.fromisoformat(b.start_iso)
+                    delta_h = (dt_s - datetime.utcnow()).total_seconds() / 3600
+                    _status = "accessible_urgent" if 0 <= delta_h < 48 else "accessible"
+                except Exception:
+                    _status = "accessible"
+
                 slots.append({
                     "id":         b.id,
                     "date":       dt_start,
                     "time_start": t_start,
                     "time_end":   t_end,
-                    "status":     "claimed_me",
+                    "status":     _status,
                     "prospect":   prospect,
                     "gcal_url":   b.gcal_event_url or "",
                 })

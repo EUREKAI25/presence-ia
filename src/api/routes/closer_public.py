@@ -2968,7 +2968,7 @@ function openModal(slot) {
     content.innerHTML = `<div style="text-align:center;padding:28px 12px">
       <div style="font-size:36px;margin-bottom:18px">🔒</div>
       <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6;margin-bottom:8px">
-        Prenez d'abord un rendez-vous urgent pour débloquer tout le calendrier.
+        Ce créneau est bloqué. Prenez d'abord en charge le rendez-vous urgent disponible.
       </p></div>`;
   } else if (slot.status === 'claimed_other') {
     content.innerHTML = '<div class="m-info">Ce créneau est déjà pris<br>par un autre closer.</div>';
@@ -3057,7 +3057,7 @@ function openLockModal() {
     <div style="text-align:center;padding:28px 12px">
       <div style="font-size:36px;margin-bottom:18px">🔒</div>
       <p style="color:#e8e8f0;font-size:14px;font-weight:600;line-height:1.6">
-        Prenez d'abord un rendez-vous urgent pour débloquer tout le calendrier.
+        Ce créneau est bloqué. Prenez d'abord en charge le rendez-vous urgent disponible.
       </p></div>`;
   document.getElementById('m-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
