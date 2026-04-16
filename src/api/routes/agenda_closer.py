@@ -276,9 +276,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="hdr">
   <div class="hdr-left">
     <span class="hdr-title">Agenda</span>
-    <span class="hdr-demo">démo</span>
+    __DEMO_BADGE__
   </div>
-  <a href="/closer/demo" class="hdr-back">← Portail</a>
+  <a href="__PORTAL_LINK__" class="hdr-back">← Portail</a>
 </div>
 
 <div class="main">
@@ -629,26 +629,30 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 """
 
 
-def _build_page() -> str:
-    slots = _build_demo_slots()
+_DEMO_BADGE = '<span class="hdr-demo">démo</span>'
+
+
+def _render_page(slots: list, token: str = "", is_demo: bool = False) -> str:
     today_str = date.today().isoformat()
-    page = _HTML.replace("__SLOTS__", json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
-    page = page.replace("__TODAY__", today_str)
+    demo_badge   = _DEMO_BADGE if is_demo else ""
+    portal_link  = f"/closer/{token}" if token else "/closer/demo"
+    page = _HTML.replace("__SLOTS__",       json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
+    page = page.replace("__TODAY__",        today_str)
+    page = page.replace("__DEMO_BADGE__",   demo_badge)
+    page = page.replace("__PORTAL_LINK__",  portal_link)
     return page
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 @router.get("/closer/agenda", response_class=HTMLResponse)
-def closer_agenda_demo():
-    """Interface agenda — vrais RDV (vue admin sans token closer)."""
+def closer_agenda_admin():
+    """Interface agenda — vue admin sans token closer."""
     slots = _build_real_slots("")
-    if not slots:
-        slots = _build_demo_slots()  # fallback démo si aucun vrai RDV
-    today_str = date.today().isoformat()
-    page = _HTML.replace("__SLOTS__", json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
-    page = page.replace("__TODAY__", today_str)
-    return HTMLResponse(page)
+    is_demo = not slots
+    if is_demo:
+        slots = _build_demo_slots()
+    return HTMLResponse(_render_page(slots, token="", is_demo=is_demo))
 
 
 def _build_real_slots(closer_token: str) -> list:
@@ -727,8 +731,4 @@ def _build_real_slots(closer_token: str) -> list:
 def closer_agenda_token(token: str):
     """Interface agenda visuel — vrais RDV depuis v3_bookings."""
     slots = _build_real_slots(token)
-    # Si aucun vrai RDV, afficher quand même la page (vide)
-    today_str = date.today().isoformat()
-    page = _HTML.replace("__SLOTS__", json.dumps(slots, ensure_ascii=False, separators=(",", ":")))
-    page = page.replace("__TODAY__", today_str)
-    return HTMLResponse(page)
+    return HTMLResponse(_render_page(slots, token=token, is_demo=False))
