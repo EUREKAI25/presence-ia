@@ -716,9 +716,18 @@ def _preflight_ia_and_image(db, c) -> str | None:
     Garantit que ia_results ET image header existent avant tout envoi.
     Retourne un message d'erreur si impossible, None si OK.
     """
+    import json as _j
     from .v3 import _run_ia_test
-    # ── 1. IA results ────────────────────────────────────────────────────────
-    if not c.ia_results:
+    # ── 1. IA results — vérifie existence ET qualité (réponses non vides) ───
+    def _ia_valid(ia_json):
+        if not ia_json: return False
+        try:
+            results = _j.loads(ia_json)
+            return any(r.get("response") for r in results)
+        except Exception:
+            return False
+
+    if not _ia_valid(c.ia_results):
         try:
             ia_data = _run_ia_test(c.profession or "", c.city or "")
             if ia_data and ia_data.get("results"):
