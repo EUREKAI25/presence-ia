@@ -1838,14 +1838,12 @@ def compute_outbound_need() -> dict:
 
         with MktSession() as mdb:
             # Nombre de closers actifs (capacité dynamique)
+            # On compte tous les actifs (real + [TEST]) — les [TEST] servent de stand-in
+            # tant que les candidatures réelles ne sont pas validées
             active_closers = mdb.query(CloserDB).filter(
                 CloserDB.project_id == "presence-ia",
                 CloserDB.is_active == True,
-                ~CloserDB.name.like("%[TEST]%"),
-            ).count() or mdb.query(CloserDB).filter(
-                CloserDB.project_id == "presence-ia",
-                CloserDB.is_active == True,
-            ).count()
+            ).count() or 1
 
             def _count_slots(start, end, status):
                 return mdb.query(SlotDB).filter(

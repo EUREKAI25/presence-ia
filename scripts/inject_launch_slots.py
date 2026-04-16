@@ -75,21 +75,12 @@ def inject_launch_slots(dry_run: bool = False, clean: bool = False):
     db = SessionLocal()
     try:
         # ── Récupérer les closers ─────────────────────────────────────────────
-        real_closers = db.query(CloserDB).filter(
+        closers = db.query(CloserDB).filter(
             CloserDB.project_id == PROJECT_ID,
             CloserDB.is_active  == True,
-            ~CloserDB.name.like("%[TEST]%"),
         ).all()
-
-        if real_closers:
-            closers = real_closers
-            label   = "réels"
-        else:
-            closers = db.query(CloserDB).filter(
-                CloserDB.project_id == PROJECT_ID,
-                CloserDB.is_active  == True,
-            ).all()
-            label = "[TEST] (fallback — aucun closer réel actif)"
+        real_closers = [c for c in closers if "[TEST]" not in (c.name or "")]
+        label = f"{len(real_closers)} réels + {len(closers) - len(real_closers)} test"
 
         n_closers = len(closers)
         print(f"\n{'═'*60}")
