@@ -854,8 +854,15 @@ def _render_landing(
     if ia_results_list:
         from collections import OrderedDict
         by_prompt = OrderedDict()
+        import re as _re
+        _city_raw = (p.city or "").strip()
+        def _fix_city_in_text(txt: str) -> str:
+            if not txt or not _city_raw:
+                return txt
+            return _re.sub(_re.escape(_city_raw), city_cap, txt, flags=_re.IGNORECASE)
+
         for r in ia_results_list:
-            pr = r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?"
+            pr = _fix_city_in_text(r.get("prompt") or f"Quels {pro_label}s recommandes-tu à {city_cap} ?")
             if pr not in by_prompt:
                 by_prompt[pr] = {"tested_at": r.get("tested_at"), "models": []}
             else:
