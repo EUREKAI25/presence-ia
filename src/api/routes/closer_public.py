@@ -1292,11 +1292,15 @@ def closer_portal(token: str, request: Request):
 
     # ── Paiement ──────────────────────────────────────────────────────────────
     closer_iban = ""
+    closer_siret = ""
+    closer_beneficiaire = ""
     payment_requests_closer = []
     if closer:
         try:
             closer_meta = json.loads(closer.meta) if isinstance(closer.meta, str) else (closer.meta or {})
-            closer_iban = closer_meta.get("iban", "")
+            closer_iban          = closer_meta.get("iban", "")
+            closer_siret         = closer_meta.get("siret", "")
+            closer_beneficiaire  = closer_meta.get("beneficiaire", "")
         except Exception:
             pass
         try:
@@ -1327,9 +1331,14 @@ def closer_portal(token: str, request: Request):
     _iban_save_js = f"""
 async function saveIban(){{
   const iban=document.getElementById('iban-input').value.trim().toUpperCase();
+  const siret=document.getElementById('siret-input').value.trim().replace(/\\s/g,'');
+  const beneficiaire=document.getElementById('beneficiaire-input').value.trim();
   if(!iban){{alert('Saisissez votre IBAN.');return;}}
+  if(!siret){{alert('Le numéro SIRET est obligatoire.');return;}}
+  if(!beneficiaire){{alert('Le nom du bénéficiaire est obligatoire.');return;}}
   const r=await fetch('/closer/{token}/iban',{{method:'POST',
-    headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{iban}})
+    headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{iban,siret,beneficiaire}})
   }});
   if(r.ok){{document.getElementById('iban-saved').style.display='inline';
     setTimeout(()=>document.getElementById('iban-saved').style.display='none',2000);}}
@@ -1377,18 +1386,42 @@ async function requestPayment(){{
   </div>
 </div>
 
-<!-- IBAN -->
+<!-- IBAN + SIRET + Bénéficiaire -->
 <div style="background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:20px;margin-bottom:20px">
-  <p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Votre IBAN (pour le virement)</p>
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <input id="iban-input" value="{closer_iban}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
-      style="flex:1;min-width:240px;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
-             padding:10px 14px;color:#e8e8f0;font-size:13px;font-family:monospace;outline:none">
+  <p style="color:#9ca3af;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px">Coordonnées bancaires (pour le virement)</p>
+
+  <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px">
+    <div>
+      <label style="color:#6b7280;font-size:11px;font-weight:600;display:block;margin-bottom:5px">
+        Nom du bénéficiaire <span style="color:#ef4444">*</span>
+      </label>
+      <input id="beneficiaire-input" value="{closer_beneficiaire}" placeholder="Prénom NOM ou raison sociale"
+        style="width:100%;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
+               padding:10px 14px;color:#e8e8f0;font-size:13px;outline:none">
+    </div>
+    <div>
+      <label style="color:#6b7280;font-size:11px;font-weight:600;display:block;margin-bottom:5px">
+        Numéro SIRET <span style="color:#ef4444">*</span>
+      </label>
+      <input id="siret-input" value="{closer_siret}" placeholder="14 chiffres (ex : 83282566100015)"
+        style="width:100%;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
+               padding:10px 14px;color:#e8e8f0;font-size:13px;font-family:monospace;outline:none"
+        maxlength="17" inputmode="numeric">
+    </div>
+    <div>
+      <label style="color:#6b7280;font-size:11px;font-weight:600;display:block;margin-bottom:5px">IBAN <span style="color:#ef4444">*</span></label>
+      <input id="iban-input" value="{closer_iban}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+        style="width:100%;background:#0f0f1a;border:1px solid #3a3a6e;border-radius:6px;
+               padding:10px 14px;color:#e8e8f0;font-size:13px;font-family:monospace;outline:none">
+      <p style="color:#555;font-size:11px;margin-top:5px">Format international. Ex : FR76 3000 6000 0112 3456 7890 189</p>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <button onclick="saveIban()" style="padding:10px 20px;background:#527fb3;border:none;
       border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Enregistrer</button>
-    <span id="iban-saved" style="color:#2ecc71;font-size:12px;display:none">IBAN enregistré ✓</span>
+    <span id="iban-saved" style="color:#2ecc71;font-size:12px;display:none">Coordonnées enregistrées ✓</span>
   </div>
-  <p style="color:#555;font-size:11px;margin-top:8px">Format international. Ex : FR76 3000 6000 0112 3456 7890 189</p>
 </div>
 
 <!-- Demander paiement -->
@@ -1844,9 +1877,10 @@ tr:hover{{background:#111127}}
 
 <div class="hdr">
   <div class="hdr-left">
-    <span class="hdr-title">Agenda</span>
+    <img src="/assets/logo-nb.svg" alt="Présence IA" style="height:28px">
+    <span class="hdr-title">{name}</span>
   </div>
-  <a href="/closer/{token}/slots" class="hdr-back">Agenda →</a>
+  <a href="/closer/{token}/agenda" class="hdr-back">Calendrier →</a>
 </div>
 
 <div style="max-width:920px;margin:0 auto;padding:28px 20px">
@@ -3149,9 +3183,15 @@ async def save_closer_iban(token: str, request: Request):
         from fastapi import HTTPException
         raise HTTPException(404, "Lien invalide")
     data = await request.json()
-    iban = data.get("iban", "").strip().upper().replace(" ", "")
+    iban         = data.get("iban", "").strip().upper().replace(" ", "")
+    siret        = data.get("siret", "").strip().replace(" ", "")
+    beneficiaire = data.get("beneficiaire", "").strip()
     if not iban or len(iban) < 15:
         return JSONResponse({"ok": False, "error": "IBAN invalide"}, status_code=400)
+    if not siret or len(siret) < 14:
+        return JSONResponse({"ok": False, "error": "SIRET invalide (14 chiffres)"}, status_code=400)
+    if not beneficiaire:
+        return JSONResponse({"ok": False, "error": "Nom bénéficiaire manquant"}, status_code=400)
     try:
         from marketing_module.database import SessionLocal as MktSession
         with MktSession() as mdb:
@@ -3161,7 +3201,9 @@ async def save_closer_iban(token: str, request: Request):
                 meta = json.loads(c.meta) if isinstance(c.meta, str) else (c.meta or {})
             except Exception:
                 pass
-            meta["iban"] = iban
+            meta["iban"]         = iban
+            meta["siret"]        = siret
+            meta["beneficiaire"] = beneficiaire
             c.meta = json.dumps(meta, ensure_ascii=False)
             mdb.commit()
         return JSONResponse({"ok": True})

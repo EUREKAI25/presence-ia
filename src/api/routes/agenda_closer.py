@@ -8,7 +8,8 @@ import json
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.requests import Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
 router = APIRouter(tags=["Closer Agenda"])
 
@@ -275,22 +276,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
 <div class="hdr">
   <div class="hdr-left">
-    <span class="hdr-title">Agenda</span>
+    <img src="/assets/logo-nb.svg" alt="Présence IA" style="height:28px">
     __DEMO_BADGE__
   </div>
   <a href="__PORTAL_LINK__" class="hdr-back">← Portail</a>
 </div>
 
 <div class="main">
-
-  <!-- Légende -->
-  <div class="sec-lbl">Vue globale</div>
-  <div class="legend">
-    <div class="leg-item"><div class="leg-dot" style="background:#dc2626"></div>Urgent</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#16a34a"></div>Disponible</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#16a34a;opacity:.3"></div>Verrouillé</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#0f0f1a;border:1px solid #1f2937"></div>Vide</div>
-  </div>
 
   <!-- Vue semaines -->
   <div class="wk-hdrs" id="wk-hdrs"></div>
@@ -640,6 +632,7 @@ def _render_page(slots: list, token: str = "", is_demo: bool = False) -> str:
     page = page.replace("__TODAY__",        today_str)
     page = page.replace("__DEMO_BADGE__",   demo_badge)
     page = page.replace("__PORTAL_LINK__",  portal_link)
+    page = page.replace("__CLOSER_TOKEN__", token or "")
     return page
 
 
@@ -692,9 +685,9 @@ def _build_real_slots(closer_token: str) -> list:
                             "profession": p.profession or "",
                             "score":      0,
                             "elements":   [],
-                            "email":      b.email or "",
-                            "phone":      b.phone or "",
-                            "website":    b.website or "",
+                            "email":      p.email or b.email or "",
+                            "phone":      p.phone or b.phone or "",
+                            "website":    p.website or b.website or "",
                         }
                 if not prospect:
                     prospect = {
@@ -703,13 +696,13 @@ def _build_real_slots(closer_token: str) -> list:
                         "email": b.email or "", "phone": b.phone or "", "website": b.website or "",
                     }
 
-                # Statut basé sur l'urgence temporelle (pas de claim tracking dans V3BookingDB)
+                # Booking réel → toujours "claimed_me" (RDV confirmé)
                 try:
                     dt_s = datetime.fromisoformat(b.start_iso)
                     delta_h = (dt_s - datetime.utcnow()).total_seconds() / 3600
-                    _status = "accessible_urgent" if 0 <= delta_h < 48 else "accessible"
+                    _status = "accessible_urgent" if 0 <= delta_h < 48 else "claimed_me"
                 except Exception:
-                    _status = "accessible"
+                    _status = "claimed_me"
 
                 slots.append({
                     "id":         b.id,
@@ -732,3 +725,85 @@ def closer_agenda_token(token: str):
     """Interface agenda visuel — vrais RDV depuis v3_bookings."""
     slots = _build_real_slots(token)
     return HTMLResponse(_render_page(slots, token=token, is_demo=False))
+
+
+# ── Audit booking ─────────────────────────────────────────────────────────────
+
+@router.get("/closer/{token}/booking/{booking_id}/audit", response_class=HTMLResponse)
+def closer_booking_audit(token: str, booking_id: str):
+    """Retourne l'audit HTML du prospect associé à ce booking."""
+    from ...database import SessionLocal
+    from ...models import V3BookingDB, V3ProspectDB, IaSnapshotDB
+
+    with SessionLocal() as db:
+        bk = db.query(V3BookingDB).filter_by(id=booking_id).first()
+        if not bk:
+            return HTMLResponse("<p>Booking introuvable.</p>", status_code=404)
+
+        snap = (
+            db.query(IaSnapshotDB)
+            .filter(IaSnapshotDB.prospect_token == bk.prospect_token,
+                    IaSnapshotDB.report_type == "audit")
+            .order_by(IaSnapshotDB.created_at.desc())
+            .first()
+        )
+        if not snap or not snap.report_html:
+            p = db.query(V3ProspectDB).filter_by(token=bk.prospect_token).first()
+            name = p.name if p else bk.prospect_token
+            return HTMLResponse(
+                f"<p>Aucun audit généré pour {name}. "
+                "Générez-en un depuis la fiche prospect admin.</p>",
+                status_code=404,
+            )
+
+        return HTMLResponse(snap.report_html)
+
+
+@router.post("/closer/{token}/booking/{booking_id}/send-audit")
+async def closer_send_audit(token: str, booking_id: str, request: Request):
+    """Envoie l'audit HTML au prospect par email (dry_run=true par défaut)."""
+    import os, logging as _log
+    from ...database import SessionLocal
+    from ...models import V3BookingDB, V3ProspectDB, IaSnapshotDB
+
+    body     = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    dry_run  = str(body.get("dry_run", os.getenv("OUTBOUND_DRY_RUN", "true"))).lower() == "true"
+
+    with SessionLocal() as db:
+        bk = db.query(V3BookingDB).filter_by(id=booking_id).first()
+        if not bk:
+            return {"ok": False, "error": "Booking introuvable"}
+
+        p = db.query(V3ProspectDB).filter_by(token=bk.prospect_token).first()
+        if not p or not p.email:
+            return {"ok": False, "error": "Prospect ou email introuvable"}
+
+        snap = (
+            db.query(IaSnapshotDB)
+            .filter(IaSnapshotDB.prospect_token == bk.prospect_token,
+                    IaSnapshotDB.report_type == "audit")
+            .order_by(IaSnapshotDB.created_at.desc())
+            .first()
+        )
+        if not snap or not snap.report_html:
+            return {"ok": False, "error": "Aucun audit généré pour ce prospect"}
+
+        if dry_run:
+            _log.getLogger(__name__).info(
+                "[audit-send][DRY_RUN] booking=%s prospect=%s email=%s",
+                booking_id, p.token, p.email,
+            )
+            return {"ok": True, "dry_run": True, "to": p.email, "prospect": p.name}
+
+        # Envoi réel
+        from ..routes.v3 import _send_brevo_email
+        subj = f"Votre audit de visibilité IA — {p.name}"
+        ok   = _send_brevo_email(
+            to_email   = p.email,
+            to_name    = p.name,
+            subject    = subj,
+            body       = snap.report_html,
+            landing_url= p.landing_url or "",
+        )
+        return {"ok": ok, "dry_run": False, "to": p.email, "prospect": p.name,
+                "error": None if ok else "Erreur Brevo"}
