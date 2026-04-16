@@ -1769,7 +1769,10 @@ def _get_calendly_available_slots(token: str, org: str, start, end) -> list:
 
 def compute_outbound_need() -> dict:
     """
-    Calcule le besoin en leads en fonction des créneaux Calendly.
+    Calcule le besoin en leads en fonction des créneaux de la table slots (marketing.db).
+
+    Capacité = active_closers × slots_par_jour (CLOSER_SLOTS_PER_DAY, défaut 2).
+    Aucun envoi avant LAUNCH_DATE (2026-04-20).
 
     Retourne :
       proche         : {total, reserves, disponibles}
@@ -1777,13 +1780,40 @@ def compute_outbound_need() -> dict:
       leads_en_file  : int
       leads_necessaires: int
       cap_recommande : int (envois max pour ce run)
-      statut         : "idle" | "running" | "saturated"
+      statut         : "idle" | "running" | "saturated" | "pre_launch"
       bootstrap      : bool
     """
     import os
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timezone, timedelta, date
     from .database import SessionLocal
     from .models import V3ProspectDB
+
+    # ── Verrou de lancement ───────────────────────────────────────────────────
+    LAUNCH_DATE = date(2026, 4, 20)
+    today_local = datetime.now().date()
+    if today_local < LAUNCH_DATE:
+        log.info("compute_outbound_need: avant LAUNCH_DATE (%s) — pipeline en pause", LAUNCH_DATE)
+        with SessionLocal() as db:
+            leads_en_file = db.query(V3ProspectDB).filter(
+                V3ProspectDB.ia_results.isnot(None),
+                V3ProspectDB.sent_at.is_(None),
+                V3ProspectDB.email.isnot(None),
+                V3ProspectDB.is_test.is_(False),
+            ).count()
+        return {
+            "proche":            {"total": 0, "reserves": 0, "disponibles": 0},
+            "moyen":             {"total": 0, "reserves": 0, "disponibles": 0},
+            "lointain":          {"total": 0, "reserves": 0, "disponibles": 0},
+            "taux_couverture":   0.0,
+            "leads_en_file":     leads_en_file,
+            "leads_necessaires": 0,
+            "leads_manquants":   0,
+            "cap_recommande":    0,
+            "statut":            "pre_launch",
+            "bootstrap":         True,
+            "taux_conversion":   0.02,
+            "source_slots":      "db",
+        }
 
     now = datetime.now(timezone.utc)
 
@@ -1796,64 +1826,53 @@ def compute_outbound_need() -> dict:
     moyen_start,    moyen_end    = _range(5, 7)
     lointain_start, lointain_end = _range(8, 14)
 
-    token = os.getenv("CALENDLY_TOKEN", "")
-    org   = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
-    slots_per_day = int(os.getenv("CLOSER_SLOTS_PER_DAY", "2"))
+    # ── Slots depuis la DB (plus Calendly) ────────────────────────────────────
+    proche_dispo    = moyen_dispo    = lointain_dispo    = 0
+    proche_reserves = moyen_reserves = lointain_reserves = 0
+    active_closers  = 1
+    slots_per_day   = int(os.getenv("CLOSER_SLOTS_PER_DAY", "2"))
 
-    # ── Créneaux disponibles (Calendly API) ───────────────────────────────────
-    def _count_in_range(slots, start, end):
-        n = 0
-        for s in slots:
-            try:
-                t = datetime.fromisoformat(s["start"].replace("Z", "+00:00"))
-                if start <= t <= end:
-                    n += 1
-            except Exception:
-                pass
-        return n
-
-    all_available = []
-    if token:
-        try:
-            all_available = _get_calendly_available_slots(
-                token, org, proche_start, lointain_end)
-        except Exception as e:
-            log.warning("compute_outbound_need: Calendly API indisponible — %s", e)
-
-    if all_available:
-        proche_dispo_cal   = _count_in_range(all_available, proche_start, proche_end)
-        moyen_dispo_cal    = _count_in_range(all_available, moyen_start, moyen_end)
-        lointain_dispo_cal = _count_in_range(all_available, lointain_start, lointain_end)
-    else:
-        # Fallback : capacité configurée (jours × slots/jour)
-        proche_dispo_cal   = 3 * slots_per_day
-        moyen_dispo_cal    = 3 * slots_per_day
-        lointain_dispo_cal = 7 * slots_per_day
-
-    # ── Créneaux réservés (meetings DB) ───────────────────────────────────────
     try:
         from marketing_module.database import SessionLocal as MktSession
-        from marketing_module.models import MeetingDB, MeetingStatus
+        from marketing_module.models import SlotDB, SlotStatus, CloserDB
 
         with MktSession() as mdb:
-            def _booked(start, end):
-                return mdb.query(MeetingDB).filter(
-                    MeetingDB.project_id == "presence-ia",
-                    MeetingDB.status == MeetingStatus.scheduled,
-                    MeetingDB.scheduled_at >= start,
-                    MeetingDB.scheduled_at <= end,
+            # Nombre de closers actifs (capacité dynamique)
+            active_closers = mdb.query(CloserDB).filter(
+                CloserDB.project_id == "presence-ia",
+                CloserDB.is_active == True,
+                ~CloserDB.name.like("%[TEST]%"),
+            ).count() or mdb.query(CloserDB).filter(
+                CloserDB.project_id == "presence-ia",
+                CloserDB.is_active == True,
+            ).count()
+
+            def _count_slots(start, end, status):
+                return mdb.query(SlotDB).filter(
+                    SlotDB.project_id == "presence-ia",
+                    SlotDB.status == status,
+                    SlotDB.starts_at >= start,
+                    SlotDB.starts_at <= end,
                 ).count()
 
-            proche_reserves   = _booked(proche_start, proche_end)
-            moyen_reserves    = _booked(moyen_start, moyen_end)
-            lointain_reserves = _booked(lointain_start, lointain_end)
+            proche_dispo    = _count_slots(proche_start,   proche_end,   SlotStatus.available)
+            moyen_dispo     = _count_slots(moyen_start,    moyen_end,    SlotStatus.available)
+            lointain_dispo  = _count_slots(lointain_start, lointain_end, SlotStatus.available)
+            proche_reserves = _count_slots(proche_start,   proche_end,   SlotStatus.booked)
+            moyen_reserves  = _count_slots(moyen_start,    moyen_end,    SlotStatus.booked)
+            lointain_reserves = _count_slots(lointain_start, lointain_end, SlotStatus.booked)
+
     except Exception as e:
         log.warning("compute_outbound_need: marketing_module indisponible — %s", e)
-        proche_reserves = moyen_reserves = lointain_reserves = 0
+        # Fallback : capacité configurée depuis env
+        closer_cap = active_closers * slots_per_day
+        proche_dispo    = 3 * closer_cap
+        moyen_dispo     = 3 * closer_cap
+        lointain_dispo  = 7 * closer_cap
 
-    # ── Totaux slots proches (dispo + réservés = total proposé aux prospects) ─
-    proche_total      = proche_dispo_cal + proche_reserves
-    proche_disponibles = max(0, proche_dispo_cal)
+    # ── Totaux ────────────────────────────────────────────────────────────────
+    proche_total      = proche_dispo + proche_reserves
+    proche_disponibles = max(0, proche_dispo)
 
     taux = (proche_reserves / proche_total) if proche_total > 0 else 0.0
 
@@ -1863,21 +1882,18 @@ def compute_outbound_need() -> dict:
             V3ProspectDB.ia_results.isnot(None),
             V3ProspectDB.sent_at.is_(None),
             V3ProspectDB.email.isnot(None),
+            V3ProspectDB.is_test.is_(False),
         ).count()
         sent_total = db.query(V3ProspectDB).filter(
             V3ProspectDB.sent_at.isnot(None)
         ).count()
 
     bootstrap        = sent_total < 30
-    taux_conversion  = 0.02   # 2% fixe (mode bootstrap)
+    taux_conversion  = 0.02
     leads_necessaires = int(proche_disponibles / taux_conversion) if proche_disponibles > 0 else 0
     leads_manquants   = max(0, leads_necessaires - leads_en_file)
 
     # ── Statut (4 niveaux) ────────────────────────────────────────────────────
-    # STOP     : couverture > 85%
-    # RUN      : couverture < 70% → génération agressive
-    # TOP_UP   : couverture 70–85% ET file insuffisante → appoint léger (50% du manque)
-    # IDLE     : couverture 70–85% ET file suffisante
     if taux >= 0.85:
         statut        = "saturated"
         cap_recommande = 0
@@ -1885,7 +1901,6 @@ def compute_outbound_need() -> dict:
         statut        = "running"
         cap_recommande = leads_manquants
     else:
-        # Zone intermédiaire 70–85%
         if leads_en_file >= leads_necessaires:
             statut        = "idle"
             cap_recommande = 0
@@ -1896,12 +1911,12 @@ def compute_outbound_need() -> dict:
     return {
         "proche":            {"total": proche_total, "reserves": proche_reserves,
                               "disponibles": proche_disponibles},
-        "moyen":             {"total": moyen_dispo_cal + moyen_reserves,
+        "moyen":             {"total": moyen_dispo + moyen_reserves,
                               "reserves": moyen_reserves,
-                              "disponibles": max(0, moyen_dispo_cal)},
-        "lointain":          {"total": lointain_dispo_cal + lointain_reserves,
+                              "disponibles": max(0, moyen_dispo)},
+        "lointain":          {"total": lointain_dispo + lointain_reserves,
                               "reserves": lointain_reserves,
-                              "disponibles": max(0, lointain_dispo_cal)},
+                              "disponibles": max(0, lointain_dispo)},
         "taux_couverture":   round(taux * 100, 1),
         "leads_en_file":     leads_en_file,
         "leads_necessaires": leads_necessaires,
@@ -1910,7 +1925,8 @@ def compute_outbound_need() -> dict:
         "statut":            statut,
         "bootstrap":         bootstrap,
         "taux_conversion":   taux_conversion,
-        "source_slots":      "calendly" if all_available else "config",
+        "source_slots":      "db",
+        "active_closers":    active_closers,
     }
 
 
