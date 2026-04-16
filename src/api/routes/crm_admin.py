@@ -750,8 +750,10 @@ def crm_closers(request: Request):
         from marketing_module.models import CloserDB, CloserApplicationDB
         with MktSession() as mdb:
             closers = mdb.query(CloserDB).filter_by(project_id="presence-ia").all()
-            applications = mdb.query(CloserApplicationDB).filter_by(project_id="presence-ia")\
-                .order_by(CloserApplicationDB.created_at.desc()).all()
+            applications = mdb.query(CloserApplicationDB).filter(
+                CloserApplicationDB.project_id == "presence-ia",
+                CloserApplicationDB.stage != "validated",
+            ).order_by(CloserApplicationDB.created_at.desc()).all()
     except Exception:
         pass
 
