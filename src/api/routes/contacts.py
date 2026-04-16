@@ -711,6 +711,46 @@ def contact_delete(cid: str, request: Request, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+def _preflight_ia_and_image(db, c) -> str | None:
+    """
+    Garantit que ia_results ET image header existent avant tout envoi.
+    Retourne un message d'erreur si impossible, None si OK.
+    """
+    from .v3 import _run_ia_test
+    # ── 1. IA results ────────────────────────────────────────────────────────
+    if not c.ia_results:
+        try:
+            ia_data = _run_ia_test(c.profession or "", c.city or "")
+            if ia_data and ia_data.get("results"):
+                import json as _j
+                ia_json = _j.dumps(ia_data["results"], ensure_ascii=False)
+                # Mettre à jour tous les prospects de la même paire
+                for p in db.query(V3ProspectDB).filter_by(
+                    city=c.city, profession=c.profession
+                ).all():
+                    p.ia_results   = ia_json
+                    p.ia_tested_at = ia_data.get("tested_at")
+                db.commit()
+            else:
+                return "Requêtes IA vides — impossible de générer la landing"
+        except Exception as e:
+            return f"Erreur requêtes IA : {e}"
+    # ── 2. Image header ──────────────────────────────────────────────────────
+    try:
+        from ...models import RefCityDB
+        from ...city_images import fetch_city_header_image
+        ref = db.query(RefCityDB).filter_by(
+            city_name=(c.city or "").upper()
+        ).first()
+        if not ref or not ref.header_image_url:
+            img_url = fetch_city_header_image(c.city or "")
+            if not img_url:
+                return f"Image introuvable pour {c.city} — impossible de générer la landing"
+    except Exception:
+        pass  # image non bloquante si erreur réseau
+    return None
+
+
 @router.post("/admin/contacts/{cid}/send-email")
 async def contact_send_email(cid: str, request: Request, db: Session = Depends(get_db)):
     _check_token(request)
@@ -718,6 +758,10 @@ async def contact_send_email(cid: str, request: Request, db: Session = Depends(g
     if not c: raise HTTPException(404)
     if not c.email:
         return JSONResponse({"ok": False, "error": "Pas d'email"})
+    # ── Preflight : IA + image obligatoires avant envoi ──────────────────────
+    err = _preflight_ia_and_image(db, c)
+    if err:
+        return JSONResponse({"ok": False, "error": err})
     from .v3 import (_send_brevo_email, _send_brevo_sms, _is_gmail,
                      _contact_message, _contact_message_sms,
                      _DEFAULT_EMAIL_SUBJECT, BASE_URL)
@@ -763,6 +807,9 @@ async def contact_send_sms(cid: str, request: Request, db: Session = Depends(get
     if not c: raise HTTPException(404)
     if not c.phone:
         return JSONResponse({"ok": False, "error": "Pas de téléphone"})
+    err = _preflight_ia_and_image(db, c)
+    if err:
+        return JSONResponse({"ok": False, "error": err})
     from .v3 import _send_brevo_sms, _contact_message_sms, BASE_URL
     name       = c.name or ""
     city       = c.city or ""
