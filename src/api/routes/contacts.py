@@ -325,6 +325,7 @@ tr:hover td{{background:#fafafa}}
     <button id="fbtn-sp"    onclick="selectByType('sp')"    class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
     <button id="fbtn-all"   onclick="selectAll()"           class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button id="fbtn-none"  onclick="selectNone()"          class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
+    <button id="mode-toggle" onclick="toggleTestMode()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">🧪 Mode test</button>
     <div style="flex:1"></div>
     <span id="bulk-count" style="font-size:12px;color:#6b7280">0 sélectionné(s)</span>
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
@@ -438,18 +439,41 @@ async function _pollLeads() {{
   }} catch(e) {{}}
 }})();
 
+// ── Mode test / envoi ─────────────────────────────────────────────────────────
+let _testMode = false;
+function _applyMode() {{
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    const isTest = cb.closest('tr').dataset.isTest === '1';
+    const disabled = _testMode ? !isTest : isTest;
+    cb.disabled = disabled;
+    cb.style.cursor  = disabled ? 'not-allowed' : 'pointer';
+    cb.style.opacity = disabled ? '0.3' : '1';
+    if(disabled) cb.checked = false;
+  }});
+  const btn = document.getElementById('mode-toggle');
+  if(_testMode) {{
+    btn.textContent = '🧪 Mode test actif';
+    btn.style.background = '#f59e0b'; btn.style.color = '#fff'; btn.style.borderColor = '#f59e0b';
+  }} else {{
+    btn.textContent = '🧪 Mode test';
+    btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+  }}
+  _updateBulkBar();
+}}
+function toggleTestMode() {{ _testMode = !_testMode; selectNone(); _applyMode(); }}
+
 // ── Checkboxes + sélection ────────────────────────────────────────────────────
 function _updateBulkBar() {{
   const checked = document.querySelectorAll('.row-cb:checked');
   document.getElementById('bulk-count').textContent = checked.length + ' sélectionné(s)';
-  // La barre reste toujours visible — pas de masquage
 }}
 document.addEventListener('change', function(e) {{
   if(e.target.id === 'cb-all') {{
-    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = e.target.checked);
+    document.querySelectorAll('.row-cb:not(:disabled)').forEach(cb => cb.checked = e.target.checked);
   }}
   if(e.target.classList.contains('row-cb') || e.target.id === 'cb-all') _updateBulkBar();
 }});
+document.addEventListener('DOMContentLoaded', function() {{ _applyMode(); }});
 function _getQty() {{
   const v = parseInt(document.getElementById('bulk-qty').value);
   return (v > 0) ? v : Infinity;
@@ -484,10 +508,11 @@ function _applyFilters() {{
   document.querySelectorAll('.row-cb').forEach(cb => {{
     cb.checked = false;
     const tr = cb.closest('tr');
-    if (tr.dataset.isTest === '1') {{ tr.style.display = ''; return; }}
+    const isTest = tr.dataset.isTest === '1';
+    if (isTest) {{ tr.style.display = ''; return; }}
     const visible = _rowMatches(tr);
     tr.style.display = visible ? '' : 'none';
-    if (visible && n < qty) {{ cb.checked = true; n++; }}
+    if (visible && !cb.disabled && n < qty) {{ cb.checked = true; n++; }}
   }});
   _updateBulkBar();
 }}
@@ -508,7 +533,7 @@ function _clearFilters() {{
 function selectAll() {{
   _clearFilters();
   const qty = _getQty(); let n = 0;
-  document.querySelectorAll('.row-cb').forEach(cb => {{
+  document.querySelectorAll('.row-cb:not(:disabled)').forEach(cb => {{
     cb.checked = n < qty; n++;
   }});
   _updateBulkBar();
