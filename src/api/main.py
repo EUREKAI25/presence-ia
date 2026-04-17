@@ -705,3 +705,6 @@ app.include_router(methode_ia_router)
 
 from .routes.implantation_ia import router as implantation_ia_router
 app.include_router(implantation_ia_router)
+
+from .routes.domination_ia import router as domination_ia_router
+app.include_router(domination_ia_router)
