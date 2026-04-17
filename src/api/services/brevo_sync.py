@@ -105,13 +105,13 @@ def _fetch_email_events(api_key: str, days: int = 30) -> list:
 
 
 def _fetch_sms_reports(api_key: str, date_from: str, date_to: str) -> list:
-    """Tente de récupérer les logs SMS par destinataire."""
+    """Récupère les événements SMS par destinataire via /transactionalSMS/statistics/events."""
     import requests
     logs, offset = [], 0
     log.info("[BREVO SYNC] Récupération logs SMS (%s → %s)…", date_from, date_to)
     while True:
         r = requests.get(
-            f"{API_BASE}/transactionalSMS/statistics",
+            f"{API_BASE}/transactionalSMS/statistics/events",
             headers={"api-key": api_key},
             params={"startDate": date_from, "endDate": date_to,
                     "limit": 500, "offset": offset},
@@ -121,8 +121,7 @@ def _fetch_sms_reports(api_key: str, date_from: str, date_to: str) -> list:
             log.warning("[BREVO SYNC] SMS API %s : %s", r.status_code, r.text[:300])
             break
         data  = r.json()
-        batch = (data if isinstance(data, list)
-                 else data.get("data", data.get("statistics", data.get("logs", []))))
+        batch = data.get("events", data) if isinstance(data, dict) else data
         if not batch:
             break
         logs.extend(batch)
@@ -248,12 +247,14 @@ def sync_brevo_events(days: int = 30) -> dict:
             continue
         sms_matched += 1
 
-        brevo_status = (entry.get("status") or entry.get("state") or "").lower()
+        # L'API /statistics/events retourne le champ "event", pas "status"
+        brevo_status = (entry.get("event") or entry.get("status") or entry.get("state") or "").lower()
         new_status   = ({"delivered": "delivered", "success": "delivered",
                           "failed": "failed", "undelivered": "failed",
+                          "hardbounce": "failed", "softbounce": "failed",
                           "bounce": "failed", "bounced": "failed",
                           "sent": "sent", "accepted": "sent"}.get(brevo_status))
-        event_dt = _to_dt_str(entry.get("sentAt") or entry.get("date") or entry.get("timestamp"))
+        event_dt = _to_dt_str(entry.get("date") or entry.get("sentAt") or entry.get("timestamp"))
 
         row    = by_phone[key]
         fields = {}
