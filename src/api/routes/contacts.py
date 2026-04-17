@@ -207,7 +207,7 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
         status_cell = ('<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fde68a;color:#92400e">TEST</span>'
                        if is_test else
                        f'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;{badge_style}">{badge_label}</span>')
-        rows += f"""<tr id="row-{c.token}" data-cid="{c.token}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" data-is-test="{'1' if is_test else '0'}" style="{row_style}">
+        rows += f"""<tr id="row-{c.token}" data-cid="{c.token}" data-has-email="{has_email}" data-has-mob="{has_mob}" data-has-p="{has_p}" data-has-sp="{has_sp}" data-img-ready="{img_attr}" data-is-test="{'1' if is_test else '0'}" data-contacted="{'1' if c.contacted else '0'}" style="{row_style}">
   <td style="padding:8px 6px;text-align:center"><input type="checkbox" class="row-cb" data-cid="{c.token}" style="cursor:pointer"></td>
   <td style="padding:8px 10px;font-size:12px;font-weight:600">{c.name}</td>
   <td style="padding:8px 6px">{status_cell}</td>
@@ -325,7 +325,8 @@ tr:hover td{{background:#fafafa}}
     <button id="fbtn-sp"    onclick="selectByType('sp')"    class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
     <button id="fbtn-all"   onclick="selectAll()"           class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button id="fbtn-none"  onclick="selectNone()"          class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
-    <button id="mode-toggle" onclick="toggleTestMode()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">🧪 Mode test</button>
+    <button id="mode-toggle"      onclick="toggleTestMode()"      class="btn btn-gray" style="padding:5px 10px;font-size:11px">🧪 Mode test</button>
+    <button id="fbtn-hide-sent"  onclick="toggleHideContacted()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">🚫 Déjà envoyés</button>
     <div style="flex:1"></div>
     <span id="bulk-count" style="font-size:12px;color:#6b7280">0 sélectionné(s)</span>
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
@@ -462,6 +463,18 @@ function _applyMode() {{
 }}
 function toggleTestMode() {{ _testMode = !_testMode; selectNone(); _applyMode(); }}
 
+let _hideContacted = false;
+function toggleHideContacted() {{
+  _hideContacted = !_hideContacted;
+  const b = document.getElementById('fbtn-hide-sent');
+  b.style.background  = _hideContacted ? '#dc2626' : '';
+  b.style.color       = _hideContacted ? '#fff'    : '';
+  b.style.borderColor = _hideContacted ? '#dc2626' : '';
+  b.style.fontWeight  = _hideContacted ? '700'     : '';
+  selectNone();
+  _applyFilters();
+}}
+
 // ── Checkboxes + sélection ────────────────────────────────────────────────────
 function _updateBulkBar() {{
   const checked = document.querySelectorAll('.row-cb:checked');
@@ -500,7 +513,8 @@ function _refreshBtn(id) {{
 function _rowMatches(tr) {{
   const geoOk  = _geoF.size  === 0 || [..._geoF].some(t  => tr.dataset['has'+t.charAt(0).toUpperCase()+t.slice(1)] === '1');
   const ctctOk = _ctctF.size === 0 || [..._ctctF].some(t => tr.dataset['has'+t.charAt(0).toUpperCase()+t.slice(1)] === '1');
-  return geoOk && ctctOk;
+  const sentOk = !_hideContacted || tr.dataset.contacted !== '1';
+  return geoOk && ctctOk && sentOk;
 }}
 
 function _applyFilters() {{
