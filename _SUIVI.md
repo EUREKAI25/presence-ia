@@ -1,8 +1,598 @@
 # PRESENCE_IA — Suivi
 
-**Statut** : 🟢 actif — Pipeline complet opérationnel
+**Statut** : 🚀 lancement — Prospection active depuis 16/04, closers démarrent 20/04
 **Créé** : 2026-02-12
-**Dernière MAJ** : 2026-04-10
+**Dernière MAJ** : 2026-04-16
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 17) — Tests pipeline complet + fix bug cap + routes audit closer
+
+### Livré
+
+**Fix bug critique `_job_outbound` (scheduler.py:1972/1983) :**
+- `cap` (variable inexistante) → `cap_email` / `cap_sms` dans les `.limit()` des requêtes de sélection
+- Sans ce fix : NameError au premier lancement réel de `_job_outbound` hors dry_run avec `force=False`
+
+**Nouvelles routes closer (agenda_closer.py) :**
+- `GET /closer/{token}/booking/{id}/audit` → HTML audit depuis dernier `IaSnapshotDB` du prospect
+- `POST /closer/{token}/booking/{id}/send-audit` → envoi audit Brevo (dry_run=true par défaut)
+- Fix : `prospect["email"]` dans `_build_real_slots` renvoyait `b.email` (client qui booke) au lieu de `p.email` (prospect cible)
+
+**Tests — 4 nouveaux fichiers, 81 tests au total :**
+
+| Fichier | Tests | Couverture |
+|---------|-------|-----------|
+| `test_pipeline_complet.py` | 29 | Sélection prospects, comportements (ignore/ouvre/clique/réserve/urgent/tard), bookings cohérents, agenda, pilotage 4 états, flux E2E, dry_run, fix cap |
+| `test_outbound_need.py` | 14 | compute_outbound_need — tiers, bootstrap, launch_mode, urgence_lundi, is_test |
+| `test_booking_pipeline.py` | 11 | Agenda closer, urgent <48h, double booking, is_test exclu, dry_run |
+| `test_audit_flow.py` | 17 | Génération audit, HTML structure, Brevo simulé (mock HTTP), routes closer, erreurs |
+| `test_filter_slots.py` | 10 | Visibilité créneaux — J+0, J+1 normal/launch, cap/jour, horizon 14j, déterminisme, passé |
+
+**Résultats finaux : 81/81 ✅ — 0 échec**
+
+**Bugs détectés et corrigés par les tests :**
+1. `scheduler.py` — `cap` (NameError) → `cap_email` / `cap_sms` (fix critique)
+2. `agenda_closer.py` — `prospect["email"]` = `b.email` (client) au lieu de `p.email` (prospect cible) (fix fonctionnel)
+3. `tests/test_booking_pipeline.py` — patch target incorrect `src.scheduler.fetch_city_header_image` → `src.city_images.fetch_city_header_image`
+
+**Points faibles connus (pré-existants, non bloquants) :**
+- 13 tests anciens en échec (test_landing, test_jobs, test_auto_scan, test_send_queue) — non liés au pipeline v3
+- `test_contacts.py` : erreur de collection (import cassé), n'affecte pas le runtime
+- Pas d'ORDER BY score dans la sélection prospects outbound — ordre DB natif, acceptable pour le lancement
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 16) — Suite tests outbound + filter_slots
+
+### Livré
+
+**3 fichiers de tests automatisés :**
+- `tests/test_outbound_need.py` — 14 tests T01-T12 + slots/closers (compute_outbound_need)
+- `tests/test_filter_slots.py` — 10 tests F01-F08 (_filter_slots)
+- `tests/test_booking_pipeline.py` — 11 tests B01-B07 (booking pipeline + agenda)
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 15) — Outbound piloté par RDV réels : caps email/SMS séparés, cibles configurables
+
+### Livré
+
+**`compute_outbound_need()` — refonte pilotage :**
+- Source RDV : `v3_bookings` (plus SlotDB.booked) — join avec V3ProspectDB pour exclure `is_test`
+- SlotDB ne sert plus qu'à compter les slots `available` (capacité résiduelle affichable)
+- Calcul sur 14 jours + focus lundi prochain séparé (`rdv_taken_monday`)
+- Nouveaux champs retournés : `cap_email`, `cap_sms`, `rdv_taken_week`, `rdv_taken_monday`, `fill_need`, `urgence_lundi`, `launch_mode`
+- Tiers d'envoi lisibles (fill_need >= 0.80/0.40/0.15) → statut running/top_up/idle/saturated
+- `urgence_lundi` : déclenche SMS même en idle si lundi < 50% de la cible
+- Bootstrap override : si < 30 envois totaux et saturated → forcé running avec volumes de base
+- Launch mode : tous les volumes × 1.5, plafonné par max_email/max_sms
+
+**`_job_outbound()` — boucle séparée email/SMS :**
+- Cap unique remplacé par `cap_email` + `cap_sms` (depuis compute_outbound_need)
+- Deux boucles indépendantes : d'abord email jusqu'à `cap_email`, puis SMS jusqu'à `cap_sms`
+- Log résumé clair : rdv_pris/cible, fill%, lundi_pris/cible, urgence_lundi, caps, launch_mode
+- Résumé final : `email=N sms=N (skip_cités=N)`
+
+**`_filter_slots()` dans v3.py — dynamique :**
+- `_SLOT_LIMITS` hardcodé supprimé → remplacé par lecture env vars à chaque appel
+- `MAX_VISIBLE_SLOTS_PER_DAY` (défaut 4) : plafond créneaux affichés par jour
+- `DAYS_VISIBLE_AHEAD` (défaut 14) : horizon prospect
+- `LAUNCH_MODE` : J+1 0-2 slots, J+2+ jusqu'au max ; régime normal : J+1 max 1
+
+**Nouvelles variables d'env (configurables, avec défauts sûrs) :**
+```
+TARGET_RDV_MONDAY=3        # RDV lundi cible
+TARGET_RDV_WEEK=10         # RDV 14j cible
+OUTBOUND_BASE_EMAIL=5      # emails de base / run
+OUTBOUND_BASE_SMS=3        # SMS de base / run
+OUTBOUND_MAX_EMAIL=20      # plafond email / run
+OUTBOUND_MAX_SMS=10        # plafond SMS / run
+LAUNCH_MODE=false          # true = volumes x1.5 + J+1/J+2 ouverts
+MAX_VISIBLE_SLOTS_PER_DAY=4
+DAYS_VISIBLE_AHEAD=14
+```
+
+**Exemple de calcul (régime normal, pas de lundi urgent) :**
+```
+rdv_taken_week=2, target=10 → fill_need=0.80 → statut=running
+cap_email=20, cap_sms=3
+→ envoi jusqu'à 20 emails + 3 SMS
+```
+
+### À tester après déploiement
+1. Vérifier logs `[OUTBOUND]` : statut + rdv_pris/cible + caps affiché
+2. Tester trigger manuel `/api/admin/trigger-outbound`
+3. Vérifier page de réservation : max 4 créneaux/jour, horizon 14j
+4. Activer LAUNCH_MODE=true pour la période de démarrage (20/04)
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 14) — Nettoyage structurel : suppression Calendly, source de vérité unique
+
+### Livré
+
+**Suppression complète de Calendly comme source lue :**
+- `scheduler.py` : suppression `_job_calendly_poll` (polling toutes les 10 min → MeetingDB) + dé-registration du job
+- `scheduler.py` : suppression `_get_calendly_available_slots` (helper inutilisé)
+- `v3.py` : suppression `CALENDLY_URL` constant
+- `v3.py` : suppression `_fetch_calendly_slots()` + `_fallback_slots()` (créneaux synthétiques cachés)
+
+**Centralisation SlotDB comme source unique pour les créneaux :**
+- `v3.py` : nouvelle fonction `_slots_from_db(days)` — lit SlotDB `status=available` du projet `presence-ia`
+- Page de réservation (`/l/{token}/book`) branchée sur `_slots_from_db` au lieu de Calendly
+- Suppression du fallback silencieux vers des créneaux synthétiques
+
+**Nettoyage nommage :**
+- Variable `_calendly_tracked` renommée `_book_url` dans la landing (variable locale, pas de changement visuel)
+- Fallback "no slots" : lien Calendly direct supprimé → message neutre
+
+**Routes conservées :**
+- `GET /l/track/calendly/{token}` — conservée comme redirection legacy (→ `/l/{token}/book`), pas de logique Calendly
+
+### État après nettoyage
+- `v3_bookings` = source de vérité des RDV réels ✅
+- `SlotDB` = source de vérité des créneaux / capacité ✅
+- `compute_outbound_need()` lit SlotDB ✅ (déjà fait session 13)
+- `agenda_closer` lit `v3_bookings` ✅ (déjà fait session 13)
+- Page de réservation lit SlotDB ✅ (cette session)
+- Aucun appel Calendly API dans le code ✅
+
+### À tester
+1. Réserver depuis `/l/{token}/book` → vérifier que les créneaux affichés viennent de SlotDB
+2. Vérifier que `/closer/agenda` et `/closer/{token}/agenda` affichent bien les vrais RDV
+3. Vérifier `POST /api/admin/trigger-outbound` — compute_outbound_need() lit toujours SlotDB
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 13) — Fix portail closer : agenda, slots, urgence
+
+### Livré
+
+**Fix résultats IA vides (qualité Gemini) :**
+- `_ia_valid()` : vérifie qu'au moins une réponse est non-vide avant d'accepter les résultats
+- Préflight recharge les results IA si vides avant chaque envoi email/SMS
+
+**Fix `_job_refresh_ia` — paire active uniquement (commit précédent) :**
+- Suppression du bloc qui itérait sur toutes les paires DB → ne tourne plus que sur `get_active_pair()`
+- Règle en mémoire : JAMAIS lancer sur plusieurs paires, 1 paire active max, 9 requêtes max
+
+**Fix 504 Gateway Timeout sur envoi email/SMS :**
+- `_preflight_ia_and_image` bloquait le event loop uvicorn (~90s)
+- Fix : `run_in_executor` + SessionLocal indépendant dans le thread
+- Nginx : timeout 300s pour les endpoints `/send-email` et `/send-sms`
+
+**Fix portail closer — boutons agenda/planning :**
+- Portail `/closer/{token}` : bouton "Voir mon agenda" → `/agenda`, bouton "Voir le planning" → `/slots`
+- CRM admin : lien "📅 Agenda" pointe vers `/closer/{token}/agenda`
+
+**Fix agenda closer `/closer/{token}/agenda` :**
+- `_build_real_slots()` charge les vrais RDVs depuis `v3_bookings`
+- Statut basé sur urgence temporelle : `accessible_urgent` si < 48h, `accessible` sinon
+- Plus de badge "démo" sur la page token closer (only sur `/closer/agenda` sans token + données fictives)
+- Lien "← Portail" pointe vers `/closer/{token}` (vrai portail)
+
+**Fix planning closer `/closer/{token}/slots` :**
+- `v3_bookings` est maintenant source **principale** (fusionnée toujours, pas seulement fallback)
+- Statut temporel correct : `accessible_urgent` (< 48h) / `accessible`
+- Texte modal de blocage corrigé : "Ce créneau est bloqué. Prenez d'abord en charge le rendez-vous urgent disponible."
+
+**Nettoyage DB VPS :**
+- SlotDB marketing.db : 376 vieux slots de test (mars 2026) supprimés
+- v3_bookings : 1 booking de test supprimé — base propre pour tests
+
+### État VPS au 16/04 (fin session 13)
+
+| Composant | État |
+|---|---|
+| Code déployé | ✅ commit `9716ad9` |
+| SlotDB | ✅ vide (376 vieux slots supprimés) |
+| v3_bookings | ✅ vide (prêt pour nouveau test booking) |
+| Agenda closer | ✅ RDV urgent < 48h affiché en rouge |
+| Badge démo | ✅ supprimé des pages token |
+
+### À tester au prochain démarrage
+
+1. Réserver depuis la landing → RDV apparaît sur `/closer/{token}/slots` ET `/closer/{token}/agenda` en ROUGE (urgent < 48h)
+2. Vérifier qu'il n'y a pas de badge "démo" sur les pages token closer
+3. Cliquer sur le slot urgent → modal sans blocage (pas de 🔒)
+
+---
+
+## 🔌 SESSION 2026-04-16 (session 12) — Lancement prospection + slots closers
+
+### Livré
+
+**Prospects de test remplacés (session précédente) :**
+- Suppression de tous les `is_test=1` + doublons (17 enregistrements)
+- 2 nouvelles paires test avec profession + ville jamais traitées
+- Fix : `landing_url` NOT NULL → calculée à l'insertion
+
+**`selectAll()` — exclusion prospects test (commit `df067e8`) :**
+- `data-is-test="1"` sur chaque `<tr>` test
+- `selectAll()` skip les lignes test → jamais sélectionnées en envoi groupé
+
+**`compute_outbound_need()` — migration Calendly → DB slots (commits `9548853` + `847b6e1`) :**
+- Suppression totale de l'appel Calendly API
+- Lecture des slots depuis `SlotDB` (marketing.db) — `SlotStatus.available` / `booked`
+- Comptage `active_closers` depuis `CloserDB WHERE is_active=True` (real + [TEST])
+- Prospects `is_test=True` exclus du comptage `leads_en_file`
+- `source_slots` = `"db"` (plus de référence Calendly)
+
+**`LAUNCH_DATE` ajusté pour lancement J-4 (commit `8e0b48a`) :**
+- `LAUNCH_DATE = date(2026, 4, 16)` dans `compute_outbound_need()` → pipeline actif maintenant
+- Fix : `pre_launch` ajouté comme statut bloquant (return explicite, comme saturated/idle)
+- `LAUNCH_DATE` dans `inject_launch_slots.py` reste au 20/04 (date démarrage closers)
+
+**`POST /api/admin/trigger-outbound` (commit `8e0b48a`) :**
+- Déclenche `_job_outbound()` immédiatement en arrière-plan (threading)
+- Évite d'attendre le cron 9h UTC pour le premier run
+
+**`scripts/inject_launch_slots.py` (nouveau script) :**
+- Génère les slots 20/04 → 15/05 (4 semaines, lun–ven uniquement)
+- Lundi : closers × 3, Mardi : closers × 4, reste : closers × 2
+- Heures : 9h, 10h, 11h, 14h, 15h, 16h (20 min chacun)
+- Tags `[LAUNCH]` en notes pour nettoyage propre (`--clean`)
+- **Exécuté en réel sur VPS** → 156 slots injectés (3 closers actifs : 1 réel + 2 test)
+
+**Fix `admin_hub.py` — Top Closers (commit `153a7e4`) :**
+- Bug : `closer_perfs` utilisait l'UUID comme clé → affichait UUIDs en clair
+- Fix : lookup `CloserDB` avant la boucle meetings → dict `id → name`
+- `closer_label = closer_name_map.get(raw_cid, raw_cid)` → nom affiché
+
+### État VPS au 16/04
+
+| Composant | État |
+|---|---|
+| Code déployé | ✅ commit `153a7e4` |
+| Slots injectés | ✅ 156 slots (20/04 → 15/05) |
+| `OUTBOUND_DRY_RUN` | ⚠️ encore `true` — **à passer à `false`** pour activer les vrais envois |
+| Closers [TEST] | ✅ Thomas Dupont + Camille Martin restaurés |
+| Candidatures closers | ⏳ 5 candidatures `stage=NULL` — à traiter via `/admin/crm/closers` |
+
+### Prochaine étape
+
+1. **Toi** : `OUTBOUND_DRY_RUN=false` dans `/opt/presence-ia/.env` → `systemctl restart presence-ia`
+2. Déclencher le premier run : `POST /api/admin/trigger-outbound`
+3. Le cron `_job_outbound` tourne ensuite automatiquement chaque jour à 9h UTC (11h Paris)
+4. Quand les candidatures closers sont validées → re-run `inject_launch_slots.py --clean` pour régénérer les slots avec le bon nombre de closers réels
+
+---
+
+## 🔌 SESSION 2026-04-12 (session 10) — Fix outbound + page Avancement pipeline
+
+### Livré
+
+**Fix `active_pair.select_next_pair()` (commit `96d35bd`) :**
+- Cause du bug : `ProspectionTargetDB` avait Brest/couvreur + Brest/"5" (0 prospects) → job annulé depuis le 09/04
+- Fix : sélection directe depuis `V3ProspectDB` (ia_results + email + not sent), sans dépendance ProspectionTargetDB
+- Classement : score_métier×2 + log(stock) → favorise les paires bien peuplées et bien scorées
+
+**Page `/admin/pipeline-pairs` — accordéons imbriqués :**
+- Banner paire active en haut (vert si active, rouge si absente)
+- Niveau 1 : Profession (label_pluriel, score, SIRENE enrichis, V3 envoyés, % barre)
+- Niveau 2 : Ville (stock dispo, envoyés, % barre colorée)
+- Niveau 3 : Segments SIRENE par département (badges numérotés 1✓ 2✓ 3⟳ 4○, résumé texte "1-8 traités · 9 en cours · 10-12 à traiter")
+- Lien "Avancement pipeline" dans sidebar LEADS (toutes les pages admin)
+
+---
+
+## 🔌 SESSION 2026-04-11 (session 9) — Journal de pilotage pipeline
+
+### Livré
+
+**Modèle `PipelineHistoryLogDB` (commit `450ec01`) :**
+- Table `pipeline_history_log` créée automatiquement par `create_all`
+- Champs : ts, mode (BOOTSTRAP/AUTO), paire (city/profession), taux_couverture, slots proches/moyens/lointains (total + remplis), leads_en_file, leads_necessaires, statut, cap_genere, source_slots
+
+**Scheduler `_job_outbound()` :**
+- Log une ligne à CHAQUE run, même idle/saturated
+- Inséré avant les `return` précoces → couverture complète des 4 statuts
+- Source slots (calendly / config) et paire active inclus
+
+**Endpoint `GET /api/admin/pipeline-history` :**
+- Retourne les 50 dernières lignes au format JSON
+- Protégé par token admin
+
+**Sidebar admin (toutes les pages) :**
+- Bouton "📋 Journal pilotage" fixé en bas à gauche
+- Ouvre un drawer droit (780px max, scrollable)
+- Résumé : 5 KPI cards (mode, statut coloré, paire, couverture, cap)
+- Tableau 7 colonnes : date/heure · paire · couverture · statut badge · en file · nécessaires · cap
+- Clic ligne → détail complet (alert formatée, 15 champs)
+
+**Fix SyntaxError navigateur (commit `23d23e8`) :**
+- Même bug que les onglets : `\'` imbriqués dans f-strings → JS invalide
+- Réécriture complète : strings Python normales + `\n` explicites, DOM API (createElement)
+- `_phRows[]` global + index pour le clic détail (plus de JSON.stringify inline)
+- Validé : 3 `<script>` / 3 `</script>` équilibrés, JS syntaxiquement propre
+
+---
+
+## 🔌 SESSION 2026-04-11 (session 8) — Tracking réaction prospects : clicked_at + booked_at + délais
+
+### Livré
+
+**Modèle + migrations (commit `11ddeeb`) :**
+- [x] `V3ProspectDB` : +`email_clicked_at` (DateTime), +`email_booked_at` (DateTime)
+- [x] ALTER TABLE migrations dans `database.py` pour les 2 nouvelles colonnes (idempotent)
+
+**Webhook Brevo `src/api/routes/brevo_webhook.py` :**
+- [x] Event `"click"` → status `"clicked"` (était incorrectement mappé sur `"opened"`)
+- [x] `email_clicked_at` renseigné au premier clic Brevo
+- [x] Backfill `email_opened_at` si absent (un clic implique une ouverture)
+
+**Scheduler `src/scheduler.py` — booking Calendly :**
+- [x] `email_booked_at` renseigné au moment où le prospect réserve un slot Calendly (bloc `_job_poll_calendly`)
+
+**Admin `/admin/outbound-stats` :**
+- [x] Section "Délais moyens de réaction" — 3 KPI cards :
+  - Délai ouverture (envoi → opened_at, violet)
+  - Délai clic (envoi → clicked_at, orange)
+  - Délai RDV (envoi → booked_at, vert)
+  - Chaque KPI affiche la valeur formatée (min ou h) + nb observations
+
+---
+
+## 🔌 SESSION 2026-04-11 (session 7) — Chantier C : sélection autonome paire + tests
+
+### Livré
+
+**Chantier C — `src/active_pair.py` (commit `0f100b5`) :**
+- [x] État persistant dans `data/active_pair_state.json` (compatible redémarrage/multi-process)
+- [x] `get/set/clear_active_pair()` — lecture/écriture état
+- [x] `select_next_pair(db)` — trie par score profession décroissant, prend la première avec ≥1 prospect disponible
+- [x] `check_saturation(db)` — détecte 0 prospect dispo → efface + sélectionne suivante automatiquement
+- [x] `_available_count(db, city, profession)` — filtre email non null, sent_at null, statut non bounced/unsubscribed
+
+**Scheduler modifié (commit `0f100b5`) :**
+- [x] `_job_run_due_targets` : exécute uniquement la paire active (auto-sélection si aucune, vérif saturation post-run)
+- [x] `_job_outbound` : filtre `city + profession` sur la paire active, annule si aucune paire dispo
+
+**Admin dashboard — card "Sélection paire (Chantier C)" (commit `0f100b5`) :**
+- [x] Bandeau vert = paire active (score, date démarrage, prospects dispo), badge "FORCÉE" si override
+- [x] Tableau classé par score avec bouton **Forcer** sur chaque paire
+- [x] Bouton **Réinitialiser** (efface + auto-sélection au prochain job)
+- [x] `POST /api/admin/active-pair/force/{target_id}` + `POST /api/admin/active-pair/reset` + `GET /api/admin/active-pair`
+
+**Tests logiques `scripts/test_active_pair.py` (commit `b1da84e`) :**
+- [x] SQLite `:memory:` + StaticPool + état tmp — aucun pipeline réel
+- [x] T1 : meilleure paire par score sélectionnée en premier (Paris×plombier 8.5 vs D 7.5 saturée)
+- [x] T2 : une seule paire active à la fois, select_next_pair idempotent
+- [x] T3 : paire saturée ignorée même si score élevé
+- [x] T4 : bascule automatique après saturation (10 prospects vidés → Lyon×electricien)
+- [x] T5 : override admin + flag override=True + réinitialisation → retour auto
+
+**Fix bug SQL (commit `b1da84e`) :**
+- [x] `_available_count` : `NULL NOT IN (...)` évalue à NULL en SQL → excluait silencieusement tous les prospects sans email_status. Corrigé : `OR(IS NULL, NOT IN (...))`
+
+### En attente
+- [ ] Vérification logique J+15 côté code pour bouton "Demander le versement" (closers)
+
+---
+
+## 🔌 SESSION 2026-04-11 (session 6) — Portail closer : design validé + contenu formaté
+
+### Livré
+
+**Agenda closer `/closer/{token}/slots` — design agenda_closer_preview.html (commits `f83aac1` → `fbf9fb7`) :**
+- [x] Remplacement total de l'ancienne vue calendrier par la grille validée : grille 4 semaines (cases colorées par statut) + vue jour (liste créneaux) + modal bottom-sheet
+- [x] Statuts visuels : `accessible` (vert), `accessible_urgent` (vert vif), `inaccessible` (gris), `claimed_me` (violet), `claimed_other` (orange), `safety_margin` (lavande)
+- [x] Format slot : `{id, date, time_start, time_end, status, prospect: {company, city, profession, score, elements}}`
+- [x] `claimSlot()` → `POST /closer/{token}/slots/{slot_id}/claim`
+- [x] Grille dynamique : `weeksNeeded = max(2, ceil((lastSlotDate - monday + 1 week) / 1 week))`
+
+**Header unifié preview (commits `cb2ee4d` → `4536934`) :**
+- [x] Structure `.hdr / .hdr-left / .hdr-title / .hdr-back` identique au preview validé sur les deux pages
+- [x] Portal `/closer/{token}` : titre "Agenda" + lien "Agenda →" vers /slots
+- [x] Slots `/closer/{token}/slots` : titre "Agenda" + lien "← Portail"
+
+**Fix bug tabs non cliquables (commit `4536934`) :**
+- [x] Cause : `panel_paiement` contient `<script>...</script>` — le browser coupait le `<script>` principal au 1er `</script>` dans le template literal → `switchTab` undefined
+- [x] Fix : `.replace("</script>", "<\\/script>")` dans `panels_js`
+
+**Contenu portail closer :**
+- [x] `commission_info` mis à jour : 15% → 18%, suppression "HT" (non assujetti TVA)
+- [x] Montants recalculés : 90€ / 630€ / 1 620€
+- [x] Conditions paiement corrigées : disponible à J+15 (délai rétractation), sur demande, montant libre ≥ 300€, virement sous 72h
+- [x] Tab Offre : 3 sous-onglets (Offre 1 violet / Offre 2 vert / Offre 3 orange), header coloré + sections labellisées + bullets → en checklist + badge commission (commit `0e41392`)
+- [x] Tab Objections : accordéon toggle 8 items — `<details>/<summary>` stylisé, badge numéroté orange, citations en bloc border-left, labels LOGIQUE/VARIANTE en orange (commit `073915f`)
+
+### En attente
+- [ ] Prompt C (sélection autonome des paires) — à recevoir
+- [ ] Vérification logique J+15 côté code pour bouton "Demander le versement"
+
+---
+
+## 🔌 SESSION 2026-04-10 (session 5) — Audit délivrabilité + fix sécurité outbound
+
+### Réalisé
+
+**Fix sécurité CRITIQUE — OUTBOUND_DRY_RUN :**
+- Cause incident (30 envois non autorisés) : défaut `"false"` → envois réels si variable absente du .env
+- Fix : `scheduler.py` ligne 1458 → défaut `"true"` — live mode requiert `OUTBOUND_DRY_RUN=false` explicite
+- Commit `19ec4cb`, déployé VPS 2026-04-10 ✅
+
+**Analyse des 30 envois accidentels :**
+- 30 "sent" en base = 20 vrais prospects (22 mars) + 8 tests (`ab01ae71` + `d482c390=[TEST]Nathalie`)
+- Vrais scores sur les 20 prospects : 1 ouverture probable, 0 clic, 0 landing, 0 RDV
+- 3 "ouvertures" le 4 avril (13j après) = probablement scans antispam
+- 0 RDV — les 2 meetings en DB sont liés à des emails de test (nathaliebrigitte.com)
+
+**Audit délivrabilité Brevo :**
+- 953 emails/7j = 100% warming (pas de vrais prospects)
+- 35% bloqués, 0% ouvertures → warming inefficace
+- Cause : boîtes de réception warming (`@presence-ia.info`, `.online` etc.) hébergées sur VPS blacklisté
+
+**Diagnostic DNS / Blacklists :**
+- VPS IP `212.227.80.241` blacklistée sur FABELSOURCES + UCEPROTECTL3 (range Ionos entier)
+- Ce sont des blacklists IP → n'affecte PAS les envois via Brevo (Brevo utilise ses propres IPs)
+- Domaine `presence-ia.com` : NON blacklisté sur les listes de domaines (ivmURI, URIBL, etc. tous OK)
+- SPF : ✅ configuré (include:spf.sendinblue.com)
+- DKIM : ❌ absent pour presence-ia.com → cause probable du 35% bloqué
+- DMARC : ✅ p=none configuré
+
+**Problème architecture outbound identifié :**
+- Le job outbound envoie depuis `_WARMING_SENDERS` (`contact@presence-ia.online`, `hello@presence-ia.info`...)
+- Ces domaines `.online`, `.info`, `.cloud`, `.site` ne sont pas authentifiés (pas de SPF/DKIM)
+- À corriger : envoyer depuis une seule adresse humaine sur `presence-ia.com` (ex: `bonjour@presence-ia.com`)
+
+### Livré suite session 5
+
+- [x] Fix expéditeur outbound : `bonjour@presence-ia.com` / "Sarah — Présence IA" (commit `af99551`) — configurable via `OUTBOUND_SENDER_EMAIL` + `OUTBOUND_SENDER_NAME` dans .env
+- [x] DKIM Brevo : domaine `presence-ia.com` authentifié dans Brevo (ownership via brevo-code TXT). CNAME DKIM à ajouter si DKIM dédié voulu (`brevo1._domainkey` + `brevo2._domainkey`)
+- [x] Diagnostic blacklist : VPS IP blacklistée (FABELSOURCES + UCEPROTECTL3) mais n'affecte pas les envois via Brevo API
+- [x] Port 25 débloqué par Ionos (demande faite 2026-04-10 ~23h30) — à retester dans 30 min
+
+### Livré suite session 5 (suite)
+
+- [x] Port 25 débloqué Ionos — testé OK : 40/40 emails warming délivrés, 0 bloqués (était 35%)
+- [x] Expéditeurs outbound : rotation 5 prénoms (Sophie/Marie/Léa/Emma/Julie) sur domaines dédiés `.online/.info/.cloud/.site/.website` — tous SPF+DKIM+DMARC configurés (commit `5a02b97`)
+- [x] `presence-ia.com` protégé — jamais exposé en prospection
+
+**Chantier D — Tracking coûts API (commit `64581bf`) :**
+- [x] `src/cost_tracker.py` : compteurs thread-safe Google + Gemini (singleton)
+- [x] `src/models.py` : table `job_cost_log` (job_id, paire, appels, leads, coût)
+- [x] `src/google_places.py` : compteur sur `fetch_text_search` + `fetch_place_details`
+- [x] `src/gemini_places.py` : compteur sur `fetch_company_info`
+- [x] `src/scheduler.py` : log coûts en fin de `_job_auto_enrich`
+- [x] `src/database.py` : `db_cost_stats()` — agrégats total/par lead/récents
+- [x] `src/api/routes/admin.py` : accordéon "Coûts API" + 4 KPIs + tableau 20 derniers jobs
+- [x] Déployé VPS — tableau vide jusqu'au prochain job enrichissement (normal)
+
+**Chantier B — N = f(slots Calendly) (commit `f753998`) :**
+- [x] `_get_calendly_available_slots()` : interroge Calendly event_type_available_times J+2→J+14, fallback config `CLOSER_SLOTS_PER_DAY=2`
+- [x] `compute_outbound_need()` : segmentation proche/moyen/lointain, taux couverture, bootstrap 2%, statut idle/running/saturated
+- [x] `_job_outbound()` : skip si saturé (>85%) ou idle, cap ajusté au besoin réel
+- [x] Admin : card "Pilotage pipeline" — 4 KPIs + 3 zones + barre couverture 70%/85%
+- [x] Déployé VPS commit `f753998`
+
+**Chantier B — correctif logique (commit `8c9940f`) :**
+- [x] 4 statuts pipeline : RUN (<70%) / TOP_UP (70-85% + file insuffisante) / IDLE (70-85% + file OK) / STOP (>85%)
+- [x] TOP_UP : cap = 50% du manque (appoint léger)
+- [x] Script de simulation `scripts/test_slot_coverage.py` — 4 cas validés
+- [x] Admin : badge orange "Appoint léger" pour TOP_UP
+- [x] Déployé VPS commit `8c9940f`
+
+**Chantier B — jeu de données test (commit `dd8a0fe`) :**
+- [x] `scripts/reset_test_slots.py` : inject 2 closers [TEST] + 10 slots proches + 5 moyens + 2 lointains + 3 meetings
+- [x] Migration table `slots` : colonnes `project_id`, `notes`, `calendar_event_id`, `updated_at` ajoutées
+- [x] Exécuté sur VPS : 2 closers créés, 17 slots injectés, taux couverture 30% → statut **RUN** confirmé
+- [x] Rejouer : `python3 scripts/reset_test_slots.py` (nettoie les données [TEST] précédentes auto)
+
+### En attente
+- [ ] Prompt C (sélection autonome des paires) — à recevoir
+
+---
+
+## 🔌 SESSION 2026-04-10 (session 4) — Audit pipeline + architecture entonnoir
+
+### Analyse réalisée
+
+**Clarification rôles sources de données :**
+- SIRENE : registre légal exhaustif (671K suspects) — source de découverte, pas de contact. Valeur : couverture totale + SIRET pour facturation. Fréquence à passer à 1x/mois (scan Lun/Mer/Ven actuel excessif)
+- Google Places : enrichisseur principal (site/tél/avis) + source discovery directe. Seul coût réel du pipeline
+- Gemini Places : fallback Google Places uniquement. Coût négligeable
+- Hunter API : non configuré (HUNTER_API_KEY absent) → SMTP gratuit uniquement. Coût = 0€
+- IA scoring : validé par paire ville/métier (pas par suspect) via `_job_refresh_ia()` — lun/jeu/dim 3 créneaux. Résultats stockés dans `ia_cited_companies`, appliqués à tous les suspects de la paire en Python pur
+
+**Coûts réels identifiés :**
+- Google Places : seul coût significatif — à instrumenter (compteur d'appels + tarif)
+- Tout le reste : ~0€
+
+**Architecture entonnoir — deux entonnoirs distincts définis :**
+1. Entonnoir acquisition : Suspects SIRENE → site trouvé → email/mobile trouvé → en file → email envoyé
+2. Entonnoir conversion : Email envoyé → ouvert → cliqué → RDV réservé → RDV closé (Vente/Rappel/Refus) + % conversion + CA par offre + CA total
+
+**Mobile :** capturé à la même étape que l'email (enrich.py + Google Places)
+
+### Livré session 4 (2026-04-10)
+
+- [x] Entonnoir acquisition (5 étapes : Suspects→Site→Email→Scoré IA→Envoyés) — `admin.py` + `database.py`
+- [x] Entonnoir conversion (5 étapes + CA total + CA par offre)
+- [x] Section Pipeline/crons : last_run + next_run par job, scoring IA marqué ⚠ désactivé
+- [x] Alerte "bloqués" corrigée : signale leads bloqués par job refresh_ia désactivé
+- [x] Alerte "images" : visible seulement si prospection active (ProspectionTargetDB)
+- [x] Modale upload image : bouton par ville → upload direct inline
+- [x] `get_jobs_status()` ajouté à `scheduler.py`
+- [x] `ia_scored` + `sans_scoring_ia` + `ca_total` + `ca_par_offre` ajoutés à `db_dashboard_stats`
+- [x] Zone alertes : background orange #fff7ed + titre "⚠ Alertes à traiter" + conditionnelle (2026-04-10)
+- [x] Layout CA + alertes côte à côte, CA seul pleine largeur si aucune alerte (2026-04-10)
+- [x] Offres en cards vertes inline sous CA (% CA + nb deals + % deals) (2026-04-10)
+- [x] Déployé VPS commit 574a35d (2026-04-10)
+
+### À construire (voir NOTE_PIPELINE_REFONTE.md)
+
+- [ ] Tracking coût Google Places : compteur appels par job, coût par campagne/lead/client
+- [ ] Logique N = f(slots closers) : mode BOOTSTRAP puis STEADY_STATE (attente prompt)
+- [ ] Sélection autonome prochaine paire : score-driven + override manuel
+- [ ] SIRENE → 1x/mois dans le scheduler
+- [ ] Stop automatique quand N leads atteint (lié aux RDV dispo closers)
+
+---
+
+## 🔌 SESSION 2026-04-10 (session 3) — Refonte interface closer : Agenda visuel
+
+### Livré
+- **`src/api/routes/agenda_closer.py`** : nouvelle interface closer complète
+  - GET `/closer/agenda` — démo avec données de test
+  - GET `/closer/{token}/agenda` — route à brancher sur vraies données
+- **`main.py`** : router `agenda_closer` enregistré AVANT `closer_public` (résolution routes statiques vs `{token}`)
+
+### Interface : ce qui a été fait
+
+**Vue globale (semaines) :**
+- 4 semaines affichées, 7 cases par ligne
+- Code couleur strict : rouge (urgent), vert (disponible), gris (inaccessible seul), vide
+- Aucun texte ni indicateur dans les cases
+- Point "aujourd'hui" sous la case du jour
+- Sélection visuelle (ring indigo + scale)
+- Jours passés grisés + non cliquables
+- Mois affiché si 1er du mois
+
+**Vue détaillée (jour sélectionné) :**
+- Aujourd'hui sélectionné par défaut au chargement
+- 1 ligne = 1 créneau de 20 min (pas de fusion)
+- 6 états visuels distincts : accessible / urgent / inaccessible / claimed_me / claimed_other / conflit
+- Badge URGENT rouge sur les urgents
+- Aucun nom prospect dans la liste
+
+**Modal au clic :**
+- Entreprise, ville, métier
+- Score coloré (rouge ≥85, orange ≥70, vert sinon)
+- 3 éléments justifiant le score
+- Date/heure
+- Bouton "Prendre ce rendez-vous" (désactivé si déjà pris)
+- Fermeture : bouton ✕, clic overlay, Escape
+
+**Dataset de test :**
+- 56 créneaux, 4 semaines, 15 prospects fictifs réalistes
+- Jours rouges, verts, gris, vides présents
+- Tous les états représentés
+
+**Mobile first :**
+- Slide-up modal
+- Poignée tactile
+- Grid responsive 7 colonnes sans texte (cases carrées)
+- Tap targets conformes
+
+### Itérations UX (2026-04-10, même session)
+- Créneaux inaccessibles → vert fané (opacité basse) ; message de blocage au clic
+- Case jour "verrouillé" → modal blocage direct au clic (sans passer par la vue jour)
+- Jours passés → gris plat uniforme (plus de couleur résiduelle)
+- "Pris — autre" → **Attribué** + code orange ambré (#f59e0b)
+- Réservation instantanée : créneau pris → violet, créneau suivant → lavande (marge de sécurité), case grille rafraîchie, modal fermée
+- Nouveau statut `safety_margin` : lavande (#a78bfa), non cliquable
+- Éléments de score réécrits : spécifiques, chiffrés, datés — "0 résultat IA" supprimé
+- Label score : "Opportunité forte" → "Situation critique — conversion très probable" / "Écart de visibilité significatif" / modéré
+
+### Statut
+**En attente de test global** pour validation fonctionnelle complète.
+
+### À faire (post-validation)
+- Brancher GET `/closer/{token}/agenda` sur vraies données (marketing_module)
+- Ajouter lien depuis portail closer (remplacer /slots par /agenda)
+- POST claim slot → API réelle
 
 ---
 

@@ -41,15 +41,6 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
-    # Job 3 : polling Calendly — toutes les 10 min
-    _scheduler.add_job(
-        _job_calendly_poll,
-        trigger=IntervalTrigger(minutes=10),
-        id="calendly_poll",
-        replace_existing=True,
-        misfire_grace_time=120,
-    )
-
     # Job 4 : polling IMAP réponses — toutes les 5 min
     _scheduler.add_job(
         _job_imap_reply_poll,
@@ -419,134 +410,6 @@ def _job_refresh_ia():
     except Exception as e:
         log.error("_job_refresh_ia: %s", e)
 
-
-def _job_calendly_poll():
-    """
-    Polling Calendly (plan gratuit — pas de webhooks).
-    Toutes les 10 min : cherche les nouveaux RDV depuis le dernier poll,
-    les enregistre dans MeetingDB, marque la séquence email comme stoppée.
-    """
-    try:
-        import os, requests as _req
-        from datetime import datetime, timezone, timedelta
-        from .database import SessionLocal
-        from .models import V3ProspectDB
-
-        token = os.getenv("CALENDLY_TOKEN", "")
-        if not token:
-            return
-
-        org = "https://api.calendly.com/organizations/77e3ded7-540e-45ff-ab45-f40e8eb39e7c"
-        headers = {"Authorization": f"Bearer {token}"}
-
-        # Fenêtre : depuis 15 min en arrière (chevauchement léger pour ne rien rater)
-        since = (datetime.now(timezone.utc) - timedelta(minutes=15)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-
-        resp = _req.get(
-            "https://api.calendly.com/scheduled_events",
-            params={"organization": org, "status": "active",
-                    "min_start_time": since, "count": 100},
-            headers=headers, timeout=10,
-        )
-        if resp.status_code != 200:
-            log.warning("Calendly poll HTTP %s", resp.status_code)
-            return
-
-        events = resp.json().get("collection", [])
-        if not events:
-            return
-
-        log.info("Calendly poll : %d event(s) récents", len(events))
-
-        try:
-            from marketing_module.database import SessionLocal as MktSession
-            from marketing_module.models import MeetingDB, MeetingStatus, ReplyStatus
-            from marketing_module.database import (db_create_meeting, db_update_delivery,
-                                                    db_sync_slot_from_meeting)
-        except Exception as e:
-            log.warning("marketing_module non dispo pour Calendly poll: %s", e)
-            return
-
-        with SessionLocal() as db, MktSession() as mdb:
-            for ev in events:
-                event_uuid = ev.get("uri", "").split("/")[-1]
-                calendly_event_id = event_uuid
-
-                # Éviter les doublons
-                existing = mdb.query(MeetingDB).filter_by(
-                    calendly_event_id=calendly_event_id
-                ).first()
-                if existing:
-                    # Synchroniser quand même le slot si le meeting existe déjà
-                    db_sync_slot_from_meeting(mdb, "presence-ia", existing)
-                    continue
-
-                # Récupérer l'email de l'invité
-                inv_resp = _req.get(
-                    f"https://api.calendly.com/scheduled_events/{event_uuid}/invitees",
-                    params={"count": 1}, headers=headers, timeout=10,
-                )
-                if inv_resp.status_code != 200:
-                    continue
-                invitees = inv_resp.json().get("collection", [])
-                if not invitees:
-                    continue
-                invitee_email = invitees[0].get("email", "")
-                if not invitee_email:
-                    continue
-
-                # Chercher le prospect V3 par email
-                prospect = db.query(V3ProspectDB).filter_by(email=invitee_email).first()
-                prospect_id = prospect.token if prospect else invitee_email
-
-                # Parser la date de RDV
-                try:
-                    scheduled_at = datetime.fromisoformat(
-                        ev["start_time"].replace("Z", "+00:00")
-                    )
-                except Exception:
-                    scheduled_at = None
-
-                # Créer le meeting dans CRM
-                new_meeting = db_create_meeting(mdb, {
-                    "project_id":        "presence-ia",
-                    "prospect_id":       prospect_id,
-                    "campaign_id":       None,
-                    "scheduled_at":      scheduled_at,
-                    "status":            MeetingStatus.scheduled,
-                    "calendly_event_id": calendly_event_id,
-                    "calendly_event_uri": ev.get("uri", ""),
-                    "notes":             invitees[0].get("name", ""),
-                })
-
-                # Créer un slot 'booked' dans l'agenda des closers
-                if new_meeting:
-                    db_sync_slot_from_meeting(mdb, "presence-ia", new_meeting)
-
-                # Tracker le booking sur le prospect V3
-                if prospect and not prospect.email_booked_at:
-                    prospect.email_booked_at = datetime.utcnow()
-                    db.commit()
-
-                # Stopper la séquence email : marquer la dernière livraison comme "replied"
-                from marketing_module.models import ProspectDeliveryDB
-                last_delivery = (
-                    mdb.query(ProspectDeliveryDB)
-                    .filter_by(project_id="presence-ia", prospect_id=prospect_id)
-                    .order_by(ProspectDeliveryDB.created_at.desc())
-                    .first()
-                )
-                if last_delivery:
-                    db_update_delivery(mdb, last_delivery.id, {
-                        "reply_status": ReplyStatus.positive
-                    })
-
-                log.info("Calendly RDV enregistré — %s (%s)", invitee_email, event_uuid[:8])
-
-    except Exception as e:
-        log.error("_job_calendly_poll : %s", e)
 
 
 def _send_reply_alert(prospect_name: str, prospect_email: str, snippet: str, channel: str = "email"):
@@ -1708,62 +1571,39 @@ def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
     return any(kw in combined for kw in keywords)
 
 
-def _get_calendly_available_slots(token: str, org: str, start, end) -> list:
-    """
-    Interroge Calendly pour les créneaux disponibles sur la période [start, end].
-    Retourne une liste de dicts {start, end} ou [] si API non disponible.
-    """
-    import requests as _req
-    headers = {"Authorization": f"Bearer {token}"}
-    start_str = start.strftime("%Y-%m-%dT%H:%M:%SZ")
-    end_str   = end.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    # Récupérer les event types actifs
-    r = _req.get("https://api.calendly.com/event_types",
-                 params={"organization": org, "active": "true", "count": 10},
-                 headers=headers, timeout=10)
-    if r.status_code != 200:
-        return []
-
-    available = []
-    for et in r.json().get("collection", []):
-        et_uri = et.get("uri", "")
-        if not et_uri:
-            continue
-        r2 = _req.get("https://api.calendly.com/event_type_available_times",
-                      params={"event_type": et_uri,
-                              "start_time": start_str, "end_time": end_str},
-                      headers=headers, timeout=10)
-        if r2.status_code == 200:
-            for t in r2.json().get("collection", []):
-                if t.get("status") == "available":
-                    available.append({"start": t["start_time"], "end": t["end_time"]})
-    return available
 
 
 def compute_outbound_need() -> dict:
     """
-    Calcule le besoin en leads en fonction des créneaux de la table slots (marketing.db).
+    Calcule le besoin outbound depuis v3_bookings (RDV réels) et SlotDB (capacité).
 
-    Capacité = active_closers × slots_par_jour (CLOSER_SLOTS_PER_DAY, défaut 2).
-    Aucun envoi avant LAUNCH_DATE (2026-04-20).
+    Sources :
+      v3_bookings      → RDV déjà pris (source de vérité)
+      SlotDB.available → créneaux encore ouverts
 
-    Retourne :
-      proche         : {total, reserves, disponibles}
-      taux_couverture: float (%)
-      leads_en_file  : int
-      leads_necessaires: int
-      cap_recommande : int (envois max pour ce run)
-      statut         : "idle" | "running" | "saturated" | "pre_launch"
-      bootstrap      : bool
+    Env vars configurables :
+      TARGET_RDV_MONDAY   int   3   RDV lundi prochain cible
+      TARGET_RDV_WEEK     int   10  RDV cible sur 14 jours
+      OUTBOUND_BASE_EMAIL int   5   emails de base par run
+      OUTBOUND_BASE_SMS   int   3   SMS de base par run
+      OUTBOUND_MAX_EMAIL  int   20  plafond email par run
+      OUTBOUND_MAX_SMS    int   10  plafond SMS par run
+      LAUNCH_MODE         bool  false  volumes x1.5 + J+1/J+2 ouverts côté prospect
+
+    Retourne (parmi d'autres champs rétrocompat) :
+      cap_email, cap_sms   → volumes à envoyer ce run
+      statut               → "running" | "top_up" | "idle" | "saturated" | "pre_launch"
+      fill_need            → 1.0 = vide, 0.0 = plein
+      rdv_taken_week       → RDV réels pris sur 14j
+      rdv_taken_monday     → RDV réels pris lundi prochain
+      urgence_lundi        → bool (lundi < 50% de la cible)
     """
     import os
     from datetime import datetime, timezone, timedelta, date
     from .database import SessionLocal
-    from .models import V3ProspectDB
+    from .models import V3ProspectDB, V3BookingDB
 
     # ── Verrou de lancement ───────────────────────────────────────────────────
-    # Prospection démarre le 16/04 (J-4 avant les closers le 20/04)
     LAUNCH_DATE = date(2026, 4, 16)
     today_local = datetime.now().date()
     if today_local < LAUNCH_DATE:
@@ -1775,82 +1615,64 @@ def compute_outbound_need() -> dict:
                 V3ProspectDB.email.isnot(None),
                 V3ProspectDB.is_test.is_(False),
             ).count()
+        _z = {"total": 0, "reserves": 0, "disponibles": 0}
         return {
-            "proche":            {"total": 0, "reserves": 0, "disponibles": 0},
-            "moyen":             {"total": 0, "reserves": 0, "disponibles": 0},
-            "lointain":          {"total": 0, "reserves": 0, "disponibles": 0},
-            "taux_couverture":   0.0,
-            "leads_en_file":     leads_en_file,
-            "leads_necessaires": 0,
-            "leads_manquants":   0,
-            "cap_recommande":    0,
-            "statut":            "pre_launch",
-            "bootstrap":         True,
-            "taux_conversion":   0.02,
-            "source_slots":      "db",
+            "proche": _z, "moyen": _z, "lointain": _z,
+            "taux_couverture": 0.0, "leads_en_file": leads_en_file,
+            "leads_necessaires": 0, "leads_manquants": 0,
+            "cap_recommande": 0, "cap_email": 0, "cap_sms": 0,
+            "statut": "pre_launch", "bootstrap": True,
+            "taux_conversion": 0.02, "source_slots": "db", "active_closers": 1,
+            "rdv_taken_week": 0, "rdv_taken_monday": 0, "slots_open": 0,
+            "fill_need": 1.0, "urgence_lundi": False, "launch_mode": False,
         }
 
-    now = datetime.now(timezone.utc)
+    # ── Config env ────────────────────────────────────────────────────────────
+    target_rdv_monday = int(os.getenv("TARGET_RDV_MONDAY",   "3"))
+    target_rdv_week   = int(os.getenv("TARGET_RDV_WEEK",     "10"))
+    base_email        = int(os.getenv("OUTBOUND_BASE_EMAIL", "5"))
+    base_sms          = int(os.getenv("OUTBOUND_BASE_SMS",   "3"))
+    max_email         = int(os.getenv("OUTBOUND_MAX_EMAIL",  "20"))
+    max_sms           = int(os.getenv("OUTBOUND_MAX_SMS",    "10"))
+    launch_mode       = os.getenv("LAUNCH_MODE", "false").lower() == "true"
 
-    # ── Fenêtres ──────────────────────────────────────────────────────────────
-    def _range(d_start, d_end):
-        return (now + timedelta(days=d_start),
-                now + timedelta(days=d_end, hours=23, minutes=59, seconds=59))
+    now     = datetime.now(timezone.utc)
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S")
+    end_iso = (now + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%S")
 
-    proche_start,   proche_end   = _range(2, 4)
-    moyen_start,    moyen_end    = _range(5, 7)
-    lointain_start, lointain_end = _range(8, 14)
+    # Prochain lundi (1→7 jours, jamais 0)
+    days_to_monday    = (7 - today_local.weekday()) % 7 or 7
+    next_monday       = today_local + timedelta(days=days_to_monday)
+    monday_start_iso  = next_monday.strftime("%Y-%m-%dT00:00:00")
+    monday_end_iso    = next_monday.strftime("%Y-%m-%dT23:59:59")
 
-    # ── Slots depuis la DB (plus Calendly) ────────────────────────────────────
-    proche_dispo    = moyen_dispo    = lointain_dispo    = 0
-    proche_reserves = moyen_reserves = lointain_reserves = 0
-    active_closers  = 1
-    slots_per_day   = int(os.getenv("CLOSER_SLOTS_PER_DAY", "2"))
+    # ── Lecture v3_bookings — RDV réels ───────────────────────────────────────
+    rdv_taken_week   = 0
+    rdv_taken_monday = 0
+    leads_en_file    = 0
+    sent_total       = 0
 
-    try:
-        from marketing_module.database import SessionLocal as MktSession
-        from marketing_module.models import SlotDB, SlotStatus, CloserDB
-
-        with MktSession() as mdb:
-            # Nombre de closers actifs (capacité dynamique)
-            # On compte tous les actifs (real + [TEST]) — les [TEST] servent de stand-in
-            # tant que les candidatures réelles ne sont pas validées
-            active_closers = mdb.query(CloserDB).filter(
-                CloserDB.project_id == "presence-ia",
-                CloserDB.is_active == True,
-            ).count() or 1
-
-            def _count_slots(start, end, status):
-                return mdb.query(SlotDB).filter(
-                    SlotDB.project_id == "presence-ia",
-                    SlotDB.status == status,
-                    SlotDB.starts_at >= start,
-                    SlotDB.starts_at <= end,
-                ).count()
-
-            proche_dispo    = _count_slots(proche_start,   proche_end,   SlotStatus.available)
-            moyen_dispo     = _count_slots(moyen_start,    moyen_end,    SlotStatus.available)
-            lointain_dispo  = _count_slots(lointain_start, lointain_end, SlotStatus.available)
-            proche_reserves = _count_slots(proche_start,   proche_end,   SlotStatus.booked)
-            moyen_reserves  = _count_slots(moyen_start,    moyen_end,    SlotStatus.booked)
-            lointain_reserves = _count_slots(lointain_start, lointain_end, SlotStatus.booked)
-
-    except Exception as e:
-        log.warning("compute_outbound_need: marketing_module indisponible — %s", e)
-        # Fallback : capacité configurée depuis env
-        closer_cap = active_closers * slots_per_day
-        proche_dispo    = 3 * closer_cap
-        moyen_dispo     = 3 * closer_cap
-        lointain_dispo  = 7 * closer_cap
-
-    # ── Totaux ────────────────────────────────────────────────────────────────
-    proche_total      = proche_dispo + proche_reserves
-    proche_disponibles = max(0, proche_dispo)
-
-    taux = (proche_reserves / proche_total) if proche_total > 0 else 0.0
-
-    # ── Leads en file + mode bootstrap ────────────────────────────────────────
     with SessionLocal() as db:
+        rdv_taken_week = (
+            db.query(V3BookingDB)
+            .join(V3ProspectDB, V3ProspectDB.token == V3BookingDB.prospect_token, isouter=True)
+            .filter(
+                V3BookingDB.start_iso >= now_iso,
+                V3BookingDB.start_iso <= end_iso,
+                V3ProspectDB.is_test.isnot(True),
+            )
+            .count()
+        )
+        rdv_taken_monday = (
+            db.query(V3BookingDB)
+            .join(V3ProspectDB, V3ProspectDB.token == V3BookingDB.prospect_token, isouter=True)
+            .filter(
+                V3BookingDB.start_iso >= monday_start_iso,
+                V3BookingDB.start_iso <= monday_end_iso,
+                V3ProspectDB.is_test.isnot(True),
+            )
+            .count()
+        )
         leads_en_file = db.query(V3ProspectDB).filter(
             V3ProspectDB.ia_results.isnot(None),
             V3ProspectDB.sent_at.is_(None),
@@ -1861,69 +1683,122 @@ def compute_outbound_need() -> dict:
             V3ProspectDB.sent_at.isnot(None)
         ).count()
 
-    bootstrap        = sent_total < 30
-    taux_conversion  = 0.02
-    leads_necessaires = int(proche_disponibles / taux_conversion) if proche_disponibles > 0 else 0
-    leads_manquants   = max(0, leads_necessaires - leads_en_file)
+    # ── Lecture SlotDB — capacité disponible ──────────────────────────────────
+    active_closers = 1
+    slots_open     = 0
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import SlotDB, SlotStatus, CloserDB
+        with MktSession() as mdb:
+            active_closers = mdb.query(CloserDB).filter(
+                CloserDB.project_id == "presence-ia",
+                CloserDB.is_active  == True,
+            ).count() or 1
+            slots_open = mdb.query(SlotDB).filter(
+                SlotDB.project_id == "presence-ia",
+                SlotDB.status     == SlotStatus.available,
+                SlotDB.starts_at  >= now,
+                SlotDB.starts_at  <= now + timedelta(days=14),
+            ).count()
+    except Exception as e:
+        log.warning("compute_outbound_need: marketing_module indisponible — %s", e)
 
-    # ── Statut (4 niveaux) ────────────────────────────────────────────────────
-    if taux >= 0.85:
-        statut        = "saturated"
-        cap_recommande = 0
-    elif taux < 0.70:
-        statut        = "running"
-        cap_recommande = leads_manquants
+    # ── Calcul du besoin ──────────────────────────────────────────────────────
+    #  fill_need : 1.0 = agenda vide, 0.0 = agenda plein
+    fill_rate_week   = min(1.0, rdv_taken_week   / target_rdv_week)   if target_rdv_week   > 0 else 1.0
+    fill_rate_monday = min(1.0, rdv_taken_monday / target_rdv_monday) if target_rdv_monday > 0 else 1.0
+    fill_need        = round(1.0 - fill_rate_week, 3)
+    urgence_lundi    = fill_rate_monday < 0.5
+    bootstrap        = sent_total < 30
+
+    # ── Tiers d'envoi ─────────────────────────────────────────────────────────
+    #  fill_need >= 0.80  → "running"   (< 20 % de la cible)
+    #  fill_need >= 0.40  → "top_up"    (20-60 % de la cible)
+    #  fill_need >= 0.15  → "idle"      (60-85 % de la cible)
+    #  fill_need <  0.15  → "saturated" (> 85 % de la cible)
+    if fill_need >= 0.80:
+        statut = "running"
+        e_vol  = max_email
+        s_vol  = max_sms   if urgence_lundi else base_sms
+    elif fill_need >= 0.40:
+        statut = "top_up"
+        e_vol  = base_email * 2
+        s_vol  = base_sms  if urgence_lundi else 0
+    elif fill_need >= 0.15:
+        statut = "idle"
+        e_vol  = base_email
+        s_vol  = base_sms  if urgence_lundi else 0
     else:
-        if leads_en_file >= leads_necessaires:
-            statut        = "idle"
-            cap_recommande = 0
-        else:
-            statut        = "top_up"
-            cap_recommande = max(1, leads_manquants // 2)
+        statut = "saturated"
+        e_vol  = 0
+        s_vol  = 0
+
+    # Bootstrap override : toujours au moins base_email si < 30 envois
+    if bootstrap and statut == "saturated":
+        statut = "running"
+        e_vol  = base_email
+        s_vol  = base_sms
+
+    # Launch mode : volumes × 1.5
+    if launch_mode and statut != "saturated":
+        e_vol = min(int(e_vol * 1.5), max_email)
+        s_vol = min(int(s_vol * 1.5), max_sms)
+
+    cap_email      = max(0, min(e_vol, max_email))
+    cap_sms        = max(0, min(s_vol, max_sms))
+    cap_recommande = cap_email + cap_sms
+
+    # Champ rétrocompat dashboard (exprimé en taux de remplissage RDV / cible)
+    taux_couverture = round(fill_rate_week * 100, 1)
 
     return {
-        "proche":            {"total": proche_total, "reserves": proche_reserves,
-                              "disponibles": proche_disponibles},
-        "moyen":             {"total": moyen_dispo + moyen_reserves,
-                              "reserves": moyen_reserves,
-                              "disponibles": max(0, moyen_dispo)},
-        "lointain":          {"total": lointain_dispo + lointain_reserves,
-                              "reserves": lointain_reserves,
-                              "disponibles": max(0, lointain_dispo)},
-        "taux_couverture":   round(taux * 100, 1),
+        # Rétrocompat dashboard
+        "proche":   {"total": slots_open + rdv_taken_week,
+                     "reserves": rdv_taken_week, "disponibles": slots_open},
+        "moyen":    {"total": 0, "reserves": 0, "disponibles": 0},
+        "lointain": {"total": 0, "reserves": 0, "disponibles": 0},
+        "taux_couverture":   taux_couverture,
         "leads_en_file":     leads_en_file,
-        "leads_necessaires": leads_necessaires,
-        "leads_manquants":   leads_manquants,
+        "leads_necessaires": target_rdv_week,
+        "leads_manquants":   max(0, target_rdv_week - rdv_taken_week),
         "cap_recommande":    cap_recommande,
-        "statut":            statut,
-        "bootstrap":         bootstrap,
-        "taux_conversion":   taux_conversion,
+        "taux_conversion":   0.02,
         "source_slots":      "db",
         "active_closers":    active_closers,
+        "bootstrap":         bootstrap,
+        "statut":            statut,
+        # Nouveaux champs
+        "cap_email":         cap_email,
+        "cap_sms":           cap_sms,
+        "rdv_taken_week":    rdv_taken_week,
+        "rdv_taken_monday":  rdv_taken_monday,
+        "slots_open":        slots_open,
+        "fill_need":         fill_need,
+        "urgence_lundi":     urgence_lundi,
+        "launch_mode":       launch_mode,
     }
 
 
 def _job_outbound(force: bool = False):
     """
-    Outbound v3_prospects — tous les jours à 9h UTC.
-    Sélectionne les prospects avec ia_results IS NOT NULL et sent_at IS NULL.
-    Score : skip si l'entreprise est déjà citée par l'IA, envoyer sinon.
+    Outbound v3_prospects — tous les jours à 9h UTC (ou trigger manuel).
 
-    Variables d'env :
-      OUTBOUND_CAP          — nombre max d'envois par run (défaut : 10)
-      OUTBOUND_DRY_RUN      — si "true" : aucun envoi, aucune écriture DB, logs only
-      CLOSER_SLOTS_PER_DAY  — capacité fallback si Calendly API indisponible (défaut : 2)
+    Variables d'env (pilotage) :
+      OUTBOUND_DRY_RUN      bool  true   si "true" : logs only, 0 envoi, 0 DB
+      LAUNCH_MODE           bool  false  volumes x1.5 + J+1/J+2 ouverts
+      TARGET_RDV_MONDAY     int   3      RDV lundi cible
+      TARGET_RDV_WEEK       int   10     RDV 14j cible
+      OUTBOUND_BASE_EMAIL   int   5      emails de base / run
+      OUTBOUND_BASE_SMS     int   3      SMS de base / run
+      OUTBOUND_MAX_EMAIL    int   20     plafond email / run
+      OUTBOUND_MAX_SMS      int   10     plafond SMS / run
     """
     import os, random, requests as _req
     from datetime import datetime
     from .database import SessionLocal
     from .models import V3ProspectDB, ScoringConfigDB
 
-    dry_run = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"  # SÉCURITÉ : défaut=true, activation explicite requise
-    cap     = int(os.getenv("OUTBOUND_CAP", "10"))
-    if dry_run:
-        cap = min(cap, 20)   # sécurité : cap 20 max en dry_run
-
+    dry_run   = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"  # SÉCURITÉ : défaut=true
     brevo_key = os.getenv("BREVO_API_KEY", "")
     if not brevo_key and not dry_run:
         log.warning("[OUTBOUND] BREVO_API_KEY absent — job annulé")
@@ -1931,20 +1806,29 @@ def _job_outbound(force: bool = False):
 
     mode_label = "DRY_RUN" if dry_run else "LIVE"
 
-    # ── Pilotage par slots Calendly ───────────────────────────────────────────
-    _need_for_log = None   # conservé pour le journal
+    # ── Pilotage par RDV réels (v3_bookings) + capacité (SlotDB) ─────────────
+    cap_email = int(os.getenv("OUTBOUND_MAX_EMAIL", "20"))   # fallback si compute échoue
+    cap_sms   = int(os.getenv("OUTBOUND_MAX_SMS",   "10"))
+
     if not force:
         try:
-            need = compute_outbound_need()
-            _need_for_log = need
+            need   = compute_outbound_need()
             statut = need["statut"]
+
+            # ── Résumé lisible ─────────────────────────────────────────────
             log.info(
-                "[OUTBOUND] slots proches %d/%d (%.0f%%) · leads_file=%d · besoin=%d · statut=%s",
-                need["proche"]["reserves"], need["proche"]["total"],
-                need["taux_couverture"],
-                need["leads_en_file"], need["leads_necessaires"], statut,
+                "[OUTBOUND][%s] statut=%s · rdv_pris=%d/%d · fill=%.0f%% · "
+                "lundi=%d/%d · urgence_lundi=%s · slots_open=%d · "
+                "cap_email=%d · cap_sms=%d · launch_mode=%s",
+                mode_label, statut,
+                need["rdv_taken_week"],   need["leads_necessaires"],
+                (1.0 - need["fill_need"]) * 100,
+                need["rdv_taken_monday"], int(os.getenv("TARGET_RDV_MONDAY", "3")),
+                need["urgence_lundi"],    need["slots_open"],
+                need["cap_email"], need["cap_sms"], need["launch_mode"],
             )
-            # ── Journal pilotage (toujours, même si skip) ───────────────────
+
+            # ── Journal pipeline (toujours, même si skip) ──────────────────
             try:
                 _paire_st = __import__("src.active_pair", fromlist=["get_active_pair"]).get_active_pair()
                 from .models import PipelineHistoryLogDB
@@ -1954,39 +1838,38 @@ def _job_outbound(force: bool = False):
                         paire_city        = (_paire_st or {}).get("city"),
                         paire_profession  = (_paire_st or {}).get("profession"),
                         taux_couverture   = need.get("taux_couverture"),
-                        slots_proches_total    = need.get("proche", {}).get("total"),
-                        slots_proches_remplis  = need.get("proche", {}).get("reserves"),
-                        slots_moyens_total     = need.get("moyen",  {}).get("total"),
-                        slots_moyens_remplis   = need.get("moyen",  {}).get("reserves"),
-                        slots_lointains_total  = need.get("lointain", {}).get("total"),
-                        slots_lointains_remplis= need.get("lointain", {}).get("reserves"),
+                        slots_proches_total    = need["proche"]["total"],
+                        slots_proches_remplis  = need["proche"]["reserves"],
+                        slots_moyens_total     = need["moyen"]["total"],
+                        slots_moyens_remplis   = need["moyen"]["reserves"],
+                        slots_lointains_total  = need["lointain"]["total"],
+                        slots_lointains_remplis= need["lointain"]["reserves"],
                         leads_en_file     = need.get("leads_en_file"),
                         leads_necessaires = need.get("leads_necessaires"),
                         statut            = statut,
-                        cap_genere        = cap if statut not in ("saturated", "idle") else 0,
+                        cap_genere        = need["cap_recommande"],
                         source_slots      = need.get("source_slots"),
                     ))
                     _hdb.commit()
             except Exception as _je:
                 log.debug("[OUTBOUND] pipeline_history_log: %s", _je)
-            # ───────────────────────────────────────────────────────────────
+
             if statut == "pre_launch":
-                log.info("[OUTBOUND] Pre-launch — pipeline bloqué jusqu'au 20/04/2026 — skip")
+                log.info("[OUTBOUND] Pre-launch — skip")
                 return
             if statut == "saturated":
-                log.info("[OUTBOUND] Saturé (%.0f%% > 85%%) — skip", need["taux_couverture"])
+                log.info("[OUTBOUND] Saturé (rdv=%.0f%% de la cible) — skip",
+                         (1.0 - need["fill_need"]) * 100)
                 return
-            if statut == "idle":
-                log.info("[OUTBOUND] Idle — leads en file suffisants (%d >= %d) — skip",
-                         need["leads_en_file"], need["leads_necessaires"])
+            if statut == "idle" and need["cap_email"] == 0 and need["cap_sms"] == 0:
+                log.info("[OUTBOUND] Idle et caps à 0 — skip")
                 return
-            # Ajuster le cap au besoin réel (running = cap plein, top_up = 50% du manque)
-            if need["cap_recommande"] > 0:
-                cap = min(cap, need["cap_recommande"])
-                mode_cap = "top_up" if statut == "top_up" else "run"
-                log.info("[OUTBOUND] Cap ajusté à %d (%s)", cap, mode_cap)
+
+            cap_email = need["cap_email"]
+            cap_sms   = need["cap_sms"]
+
         except Exception as e:
-            log.warning("[OUTBOUND] Calcul slot coverage échoué — mode normal: %s", e)
+            log.warning("[OUTBOUND] compute_outbound_need échoué — fallback caps: %s", e)
 
     # ── Chantier C : vérifier/avancer la paire active ────────────────────────
     from .active_pair import check_saturation as _check_saturation
@@ -2086,7 +1969,7 @@ def _job_outbound(force: bool = False):
                 (V3ProspectDB.email_status.is_(None) |
                  V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
             )
-            .limit(cap * 20)
+            .limit(max(cap_email, 1) * 20)
             .all()
         )
         # SMS : uniquement si pas d'email
@@ -2097,7 +1980,7 @@ def _job_outbound(force: bool = False):
                 V3ProspectDB.phone.isnot(None),
                 V3ProspectDB.email.is_(None),
             )
-            .limit(cap * 20)
+            .limit(max(cap_sms, 1) * 20)
             .all()
         )
 
@@ -2106,11 +1989,10 @@ def _job_outbound(force: bool = False):
     valid_sms     = [p for p in has_sms if _outbound_normalize_phone(p.phone)]
     invalid_sms   = [p for p in has_sms if not _outbound_normalize_phone(p.phone)]
 
-    # Fusionner : email d'abord, SMS ensuite
-    candidates = valid_email + valid_sms
-
-    log.info("[OUTBOUND] sélection — email_valide=%d  sms_valide=%d  email_invalide=%d  sms_invalide=%d",
-             len(valid_email), len(valid_sms), len(invalid_email), len(invalid_sms))
+    log.info("[OUTBOUND] sélection — email_valide=%d (cap=%d)  sms_valide=%d (cap=%d)"
+             "  email_invalide=%d  sms_invalide=%d",
+             len(valid_email), cap_email, len(valid_sms), cap_sms,
+             len(invalid_email), len(invalid_sms))
 
     if dry_run and invalid_email:
         for p in invalid_email:
@@ -2119,59 +2001,65 @@ def _job_outbound(force: bool = False):
         for p in invalid_sms:
             log.info("[OUTBOUND][DRY_RUN] SMS_INVALIDE — %-40s  %s", p.name[:40], p.phone)
 
-    # ── Scoring comparatif (dry_run uniquement) ────────────────────────────────
-    if dry_run:
-        cited_count     = sum(1 for p in candidates if _outbound_is_cited(p.name, p.ia_results or "[]"))
-        not_cited_count = len(candidates) - cited_count
-        log.info("[OUTBOUND][DRY_RUN] scoring comparatif sur %d candidats :", len(candidates))
-        log.info("[OUTBOUND][DRY_RUN]   avec scoring  — would_send=%d  would_skip=%d",
-                 not_cited_count, cited_count)
-        log.info("[OUTBOUND][DRY_RUN]   sans scoring  — would_send=%d", len(candidates))
+    # ── Boucle email ─────────────────────────────────────────────────────────
+    email_sent = email_would = email_skip = 0
 
-    # ── Boucle principale ─────────────────────────────────────────────────────
-    selected    = 0
-    skipped     = 0
-    would_send  = 0
-    sent        = 0
-    errors      = 0
-
-    for prospect in candidates:
-        if (sent if not dry_run else would_send) >= cap:
+    for prospect in valid_email:
+        if (email_sent if not dry_run else email_would) >= cap_email:
             break
-
-        selected += 1
-
-        # Scoring — skip si déjà cité par les IA
         if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
-            skipped += 1
-            log.info("[OUTBOUND] SKIP cité — %-40s  %-20s  %s",
-                     prospect.name[:40], prospect.city or "", prospect.email)
+            email_skip += 1
+            log.info("[OUTBOUND] SKIP cité EMAIL — %-40s  %s",
+                     prospect.name[:40], prospect.email)
             continue
-
         result = _outbound_send_prospect(
-            prospect, dry_run=dry_run,
-            brevo_key=brevo_key,
-            sent_idx=sent + would_send,
+            prospect, dry_run=dry_run, brevo_key=brevo_key,
+            sent_idx=email_sent + email_would,
         )
-
         if dry_run:
-            would_send += 1
-            log.info("[OUTBOUND][DRY_RUN] ══ %s #%d\n  To: %s <%s>\n  Body: %s",
-                     result.get("channel","?").upper(), would_send,
-                     prospect.name, prospect.email or prospect.phone,
-                     (result.get("body","")[:80]))
+            email_would += 1
+            log.info("[OUTBOUND][DRY_RUN] EMAIL #%d — %s <%s>  Body: %s",
+                     email_would, prospect.name, prospect.email,
+                     result.get("body", "")[:80])
         elif result.get("ok"):
-            sent += 1
-            log.info("[OUTBOUND] %s envoyé — %s (%s / %s)",
-                     result.get("channel","?").upper(), prospect.name,
-                     prospect.profession, prospect.city)
+            email_sent += 1
+            log.info("[OUTBOUND] EMAIL envoyé — %s (%s / %s)",
+                     prospect.name, prospect.profession, prospect.city)
         else:
-            errors += 1
-            log.warning("[OUTBOUND] erreur — %s : %s", prospect.name, result.get("error"))
+            log.warning("[OUTBOUND] EMAIL erreur — %s : %s",
+                        prospect.name, result.get("error"))
 
+    # ── Boucle SMS ────────────────────────────────────────────────────────────
+    sms_sent = sms_would = sms_skip = 0
+
+    for prospect in valid_sms:
+        if (sms_sent if not dry_run else sms_would) >= cap_sms:
+            break
+        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
+            sms_skip += 1
+            continue
+        result = _outbound_send_prospect(
+            prospect, dry_run=dry_run, brevo_key=brevo_key,
+            sent_idx=email_sent + email_would + sms_sent + sms_would,
+        )
+        if dry_run:
+            sms_would += 1
+            log.info("[OUTBOUND][DRY_RUN] SMS #%d — %s <%s>",
+                     sms_would, prospect.name, prospect.phone)
+        elif result.get("ok"):
+            sms_sent += 1
+            log.info("[OUTBOUND] SMS envoyé — %s (%s / %s)",
+                     prospect.name, prospect.profession, prospect.city)
+        else:
+            log.warning("[OUTBOUND] SMS erreur — %s : %s",
+                        prospect.name, result.get("error"))
+
+    # ── Résumé final ──────────────────────────────────────────────────────────
     if dry_run:
-        log.info("[OUTBOUND][DRY_RUN] terminé — sélectionnés=%d  skipped(cités)=%d  would_send=%d  (0 envoi réel, 0 écriture DB)",
-                 selected, skipped, would_send)
+        log.info("[OUTBOUND][DRY_RUN] terminé — "
+                 "email_would=%d (skip=%d)  sms_would=%d (skip=%d)  "
+                 "(0 envoi réel, 0 écriture DB)",
+                 email_would, email_skip, sms_would, sms_skip)
     else:
-        log.info("[OUTBOUND] terminé — sélectionnés=%d  skipped=%d  envoyés=%d  erreurs=%d",
-                 selected, skipped, sent, errors)
+        log.info("[OUTBOUND] terminé — email=%d sms=%d (skip_cités=%d)",
+                 email_sent, sms_sent, email_skip + sms_skip)
