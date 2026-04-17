@@ -699,3 +699,6 @@ app.include_router(naf_audit_router)
 
 from .routes.active_models import router as active_models_router
 app.include_router(active_models_router)
+
+from .routes.methode_ia import router as methode_ia_router
+app.include_router(methode_ia_router)
