@@ -255,7 +255,8 @@ def sync_brevo_events(days: int = 30) -> dict:
         new_status   = ({"delivered": "delivered", "success": "delivered",
                           "failed": "failed", "undelivered": "failed",
                           "hardbounce": "failed", "softbounce": "failed",
-                          "bounce": "failed", "bounced": "failed",
+                          "softbounces": "failed", "bounce": "failed", "bounced": "failed",
+                          "rejected": "failed", "blocked": "failed",
                           "sent": "sent", "accepted": "sent"}.get(brevo_status))
         event_dt = _to_dt_str(entry.get("date") or entry.get("sentAt") or entry.get("timestamp"))
 
