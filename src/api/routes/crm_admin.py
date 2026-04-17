@@ -88,7 +88,7 @@ def _send_recruit_email(to_email: str, to_name: str, stage: str) -> bool:
             "- les éléments clés pour vos rendez-vous\n"
             "- les réponses aux objections principales\n\n"
             "L'objectif est que vous puissiez vous approprier ces éléments avant vos premiers appels.\n\n"
-            "En fonction des résultats, nous ajusterons ensuite l'équipe.\n\n"
+            "En fonction des résultats, nous ajusterons ensuite la taille de l'équipe.\n\n"
             "À très vite,\nNathalie"
         ),
         "waitlist": (
