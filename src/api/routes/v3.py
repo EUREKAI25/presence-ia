@@ -3315,6 +3315,56 @@ async def brevo_webhook(request: Request):
             except Exception as e:
                 log.warning("brevo_webhook V3 update: %s", e)
 
+        # Tracking email_status sur v3_prospects (delivered / opened / clicked / bounced)
+        _STATUS_MAP = {
+            "delivered":    "delivered",
+            "open":         "opened",
+            "unique_opened": "opened",
+            "click":        "clicked",
+            "hardBounce":   "bounced",
+            "softBounce":   "bounced",
+            "blocked":      "bounced",
+            "spam":         "bounced",
+            "unsubscribed": "bounced",
+        }
+        _PRIORITY = {"delivered": 1, "opened": 2, "clicked": 3, "bounced": 1}
+        new_status = _STATUS_MAP.get(event_type)
+        if new_status and email:
+            try:
+                from datetime import datetime as _dt
+                event_dt = _dt.utcnow()
+                try:
+                    ts_raw = ev.get("ts") or ev.get("timestamp")
+                    if ts_raw:
+                        event_dt = _dt.utcfromtimestamp(int(ts_raw))
+                except Exception:
+                    pass
+                with SessionLocal() as db:
+                    p = db.query(V3ProspectDB).filter(
+                        V3ProspectDB.email == email.lower().strip()
+                    ).order_by(V3ProspectDB.email_sent_at.desc().nullslast()).first()
+                    if not p:
+                        p = db.query(V3ProspectDB).filter(
+                            V3ProspectDB.email == email
+                        ).order_by(V3ProspectDB.email_sent_at.desc().nullslast()).first()
+                    if p:
+                        cur_pri = _PRIORITY.get(p.email_status or "", 0)
+                        new_pri = _PRIORITY.get(new_status, 0)
+                        if new_pri >= cur_pri:
+                            p.email_status = new_status
+                        if new_status == "opened" and not p.email_opened_at:
+                            p.email_opened_at = event_dt
+                        if new_status == "clicked":
+                            if not p.email_clicked_at:
+                                p.email_clicked_at = event_dt
+                            if not p.email_opened_at:
+                                p.email_opened_at = event_dt
+                        if new_status == "bounced" and not p.email_bounced_at:
+                            p.email_bounced_at = event_dt
+                        db.commit()
+            except Exception as e:
+                log.warning("brevo_webhook email_status update: %s", e)
+
         processed += 1
         log.info("Brevo webhook: %s → %s", event_type, email)
 
