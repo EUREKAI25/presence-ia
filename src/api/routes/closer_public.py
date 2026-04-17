@@ -1566,9 +1566,9 @@ async function requestPayment(){{
     _offer_blocks = [b.strip() for b in _re_off.split(r'─{5,}', _pitch_raw) if b.strip()]
 
     _OFFER_META = [
-        {"slug": "o1", "label": "Offre 1", "color": "#527fb3", "bg": "#527fb315", "border": "#527fb330", "comm": "90€"},
-        {"slug": "o2", "label": "Offre 2", "color": "#2ecc71", "bg": "#2ecc7115", "border": "#2ecc7130", "comm": "630€"},
-        {"slug": "o3", "label": "Offre 3", "color": "#f59e0b", "bg": "#f59e0b15", "border": "#f59e0b30", "comm": "1 620€"},
+        {"slug": "o1", "label": "Méthode — 500€", "color": "#527fb3", "bg": "#527fb315", "border": "#527fb330", "comm": "90€"},
+        {"slug": "o2", "label": "Implantation — 3 500€", "color": "#2ecc71", "bg": "#2ecc7115", "border": "#2ecc7130", "comm": "630€"},
+        {"slug": "o3", "label": "Domination — 9 000€", "color": "#f59e0b", "bg": "#f59e0b15", "border": "#f59e0b30", "comm": "1 620€"},
     ]
 
     def _render_offer_block(raw: str, meta: dict) -> str:

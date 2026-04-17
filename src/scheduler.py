@@ -1598,10 +1598,20 @@ def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
     """
     import json, re
 
-    # Mots génériques à ignorer pour le matching
-    IGNORE = {"sarl", "sas", "sasu", "eurl", "sa", "snc", "sci", "ei",
-               "et", "de", "du", "la", "le", "les", "des", "au", "aux",
-               "en", "par", "sur", "pour", "avec", "chez"}
+    # Mots génériques à ignorer pour le matching (articles, conjonctions, termes sectoriels communs)
+    IGNORE = {
+        "sarl", "sas", "sasu", "eurl", "sa", "snc", "sci", "ei",
+        "et", "de", "du", "la", "le", "les", "des", "au", "aux",
+        "en", "par", "sur", "pour", "avec", "chez",
+        # Termes sectoriels trop communs pour être discriminants
+        "travaux", "batiment", "bâtiment", "france", "groupe", "group",
+        "concept", "solutions", "solution", "tech", "smart", "green",
+        "panel", "etanche", "entreprise", "generale", "general",
+        "energie", "energetique", "renovation", "renov", "services",
+        "service", "invest", "holding", "partner", "partners",
+        "construction", "immobilier", "habitat", "maison", "home",
+        "paris", "lyon", "marseille", "toulouse", "bordeaux", "nantes",
+    }
 
     try:
         results = json.loads(ia_results_json) if isinstance(ia_results_json, str) else ia_results_json
@@ -1621,8 +1631,9 @@ def _outbound_is_cited(name: str, ia_results_json: str) -> bool:
     if not keywords:
         return False
 
-    # Cité si au moins 1 mot-clé significatif trouvé dans les réponses
-    return any(kw in combined for kw in keywords)
+    # Cité si au moins 2 mots-clés significatifs trouvés (évite faux positifs sur mots sectoriels)
+    matched = [kw for kw in keywords if kw in combined]
+    return len(matched) >= 2
 
 
 

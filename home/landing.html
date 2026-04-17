@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Présence IA — Visibilité dans ChatGPT, Gemini et Google AI</title>
+  <meta name="description" content="Présence IA positionne votre entreprise dans les réponses des assistants IA. Une nouvelle forme de visibilité pour les professionnels exigeants.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:  #394455;
+      --accent:   #527FB3;
+      --bg:       #ffffff;
+      --surface:  #f0f4f9;
+      --text:     #1a2535;
+      --muted:    #6b7a90;
+      --border:   #dde2ea;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex; justify-content: space-between; align-items: center;
+      height: 64px; max-width: 1080px; margin: 0 auto; padding: 0 32px;
+    }
+    .nav-logo {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 18px; font-weight: 400; color: var(--primary);
+      letter-spacing: .01em;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a {
+      font-size: 14px; font-weight: 500; color: var(--muted);
+      transition: color .15s;
+    }
+    .nav-links a:hover { color: var(--primary); }
+    .nav-cta {
+      display: inline-block; padding: 9px 22px;
+      background: var(--primary); color: #fff;
+      font-size: 13px; font-weight: 600; border-radius: 6px;
+      letter-spacing: .02em;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 120px 0 96px;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block; margin-bottom: 28px;
+      padding: 5px 14px; border: 1px solid #c8a96e50;
+      border-radius: 99px; font-size: 12px; font-weight: 600;
+      color: var(--accent); letter-spacing: .06em; text-transform: uppercase;
+    }
+    .hero h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(36px, 5vw, 58px);
+      font-weight: 400; line-height: 1.15;
+      color: var(--primary); letter-spacing: -.02em;
+      max-width: 700px; margin: 0 auto 20px;
+    }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero-sub {
+      font-size: 18px; color: var(--muted); line-height: 1.65;
+      max-width: 560px; margin: 0 auto 44px;
+    }
+    .hero-actions { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-block; padding: 14px 32px;
+      background: var(--primary); color: #fff;
+      font-size: 14px; font-weight: 600; border-radius: 8px;
+      letter-spacing: .02em;
+    }
+    .btn-outline {
+      display: inline-block; padding: 13px 28px;
+      border: 1px solid var(--border); color: var(--muted);
+      font-size: 14px; font-weight: 500; border-radius: 8px;
+    }
+    .hero-proof {
+      margin-top: 56px; font-size: 12px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .hero-proof-logos {
+      display: flex; justify-content: center; gap: 32px;
+      margin-top: 16px; align-items: center;
+    }
+    .ai-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 99px;
+      font-size: 12px; font-weight: 600; color: var(--muted);
+    }
+    .ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    /* ── SECTION HEADERS ── */
+    .section { padding: 88px 0; }
+    .section-alt { background: var(--surface); }
+    .section-dark { background: var(--primary); }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--accent); margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(28px, 3.5vw, 40px); font-weight: 400;
+      line-height: 1.2; color: var(--primary); letter-spacing: -.02em;
+      margin-bottom: 16px;
+    }
+    .section-dark .section-title { color: #fff; }
+    .section-dark .section-label { color: #c8a96ecc; }
+    .section-sub {
+      font-size: 17px; color: var(--muted); max-width: 520px;
+      line-height: 1.65; margin-bottom: 56px;
+    }
+    .section-dark .section-sub { color: rgba(255,255,255,.55); }
+
+    /* ── STATS ── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1px; background: var(--border);
+    }
+    .stat-item {
+      background: #fff; padding: 40px 36px;
+    }
+    .section-alt .stat-item { background: var(--surface); }
+    .stat-value {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 44px; font-weight: 400; color: var(--primary);
+      line-height: 1; letter-spacing: -.03em; margin-bottom: 8px;
+    }
+    .stat-label { font-size: 14px; color: var(--muted); }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+    }
+    .feature-card {
+      padding: 32px; border: 1px solid var(--border); border-radius: 10px;
+      background: #fff;
+    }
+    .feature-icon {
+      width: 40px; height: 40px; background: #c8a96e15;
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 20px;
+    }
+    .feature-card h3 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 18px; font-weight: 400; color: var(--primary);
+      margin-bottom: 10px; letter-spacing: -.01em;
+    }
+    .feature-card p { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+    /* ── PROCESS ── */
+    .process-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; position: relative; }
+    .step {
+      padding: 0 32px 0 0; position: relative;
+    }
+    .step-num {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 11px; font-weight: 600; color: var(--accent);
+      letter-spacing: .08em; text-transform: uppercase; margin-bottom: 16px;
+    }
+    .step h3 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 20px; font-weight: 400; color: #fff;
+      margin-bottom: 10px; letter-spacing: -.01em;
+    }
+    .step p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.65; }
+
+    /* ── PRICING ── */
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; align-items: start;
+    }
+    .plan {
+      padding: 32px; border: 1px solid var(--border); border-radius: 10px;
+      background: #fff;
+    }
+    .plan.featured {
+      background: var(--primary); border-color: var(--primary);
+      position: relative;
+    }
+    .plan-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted); margin-bottom: 20px;
+    }
+    .plan.featured .plan-label { color: #c8a96ecc; }
+    .plan-price {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 38px; font-weight: 400; color: var(--primary);
+      letter-spacing: -.03em; margin-bottom: 4px; line-height: 1;
+    }
+    .plan.featured .plan-price { color: #fff; }
+    .plan-period {
+      font-size: 13px; color: var(--muted); margin-bottom: 24px;
+    }
+    .plan.featured .plan-period { color: rgba(255,255,255,.45); }
+    .plan-divider {
+      height: 1px; background: var(--border); margin: 24px 0;
+    }
+    .plan.featured .plan-divider { background: rgba(255,255,255,.1); }
+    .plan-features { list-style: none; padding: 0; margin-bottom: 28px; }
+    .plan-features li {
+      font-size: 14px; color: var(--muted); padding: 6px 0;
+      display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border);
+    }
+    .plan-features li:last-child { border-bottom: none; }
+    .plan.featured .plan-features li { color: rgba(255,255,255,.65); border-color: rgba(255,255,255,.08); }
+    .plan-features .check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+    .plan-cta {
+      display: block; text-align: center; padding: 12px 24px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; font-weight: 600; color: var(--primary);
+      letter-spacing: .02em;
+    }
+    .plan.featured .plan-cta {
+      background: var(--accent); color: var(--primary);
+      border-color: var(--accent);
+    }
+    .featured-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--accent); color: var(--primary);
+      font-size: 10px; font-weight: 800; padding: 3px 12px;
+      border-radius: 99px; letter-spacing: .06em; text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .testimonial {
+      padding: 28px 30px; border: 1px solid var(--border);
+      border-radius: 10px; background: #fff;
+    }
+    .testimonial-text {
+      font-size: 15px; color: var(--text); line-height: 1.7;
+      font-style: italic; margin-bottom: 20px;
+    }
+    .testimonial-text::before { content: '"'; color: var(--accent); font-size: 22px; }
+    .testimonial-author { display: flex; align-items: center; gap: 12px; }
+    .testimonial-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      font-size: 14px; font-weight: 700; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .testimonial-name { font-size: 14px; font-weight: 600; color: var(--primary); }
+    .testimonial-role { font-size: 12px; color: var(--muted); }
+
+    /* ── CTA FINAL ── */
+    .cta-section {
+      text-align: center; padding: 104px 0;
+      border-top: 1px solid var(--border);
+    }
+    .cta-section h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(28px, 4vw, 46px); font-weight: 400;
+      color: var(--primary); letter-spacing: -.02em;
+      max-width: 560px; margin: 0 auto 16px; line-height: 1.2;
+    }
+    .cta-section p { font-size: 17px; color: var(--muted); margin-bottom: 40px; }
+    .cta-note { font-size: 13px; color: var(--muted); margin-top: 16px; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--primary); padding: 48px 0;
+    }
+    .footer-inner {
+      display: flex; justify-content: space-between; align-items: center;
+      max-width: 1080px; margin: 0 auto; padding: 0 32px;
+    }
+    .footer-brand {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 16px; color: rgba(255,255,255,.7);
+    }
+    .footer-brand span { color: var(--accent); }
+    .footer-links { display: flex; gap: 28px; }
+    .footer-links a { font-size: 13px; color: rgba(255,255,255,.4); }
+    .footer-copy { font-size: 12px; color: rgba(255,255,255,.25); margin-top: 4px; }
+
+    /* Hero — fond ville nuit */
+    .hero {
+      background-image: url('https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=1920&q=80') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      position: relative !important;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(57,68,85,0.82) 0%, rgba(82,127,179,0.62) 100%);
+      z-index: 0;
+    }
+    .hero .container { position: relative; z-index: 1; }
+    .hero h1, .hero-sub, .hero-badge, .hero-proof, .ai-pill {
+      color: #ffffff !important;
+    }
+    .hero h1 em { color: #88A5C5 !important; }
+    .hero .btn-primary {
+      background: #527FB3 !important;
+      color: #fff !important;
+    }
+    .hero .btn-outline {
+      border-color: rgba(255,255,255,0.4) !important;
+      color: rgba(255,255,255,0.85) !important;
+      background: rgba(255,255,255,0.08) !important;
+    }
+    .hero .ai-pill {
+      background: rgba(255,255,255,0.12) !important;
+      border-color: rgba(255,255,255,0.2) !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo"><img src="../src/assets/logo.svg" alt="Présence IA" style="height:36px;width:auto"></div>
+      <div class="nav-links">
+        <a href="#services">Services</a>
+        <a href="#process">Méthode</a>
+        <a href="#pricing">Tarifs</a>
+        <a href="#contact" class="nav-cta">Démarrer</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">Nouvelle génération de visibilité</div>
+      <h1>Votre entreprise,<br><em>présente</em> dans l'IA</h1>
+      <p class="hero-sub">
+        Quand vos clients posent une question à ChatGPT ou Gemini,
+        votre nom apparaît. Pas par hasard — par stratégie.
+      </p>
+      <div class="hero-actions">
+        <a href="#pricing" class="btn-primary">Voir les offres</a>
+        <a href="#process" class="btn-outline">Comment ça fonctionne</a>
+      </div>
+      <div class="hero-proof">
+        <div style="margin-bottom:10px;">Visibilité garantie sur</div>
+        <div class="hero-proof-logos">
+          <div class="ai-pill"><span class="ai-dot"></span>ChatGPT</div>
+          <div class="ai-pill"><span class="ai-dot"></span>Gemini</div>
+          <div class="ai-pill"><span class="ai-dot"></span>Google AI</div>
+          <div class="ai-pill"><span class="ai-dot"></span>Perplexity</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="section section-alt" id="services">
+    <div class="container">
+      <div class="section-label">Résultats mesurables</div>
+      <h2 class="section-title">Des chiffres,<br>pas des promesses</h2>
+      <p class="section-sub">
+        Nos clients apparaissent dans les réponses IA dans les 30 à 90 jours.
+        Tracé, mesuré, rapporté.
+      </p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">87&nbsp;%</div>
+        <div class="stat-label">des clients atteignent le Top 3 IA en 60 jours</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">3×</div>
+        <div class="stat-label">plus de mentions IA en moyenne après 90 jours</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">+40&nbsp;%</div>
+        <div class="stat-label">de trafic qualifié issu des assistants conversationnels</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">120+</div>
+        <div class="stat-label">professionnels et TPE accompagnés depuis 2024</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" style="background:#fff;">
+    <div class="container">
+      <div class="section-label">Ce que vous obtenez</div>
+      <h2 class="section-title">Un système complet,<br>pas une promesse</h2>
+      <p class="section-sub">
+        Chaque élément de votre présence IA est construit, optimisé et maintenu.
+      </p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">◈</div>
+          <h3>Audit IA initial</h3>
+          <p>Analyse de votre visibilité actuelle sur les 4 principaux assistants. État des lieux chiffré, carte des opportunités.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">◉</div>
+          <h3>Contenu optimisé IA</h3>
+          <p>Rédaction de contenus conçus pour être cités par les LLM. Structure, champs sémantiques, autorité thématique.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">◎</div>
+          <h3>Fiche signalétique IA</h3>
+          <p>Création d'une identité lisible par les IA : descriptions standardisées, données structurées, citations de sources.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⬡</div>
+          <h3>Monitoring mensuel</h3>
+          <p>Rapport mensuel de citations IA : fréquence, contexte, concurrents. Ajustements en temps réel.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">◆</div>
+          <h3>Stratégie editoriale</h3>
+          <p>Plan de contenu aligné avec les requêtes de vos clients idéaux dans les assistants IA.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">◇</div>
+          <h3>Accès au tableau de bord</h3>
+          <p>Interface dédiée pour suivre votre score de présence IA, vos mentions et l'évolution de vos positions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESS -->
+  <section class="section section-dark" id="process">
+    <div class="container">
+      <div class="section-label">Notre méthode</div>
+      <h2 class="section-title" style="margin-bottom:56px;">Quatre étapes.<br>Un résultat clair.</h2>
+      <div class="process-steps">
+        <div class="step">
+          <div class="step-num">Étape 01</div>
+          <h3>Diagnostic</h3>
+          <p>Audit complet de votre visibilité sur tous les assistants IA. Benchmark concurrentiel inclus.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">Étape 02</div>
+          <h3>Architecture</h3>
+          <p>Construction de votre infrastructure sémantique IA : données structurées, contenus, citations.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">Étape 03</div>
+          <h3>Activation</h3>
+          <p>Déploiement des actifs sur les canaux prioritaires. Intégration dans les sources citées par les IA.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">Étape 04</div>
+          <h3>Optimisation</h3>
+          <p>Suivi mensuel, rapports de position, ajustements continus selon les évolutions des modèles.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <div class="section-label">Tarifs</div>
+      <h2 class="section-title">Choisissez votre niveau<br>de présence</h2>
+      <p class="section-sub">Sans engagement annuel. Facturation mensuelle. Résultats garantis contractuellement.</p>
+      <div class="pricing-grid">
+        <div class="plan">
+          <div class="plan-label">Méthode Présence IA</div>
+          <div class="plan-price">500&nbsp;€</div>
+          <div class="plan-period">Comprendre et agir en autonomie</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li><span class="check">✓</span>Audit IA complet (présence, concurrents, visibilité)</li>
+            <li><span class="check">✓</span>Diagnostic clair</li>
+            <li><span class="check">✓</span>Plan d'action priorisé</li>
+            <li><span class="check">✓</span>Prompts prêts à l'emploi (pages, FAQ, contenus IA)</li>
+            <li><span class="check">✓</span>Structures de contenus testées</li>
+            <li><span class="check">✓</span>Checklist d'implémentation</li>
+          </ul>
+          <a href="#contact" class="plan-cta">Commencer</a>
+        </div>
+        <div class="plan featured">
+          <div class="featured-badge">Le plus choisi</div>
+          <div class="plan-label">Implantation IA</div>
+          <div class="plan-price">3&nbsp;500&nbsp;€</div>
+          <div class="plan-period">Mettre en place efficacement, sans effort</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li><span class="check">✓</span>Tout de la Méthode Présence IA</li>
+            <li><span class="check">✓</span>Analyse des 3 concurrents les plus cités dans les IA</li>
+            <li><span class="check">✓</span>Optimisation des contenus existants</li>
+            <li><span class="check">✓</span>Génération de contenus IA (pages, FAQ, textes)</li>
+            <li><span class="check">✓</span>Structuration de la présence web</li>
+            <li><span class="check">✓</span>Implémentation complète ou livrables prêts</li>
+          </ul>
+          <a href="#contact" class="plan-cta">Commencer</a>
+        </div>
+        <div class="plan">
+          <div class="plan-label">Domination IA</div>
+          <div class="plan-price">9&nbsp;000&nbsp;€</div>
+          <div class="plan-period">Devenir la référence sur votre zone</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li><span class="check">✓</span>Tout de l'Implantation IA</li>
+            <li><span class="check">✓</span>Analyse de tous les concurrents cités + mise à jour mensuelle</li>
+            <li><span class="check">✓</span>Génération continue de contenus + pages optimisées</li>
+            <li><span class="check">✓</span>Monitoring visibilité IA + ajustements continus</li>
+            <li><span class="check">✓</span>Exclusivité territoriale (~100 km)</li>
+            <li><span class="check">✓</span>Rapports mensuels + stratégie évolutive</li>
+          </ul>
+          <a href="#contact" class="plan-cta">Commencer</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-label">Témoignages</div>
+      <h2 class="section-title">Ce qu'en disent<br>nos clients</h2>
+      <p class="section-sub" style="margin-bottom:48px;">Des professionnels qui ont choisi d'être trouvés, pas de courir après.</p>
+      <div class="testimonials-grid">
+        <div class="testimonial">
+          <p class="testimonial-text">En 6 semaines, ChatGPT me citait dans les réponses sur la gestion de patrimoine à Lyon. Mes consultations entrantes ont doublé.</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">MR</div>
+            <div>
+              <div class="testimonial-name">Marc Renaud</div>
+              <div class="testimonial-role">Conseiller en gestion de patrimoine, Lyon</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <p class="testimonial-text">J'étais sceptique. Après 90 jours, Gemini me présente comme référence en droit immobilier sur Paris. C'est du concret.</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">SL</div>
+            <div>
+              <div class="testimonial-name">Sophie Laurent</div>
+              <div class="testimonial-role">Avocate, droit immobilier — Paris</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <p class="testimonial-text">Le tableau de bord mensuel me permet de voir exactement où j'apparais. C'est la première fois que je mesure ma visibilité digitale.</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">TD</div>
+            <div>
+              <div class="testimonial-name">Thomas Dumont</div>
+              <div class="testimonial-role">Architecte d'intérieur, Bordeaux</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="cta-section" id="contact">
+    <div class="container">
+      <div class="section-label" style="text-align:center; margin-bottom:20px;">Prenez position maintenant</div>
+      <h2>Vos concurrents ne sont pas encore visibles dans l'IA.</h2>
+      <p>La fenêtre d'opportunité se referme. Ceux qui agissent aujourd'hui construisent une avance difficile à rattraper.</p>
+      <div class="hero-actions">
+        <a href="mailto:contact@presence-ia.fr" class="btn-primary">Demander un diagnostic gratuit</a>
+        <a href="tel:+33123456789" class="btn-outline">Appeler un expert</a>
+      </div>
+      <p class="cta-note">Diagnostic offert · Sans engagement · Réponse sous 24h</p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand"><img src="../src/assets/logo.svg" alt="Présence IA" style="height:28px;width:auto;filter:brightness(0) invert(1);opacity:0.7"></div>
+        <div class="footer-copy">© 2026 Présence IA — Tous droits réservés</div>
+      </div>
+      <div class="footer-links">
+        <a href="#">Mentions légales</a>
+        <a href="#">Confidentialité</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
