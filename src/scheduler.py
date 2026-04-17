@@ -1400,7 +1400,7 @@ Vous pouvez accéder directement à l'agenda ici :
 Nathalie PresenceIA
 """
 
-_FOLLOWUP_SENDER = ("nathalie@presence-ia.online", "Nathalie — Présence IA")
+_FOLLOWUP_SENDER = ("contact@presence-ia.online", "Nathalie — Présence IA")
 
 
 def _outbound_send_prospect(p, dry_run: bool = False,
