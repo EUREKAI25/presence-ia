@@ -1276,155 +1276,188 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
     token = _admin_token()
 
     from datetime import date as _date, timedelta as _td
-    from sqlalchemy import func, case
 
-    # ── Totaux globaux ─────────────────────────────────────────────────────────
-    rows = db.query(V3ProspectDB).filter(V3ProspectDB.email_status.isnot(None)).all()
-    total_sent      = sum(1 for r in rows if r.email_status in ("sent","delivered","opened","bounced"))
-    total_delivered = sum(1 for r in rows if r.email_status in ("delivered","opened"))
-    total_opened    = sum(1 for r in rows if r.email_status == "opened")
-    total_bounced   = sum(1 for r in rows if r.email_status == "bounced")
+    # ── Source de vérité : email_sent_at (pas email_status) ───────────────────
+    email_rows = db.query(V3ProspectDB).filter(V3ProspectDB.email_sent_at.isnot(None)).all()
+    sms_rows   = db.query(V3ProspectDB).filter(
+        V3ProspectDB.sent_method == "sms",
+        V3ProspectDB.sent_at.isnot(None),
+        V3ProspectDB.email_sent_at.is_(None),  # exclure ceux qui ont aussi eu un email
+    ).all()
 
-    open_rate   = round(total_opened   / total_delivered * 100, 1) if total_delivered else 0
-    bounce_rate = round(total_bounced  / total_sent      * 100, 1) if total_sent      else 0
+    # ── KPIs email ─────────────────────────────────────────────────────────────
+    e_sent      = len(email_rows)
+    e_delivered = sum(1 for r in email_rows if r.email_status in ("delivered", "opened", "clicked"))
+    e_opened    = sum(1 for r in email_rows if r.email_status in ("opened", "clicked") or r.email_opened_at)
+    e_clicked   = sum(1 for r in email_rows if r.email_status == "clicked" or r.email_clicked_at)
+    e_bounced   = sum(1 for r in email_rows if r.email_status == "bounced" or r.email_bounced_at)
+    e_booked    = sum(1 for r in email_rows if r.email_booked_at)
 
-    # ── Breakdown 7 derniers jours ─────────────────────────────────────────────
+    e_deliv_rate  = round(e_delivered / e_sent * 100, 1) if e_sent else 0
+    e_open_rate   = round(e_opened    / e_sent * 100, 1) if e_sent else 0
+    e_bounce_rate = round(e_bounced   / e_sent * 100, 1) if e_sent else 0
+
+    # ── KPIs SMS ───────────────────────────────────────────────────────────────
+    s_sent    = db.query(V3ProspectDB).filter(V3ProspectDB.sent_method == "sms").count()
+    s_bounced = db.query(V3ProspectDB).filter(
+        V3ProspectDB.sent_method == "sms",
+        V3ProspectDB.email_bounced_at.isnot(None),
+    ).count()
+
+    # ── Pipeline global ────────────────────────────────────────────────────────
+    total_prospects = db.query(V3ProspectDB).count()
+    enriched        = db.query(V3ProspectDB).filter(V3ProspectDB.ia_results.isnot(None)).count()
+    total_contacted = db.query(V3ProspectDB).filter(V3ProspectDB.contacted == True).count()  # noqa: E712
+    eligible_email  = db.query(V3ProspectDB).filter(
+        V3ProspectDB.ia_results.isnot(None),
+        V3ProspectDB.email.isnot(None),
+        V3ProspectDB.email_sent_at.is_(None),
+    ).count()
+
+    # ── 7 derniers jours ──────────────────────────────────────────────────────
     today = _date.today()
     days  = [(today - _td(days=i)) for i in range(6, -1, -1)]
-
     day_rows = []
     for d in days:
         d_start = datetime(d.year, d.month, d.day)
         d_end   = d_start + _td(days=1)
-        day_sent     = sum(1 for r in rows if r.email_sent_at   and d_start <= r.email_sent_at   < d_end)
-        day_opened   = sum(1 for r in rows if r.email_opened_at and d_start <= r.email_opened_at < d_end)
-        day_bounced  = sum(1 for r in rows if r.email_bounced_at and d_start <= r.email_bounced_at < d_end)
-        day_rows.append((d.strftime("%d/%m"), day_sent, day_opened, day_bounced))
+        de = sum(1 for r in email_rows if r.email_sent_at and d_start <= r.email_sent_at < d_end)
+        ds = sum(1 for r in sms_rows   if r.sent_at       and d_start <= r.sent_at       < d_end)
+        do = sum(1 for r in email_rows if r.email_opened_at  and d_start <= r.email_opened_at  < d_end)
+        db2 = sum(1 for r in email_rows if r.email_bounced_at and d_start <= r.email_bounced_at < d_end)
+        day_rows.append((d.strftime("%d/%m"), de, ds, do, db2))
 
-    # ── Breakdown par sender ───────────────────────────────────────────────────
-    sender_map: dict = {}
-    for r in rows:
-        if not r.email_sent_at:
-            continue
-        sender = getattr(r, "sent_method", None) or "?"
-        # sent_method = 'brevo' pour tous — on utilise le domaine sender si dispo
-        # Pas de sender stocké par prospect : on montre la distribution par statut
-    # (sender non stocké par prospect — bloc remplacé par distribution statuts)
-    status_dist = {}
-    for r in rows:
-        s = r.email_status or "unknown"
-        status_dist[s] = status_dist.get(s, 0) + 1
+    # ── Par paire (7 derniers jours) ───────────────────────────────────────────
+    week_start = datetime(today.year, today.month, today.day) - _td(days=6)
+    pair_map: dict = {}
+    for r in email_rows:
+        if r.email_sent_at and r.email_sent_at >= week_start:
+            key = (r.profession or "?", r.city or "?")
+            pair_map[key] = pair_map.get(key, 0) + 1
+    for r in sms_rows:
+        if r.sent_at and r.sent_at >= week_start:
+            key = (r.profession or "?", r.city or "?")
+            pair_map[key] = pair_map.get(key, 0) + 1
+    pair_rows_html = "".join(
+        f"<tr><td>{prof}</td><td>{city}</td><td>{cnt}</td></tr>"
+        for (prof, city), cnt in sorted(pair_map.items(), key=lambda x: -x[1])
+    ) or '<tr><td colspan="3" style="color:#9ca3af;text-align:center">Aucun envoi cette semaine</td></tr>'
 
-    # ── HTML ───────────────────────────────────────────────────────────────────
-    def _kpi_card(label, value, sub="", color="#4f46e5"):
-        return f"""<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;min-width:130px">
-<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">{label}</div>
-<div style="font-size:28px;font-weight:700;color:{color}">{value}</div>
-{"<div style='font-size:12px;color:#9ca3af;margin-top:2px'>"+sub+"</div>" if sub else ""}
-</div>"""
-
-    kpis = (
-        _kpi_card("Envoyés",    total_sent,      "",              "#1e3a5f") +
-        _kpi_card("Delivered",  total_delivered, f"{round(total_delivered/total_sent*100,1) if total_sent else 0}% des envoyés", "#0ea5e9") +
-        _kpi_card("Ouverts",    total_opened,    f"{open_rate}% des delivered", "#10b981") +
-        _kpi_card("Bounced",    total_bounced,   f"{bounce_rate}% des envoyés", "#ef4444")
-    )
-
-    day_table_rows = "".join(
-        f"<tr><td>{d}</td><td>{s}</td><td>{o}</td><td>{b}</td></tr>"
-        for d, s, o, b in day_rows
-    )
-
-    status_dist_rows = "".join(
-        f"<tr><td>{st}</td><td>{cnt}</td></tr>"
-        for st, cnt in sorted(status_dist.items(), key=lambda x: -x[1])
-    )
-
-    eligible_total = db.query(V3ProspectDB).filter(
-        V3ProspectDB.ia_results.isnot(None),
-        V3ProspectDB.email.isnot(None),
-    ).count()
-
-    # ── Délais moyens de réaction ─────────────────────────────────────────────
-    def _avg_delay_h(records, ts_start_attr, ts_end_attr) -> str:
-        """Retourne le délai moyen en heures entre deux timestamps, sous forme lisible."""
+    # ── Délais moyens ──────────────────────────────────────────────────────────
+    def _avg_delay(records, t0_attr, t1_attr) -> str:
         deltas = []
         for r in records:
-            t0 = getattr(r, ts_start_attr, None)
-            t1 = getattr(r, ts_end_attr, None)
+            t0 = getattr(r, t0_attr, None)
+            t1 = getattr(r, t1_attr, None)
             if t0 and t1 and t1 > t0:
                 deltas.append((t1 - t0).total_seconds())
         if not deltas:
             return "—"
         avg_s = sum(deltas) / len(deltas)
-        if avg_s < 3600:
-            return f"{int(avg_s // 60)} min ({len(deltas)} obs.)"
-        return f"{avg_s / 3600:.1f} h ({len(deltas)} obs.)"
+        return f"{int(avg_s//60)} min" if avg_s < 3600 else f"{avg_s/3600:.1f} h"
 
-    all_sent = db.query(V3ProspectDB).filter(V3ProspectDB.email_sent_at.isnot(None)).all()
-    delay_open   = _avg_delay_h(all_sent, "email_sent_at", "email_opened_at")
-    delay_click  = _avg_delay_h(all_sent, "email_sent_at", "email_clicked_at")
-    delay_booked = _avg_delay_h(all_sent, "email_sent_at", "email_booked_at")
+    delay_open   = _avg_delay(email_rows, "email_sent_at", "email_opened_at")
+    delay_click  = _avg_delay(email_rows, "email_sent_at", "email_clicked_at")
+    delay_booked = _avg_delay(email_rows, "email_sent_at", "email_booked_at")
 
-    delay_cards = (
-        _kpi_card("Délai ouverture",  delay_open,   "envoi → ouverture", "#8b5cf6") +
-        _kpi_card("Délai clic",       delay_click,  "envoi → clic",      "#f59e0b") +
-        _kpi_card("Délai RDV",        delay_booked, "envoi → booking",   "#10b981")
-    )
+    # ── HTML helpers ───────────────────────────────────────────────────────────
+    def _kpi(label, value, sub="", color="#4f46e5"):
+        return (f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;'
+                f'padding:16px 20px;min-width:120px">'
+                f'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;'
+                f'letter-spacing:.5px;margin-bottom:4px">{label}</div>'
+                f'<div style="font-size:28px;font-weight:700;color:{color}">{value}</div>'
+                + (f'<div style="font-size:12px;color:#9ca3af;margin-top:2px">{sub}</div>' if sub else '')
+                + '</div>')
 
     nav = admin_nav(token, "outbound")
     return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Outbound — Présence IA</title>
 <style>
 body{{font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0;color:#1a1a2e}}
-.wrap{{max-width:900px;margin:0 auto;padding:24px}}
+.wrap{{max-width:960px;margin:0 auto;padding:24px}}
 h1{{font-size:22px;font-weight:700;margin:0 0 4px}}
 .sub{{color:#6b7280;font-size:13px;margin:0 0 24px}}
-.kpis{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}}
+.kpis{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}}
 table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;
        box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid #e5e7eb;margin-bottom:24px}}
 th{{background:#f9fafb;color:#6b7280;padding:10px 12px;text-align:left;font-size:12px;font-weight:600}}
 td{{padding:9px 12px;border-bottom:1px solid #f3f4f6;color:#374151;font-size:14px}}
 tr:last-child td{{border-bottom:none}}
-h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
-.badge{{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}}
+h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}}
+.section-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+                color:#fff;background:#4f46e5;padding:3px 10px;border-radius:4px;margin-right:8px}}
+.section-sms{{background:#0ea5e9}}
 </style></head><body>
 {nav}
 <div class="wrap">
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
-  <h1 style="margin:0">Outbound — Performance</h1>
+  <h1 style="margin:0">Outbound — Stats complètes</h1>
   <button id="btn-trigger" onclick="triggerOutbound()"
     style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;
            padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;
-           cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(99,102,241,.4)">
+           cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.4)">
     ▶ Déclencher outbound maintenant
   </button>
 </div>
-<p class="sub">Emails envoyés depuis job_outbound — tracking Brevo &nbsp;·&nbsp;
-  <span style="color:#6366f1">{eligible_total:,} prospects éligibles en DB</span></p>
+<p class="sub">Tous les envois — email + SMS — tracking Brevo actif depuis 17/04</p>
 
 <div id="trigger-result" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px"></div>
 
-<div class="kpis">{kpis}</div>
+<!-- Pipeline global -->
+<h2>Pipeline global</h2>
+<div class="kpis">
+  {_kpi("Prospects DB",    f"{total_prospects:,}",  "",                        "#1e3a5f")}
+  {_kpi("Enrichis (IA)",   f"{enriched:,}",          f"{round(enriched/total_prospects*100,1) if total_prospects else 0}% du total", "#8b5cf6")}
+  {_kpi("Contactés",       f"{total_contacted:,}",   f"email + SMS",            "#0ea5e9")}
+  {_kpi("File d'attente",  f"{eligible_email:,}",    "enrichis, pas encore envoyés", "#f59e0b")}
+</div>
 
-<h2>Délais moyens de réaction</h2>
-<div class="kpis">{delay_cards}</div>
+<!-- Email -->
+<h2><span class="section-label">Email</span> Performance</h2>
+<div class="kpis">
+  {_kpi("Envoyés",    e_sent,      "",                                    "#1e3a5f")}
+  {_kpi("Delivered",  e_delivered, f"{e_deliv_rate}% — tracking actif depuis 17/04", "#0ea5e9")}
+  {_kpi("Ouverts",    e_opened,    f"{e_open_rate}% des envoyés",          "#10b981")}
+  {_kpi("Cliqués",    e_clicked,   "",                                    "#8b5cf6")}
+  {_kpi("Bounced",    e_bounced,   f"{e_bounce_rate}% des envoyés",        "#ef4444")}
+  {_kpi("RDV pris",   e_booked,    "via lien email",                      "#f59e0b")}
+</div>
 
+<!-- SMS -->
+<h2><span class="section-label section-sms">SMS</span> Performance</h2>
+<div class="kpis">
+  {_kpi("Envoyés",   s_sent,    "",          "#0ea5e9")}
+  {_kpi("Bounced",   s_bounced, "",          "#ef4444")}
+</div>
+<p style="font-size:12px;color:#9ca3af;margin:-16px 0 20px">
+  Tracking SMS ouvertures : non disponible via Brevo (SMS unidirectionnel)
+</p>
+
+<!-- Délais -->
+<h2>Délais moyens de réaction (email)</h2>
+<div class="kpis">
+  {_kpi("Ouverture",  delay_open,   "envoi → ouverture", "#8b5cf6")}
+  {_kpi("Clic",       delay_click,  "envoi → clic",      "#f59e0b")}
+  {_kpi("RDV",        delay_booked, "envoi → booking",   "#10b981")}
+</div>
+
+<!-- 7 jours -->
 <h2>7 derniers jours</h2>
 <table>
-<tr><th>Date</th><th>Envoyés</th><th>Ouverts</th><th>Bounced</th></tr>
-{day_table_rows}
+<tr><th>Date</th><th>Emails envoyés</th><th>SMS envoyés</th><th>Ouverts</th><th>Bounced</th></tr>
+{"".join(f"<tr><td>{d}</td><td>{de}</td><td>{ds}</td><td>{do}</td><td>{db2}</td></tr>" for d,de,ds,do,db2 in day_rows)}
 </table>
 
-<h2>Distribution statuts</h2>
+<!-- Par paire -->
+<h2>Par paire (7 derniers jours)</h2>
 <table>
-<tr><th>Statut</th><th>Nombre</th></tr>
-{status_dist_rows if status_dist_rows else '<tr><td colspan="2" style="color:#9ca3af;text-align:center">Aucun envoi pour l\'instant</td></tr>'}
+<tr><th>Profession</th><th>Ville</th><th>Envois</th></tr>
+{pair_rows_html}
 </table>
 
 <p style="font-size:12px;color:#9ca3af;margin-top:8px">
-  Webhook Brevo : <code>POST /webhooks/brevo</code> &nbsp;·&nbsp;
-  Sender rotation : 25 adresses &nbsp;·&nbsp;
+  Webhook Brevo : <code>POST /webhooks/brevo</code> actif depuis 17/04 &nbsp;·&nbsp;
   <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
 </p>
 </div>
