@@ -104,10 +104,10 @@ def start_scheduler():
         misfire_grace_time=600,
     )
 
-    # Job 11 : outbound — toutes les heures, filtre interne sur LAUNCH_RUN_HOURS / WEEKDAY_RUN_HOURS
+    # Job 11 : outbound — pile à chaque heure UTC, filtre interne sur LAUNCH_RUN_HOURS / WEEKDAY_RUN_HOURS
     _scheduler.add_job(
         _job_outbound,
-        trigger=IntervalTrigger(hours=1),
+        trigger=CronTrigger(minute=0),
         id="outbound",
         replace_existing=True,
         misfire_grace_time=600,
