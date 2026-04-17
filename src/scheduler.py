@@ -1389,7 +1389,7 @@ Aujourd'hui, de plus en plus de personnes demandent directement à leur IA quel 
 
 Nous avons analysé votre position, et votre entreprise n'apparaît pas dans les réponses générées.
 
-Concrètement, cela signifie que vos concurrents peuvent être recommandés à votre place, automatiquement.
+Concrètement, cela signifie que vos concurrents sont recommandés à votre place en ce moment-même, automatiquement.
 
 Je peux vous montrer précisément ce que nous avons constaté et comment corriger cela pour votre activité de {metier} à {ville}.
 
@@ -1397,7 +1397,8 @@ Vous pouvez accéder directement à l'agenda ici :
 {lien_agenda}
 
 À très bientôt,
-Nathalie PresenceIA
+Nathalie
+Présence IA
 """
 
 _FOLLOWUP_SENDER = ("contact@presence-ia.online", "Nathalie — Présence IA")
@@ -1914,7 +1915,7 @@ def _job_followup():
             ville    = (p.city_reference or p.city or "").title()
             base_url = os.getenv("BASE_URL", "https://presence-ia.com").rstrip("/")
             landing  = base_url + (p.landing_url or "")
-            body     = _FOLLOWUP_BODY.format(metier=metier, ville=ville, lien_agenda=landing)
+            body     = _FOLLOWUP_BODY.format(metier=metier.lower(), ville=ville, lien_agenda=landing)
 
             if dry_run:
                 log.info("[FOLLOWUP][DRY_RUN] %s — %s/%s", p.email, p.profession, p.city)
