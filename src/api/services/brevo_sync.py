@@ -265,11 +265,16 @@ def sync_brevo_events(days: int = 30) -> dict:
                           "sent": "sent", "accepted": "sent"}.get(brevo_status))
         event_dt = _to_dt_str(entry.get("date") or entry.get("sentAt") or entry.get("timestamp"))
 
+        _SMS_PRIORITY = {"sent": 1, "failed": 1, "delivered": 2}
+
         row    = by_phone[key]
         fields = {}
-        if new_status and not row.get("sms_status"):
-            fields["sms_status"] = new_status
-            row["sms_status"] = new_status
+        if new_status:
+            cur_prio = _SMS_PRIORITY.get(row.get("sms_status") or "", 0)
+            new_prio = _SMS_PRIORITY.get(new_status, 0)
+            if new_prio >= cur_prio:
+                fields["sms_status"] = new_status
+                row["sms_status"] = new_status
         if new_status == "delivered" and not row.get("sms_delivered_at") and event_dt:
             fields["sms_delivered_at"] = event_dt
             row["sms_delivered_at"] = event_dt
