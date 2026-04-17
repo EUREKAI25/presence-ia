@@ -232,8 +232,11 @@ def sync_brevo_events(days: int = 30) -> dict:
     # ── SMS reports ───────────────────────────────────────────────────────────
     date_from = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
     date_to   = datetime.utcnow().strftime("%Y-%m-%d")
+    # Pour les SMS : fenêtre courte pour éviter que les contacts test
+    # (100+ events) noient les vrais prospects dans la pagination
+    sms_date_from = (datetime.utcnow() - timedelta(days=min(days, 3))).strftime("%Y-%m-%d")
 
-    sms_logs    = _fetch_sms_reports(api_key, date_from, date_to)
+    sms_logs    = _fetch_sms_reports(api_key, sms_date_from, date_to)
     sms_matched = 0
     sms_updated = 0
 
