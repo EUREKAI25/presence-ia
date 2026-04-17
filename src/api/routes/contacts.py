@@ -225,9 +225,10 @@ def contacts_page(request: Request, db: Session = Depends(get_db),
 </tr>"""
 
     all_real = db.query(V3ProspectDB).filter_by(is_test=False).all()
-    count_total    = len(all_real)
-    count_prospect = sum(1 for c in all_real if c.status == "PROSPECT")
-    count_client   = sum(1 for c in all_real if c.status == "CLIENT")
+    count_total      = len(all_real)
+    count_prospect   = sum(1 for c in all_real if c.status == "PROSPECT")
+    count_client     = sum(1 for c in all_real if c.status == "CLIENT")
+    count_never_sent = sum(1 for c in all_real if not (c.contacted or c.email_sent_at or c.sent_at or c.sent_method))
 
     nav = admin_nav(token, "contacts")
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
@@ -247,7 +248,7 @@ tr:hover td{{background:#fafafa}}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">Contacts</h2>
-      <span style="font-size:12px;color:#6b7280">{count_total} total · {count_prospect} prospects · {count_client} clients</span>
+      <span style="font-size:12px;color:#6b7280">{count_total} total · {count_prospect} prospects · {count_client} clients · <strong style="color:#16a34a">{count_never_sent} jamais contactés</strong></span>
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('leads-panel').classList.toggle('hidden')" class="btn" style="background:#16a34a">+ Obtenir des leads</button>
@@ -326,8 +327,9 @@ tr:hover td{{background:#fafafa}}
     <button id="fbtn-sp"    onclick="selectByType('sp')"    class="btn btn-gray" style="padding:5px 10px;font-size:11px">📍 SP</button>
     <button id="fbtn-all"   onclick="selectAll()"           class="btn btn-gray" style="padding:5px 10px;font-size:11px">☑ Tout</button>
     <button id="fbtn-none"  onclick="selectNone()"          class="btn btn-gray" style="padding:5px 10px;font-size:11px">☐ Aucun</button>
-    <button id="mode-toggle"      onclick="toggleTestMode()"      class="btn btn-gray" style="padding:5px 10px;font-size:11px">🧪 Mode test</button>
-    <button id="fbtn-hide-sent"  onclick="toggleHideContacted()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">🚫 Déjà envoyés</button>
+    <button id="fbtn-never"      onclick="selectNeverContacted()" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✨ Jamais contactés</button>
+    <button id="mode-toggle"     onclick="toggleTestMode()"       class="btn btn-gray" style="padding:5px 10px;font-size:11px">🧪 Mode test</button>
+    <button id="fbtn-hide-sent"  onclick="toggleHideContacted()"  class="btn btn-gray" style="padding:5px 10px;font-size:11px">🚫 Masquer envoyés</button>
     <div style="flex:1"></div>
     <span id="bulk-count" style="font-size:12px;color:#6b7280">0 sélectionné(s)</span>
     <button onclick="bulkSendEmail()" class="btn" style="background:#2563eb;padding:5px 12px;font-size:11px">✉ Envoyer email</button>
@@ -463,6 +465,21 @@ function _applyMode() {{
   _updateBulkBar();
 }}
 function toggleTestMode() {{ _testMode = !_testMode; selectNone(); _applyMode(); }}
+
+function selectNeverContacted() {{
+  _clearFilters();
+  const qty = _getQty(); let n = 0;
+  document.querySelectorAll('.row-cb').forEach(cb => {{
+    const tr = cb.closest('tr');
+    const isTest = tr.dataset.isTest === '1';
+    const alreadySent = tr.dataset.contacted === '1';
+    const visible = !isTest && !alreadySent;
+    tr.style.display = visible ? '' : 'none';
+    cb.checked = visible && !cb.disabled && n < qty;
+    if (visible && !cb.disabled && n < qty) n++;
+  }});
+  _updateBulkBar();
+}}
 
 let _hideContacted = false;
 function toggleHideContacted() {{
