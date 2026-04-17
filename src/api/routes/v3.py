@@ -1436,12 +1436,20 @@ def _render_book_page(token: str, filtered: list, prefill: dict = {}) -> str:
     for s in filtered:
         by_date[s["_dt"].date()].append(s)
 
+    # Première semaine avec des créneaux disponibles
+    initial_week = 0
+    for _wo in range(2):
+        _wk_days = [monday + timedelta(weeks=_wo, days=i) for i in range(5)]
+        if any(d in by_date and any(s["_dt"].date() >= today for s in by_date[d]) for d in _wk_days):
+            initial_week = _wo
+            break
+
     # Générer les semaines (max 2 semaines)
     weeks_html = ""
     for week_offset in range(2):
         wk_monday = monday + timedelta(weeks=week_offset)
         wk_days   = [wk_monday + timedelta(days=i) for i in range(5)]  # Lun–Ven
-        hidden    = "style='display:none'" if week_offset > 0 else ""
+        hidden    = "style='display:none'" if week_offset != initial_week else ""
         has_slots = any(d in by_date for d in wk_days)
 
         # Libellé semaine
@@ -1590,7 +1598,7 @@ h1{{font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:4px;letter-spacing
 
 <script>
 const WEEKS = [{{"label":"Semaine du {monday.day} {_MOIS_FR[monday.month]}","idx":0}},{{"label":"Semaine du {(monday + timedelta(weeks=1)).day} {_MOIS_FR[(monday + timedelta(weeks=1)).month]}","idx":1}}];
-let cur = 0, _startIso = '', _endIso = '';
+let cur = {initial_week}, _startIso = '', _endIso = '';
 
 function changeWeek(dir) {{
   document.querySelector('.week[data-week="'+cur+'"]').style.display='none';
@@ -1600,7 +1608,9 @@ function changeWeek(dir) {{
   document.getElementById('btn-prev').disabled = cur === 0;
   document.getElementById('btn-next').disabled = cur === WEEKS.length - 1;
 }}
-document.getElementById('week-label').textContent = WEEKS[0].label;
+document.getElementById('week-label').textContent = WEEKS[{initial_week}].label;
+document.getElementById('btn-prev').disabled = {initial_week} === 0;
+document.getElementById('btn-next').disabled = {initial_week} === WEEKS.length - 1;
 
 function openSlot(startIso, endIso, label) {{
   _startIso = startIso; _endIso = endIso;
