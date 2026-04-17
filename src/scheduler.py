@@ -104,13 +104,13 @@ def start_scheduler():
         misfire_grace_time=600,
     )
 
-    # Job 11 : outbound v3_prospects — tous les jours à 9h UTC (après refresh IA)
+    # Job 11 : outbound — toutes les heures, filtre interne sur LAUNCH_RUN_HOURS / WEEKDAY_RUN_HOURS
     _scheduler.add_job(
         _job_outbound,
-        trigger=CronTrigger(hour=9, minute=0, timezone="UTC"),
+        trigger=IntervalTrigger(hours=1),
         id="outbound",
         replace_existing=True,
-        misfire_grace_time=3600,
+        misfire_grace_time=600,
     )
 
     _scheduler.start()
@@ -1781,24 +1781,30 @@ def compute_outbound_need() -> dict:
 
 def _job_outbound(force: bool = False):
     """
-    Outbound v3_prospects — tous les jours à 9h UTC (ou trigger manuel).
+    Outbound v3_prospects — mode autonome multi-paires.
 
     Variables d'env (pilotage) :
-      OUTBOUND_DRY_RUN      bool  true   si "true" : logs only, 0 envoi, 0 DB
-      LAUNCH_MODE           bool  false  volumes x1.5 + J+1/J+2 ouverts
-      TARGET_RDV_MONDAY     int   3      RDV lundi cible
-      TARGET_RDV_WEEK       int   10     RDV 14j cible
-      OUTBOUND_BASE_EMAIL   int   5      emails de base / run
-      OUTBOUND_BASE_SMS     int   3      SMS de base / run
-      OUTBOUND_MAX_EMAIL    int   20     plafond email / run
-      OUTBOUND_MAX_SMS      int   10     plafond SMS / run
+      OUTBOUND_DRY_RUN          bool    true          logs only, 0 envoi, 0 DB
+      LAUNCH_MODE               bool    false         volumes x1.5 côté compute_outbound_need
+      LAUNCH_AUTORUNS_ENABLED   bool    true          runs pilotés par horaires configurés
+      LAUNCH_END_DATE           date    2026-04-21    fin du mode launch (YYYY-MM-DD)
+      LAUNCH_RUN_HOURS          str     7,10,13,16,19 heures UTC pendant la période launch
+      WEEKDAY_RUN_HOURS         str     9             heures UTC semaine normale (lun-ven)
+      WEEKEND_RUN_HOURS         str     9,14          heures UTC weekend normal (sam-dim)
+      MAX_PAIRS_PER_RUN         int     5             paires max traitées par run
+      TARGET_RDV_MONDAY         int     3             RDV lundi cible
+      TARGET_RDV_WEEK           int     10            RDV 14j cible
+      OUTBOUND_BASE_EMAIL       int     40            emails de base / run
+      OUTBOUND_BASE_SMS         int     10            SMS de base / run
+      OUTBOUND_MAX_EMAIL        int     200           plafond email / run
+      OUTBOUND_MAX_SMS          int     40            plafond SMS / run
     """
-    import os, random, requests as _req
-    from datetime import datetime
+    import os, requests as _req
+    from datetime import datetime, timezone, date as _date_cls
     from .database import SessionLocal
     from .models import V3ProspectDB, ScoringConfigDB
 
-    dry_run   = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"  # SÉCURITÉ : défaut=true
+    dry_run   = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"
     brevo_key = os.getenv("BREVO_API_KEY", "")
     if not brevo_key and not dry_run:
         log.warning("[OUTBOUND] BREVO_API_KEY absent — job annulé")
@@ -1806,29 +1812,48 @@ def _job_outbound(force: bool = False):
 
     mode_label = "DRY_RUN" if dry_run else "LIVE"
 
-    # ── Pilotage par RDV réels (v3_bookings) + capacité (SlotDB) ─────────────
-    cap_email = int(os.getenv("OUTBOUND_MAX_EMAIL", "20"))   # fallback si compute échoue
-    cap_sms   = int(os.getenv("OUTBOUND_MAX_SMS",   "10"))
+    # ── Vérification fenêtre horaire (bypassée si force=True) ────────────────
+    if not force and os.getenv("LAUNCH_AUTORUNS_ENABLED", "true").lower() == "true":
+        now_utc = datetime.now(timezone.utc)
+        try:
+            launch_end = _date_cls.fromisoformat(os.getenv("LAUNCH_END_DATE", "2026-04-21"))
+        except ValueError:
+            launch_end = _date_cls(2026, 4, 21)
+        today_d   = now_utc.date()
+        is_launch = today_d <= launch_end
+        is_weekend = today_d.weekday() >= 5
+        if is_launch:
+            raw_hours = os.getenv("LAUNCH_RUN_HOURS",   "7,10,13,16,19")
+        elif is_weekend:
+            raw_hours = os.getenv("WEEKEND_RUN_HOURS",  "9,14")
+        else:
+            raw_hours = os.getenv("WEEKDAY_RUN_HOURS",  "9")
+        allowed = [int(h.strip()) for h in raw_hours.split(",") if h.strip().isdigit()]
+        if now_utc.hour not in allowed:
+            log.debug("[OUTBOUND] skip — %dh UTC hors plage %s (launch=%s)",
+                      now_utc.hour, allowed, is_launch)
+            return
+        log.info("[OUTBOUND][%s] run autorisé — %dh UTC · plage=%s · launch=%s",
+                 mode_label, now_utc.hour, allowed, is_launch)
+
+    # ── Pilotage par RDV réels (compute_outbound_need) ────────────────────────
+    cap_email = int(os.getenv("OUTBOUND_MAX_EMAIL", "200"))
+    cap_sms   = int(os.getenv("OUTBOUND_MAX_SMS",   "40"))
 
     if not force:
         try:
             need   = compute_outbound_need()
             statut = need["statut"]
-
-            # ── Résumé lisible ─────────────────────────────────────────────
             log.info(
-                "[OUTBOUND][%s] statut=%s · rdv_pris=%d/%d · fill=%.0f%% · "
-                "lundi=%d/%d · urgence_lundi=%s · slots_open=%d · "
-                "cap_email=%d · cap_sms=%d · launch_mode=%s",
+                "[OUTBOUND][%s] statut=%s · rdv=%d/%d · fill=%.0f%% · "
+                "lundi=%d/%d · urgence=%s · slots=%d · cap_e=%d · cap_s=%d · launch=%s",
                 mode_label, statut,
-                need["rdv_taken_week"],   need["leads_necessaires"],
+                need["rdv_taken_week"], need["leads_necessaires"],
                 (1.0 - need["fill_need"]) * 100,
                 need["rdv_taken_monday"], int(os.getenv("TARGET_RDV_MONDAY", "3")),
-                need["urgence_lundi"],    need["slots_open"],
+                need["urgence_lundi"], need["slots_open"],
                 need["cap_email"], need["cap_sms"], need["launch_mode"],
             )
-
-            # ── Journal pipeline (toujours, même si skip) ──────────────────
             try:
                 _paire_st = __import__("src.active_pair", fromlist=["get_active_pair"]).get_active_pair()
                 from .models import PipelineHistoryLogDB
@@ -1853,214 +1878,232 @@ def _job_outbound(force: bool = False):
                     _hdb.commit()
             except Exception as _je:
                 log.debug("[OUTBOUND] pipeline_history_log: %s", _je)
-
             if statut == "pre_launch":
-                log.info("[OUTBOUND] Pre-launch — skip")
-                return
+                log.info("[OUTBOUND] Pre-launch — skip"); return
             if statut == "saturated":
-                log.info("[OUTBOUND] Saturé (rdv=%.0f%% de la cible) — skip",
-                         (1.0 - need["fill_need"]) * 100)
-                return
+                log.info("[OUTBOUND] Saturé (%.0f%% cible) — skip",
+                         (1.0 - need["fill_need"]) * 100); return
             if statut == "idle" and need["cap_email"] == 0 and need["cap_sms"] == 0:
-                log.info("[OUTBOUND] Idle et caps à 0 — skip")
-                return
-
+                log.info("[OUTBOUND] Idle caps=0 — skip"); return
             cap_email = need["cap_email"]
             cap_sms   = need["cap_sms"]
-
         except Exception as e:
             log.warning("[OUTBOUND] compute_outbound_need échoué — fallback caps: %s", e)
 
-    # ── Chantier C : vérifier/avancer la paire active ────────────────────────
-    from .active_pair import check_saturation as _check_saturation
-    with SessionLocal() as _db_pair:
-        _active = _check_saturation(_db_pair)
-    if not _active:
-        log.warning("[OUTBOUND] aucune paire active disponible — job annulé")
-        return
-    log.info("[OUTBOUND] paire active — %s / %s (score=%.1f)",
-             _active["profession"], _active["city"], _active.get("score", 0))
-
-    # ── Test IA au niveau paire si jamais testé ──────────────────────────────
-    # (une seule fois par paire nouvelle — le refresh 3×/sem prend le relais ensuite)
-    try:
-        from .api.routes.v3 import _run_ia_test
-        import json as _json_ia
-        with SessionLocal() as _db_ia:
-            _pair_has_ia = _db_ia.query(V3ProspectDB).filter(
-                V3ProspectDB.city       == _active["city"],
-                V3ProspectDB.profession == _active["profession"],
-                V3ProspectDB.ia_results.isnot(None),
-            ).first() is not None
-        if not _pair_has_ia:
-            log.info("[OUTBOUND] paire %s/%s — aucun ia_results → test IA avant envoi",
-                     _active["profession"], _active["city"])
-            _ia_data = _run_ia_test(_active["profession"], _active["city"])
-            if _ia_data and _ia_data.get("results"):
-                _ia_json  = _json_ia.dumps(_ia_data["results"], ensure_ascii=False)
-                _ia_cited = _extract_cited_names(_ia_data["results"])
-                with SessionLocal() as _db_ia2:
-                    for _p_ia in _db_ia2.query(V3ProspectDB).filter_by(
-                        city=_active["city"], profession=_active["profession"]
-                    ).all():
-                        _p_ia.ia_results   = _ia_json
-                        _p_ia.ia_tested_at = _ia_data.get("tested_at")
-                    _db_ia2.commit()
-                    _upsert_cited_companies(_db_ia2, _active["profession"], _active["city"], _ia_cited)
-                log.info("[OUTBOUND] ia_results initialisés pour %s/%s — %d cités",
-                         _active["profession"], _active["city"], len(_ia_cited))
-            else:
-                log.warning("[OUTBOUND] test IA vide pour %s/%s — envoi maintenu",
-                            _active["profession"], _active["city"])
-    except Exception as _e_ia:
-        log.error("[OUTBOUND] erreur test IA initial paire: %s", _e_ia)
-
-    # ── Image obligatoire pour la paire active ───────────────────────────────
-    try:
-        from .city_images import fetch_city_header_image
-        from .models import RefCityDB as _RefCityDB
-        with SessionLocal() as _db_img:
-            _ref_img = _db_img.query(_RefCityDB).filter_by(
-                city_name=(_active["city"] or "").upper()
-            ).first()
-            _has_img = bool(_ref_img and _ref_img.header_image_url)
-        if not _has_img:
-            log.info("[OUTBOUND] Image absente pour %s — fetch Unsplash (fallback)…",
-                     _active["city"])
-            _img_url = fetch_city_header_image(_active["city"])
-            if not _img_url:
-                log.warning("[OUTBOUND] Aucune image pour %s — job annulé (landing sans visuel)",
-                            _active["city"])
-                return
-            log.info("[OUTBOUND] Image récupérée pour %s : %s", _active["city"], _img_url[:60])
-    except Exception as _ie:
-        log.warning("[OUTBOUND] Vérification image échouée : %s — on continue", _ie)
-
-    # ── Lire le flag refs_only depuis ScoringConfigDB ─────────────────────────
-    refs_only = True  # fallback
+    # ── refs_only — lu une seule fois ─────────────────────────────────────────
+    refs_only = True
     try:
         with SessionLocal() as _db_cfg:
-            _cfg_refs = _db_cfg.query(ScoringConfigDB).filter_by(id="default").first()
-            if _cfg_refs and hasattr(_cfg_refs, "outbound_refs_only"):
-                refs_only = bool(_cfg_refs.outbound_refs_only)
+            _cfg = _db_cfg.query(ScoringConfigDB).filter_by(id="default").first()
+            if _cfg and hasattr(_cfg, "outbound_refs_only"):
+                refs_only = bool(_cfg.outbound_refs_only)
     except Exception:
         pass
 
-    # ── Sélection email + SMS ─────────────────────────────────────────────────
-    _base_filter = [
-        V3ProspectDB.city       == _active["city"],
-        V3ProspectDB.profession == _active["profession"],
-        V3ProspectDB.ia_results.isnot(None),
-        V3ProspectDB.sent_at.is_(None),
-    ]
-    # Exclure les profils test (gérés manuellement)
-    _base_filter.append(V3ProspectDB.is_test.isnot(True))
-    # Si refs_only : uniquement les prospects avec city_reference renseignée
-    if refs_only:
-        _base_filter.append(V3ProspectDB.city_reference.isnot(None))
+    # ── Boucle multi-paires ───────────────────────────────────────────────────
+    from .active_pair import (check_saturation as _check_sat,
+                              clear_active_pair as _clear_pair,
+                              select_next_pair  as _next_pair)
 
-    with SessionLocal() as db:
-        # Email : priorité
-        has_email = (
-            db.query(V3ProspectDB)
-            .filter(
-                *_base_filter,
-                V3ProspectDB.email.isnot(None),
-                (V3ProspectDB.email_status.is_(None) |
-                 V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
+    max_pairs   = int(os.getenv("MAX_PAIRS_PER_RUN", "5"))
+    total_email = 0
+    total_sms   = 0
+    pairs_log   = []
+    stop_reason = "cap_atteint"
+    visited     = set()  # anti-boucle sur la même paire dans ce run
+
+    for _idx in range(max_pairs):
+        rem_e = cap_email - total_email
+        rem_s = cap_sms   - total_sms
+        if rem_e <= 0 and rem_s <= 0:
+            stop_reason = "cap_atteint"; break
+
+        with SessionLocal() as _db_p:
+            _active = _check_sat(_db_p)
+        if not _active:
+            stop_reason = "aucune_paire_disponible"; break
+
+        pk = (_active["profession"], _active["city"])
+        if pk in visited:
+            stop_reason = "paires_epuisees_ce_run"
+            log.info("[OUTBOUND] paire %s/%s déjà traitée ce run → arrêt", *pk); break
+        visited.add(pk)
+
+        log.info("[OUTBOUND][%s] paire %d/%d — %s / %s (score=%.1f) rem_e=%d rem_s=%d",
+                 mode_label, _idx+1, max_pairs,
+                 _active["profession"], _active["city"], _active.get("score", 0),
+                 rem_e, rem_s)
+
+        # Test IA si nécessaire pour cette paire
+        try:
+            from .api.routes.v3 import _run_ia_test
+            import json as _json_ia
+            with SessionLocal() as _db_ia:
+                _has_ia = _db_ia.query(V3ProspectDB).filter(
+                    V3ProspectDB.city == _active["city"],
+                    V3ProspectDB.profession == _active["profession"],
+                    V3ProspectDB.ia_results.isnot(None),
+                ).first() is not None
+            if not _has_ia:
+                log.info("[OUTBOUND] %s/%s — test IA initial…",
+                         _active["profession"], _active["city"])
+                _ia_data = _run_ia_test(_active["profession"], _active["city"])
+                if _ia_data and _ia_data.get("results"):
+                    _ia_json  = _json_ia.dumps(_ia_data["results"], ensure_ascii=False)
+                    _ia_cited = _extract_cited_names(_ia_data["results"])
+                    with SessionLocal() as _db_ia2:
+                        for _p in _db_ia2.query(V3ProspectDB).filter_by(
+                            city=_active["city"], profession=_active["profession"]
+                        ).all():
+                            _p.ia_results   = _ia_json
+                            _p.ia_tested_at = _ia_data.get("tested_at")
+                        _db_ia2.commit()
+                        _upsert_cited_companies(_db_ia2, _active["profession"],
+                                                _active["city"], _ia_cited)
+        except Exception as _e_ia:
+            log.error("[OUTBOUND] erreur test IA paire %d: %s", _idx+1, _e_ia)
+
+        # Image ville
+        try:
+            from .city_images import fetch_city_header_image
+            from .models import RefCityDB as _RefCityDB
+            with SessionLocal() as _db_img:
+                _ref = _db_img.query(_RefCityDB).filter_by(
+                    city_name=(_active["city"] or "").upper()
+                ).first()
+                _has_img = bool(_ref and _ref.header_image_url)
+            if not _has_img:
+                _img_url = fetch_city_header_image(_active["city"])
+                if not _img_url:
+                    log.warning("[OUTBOUND] %s — pas d'image → paire suivante", _active["city"])
+                    _clear_pair("no_image")
+                    with SessionLocal() as _db_nx: _next_pair(_db_nx)
+                    continue
+        except Exception as _ie:
+            log.warning("[OUTBOUND] image check échoué : %s — on continue", _ie)
+
+        # Sélection prospects pour cette paire
+        _bf = [
+            V3ProspectDB.city       == _active["city"],
+            V3ProspectDB.profession == _active["profession"],
+            V3ProspectDB.ia_results.isnot(None),
+            V3ProspectDB.sent_at.is_(None),
+            V3ProspectDB.is_test.isnot(True),
+        ]
+        if refs_only:
+            _bf.append(V3ProspectDB.city_reference.isnot(None))
+
+        with SessionLocal() as db:
+            has_email = (
+                db.query(V3ProspectDB)
+                .filter(
+                    *_bf,
+                    V3ProspectDB.email.isnot(None),
+                    (V3ProspectDB.email_status.is_(None) |
+                     V3ProspectDB.email_status.notin_(["bounced", "unsubscribed"])),
+                )
+                .limit(max(rem_e, 1) * 20)
+                .all()
             )
-            .limit(max(cap_email, 1) * 20)
-            .all()
-        )
-        # SMS : a un mobile, pas encore dans le pool email (personnes différentes)
-        email_tokens = {p.token for p in has_email}
-        has_sms = (
-            db.query(V3ProspectDB)
-            .filter(
-                *_base_filter,
-                V3ProspectDB.phone.isnot(None),
-                ~V3ProspectDB.token.in_(email_tokens) if email_tokens else True,
+            email_tokens = {p.token for p in has_email}
+            has_sms = (
+                db.query(V3ProspectDB)
+                .filter(
+                    *_bf,
+                    V3ProspectDB.phone.isnot(None),
+                    ~V3ProspectDB.token.in_(email_tokens) if email_tokens else True,
+                )
+                .limit(max(rem_s, 1) * 20)
+                .all()
             )
-            .limit(max(cap_sms, 1) * 20)
-            .all()
-        )
 
-    valid_email   = [p for p in has_email if _outbound_is_valid_email(p.email)]
-    invalid_email = [p for p in has_email if not _outbound_is_valid_email(p.email)]
-    valid_sms     = [p for p in has_sms if _outbound_normalize_phone(p.phone)]
-    invalid_sms   = [p for p in has_sms if not _outbound_normalize_phone(p.phone)]
+        valid_email = [p for p in has_email if _outbound_is_valid_email(p.email)]
+        valid_sms   = [p for p in has_sms   if _outbound_normalize_phone(p.phone)]
 
-    log.info("[OUTBOUND] sélection — email_valide=%d (cap=%d)  sms_valide=%d (cap=%d)"
-             "  email_invalide=%d  sms_invalide=%d",
-             len(valid_email), cap_email, len(valid_sms), cap_sms,
-             len(invalid_email), len(invalid_sms))
-
-    if dry_run and invalid_email:
-        for p in invalid_email:
-            log.info("[OUTBOUND][DRY_RUN] EMAIL_INVALIDE — %-40s  %s", p.name[:40], p.email)
-    if dry_run and invalid_sms:
-        for p in invalid_sms:
-            log.info("[OUTBOUND][DRY_RUN] SMS_INVALIDE — %-40s  %s", p.name[:40], p.phone)
-
-    # ── Boucle email ─────────────────────────────────────────────────────────
-    email_sent = email_would = email_skip = 0
-
-    for prospect in valid_email:
-        if (email_sent if not dry_run else email_would) >= cap_email:
-            break
-        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
-            email_skip += 1
-            log.info("[OUTBOUND] SKIP cité EMAIL — %-40s  %s",
-                     prospect.name[:40], prospect.email)
+        if not valid_email and not valid_sms:
+            log.info("[OUTBOUND] %s/%s — 0 prospects prêts → paire suivante",
+                     _active["profession"], _active["city"])
+            _clear_pair("saturation")
+            with SessionLocal() as _db_nx: _next_pair(_db_nx)
             continue
-        result = _outbound_send_prospect(
-            prospect, dry_run=dry_run, brevo_key=brevo_key,
-            sent_idx=email_sent + email_would,
+
+        log.info("[OUTBOUND] %s/%s — email_dispo=%d sms_dispo=%d",
+                 _active["profession"], _active["city"],
+                 len(valid_email), len(valid_sms))
+
+        # Envois email
+        pair_e = pair_e_skip = 0
+        for prospect in valid_email:
+            if pair_e >= rem_e: break
+            if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
+                pair_e_skip += 1; continue
+            result = _outbound_send_prospect(
+                prospect, dry_run=dry_run, brevo_key=brevo_key,
+                sent_idx=total_email + pair_e,
+            )
+            if dry_run:
+                pair_e += 1
+                log.info("[OUTBOUND][DRY_RUN] EMAIL #%d — %s <%s>  Body: %s",
+                         total_email+pair_e, prospect.name, prospect.email,
+                         result.get("body", "")[:80])
+            elif result.get("ok"):
+                pair_e += 1
+                log.info("[OUTBOUND] EMAIL — %s (%s / %s)",
+                         prospect.name, prospect.profession, prospect.city)
+            else:
+                log.warning("[OUTBOUND] EMAIL erreur — %s : %s",
+                            prospect.name, result.get("error"))
+
+        # Envois SMS
+        pair_s = pair_s_skip = 0
+        for prospect in valid_sms:
+            if pair_s >= rem_s: break
+            if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
+                pair_s_skip += 1; continue
+            result = _outbound_send_prospect(
+                prospect, dry_run=dry_run, brevo_key=brevo_key,
+                sent_idx=total_email + pair_e + total_sms + pair_s,
+            )
+            if dry_run:
+                pair_s += 1
+                log.info("[OUTBOUND][DRY_RUN] SMS #%d — %s", total_sms+pair_s, prospect.name)
+            elif result.get("ok"):
+                pair_s += 1
+                log.info("[OUTBOUND] SMS — %s (%s / %s)",
+                         prospect.name, prospect.profession, prospect.city)
+            else:
+                log.warning("[OUTBOUND] SMS erreur — %s : %s",
+                            prospect.name, result.get("error"))
+
+        total_email += pair_e
+        total_sms   += pair_s
+        skip_total   = pair_e_skip + pair_s_skip
+        pairs_log.append(
+            f"{_active['profession']}/{_active['city']} e={pair_e} s={pair_s}"
+            + (f" skip={skip_total}" if skip_total else "")
         )
-        if dry_run:
-            email_would += 1
-            log.info("[OUTBOUND][DRY_RUN] EMAIL #%d — %s <%s>  Body: %s",
-                     email_would, prospect.name, prospect.email,
-                     result.get("body", "")[:80])
-        elif result.get("ok"):
-            email_sent += 1
-            log.info("[OUTBOUND] EMAIL envoyé — %s (%s / %s)",
-                     prospect.name, prospect.profession, prospect.city)
+
+        # Cap atteint → arrêt
+        if total_email >= cap_email and total_sms >= cap_sms:
+            stop_reason = "cap_atteint"; break
+
+        # Paire partiellement épuisée → basculer pour compléter le cap
+        if pair_e < rem_e or pair_s < rem_s:
+            log.info("[OUTBOUND] %s/%s épuisée (e=%d/%d s=%d/%d) → paire suivante",
+                     _active["profession"], _active["city"],
+                     pair_e, rem_e, pair_s, rem_s)
+            _clear_pair("saturation")
+            with SessionLocal() as _db_nx: _next_pair(_db_nx)
         else:
-            log.warning("[OUTBOUND] EMAIL erreur — %s : %s",
-                        prospect.name, result.get("error"))
-
-    # ── Boucle SMS ────────────────────────────────────────────────────────────
-    sms_sent = sms_would = sms_skip = 0
-
-    for prospect in valid_sms:
-        if (sms_sent if not dry_run else sms_would) >= cap_sms:
-            break
-        if _outbound_is_cited(prospect.name, prospect.ia_results or "[]"):
-            sms_skip += 1
-            continue
-        result = _outbound_send_prospect(
-            prospect, dry_run=dry_run, brevo_key=brevo_key,
-            sent_idx=email_sent + email_would + sms_sent + sms_would,
-        )
-        if dry_run:
-            sms_would += 1
-            log.info("[OUTBOUND][DRY_RUN] SMS #%d — %s <%s>",
-                     sms_would, prospect.name, prospect.phone)
-        elif result.get("ok"):
-            sms_sent += 1
-            log.info("[OUTBOUND] SMS envoyé — %s (%s / %s)",
-                     prospect.name, prospect.profession, prospect.city)
-        else:
-            log.warning("[OUTBOUND] SMS erreur — %s : %s",
-                        prospect.name, result.get("error"))
-
-    # ── Résumé final ──────────────────────────────────────────────────────────
-    if dry_run:
-        log.info("[OUTBOUND][DRY_RUN] terminé — "
-                 "email_would=%d (skip=%d)  sms_would=%d (skip=%d)  "
-                 "(0 envoi réel, 0 écriture DB)",
-                 email_would, email_skip, sms_would, sms_skip)
+            stop_reason = "cap_atteint"; break
     else:
-        log.info("[OUTBOUND] terminé — email=%d sms=%d (skip_cités=%d)",
-                 email_sent, sms_sent, email_skip + sms_skip)
+        stop_reason = "max_paires_atteint"
+
+    # ── Résumé ────────────────────────────────────────────────────────────────
+    summary = " | ".join(pairs_log) if pairs_log else "—"
+    if dry_run:
+        log.info("[OUTBOUND][DRY_RUN] terminé — email=%d/%d sms=%d/%d · %s",
+                 total_email, cap_email, total_sms, cap_sms, summary)
+    else:
+        log.info("[OUTBOUND] terminé — email=%d/%d sms=%d/%d · arrêt=%s · %s",
+                 total_email, cap_email, total_sms, cap_sms, stop_reason, summary)
