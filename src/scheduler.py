@@ -113,6 +113,15 @@ def start_scheduler():
         misfire_grace_time=600,
     )
 
+    # Job 11b : relance J+1 — toutes les heures, 15 min après l'outbound
+    _scheduler.add_job(
+        _job_followup,
+        trigger=CronTrigger(minute=15),
+        id="followup",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
     # Job 12 : sync Brevo — chaque nuit à 3h UTC (sécurité en complément du webhook)
     _scheduler.add_job(
         _job_sync_brevo,
@@ -1369,6 +1378,30 @@ _OUTBOUND_SENDERS = [
     ("julie@presence-ia.website",  "Julie — Présence IA"),
 ]
 
+_FOLLOWUP_SUBJECT = "Je me permets de vous relancer"
+
+_FOLLOWUP_BODY = """\
+Bonjour,
+
+Je me permets de revenir vers vous suite à mon précédent message.
+
+Aujourd'hui, de plus en plus de personnes demandent directement à leur IA quel est le meilleur {metier} à {ville}.
+
+Nous avons analysé votre position, et votre entreprise n'apparaît pas dans les réponses générées.
+
+Concrètement, cela signifie que vos concurrents peuvent être recommandés à votre place, automatiquement.
+
+Je peux vous montrer précisément ce que nous avons constaté et comment corriger cela pour votre activité de {metier} à {ville}.
+
+Vous pouvez accéder directement à l'agenda ici :
+{lien_agenda}
+
+À très bientôt,
+Nathalie PresenceIA
+"""
+
+_FOLLOWUP_SENDER = ("nathalie@presence-ia.online", "Nathalie — Présence IA")
+
 
 def _outbound_send_prospect(p, dry_run: bool = False,
                             brevo_key: str = None, sent_idx: int = 0) -> dict:
@@ -1796,6 +1829,132 @@ def compute_outbound_need() -> dict:
         "urgence_lundi":     urgence_lundi,
         "launch_mode":       launch_mode,
     }
+
+
+def _job_followup():
+    """
+    Relance J+1 — envoie le mail de suivi 24h après J0.
+
+    Règles de blocage (skip) :
+      - email_status = bounced (inclut unsubscribe)
+      - email_status = replied
+      - email_booked_at IS NOT NULL  ou  booking dans v3_bookings
+      - email_clicked_at IS NOT NULL (a visité la landing — signal fiable)
+      - profession ou city vide
+      - followup_sent_at déjà renseigné (anti-doublon)
+    """
+    import requests as _req
+    import random as _random
+    from datetime import datetime, timedelta
+    from .database import SessionLocal
+    from .models import V3ProspectDB, V3BookingDB
+
+    dry_run   = os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"
+    brevo_key = os.getenv("BREVO_API_KEY", "")
+    if not brevo_key and not dry_run:
+        log.warning("[FOLLOWUP] BREVO_API_KEY absent — job annulé")
+        return
+
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+
+    with SessionLocal() as db:
+        candidates = db.query(V3ProspectDB).filter(
+            V3ProspectDB.email_sent_at.isnot(None),
+            V3ProspectDB.email_sent_at <= cutoff,
+            V3ProspectDB.followup_sent_at.is_(None),
+            V3ProspectDB.sent_method == "email",
+            V3ProspectDB.email.isnot(None),
+            V3ProspectDB.is_test == False,  # noqa: E712
+        ).all()
+
+        if not candidates:
+            log.info("[FOLLOWUP] Aucun prospect éligible")
+            return
+
+        log.info("[FOLLOWUP] %d prospects à traiter", len(candidates))
+
+        # Index bookings par prospect_token pour éviter N requêtes
+        booked_tokens = {
+            r.prospect_token
+            for r in db.query(V3BookingDB.prospect_token).all()
+        }
+
+        sent = skipped = 0
+        skip_reasons: dict = {}
+
+        for p in candidates:
+            # ── Règles de blocage ─────────────────────────────────────────────
+            reason = None
+            if p.email_status == "bounced":
+                reason = "bounced_or_unsubscribed"
+            elif p.email_status == "replied":
+                reason = "replied"
+            elif p.email_booked_at or p.token in booked_tokens:
+                reason = "rdv_booked"
+            elif p.email_clicked_at:
+                reason = "landing_visited"
+            elif not (p.profession or "").strip():
+                reason = "no_metier"
+            elif not (p.city or "").strip():
+                reason = "no_ville"
+
+            if reason:
+                p.followup_sent_at   = datetime.utcnow()
+                p.followup_status    = "skipped"
+                p.followup_skip_reason = reason
+                skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
+                skipped += 1
+                continue
+
+            # ── Formatage ─────────────────────────────────────────────────────
+            from .api.routes.v3 import _resolve_termes
+            termes   = _resolve_termes(p.profession)
+            metier   = termes[0] if termes else (p.profession or "").lower()
+            ville    = (p.city_reference or p.city or "").title()
+            base_url = os.getenv("BASE_URL", "https://presence-ia.com").rstrip("/")
+            landing  = base_url + (p.landing_url or "")
+            body     = _FOLLOWUP_BODY.format(metier=metier, ville=ville, lien_agenda=landing)
+
+            if dry_run:
+                log.info("[FOLLOWUP][DRY_RUN] %s — %s/%s", p.email, p.profession, p.city)
+                p.followup_sent_at    = datetime.utcnow()
+                p.followup_status     = "dry_run"
+                p.followup_skip_reason = None
+                sent += 1
+                continue
+
+            # ── Envoi Brevo ───────────────────────────────────────────────────
+            try:
+                sender_email, sender_name = _FOLLOWUP_SENDER
+                resp = _req.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                    json={
+                        "sender":      {"name": sender_name, "email": sender_email},
+                        "to":          [{"email": p.email, "name": p.name}],
+                        "subject":     _FOLLOWUP_SUBJECT,
+                        "textContent": body,
+                    },
+                    timeout=15,
+                )
+                ok = resp.status_code in (200, 201, 202)
+            except Exception as exc:
+                log.error("[FOLLOWUP] erreur Brevo pour %s : %s", p.email, exc)
+                ok = False
+
+            p.followup_sent_at    = datetime.utcnow()
+            p.followup_status     = "sent" if ok else "error"
+            p.followup_skip_reason = None if ok else "brevo_error"
+            if ok:
+                sent += 1
+                log.info("[FOLLOWUP] ✓ %s — %s/%s", p.email, p.profession, p.city)
+            else:
+                skipped += 1
+
+        db.commit()
+
+    log.info("[FOLLOWUP] %s — envoyés=%d  ignorés=%d  raisons=%s",
+             "DRY_RUN" if dry_run else "LIVE", sent, skipped, skip_reasons)
 
 
 def _job_outbound(force: bool = False):

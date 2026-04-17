@@ -1309,6 +1309,22 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
     ).count()
     s_deliv_rate = round(s_delivered / s_sent * 100, 1) if s_sent else 0
 
+    # ── KPIs relance J+1 ──────────────────────────────────────────────────────
+    from sqlalchemy import func as _func
+    fu_sent    = db.query(V3ProspectDB).filter(V3ProspectDB.followup_status == "sent").count()
+    fu_skipped = db.query(V3ProspectDB).filter(V3ProspectDB.followup_status == "skipped").count()
+    fu_pending = db.query(V3ProspectDB).filter(
+        V3ProspectDB.email_sent_at.isnot(None),
+        V3ProspectDB.followup_sent_at.is_(None),
+        V3ProspectDB.sent_method == "email",
+    ).count()
+    fu_skip_dist = dict(
+        db.query(V3ProspectDB.followup_skip_reason, _func.count())
+        .filter(V3ProspectDB.followup_status == "skipped")
+        .group_by(V3ProspectDB.followup_skip_reason)
+        .all()
+    )
+
     # ── Pipeline global ────────────────────────────────────────────────────────
     total_prospects = db.query(V3ProspectDB).count()
     enriched        = db.query(V3ProspectDB).filter(V3ProspectDB.ia_results.isnot(None)).count()
@@ -1424,7 +1440,17 @@ h1{{font-size:18px;font-weight:700;margin:0}}
   {_c("Clics",      "—",              "non disponible (SMS unidirectionnel)",   "#9ca3af")}
 </div>
 
-<p style="font-size:11px;color:#9ca3af;margin-top:10px;margin-bottom:0">
+<div class="sec" style="background:#8b5cf6;margin-top:16px">Relance J+1 · automatique 24h après J0</div>
+<div class="row">
+  {_c("Envoyées",  f"{fu_sent}",    "",                           "#8b5cf6")}
+  {_c("Ignorées",  f"{fu_skipped}", f"{', '.join(f'{k}:{v}' for k,v in fu_skip_dist.items()) or '—'}", "#9ca3af")}
+  {_c("En attente", f"{fu_pending}", "J0 envoyé, J+1 pas encore dû", "#f59e0b")}
+</div>
+<p style="font-size:11px;color:#6b7280;margin-top:6px">
+  Job : toutes les heures à H:15 — Expéditeur : nathalie@presence-ia.online
+</p>
+
+<p style="font-size:11px;color:#9ca3af;margin-top:12px;margin-bottom:0">
   Webhook Brevo : <code>POST /webhooks/brevo</code> · tracking depuis 17/04 &nbsp;·&nbsp;
   <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
 </p>

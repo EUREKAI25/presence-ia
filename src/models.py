@@ -335,6 +335,10 @@ class V3ProspectDB(Base):
     email_bounced_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     email_clicked_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
     email_booked_at:  Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    # Tracking email J+1 (relance automatique)
+    followup_sent_at:    Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+    followup_status:     Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)   # sent/skipped
+    followup_skip_reason: Mapped[Optional[str]]     = mapped_column(sa.String, nullable=True)   # bounce/rdv/replied/landing/no_ville/no_metier
     # Tracking SMS outbound
     sms_status:       Mapped[Optional[str]]      = mapped_column(sa.String, nullable=True)   # sent/delivered/failed
     sms_delivered_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
