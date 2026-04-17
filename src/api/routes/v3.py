@@ -1061,7 +1061,8 @@ def _render_landing(
             )
 
     from ._gtm import gtm_head, gtm_body, gtm_push
-    _book_url = f"/l/{p.token}/book"
+    _book_url      = f"/l/{p.token}/book"
+    _book_track_url = f"/l/track/calendly/{p.token}"
 
     return f"""<!DOCTYPE html><html lang="fr"><head>
 {gtm_head()}
@@ -1163,7 +1164,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
 
 <nav class="sticky-nav">
   <a class="sn-logo" href="/"><img src="/assets/logo-nb.svg" alt="Présence IA" style="height:44px;width:auto;display:block"></a>
-  <a class="sn-cta" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit</a>
+  <a class="sn-cta" href="{_book_track_url}">Réserver mon rendez-vous gratuit</a>
 </nav>
 
 {hero_html}
@@ -1189,7 +1190,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
     <p class="ia-mention">Analyse réalisée sur ChatGPT, Claude et Gemini.</p>
     <div class="ia-demo-cta">
       <p class="ia-demo-transition">Lors de ce rendez-vous, nous analysons rapidement votre situation et vous montrons comment les IA perçoivent aujourd'hui votre activité dans votre secteur et votre ville.<br><br>Vous repartez avec une vision claire de votre position actuelle et des premières actions à mettre en place pour commencer à apparaître dans les recommandations.</p>
-      <a class="btn-pitch" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
+      <a class="btn-pitch" href="{_book_track_url}">Réserver mon rendez-vous gratuit →</a>
       <p class="ia-demo-cta__limit">Nous analysons un nombre limité d'entreprises par secteur et par ville.</p>
     </div>
   </div>
@@ -1199,7 +1200,7 @@ footer a{{color:#9ca3af;text-decoration:underline}}
   <div class="c" style="text-align:center">
     <h2 class="pre-faq-title">Comprendre pourquoi votre entreprise n'apparaît pas.</h2>
     <p class="pre-faq-text">Recevez votre audit et découvrez comment les IA choisissent les entreprises qu'elles recommandent.</p>
-    <a class="btn-pitch" href="{_book_url}" target="_blank" data-gtm-event="calendly_click">Réserver mon rendez-vous gratuit →</a>
+    <a class="btn-pitch" href="{_book_track_url}">Réserver mon rendez-vous gratuit →</a>
   </div>
 </section>
 
@@ -1862,7 +1863,8 @@ def _send_booking_confirmation(
 
 @router.get("/l/track/calendly/{token}")
 def track_calendly(token: str):
-    """Tracking clic Calendly + redirect (legacy — redirige vers la page de réservation filtrée)."""
+    """Tracking clic CTA + redirect vers la page de réservation."""
+    _mkt.record_calendly_click(token)
     return RedirectResponse(f"/l/{token}/book", status_code=302)
 
 
