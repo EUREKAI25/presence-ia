@@ -1314,61 +1314,19 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
         V3ProspectDB.email_sent_at.is_(None),
     ).count()
 
-    # ── 7 derniers jours ──────────────────────────────────────────────────────
-    today = _date.today()
-    days  = [(today - _td(days=i)) for i in range(6, -1, -1)]
-    day_rows = []
-    for d in days:
-        d_start = datetime(d.year, d.month, d.day)
-        d_end   = d_start + _td(days=1)
-        de = sum(1 for r in email_rows if r.email_sent_at and d_start <= r.email_sent_at < d_end)
-        ds = sum(1 for r in sms_rows   if r.sent_at       and d_start <= r.sent_at       < d_end)
-        do = sum(1 for r in email_rows if r.email_opened_at  and d_start <= r.email_opened_at  < d_end)
-        db2 = sum(1 for r in email_rows if r.email_bounced_at and d_start <= r.email_bounced_at < d_end)
-        day_rows.append((d.strftime("%d/%m"), de, ds, do, db2))
+    # ── Taux de clics ──────────────────────────────────────────────────────────
+    e_click_rate = round(e_clicked / e_sent * 100, 1) if e_sent else 0
+    pct_enriched = round(enriched / total_prospects * 100, 1) if total_prospects else 0
 
-    # ── Par paire (7 derniers jours) ───────────────────────────────────────────
-    week_start = datetime(today.year, today.month, today.day) - _td(days=6)
-    pair_map: dict = {}
-    for r in email_rows:
-        if r.email_sent_at and r.email_sent_at >= week_start:
-            key = (r.profession or "?", r.city or "?")
-            pair_map[key] = pair_map.get(key, 0) + 1
-    for r in sms_rows:
-        if r.sent_at and r.sent_at >= week_start:
-            key = (r.profession or "?", r.city or "?")
-            pair_map[key] = pair_map.get(key, 0) + 1
-    pair_rows_html = "".join(
-        f"<tr><td>{prof}</td><td>{city}</td><td>{cnt}</td></tr>"
-        for (prof, city), cnt in sorted(pair_map.items(), key=lambda x: -x[1])
-    ) or '<tr><td colspan="3" style="color:#9ca3af;text-align:center">Aucun envoi cette semaine</td></tr>'
-
-    # ── Délais moyens ──────────────────────────────────────────────────────────
-    def _avg_delay(records, t0_attr, t1_attr) -> str:
-        deltas = []
-        for r in records:
-            t0 = getattr(r, t0_attr, None)
-            t1 = getattr(r, t1_attr, None)
-            if t0 and t1 and t1 > t0:
-                deltas.append((t1 - t0).total_seconds())
-        if not deltas:
-            return "—"
-        avg_s = sum(deltas) / len(deltas)
-        return f"{int(avg_s//60)} min" if avg_s < 3600 else f"{avg_s/3600:.1f} h"
-
-    delay_open   = _avg_delay(email_rows, "email_sent_at", "email_opened_at")
-    delay_click  = _avg_delay(email_rows, "email_sent_at", "email_clicked_at")
-    delay_booked = _avg_delay(email_rows, "email_sent_at", "email_booked_at")
-
-    # ── HTML helpers ───────────────────────────────────────────────────────────
-    def _kpi(label, value, sub="", color="#4f46e5"):
-        return (f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;'
-                f'padding:16px 20px;min-width:120px">'
-                f'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;'
-                f'letter-spacing:.5px;margin-bottom:4px">{label}</div>'
-                f'<div style="font-size:28px;font-weight:700;color:{color}">{value}</div>'
-                + (f'<div style="font-size:12px;color:#9ca3af;margin-top:2px">{sub}</div>' if sub else '')
-                + '</div>')
+    def _c(label, val, sub, color):
+        sub_html = (f'<div style="font-size:11px;color:#9ca3af;margin-top:1px">{sub}</div>'
+                    if sub else "")
+        return (f'<div style="background:#fff;border:1px solid #e5e7eb;border-radius:7px;'
+                f'padding:10px 14px;flex:1;min-width:0">'
+                f'<div style="font-size:10px;color:#6b7280;text-transform:uppercase;'
+                f'letter-spacing:.5px;font-weight:600;margin-bottom:2px">{label}</div>'
+                f'<div style="font-size:24px;font-weight:700;color:{color};line-height:1.1">{val}</div>'
+                f'{sub_html}</div>')
 
     # ── Prochain run automatique ───────────────────────────────────────────────
     import os as _os
@@ -1386,119 +1344,70 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
         _first = _run_hours[0]
         _next_label = f"Demain {_first}h UTC = {_first + 2}h Paris"
     _hours_paris = " · ".join(f"{h + 2}h" for h in _run_hours)
-    _dry_banner  = (
-        '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;'
-        'padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:8px">'
-        '⚠️ <strong>OUTBOUND_DRY_RUN = true</strong> — les runs automatiques n\'envoient rien.'
-        ' Passer à <code>false</code> pour activer l\'envoi auto.</div>'
-    ) if _dry_run else ""
+    _dry_inline  = ('<span style="margin-left:auto;background:#fef3c7;color:#92400e;'
+                    'border:1px solid #f59e0b;padding:2px 10px;border-radius:4px;'
+                    'font-size:12px;font-weight:700">⚠️ DRY RUN — envoi auto désactivé</span>'
+                   ) if _dry_run else ""
 
     nav = admin_nav(token, "outbound")
     return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Outbound — Présence IA</title>
 <style>
 body{{font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0;color:#1a1a2e}}
-.wrap{{max-width:960px;margin:0 auto;padding:24px}}
-h1{{font-size:22px;font-weight:700;margin:0 0 4px}}
-.sub{{color:#6b7280;font-size:13px;margin:0 0 24px}}
-.kpis{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}}
-table{{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;
-       box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid #e5e7eb;margin-bottom:24px}}
-th{{background:#f9fafb;color:#6b7280;padding:10px 12px;text-align:left;font-size:12px;font-weight:600}}
-td{{padding:9px 12px;border-bottom:1px solid #f3f4f6;color:#374151;font-size:14px}}
-tr:last-child td{{border-bottom:none}}
-h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}}
-.section-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
-                color:#fff;background:#4f46e5;padding:3px 10px;border-radius:4px;margin-right:8px}}
-.section-sms{{background:#0ea5e9}}
+.wrap{{max-width:960px;margin:0 auto;padding:14px 20px}}
+h1{{font-size:18px;font-weight:700;margin:0}}
+.row{{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}}
+.sec{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+      color:#fff;padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:6px}}
 </style></head><body>
 {nav}
 <div class="wrap">
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
-  <h1 style="margin:0">Outbound — Stats complètes</h1>
+
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+  <h1>Outbound — Stats</h1>
   <button id="btn-trigger" onclick="triggerOutbound()"
     style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;
-           padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;
+           padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;
            cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.4)">
-    ▶ Déclencher outbound maintenant
+    ▶ Déclencher maintenant
   </button>
 </div>
-<p class="sub">Tous les envois — email + SMS — tracking Brevo actif depuis 17/04</p>
 
-<div id="trigger-result" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px"></div>
+<div id="trigger-result" style="display:none;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px"></div>
 
-{_dry_banner}
-<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px">
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-    <div>
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Prochain run auto</span><br>
-      <span style="font-size:18px;font-weight:700;color:#4f46e5">⏰ {_next_label}</span>
-    </div>
-    <div style="border-left:1px solid #e5e7eb;padding-left:16px">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Mode</span><br>
-      <span style="font-weight:600;color:#1e3a5f">{_mode_label}</span>
-    </div>
-    <div style="border-left:1px solid #e5e7eb;padding-left:16px">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Horaires Paris</span><br>
-      <span style="color:#374151">{_hours_paris}</span>
-    </div>
-  </div>
+<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:7px;padding:8px 14px;
+            margin-bottom:10px;display:flex;gap:20px;align-items:center;font-size:13px;flex-wrap:wrap">
+  <span>⏰ <strong>Prochain run :</strong> <span style="color:#4f46e5;font-weight:700">{_next_label}</span></span>
+  <span style="color:#6b7280">Mode : <strong style="color:#1e3a5f">{_mode_label}</strong></span>
+  <span style="color:#6b7280">Horaires Paris : <strong>{_hours_paris}</strong></span>
+  {_dry_inline}
 </div>
 
-<!-- Pipeline global -->
-<h2>Pipeline global</h2>
-<div class="kpis">
-  {_kpi("Prospects DB",    f"{total_prospects:,}",  "",                        "#1e3a5f")}
-  {_kpi("Enrichis (IA)",   f"{enriched:,}",          f"{round(enriched/total_prospects*100,1) if total_prospects else 0}% du total", "#8b5cf6")}
-  {_kpi("Contactés",       f"{total_contacted:,}",   f"email + SMS",            "#0ea5e9")}
-  {_kpi("File d'attente",  f"{eligible_email:,}",    "enrichis, pas encore envoyés", "#f59e0b")}
+<div class="sec" style="background:#1e3a5f">Pipeline</div>
+<div class="row">
+  {_c("Prospects DB",   f"{total_prospects:,}", "",                       "#1e3a5f")}
+  {_c("Enrichis IA",    f"{enriched:,}",         f"{pct_enriched}% total", "#8b5cf6")}
+  {_c("Contactés",      f"{total_contacted:,}",  "email + SMS",            "#0ea5e9")}
+  {_c("File d'attente", f"{eligible_email:,}",   "enrichis non envoyés",   "#f59e0b")}
 </div>
 
-<!-- Email -->
-<h2><span class="section-label">Email</span> Performance</h2>
-<div class="kpis">
-  {_kpi("Envoyés",    e_sent,      "",                                    "#1e3a5f")}
-  {_kpi("Delivered",  e_delivered, f"{e_deliv_rate}% — tracking actif depuis 17/04", "#0ea5e9")}
-  {_kpi("Ouverts",    e_opened,    f"{e_open_rate}% des envoyés",          "#10b981")}
-  {_kpi("Cliqués",    e_clicked,   "",                                    "#8b5cf6")}
-  {_kpi("Bounced",    e_bounced,   f"{e_bounce_rate}% des envoyés",        "#ef4444")}
-  {_kpi("RDV pris",   e_booked,    "via lien email",                      "#f59e0b")}
+<div class="sec" style="background:#4f46e5;margin-top:6px">Email · {e_sent} envoyés</div>
+<div class="row">
+  {_c("Delivered", f"{e_delivered}", f"{e_deliv_rate}%",  "#0ea5e9")}
+  {_c("Ouverts",   f"{e_opened}",    f"{e_open_rate}%",   "#10b981")}
+  {_c("Cliqués",   f"{e_clicked}",   f"{e_click_rate}%",  "#8b5cf6")}
+  {_c("Bounced",   f"{e_bounced}",   f"{e_bounce_rate}%", "#ef4444")}
+  {_c("RDV pris",  f"{e_booked}",    "via lien email",    "#f59e0b")}
 </div>
 
-<!-- SMS -->
-<h2><span class="section-label section-sms">SMS</span> Performance</h2>
-<div class="kpis">
-  {_kpi("Envoyés",   s_sent,    "",          "#0ea5e9")}
-  {_kpi("Bounced",   s_bounced, "",          "#ef4444")}
-</div>
-<p style="font-size:12px;color:#9ca3af;margin:-16px 0 20px">
-  Tracking SMS ouvertures : non disponible via Brevo (SMS unidirectionnel)
-</p>
-
-<!-- Délais -->
-<h2>Délais moyens de réaction (email)</h2>
-<div class="kpis">
-  {_kpi("Ouverture",  delay_open,   "envoi → ouverture", "#8b5cf6")}
-  {_kpi("Clic",       delay_click,  "envoi → clic",      "#f59e0b")}
-  {_kpi("RDV",        delay_booked, "envoi → booking",   "#10b981")}
+<div class="sec" style="background:#0ea5e9;margin-top:6px">SMS · {s_sent} envoyés</div>
+<div class="row">
+  {_c("Bounced", f"{s_bounced}", "",                                          "#ef4444")}
+  {_c("Clics",   "—",           "non disponible (SMS unidirectionnel)",        "#9ca3af")}
 </div>
 
-<!-- 7 jours -->
-<h2>7 derniers jours</h2>
-<table>
-<tr><th>Date</th><th>Emails envoyés</th><th>SMS envoyés</th><th>Ouverts</th><th>Bounced</th></tr>
-{"".join(f"<tr><td>{d}</td><td>{de}</td><td>{ds}</td><td>{do}</td><td>{db2}</td></tr>" for d,de,ds,do,db2 in day_rows)}
-</table>
-
-<!-- Par paire -->
-<h2>Par paire (7 derniers jours)</h2>
-<table>
-<tr><th>Profession</th><th>Ville</th><th>Envois</th></tr>
-{pair_rows_html}
-</table>
-
-<p style="font-size:12px;color:#9ca3af;margin-top:8px">
-  Webhook Brevo : <code>POST /webhooks/brevo</code> actif depuis 17/04 &nbsp;·&nbsp;
+<p style="font-size:11px;color:#9ca3af;margin-top:10px;margin-bottom:0">
+  Webhook Brevo : <code>POST /webhooks/brevo</code> · tracking depuis 17/04 &nbsp;·&nbsp;
   <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
 </p>
 </div>
@@ -1528,7 +1437,7 @@ async function triggerOutbound() {{
     res.textContent = 'Erreur réseau : ' + e;
   }}
   btn.disabled = false;
-  btn.innerHTML = '▶ Déclencher outbound maintenant';
+  btn.innerHTML = '▶ Déclencher maintenant';
 }}
 </script>
 </body></html>""")
