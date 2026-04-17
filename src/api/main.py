@@ -702,3 +702,6 @@ app.include_router(active_models_router)
 
 from .routes.methode_ia import router as methode_ia_router
 app.include_router(methode_ia_router)
+
+from .routes.implantation_ia import router as implantation_ia_router
+app.include_router(implantation_ia_router)
