@@ -39,6 +39,7 @@ def offers_page(request: Request, db: Session = Depends(get_db)):
         meta     = json.loads(o.meta or "{}") if isinstance(o.meta, str) else (o.meta or {})
         mods_txt = json.dumps(meta.get("eurkai_modules", []), ensure_ascii=False, indent=2)
         not_inc  = "\n".join(meta.get("not_included", []))
+        pay_opts = json.dumps(meta.get("payment_options", []), ensure_ascii=False, indent=2)
         price_display = f"{int(o.price)}€" if o.price == int(o.price) else f"{o.price}€"
         border_color = "#2ecc71" if o.active else "#e2e8f0"
 
@@ -102,6 +103,9 @@ def offers_page(request: Request, db: Session = Depends(get_db)):
 <div style="margin-top:10px"><label style="{lbl}">Argumentaire upgrade</label>
   <input id="upgrade-{o.id}" value="{meta.get('upgrade_pitch', '')}" style="{inp}">
 </div>
+<div style="{sect}">Liens de paiement (modalités)</div>
+<p style="color:#6b7280;font-size:11px;margin-bottom:8px">Format JSON — chaque option : <code style="background:#f1f5f9;padding:2px 5px;border-radius:3px">{{"slug":"x1","label":"Paiement unique","installments":1,"amount":500,"payment_link":"https://..."}}</code></p>
+<textarea id="payopts-{o.id}" rows="10" style="{ta}" placeholder='[\n  {{"slug":"x1","label":"Paiement unique","installments":1,"amount":500,"payment_link":""}}\n]'>{pay_opts}</textarea>
 <div style="{sect}">Modules EURKAI (JSON)</div>
 <div><textarea id="modules-{o.id}" rows="6" style="{ta}">{mods_txt}</textarea></div>
 <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
@@ -132,6 +136,8 @@ async function saveOffer(id, btn) {{
   const features = g('features').value.split('\\n').map(s=>s.trim()).filter(Boolean);
   let eurkai_modules = [];
   try {{ eurkai_modules = JSON.parse(g('modules').value); }} catch(e) {{}}
+  let payment_options = [];
+  try {{ payment_options = JSON.parse(g('payopts').value); }} catch(e) {{}}
   const not_included = g('notinc').value.split('\\n').map(s=>s.trim()).filter(Boolean);
   const meta = {{
     description:         g('desc').value,
@@ -147,6 +153,7 @@ async function saveOffer(id, btn) {{
     execution_qty:       parseInt(g('qty').value) || 1,
     not_included,
     upgrade_pitch:       g('upgrade').value,
+    payment_options,
     eurkai_modules,
   }};
   const data = {{

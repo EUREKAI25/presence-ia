@@ -1953,12 +1953,15 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
     meeting = None
     prospect = None
     deliveries = []
+    closer_db = None
+    db_offers = []
+    last_offer_send = None
 
     try:
         from marketing_module.database import SessionLocal as MktSession
-        from marketing_module.models import MeetingDB, ProspectDeliveryDB
+        from marketing_module.models import MeetingDB, ProspectDeliveryDB, CloserDB
         from ...database import SessionLocal
-        from ...models import V3ProspectDB
+        from ...models import V3ProspectDB, OfferSendDB
 
         with MktSession() as mdb:
             meeting = mdb.query(MeetingDB).filter_by(id=meeting_id).first()
@@ -1966,10 +1969,23 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
                 deliveries = mdb.query(ProspectDeliveryDB).filter_by(
                     project_id=PROJECT_ID, prospect_id=meeting.prospect_id
                 ).order_by(ProspectDeliveryDB.created_at.desc()).limit(5).all()
+                if meeting.closer_id:
+                    closer_db = mdb.query(CloserDB).filter_by(id=meeting.closer_id).first()
 
         if meeting:
             with SessionLocal() as db:
                 prospect = db.query(V3ProspectDB).filter_by(token=meeting.prospect_id).first()
+                try:
+                    from offers_module.models import OfferDB as _OfferDB
+                    db_offers = db.query(_OfferDB).filter(_OfferDB.active == True).order_by(_OfferDB.price).all()
+                except Exception:
+                    pass
+                last_offer_send = (
+                    db.query(OfferSendDB)
+                    .filter_by(meeting_id=meeting_id)
+                    .order_by(OfferSendDB.sent_at.desc())
+                    .first()
+                )
     except Exception:
         pass
 
@@ -2058,15 +2074,15 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
         f'border-radius:4px;color:#2ecc71;font-size:12px;text-decoration:none">🔗 Landing</a>'
     ) if land else ""
 
-    # ── Accordéon offres ──────────────────────────────────────────────────
+    # ── Accordéon offres (textes) ─────────────────────────────────────────
     pitch = content.get("offer_pitch", "")
     import re as _re2
     offer_blocks = _re2.split(r'─{5,}', pitch)
     offer_texts = {str(i+1): offer_blocks[i+1].strip() if i+1 < len(offer_blocks) else "" for i in range(3)}
     offer_accordeon = ""
-    for i, (num, oname, price) in enumerate([("1","Audit Complet","500 €"),
-                                              ("2","Exécution Complète","3 500 €"),
-                                              ("3","Domination IA Locale","9 000 €")]):
+    for i, (num, oname, price) in enumerate([("1","Méthode Présence IA","500 €"),
+                                              ("2","Implantation IA","3 500 €"),
+                                              ("3","Domination IA","9 000 €")]):
         open_attr = " open" if i == 1 else ""
         offer_accordeon += (
             f'<details{open_attr} style="margin-bottom:10px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:8px">'
@@ -2075,13 +2091,73 @@ def closer_meeting_detail(closer_token: str, meeting_id: str, request: Request):
             f'<div style="color:#fff;font-size:15px;font-weight:700;margin-top:2px">{oname}</div></div>'
             f'<div style="text-align:right">'
             f'<div style="color:#2ecc71;font-size:1.8rem;font-weight:900">{price}</div>'
-            f'<button onclick="sendPaymentLink(event,\'{num}\')" style="margin-top:4px;padding:4px 10px;'
-            f'background:#527fb3;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer">'
-            f'Envoyer lien →</button></div></summary>'
+            f'</div></summary>'
             f'<div style="padding:0 16px 16px">'
             f'<pre id="ob{num}" style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:#ccc;line-height:1.7"></pre>'
             f'</div></details>'
         )
+
+    # ── Boutons "Envoyer une offre" depuis OfferDB ─────────────────────────
+    import json as _json2
+    _send_buttons = []
+    _offers_js_data = {}
+    _COLORS = ["#527fb3", "#2ecc71", "#f59e0b", "#8b5cf6", "#e94560"]
+    for _oi, _o in enumerate(db_offers):
+        _ometa = _json2.loads(_o.meta or "{}") if isinstance(_o.meta, str) else (_o.meta or {})
+        _opts = _ometa.get("payment_options", [])
+        if not _opts:
+            _opts = [{"slug": "x1", "label": "Paiement unique",
+                      "installments": 1, "amount": int(_o.price), "payment_link": ""}]
+        _col = _COLORS[_oi % len(_COLORS)]
+        for _opt in _opts:
+            _slug = _opt.get("slug", "x1")
+            _lbl  = _opt.get("label", "Paiement unique")
+            _amt  = _opt.get("amount", int(_o.price))
+            _inst = _opt.get("installments", 1)
+            _plink = _opt.get("payment_link", "")
+            _key  = f"{_o.id}__{_slug}"
+            _amt_disp = f"{_amt:,} €/mois × {_inst}".replace(",", "\u202f") if _inst > 1 else f"{_amt:,} €".replace(",", "\u202f")
+            _send_buttons.append(
+                f'<button onclick="openOfferModal({_json2.dumps(_key)})" '
+                f'style="padding:10px 14px;background:{_col}15;border:1px solid {_col}40;'
+                f'border-radius:8px;color:#fff;font-size:12px;cursor:pointer;text-align:left;'
+                f'min-width:160px;transition:background .15s" '
+                f'onmouseover="this.style.background=\'{_col}30\'" onmouseout="this.style.background=\'{_col}15\'">'
+                f'<div style="font-weight:700;color:{_col}">{_o.name}</div>'
+                f'<div style="font-size:11px;color:#9ca3af;margin-top:2px">{_lbl}</div>'
+                f'<div style="font-size:14px;font-weight:900;color:#fff;margin-top:4px">{_amt_disp}</div>'
+                f'</button>'
+            )
+            _offers_js_data[_key] = {
+                "offer_id": _o.id,
+                "offer_name": _o.name,
+                "option_slug": _slug,
+                "option_label": _lbl,
+                "amount": _amt,
+                "installments": _inst,
+                "amount_disp": _amt_disp,
+                "has_link": bool(_plink),
+            }
+
+    _send_block_inner = (
+        '<div style="display:flex;flex-wrap:wrap;gap:10px">' +
+        "".join(_send_buttons) +
+        '</div>'
+    ) if _send_buttons else '<p style="color:#555;font-size:12px">Aucune offre configurée — vérifier /admin/offers</p>'
+
+    _last_send_html = ""
+    if last_offer_send:
+        _last_send_html = (
+            f'<div style="margin-top:12px;padding:10px 14px;background:#0f0f1a;border:1px solid #2a2a4e;'
+            f'border-radius:6px;font-size:12px">'
+            f'<span style="color:#9ca3af">Dernier envoi :</span> '
+            f'<strong style="color:#2ecc71">{last_offer_send.offer_name}</strong>'
+            f'{"&nbsp;·&nbsp;" + last_offer_send.payment_option if last_offer_send.payment_option else ""}'
+            f' — {last_offer_send.sent_at.strftime("%d/%m/%y %H:%M")}'
+            f'</div>'
+        )
+
+    _offers_js = _json2.dumps(_offers_js_data, ensure_ascii=False)
 
     script_text = content.get("pitch_script", "")
 
@@ -2183,6 +2259,13 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
   </ul>
 </div>
 
+<!-- ENVOYER UNE OFFRE -->
+<div class="card">
+  <span class="sec">Envoyer une offre</span>
+  {_send_block_inner}
+  {_last_send_html}
+</div>
+
 <!-- RESSOURCES CLOSER -->
 <div style="margin-top:4px">
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
@@ -2235,9 +2318,7 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
       <div id="cl-offer-block">
         <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:6px">Offre signée</label>
         <select id="cl-offer">
-          <option value="500">Audit Complet — 500 €</option>
-          <option value="3500" selected>Exécution Complète — 3 500 €</option>
-          <option value="9000">Domination IA Locale — 9 000 €</option>
+          {"".join(f'<option value="{int(_o.price)}" {"selected" if _oi==1 else ""}>{_o.name} — {int(_o.price):,} €'.replace(",","\\u202f")+"</option>" for _oi,_o in enumerate(db_offers)) or '<option value="3500">Implantation IA — 3 500 €</option>'}
         </select>
       </div>
       <div id="cl-date-block" style="display:none">
@@ -2257,6 +2338,34 @@ select{{background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;color:#ccc
           style="padding:8px 16px;background:#527fb3;border:none;color:#fff;
                  border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Enregistrer</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI OFFRE -->
+<div class="modal-bg" id="modal-offer">
+  <div class="modal">
+    <h2 style="color:#fff;font-size:16px;font-weight:700;margin-bottom:6px">Envoyer l'offre</h2>
+    <p style="color:#9ca3af;font-size:12px;margin-bottom:20px">Un email avec le lien de paiement sera envoyé au prospect.</p>
+    <div style="background:#0f0f1a;border:1px solid #2a2a4e;border-radius:8px;padding:14px;margin-bottom:16px">
+      <div id="mo-name" style="color:#2ecc71;font-size:15px;font-weight:700"></div>
+      <div id="mo-option" style="color:#9ca3af;font-size:12px;margin-top:2px"></div>
+      <div id="mo-amount" style="color:#fff;font-size:1.6rem;font-weight:900;margin-top:6px"></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="color:#9ca3af;font-size:11px;display:block;margin-bottom:4px">Email du prospect</label>
+      <div id="mo-email" style="color:#fff;font-size:13px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:6px;padding:8px 10px">{email}</div>
+    </div>
+    <div id="mo-nolink" style="display:none;background:#7c2d1220;border:1px solid #7c2d1240;border-radius:6px;padding:10px;margin-bottom:14px;color:#f87171;font-size:12px">
+      ⚠️ Aucun lien de paiement configuré pour cette option. Configurez-le dans <a href="/admin/offers" style="color:#f87171">Admin → Offres</a>.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="document.getElementById('modal-offer').classList.remove('open')"
+        style="padding:8px 16px;background:#1a1a2e;border:1px solid #2a2a4e;color:#9ca3af;
+               border-radius:6px;cursor:pointer;font-size:12px">Annuler</button>
+      <button id="mo-send-btn" onclick="confirmSendOffer()"
+        style="padding:8px 16px;background:#2ecc71;border:none;color:#fff;
+               border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Envoyer →</button>
     </div>
   </div>
 </div>
@@ -2315,14 +2424,39 @@ async function submitComplete() {{
   else alert(d.error || 'Erreur');
 }}
 
-async function sendPaymentLink(e, offerNum) {{
-  e.stopPropagation(); e.preventDefault();
-  const r = await fetch('/closer/{closer_token}/meeting/{meeting_id}/payment-link', {{
+// ── Envoi offre ──
+const _offersData = {_offers_js};
+let _selectedOfferKey = null;
+
+function openOfferModal(key) {{
+  const o = _offersData[key];
+  if (!o) return;
+  _selectedOfferKey = key;
+  document.getElementById('mo-name').textContent   = o.offer_name;
+  document.getElementById('mo-option').textContent = o.option_label + (o.installments > 1 ? ' · ' + o.installments + ' mensualités' : '');
+  document.getElementById('mo-amount').textContent = o.amount_disp;
+  const noLink = document.getElementById('mo-nolink');
+  const sendBtn = document.getElementById('mo-send-btn');
+  noLink.style.display  = o.has_link ? 'none' : 'block';
+  sendBtn.disabled      = !o.has_link;
+  sendBtn.style.opacity = o.has_link ? '1' : '.4';
+  document.getElementById('modal-offer').classList.add('open');
+}}
+
+async function confirmSendOffer() {{
+  if (!_selectedOfferKey) return;
+  const o = _offersData[_selectedOfferKey];
+  const btn = document.getElementById('mo-send-btn');
+  btn.disabled = true; btn.textContent = '…';
+  const r = await fetch('/closer/{closer_token}/meeting/{meeting_id}/send-offer', {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{offer_num: offerNum}})
+    body: JSON.stringify({{offer_id: o.offer_id, option_slug: o.option_slug}})
   }});
   const d = await r.json();
-  alert(d.message || 'Lien envoyé !');
+  btn.disabled = false; btn.textContent = 'Envoyer →';
+  document.getElementById('modal-offer').classList.remove('open');
+  if (r.ok) {{ alert('✅ ' + (d.message || 'Email envoyé !')); location.reload(); }}
+  else      {{ alert('❌ ' + (d.error || 'Erreur envoi')); }}
 }}
 </script>
 </body></html>""")
@@ -2380,19 +2514,129 @@ async def closer_complete_meeting(closer_token: str, meeting_id: str, request: R
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.post("/closer/{closer_token}/meeting/{meeting_id}/payment-link", response_class=JSONResponse)
-async def closer_send_payment_link(closer_token: str, meeting_id: str, request: Request):
-    """Envoyer le lien de paiement Stripe au prospect (stub — configurer Stripe Price IDs)."""
+@router.post("/closer/{closer_token}/meeting/{meeting_id}/send-offer", response_class=JSONResponse)
+async def closer_send_offer(closer_token: str, meeting_id: str, request: Request):
+    """Envoyer un lien de paiement au prospect depuis la fiche RDV."""
+    import json as _json
+    from datetime import datetime
     body = await request.json()
-    offer_num = str(body.get("offer_num", "2"))
-    offers = {"1": ("Audit Complet", "500"), "2": ("Exécution Complète", "3500"),
-              "3": ("Domination IA Locale", "9000")}
-    o_name, o_price = offers.get(offer_num, ("Offre", ""))
-    # TODO: créer session Stripe + envoyer email quand stripe_price_id configuré
-    return JSONResponse({
-        "message": f"⚠️ Stripe non configuré — Prix ID manquant pour '{o_name} ({o_price}€)'. "
-                   f"Configurez dans /admin puis réessayez."
-    })
+    offer_id    = body.get("offer_id")
+    option_slug = body.get("option_slug", "x1")
+
+    if not offer_id:
+        return JSONResponse({"error": "offer_id manquant"}, status_code=400)
+
+    try:
+        from offers_module.models import OfferDB as _OfferDB
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import MeetingDB, CloserDB
+        from ...database import SessionLocal
+        from ...models import V3ProspectDB, OfferSendDB
+
+        # ── Charger l'offre ──────────────────────────────────────────────
+        with SessionLocal() as db:
+            offer = db.query(_OfferDB).filter_by(id=offer_id).first()
+        if not offer:
+            return JSONResponse({"error": "Offre introuvable"}, status_code=404)
+
+        meta  = _json.loads(offer.meta or "{}") if isinstance(offer.meta, str) else (offer.meta or {})
+        opts  = meta.get("payment_options", [])
+        if not opts:
+            opts = [{"slug": "x1", "label": "Paiement unique",
+                     "installments": 1, "amount": int(offer.price), "payment_link": ""}]
+        opt   = next((o for o in opts if o.get("slug") == option_slug), opts[0])
+        plink = opt.get("payment_link", "")
+        if not plink:
+            return JSONResponse({"error": "Aucun lien de paiement configuré pour cette option. "
+                                          "Configurez-le dans /admin/offers."}, status_code=422)
+
+        amt_disp = (f"{opt.get('amount',int(offer.price)):,} €/mois × {opt.get('installments',1)}"
+                    .replace(",", "\u202f")
+                    if opt.get("installments", 1) > 1
+                    else f"{opt.get('amount', int(offer.price)):,} €".replace(",", "\u202f"))
+
+        # ── Charger prospect + closer ────────────────────────────────────
+        prospect_email = None
+        prospect_name  = "Madame, Monsieur"
+        closer_name    = "L'équipe Présence IA"
+        closer_id      = None
+
+        with MktSession() as mdb:
+            meeting = mdb.query(MeetingDB).filter_by(id=meeting_id).first()
+            if meeting and meeting.closer_id:
+                closer_id = meeting.closer_id
+                c = mdb.query(CloserDB).filter_by(id=meeting.closer_id).first()
+                if c:
+                    closer_name = c.name or closer_name
+
+        with SessionLocal() as db:
+            if meeting and meeting.prospect_id:
+                p = db.query(V3ProspectDB).filter_by(token=meeting.prospect_id).first()
+                if p:
+                    prospect_email = p.email
+                    prospect_name  = (p.name or prospect_name).title()
+
+        if not prospect_email:
+            return JSONResponse({"error": "Email du prospect introuvable"}, status_code=422)
+
+        # ── Construire l'email ────────────────────────────────────────────
+        subject = f"Votre accès Présence IA — {offer.name}"
+        html_body = f"""<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1e293b">
+<p style="font-size:15px">Bonjour,</p>
+<p style="font-size:15px;margin-top:16px">Suite à notre échange, voici l'accès à l'offre sélectionnée :</p>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin:24px 0;text-align:center">
+  <div style="font-size:13px;color:#64748b">{offer.name} — {opt.get('label','Paiement unique')}</div>
+  <div style="font-size:2rem;font-weight:900;color:#0f172a;margin:8px 0">{amt_disp}</div>
+  <a href="{plink}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;
+     padding:14px 32px;border-radius:8px;font-size:15px;font-weight:700;margin-top:8px">
+    Accéder au paiement →
+  </a>
+</div>
+<p style="font-size:14px;color:#475569">Une fois le paiement effectué, nous lançons immédiatement l'analyse et la mise en place.</p>
+<p style="font-size:14px;margin-top:24px">À votre disposition,<br><strong>{closer_name}</strong><br>
+<span style="color:#64748b;font-size:12px">Présence IA</span></p>
+</div>"""
+
+        # ── Envoyer via Brevo ─────────────────────────────────────────────
+        import httpx, os
+        brevo_key = os.getenv("BREVO_API_KEY", "")
+        ok = False
+        if brevo_key:
+            payload = {
+                "sender": {"name": closer_name, "email": "contact@presence-ia.online"},
+                "to":     [{"email": prospect_email}],
+                "subject": subject,
+                "htmlContent": html_body,
+            }
+            resp = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                json=payload, timeout=15,
+            )
+            ok = resp.status_code in (200, 201)
+
+        # ── Enregistrer en base ────────────────────────────────────────────
+        with SessionLocal() as db:
+            db.add(OfferSendDB(
+                meeting_id     = meeting_id,
+                offer_id       = offer_id,
+                offer_name     = f"{offer.name} — {opt.get('label','x1')}",
+                offer_price    = float(opt.get("amount", offer.price)),
+                payment_option = option_slug,
+                payment_link   = plink,
+                closer_id      = closer_id,
+                prospect_email = prospect_email,
+                sent_at        = datetime.utcnow(),
+            ))
+            db.commit()
+
+        if ok:
+            return JSONResponse({"message": f"Email envoyé à {prospect_email}"})
+        else:
+            return JSONResponse({"error": "Email enregistré mais envoi Brevo échoué — vérifier BREVO_API_KEY"}, status_code=500)
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -584,6 +584,21 @@ class PipelineHistoryLogDB(Base):
     source_slots          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)    # calendly / config
 
 
+class OfferSendDB(Base):
+    """Historique des envois de liens de paiement depuis la fiche RDV closer."""
+    __tablename__ = "offer_sends"
+    id             : Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    meeting_id     : Mapped[str]            = mapped_column(sa.String, nullable=False, index=True)
+    offer_id       : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    offer_name     : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    offer_price    : Mapped[float]          = mapped_column(sa.Float, nullable=False)
+    payment_option : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)   # slug: x1/x6/x12
+    payment_link   : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    closer_id      : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    prospect_email : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    sent_at        : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+
+
 class RefCityDB(Base):
     """Villes de référence (préfectures / sous-préfectures) pour la prospection."""
     __tablename__ = "ref_cities"
