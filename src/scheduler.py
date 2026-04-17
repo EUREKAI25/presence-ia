@@ -113,6 +113,15 @@ def start_scheduler():
         misfire_grace_time=600,
     )
 
+    # Job 12 : sync Brevo — chaque nuit à 3h UTC (sécurité en complément du webhook)
+    _scheduler.add_job(
+        _job_sync_brevo,
+        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
+        id="sync_brevo",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
     log.info("Scheduler démarré — %d job(s)", len(_scheduler.get_jobs()))
 
@@ -245,6 +254,16 @@ def _job_check_api_keys():
         log.info("check_api_keys: alerte envoyée à %s", admin_email)
     except Exception as e:
         log.warning("check_api_keys: échec envoi alerte — %s", e)
+
+
+def _job_sync_brevo():
+    """Synchronise les événements Brevo (email + SMS) vers v3_prospects — nuit à 3h UTC."""
+    try:
+        from .api.services.brevo_sync import sync_brevo_events
+        result = sync_brevo_events(days=2)  # 2 jours suffisent en cron quotidien
+        log.info("sync_brevo: %s", result)
+    except Exception as e:
+        log.error("sync_brevo: erreur — %s", e)
 
 
 def stop_scheduler():

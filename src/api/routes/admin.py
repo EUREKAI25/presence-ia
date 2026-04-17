@@ -1298,11 +1298,16 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
     e_bounce_rate = round(e_bounced   / e_sent * 100, 1) if e_sent else 0
 
     # ── KPIs SMS ───────────────────────────────────────────────────────────────
-    s_sent    = db.query(V3ProspectDB).filter(V3ProspectDB.sent_method == "sms").count()
+    s_sent      = db.query(V3ProspectDB).filter(V3ProspectDB.sent_method == "sms").count()
+    s_delivered = db.query(V3ProspectDB).filter(
+        V3ProspectDB.sent_method == "sms",
+        V3ProspectDB.sms_delivered_at.isnot(None),
+    ).count()
     s_bounced = db.query(V3ProspectDB).filter(
         V3ProspectDB.sent_method == "sms",
-        V3ProspectDB.email_bounced_at.isnot(None),
+        V3ProspectDB.sms_status == "failed",
     ).count()
+    s_deliv_rate = round(s_delivered / s_sent * 100, 1) if s_sent else 0
 
     # ── Pipeline global ────────────────────────────────────────────────────────
     total_prospects = db.query(V3ProspectDB).count()
@@ -1365,15 +1370,23 @@ h1{{font-size:18px;font-weight:700;margin:0}}
 
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
   <h1>Outbound — Stats</h1>
-  <button id="btn-trigger" onclick="triggerOutbound()"
-    style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;
-           padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;
-           cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.4)">
-    ▶ Déclencher maintenant
-  </button>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btn-sync" onclick="syncBrevo()"
+      style="background:#fff;color:#4f46e5;border:1px solid #c7d2fe;
+             padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">
+      ↻ Sync Brevo
+    </button>
+    <button id="btn-trigger" onclick="triggerOutbound()"
+      style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;
+             padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;
+             cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.4)">
+      ▶ Déclencher maintenant
+    </button>
+  </div>
 </div>
 
 <div id="trigger-result" style="display:none;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px"></div>
+<div id="sync-result"    style="display:none;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px"></div>
 
 <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:7px;padding:8px 14px;
             margin-bottom:10px;display:flex;gap:20px;align-items:center;font-size:13px;flex-wrap:wrap">
@@ -1402,8 +1415,9 @@ h1{{font-size:18px;font-weight:700;margin:0}}
 
 <div class="sec" style="background:#0ea5e9;margin-top:6px">SMS · {s_sent} envoyés</div>
 <div class="row">
-  {_c("Bounced", f"{s_bounced}", "",                                          "#ef4444")}
-  {_c("Clics",   "—",           "non disponible (SMS unidirectionnel)",        "#9ca3af")}
+  {_c("Delivered",  f"{s_delivered}",  f"{s_deliv_rate}%",                     "#10b981")}
+  {_c("Bounced",    f"{s_bounced}",    "",                                      "#ef4444")}
+  {_c("Clics",      "—",              "non disponible (SMS unidirectionnel)",   "#9ca3af")}
 </div>
 
 <p style="font-size:11px;color:#9ca3af;margin-top:10px;margin-bottom:0">
@@ -1415,29 +1429,52 @@ h1{{font-size:18px;font-weight:700;margin:0}}
 async function triggerOutbound() {{
   const btn = document.getElementById('btn-trigger');
   const res = document.getElementById('trigger-result');
-  btn.disabled = true;
-  btn.textContent = '⏳ En cours...';
+  btn.disabled = true; btn.textContent = '⏳ En cours...';
   const token = new URLSearchParams(window.location.search).get('token') || '';
   try {{
     const r = await fetch(`/api/admin/trigger-outbound?token=${{encodeURIComponent(token)}}`, {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}}
+      method: 'POST', headers: {{'Content-Type': 'application/json'}}
     }});
     const d = await r.json();
     res.style.display = 'block';
     res.style.background = d.ok ? '#dcfce7' : '#fee2e2';
     res.style.color = d.ok ? '#166534' : '#991b1b';
-    res.textContent = d.ok
-      ? '✅ Job outbound lancé — surveiller les logs.'
-      : ('Erreur : ' + (d.detail || JSON.stringify(d)));
+    res.textContent = d.ok ? '✅ Job outbound lancé.' : ('Erreur : ' + (d.detail || JSON.stringify(d)));
   }} catch(e) {{
-    res.style.display = 'block';
-    res.style.background = '#fee2e2';
-    res.style.color = '#991b1b';
+    res.style.display = 'block'; res.style.background = '#fee2e2'; res.style.color = '#991b1b';
     res.textContent = 'Erreur réseau : ' + e;
   }}
-  btn.disabled = false;
-  btn.innerHTML = '▶ Déclencher maintenant';
+  btn.disabled = false; btn.innerHTML = '▶ Déclencher maintenant';
+}}
+
+async function syncBrevo() {{
+  const btn = document.getElementById('btn-sync');
+  const res = document.getElementById('sync-result');
+  btn.disabled = true; btn.textContent = '⏳ Sync en cours...';
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  try {{
+    const r = await fetch(`/api/admin/sync-brevo?token=${{encodeURIComponent(token)}}&days=30`, {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}}
+    }});
+    const d = await r.json();
+    res.style.display = 'block';
+    if (d.ok) {{
+      res.style.background = '#dcfce7'; res.style.color = '#166534';
+      const sd = d.status_dist || {{}};
+      res.innerHTML = `✅ Sync Brevo terminée (30j) — `
+        + `Email : ${{d.email_fetched}} events, ${{d.email_updated}} mis à jour | `
+        + `SMS : ${{d.sms_fetched}} logs, ${{d.sms_updated}} mis à jour | `
+        + `Distribution : ${{JSON.stringify(sd)}} · `
+        + `<a href="" style="color:#166534">↺ Rafraîchir</a>`;
+    }} else {{
+      res.style.background = '#fee2e2'; res.style.color = '#991b1b';
+      res.textContent = 'Erreur sync : ' + (d.error || JSON.stringify(d));
+    }}
+  }} catch(e) {{
+    res.style.display = 'block'; res.style.background = '#fee2e2'; res.style.color = '#991b1b';
+    res.textContent = 'Erreur réseau : ' + e;
+  }}
+  btn.disabled = false; btn.innerHTML = '↻ Sync Brevo';
 }}
 </script>
 </body></html>""")
@@ -1522,3 +1559,27 @@ def trigger_outbound(request: Request):
     t = threading.Thread(target=_job_outbound, kwargs={"force": False}, daemon=True)
     t.start()
     return _JSONResponse({"ok": True, "message": "Job outbound lancé en arrière-plan"})
+
+
+@router.post("/api/admin/sync-brevo")
+def sync_brevo(request: Request, days: int = 30):
+    """Synchronise les événements Brevo (email + SMS) vers la DB."""
+    if (r := _check_token(request)) is not None: return r
+    import threading
+    from ...api.services.brevo_sync import sync_brevo_events
+
+    result: dict = {}
+
+    def _run():
+        nonlocal result
+        result = sync_brevo_events(days=days)
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=60)  # max 60s en synchrone pour avoir le résultat
+
+    if not result:
+        return _JSONResponse({"ok": False, "error": "Timeout ou erreur de sync"}, status_code=500)
+    if "error" in result:
+        return _JSONResponse({"ok": False, **result}, status_code=500)
+    return _JSONResponse({"ok": True, **result})
