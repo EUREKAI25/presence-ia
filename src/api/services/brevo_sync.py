@@ -232,13 +232,16 @@ def sync_brevo_events(days: int = 30) -> dict:
     # ── SMS reports ───────────────────────────────────────────────────────────
     date_from = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
     date_to   = datetime.utcnow().strftime("%Y-%m-%d")
-    # endDate exclusif dans l'API Brevo SMS → utiliser demain pour inclure aujourd'hui
-    sms_date_to = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
-    # Pour les SMS : fenêtre courte pour éviter que les contacts test
-    # (100+ events) noient les vrais prospects dans la pagination
+    # Brevo SMS API : startDate=today/endDate=today retourne les events intraday.
+    # Une plage multi-jours exclut le jour courant → on fait 2 appels séparés :
+    # 1) aujourd'hui (intraday)  2) jours précédents
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
     sms_date_from = (datetime.utcnow() - timedelta(days=min(days, 3))).strftime("%Y-%m-%d")
 
-    sms_logs    = _fetch_sms_reports(api_key, sms_date_from, sms_date_to)
+    sms_logs = _fetch_sms_reports(api_key, today, today)
+    if sms_date_from < today:
+        sms_logs += _fetch_sms_reports(api_key, sms_date_from, yesterday)
     sms_matched = 0
     sms_updated = 0
 
