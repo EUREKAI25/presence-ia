@@ -38,54 +38,86 @@ def _status_badge(status: str) -> str:
 
 def _app_stage_badge(stage: str) -> str:
     m = {
-        "contacted": ("#9ca3af", "Contacté"),
-        "applied":   ("#6366f1", "Candidature"),
-        "reviewing": ("#f59e0b", "En cours"),
-        "waitlist":  ("#a78bfa", "Liste d'attente"),
-        "validated": ("#2ecc71", "Validé"),
-        "rejected":  ("#e94560", "Refusé"),
+        "contacted":       ("#9ca3af", "Contacté"),
+        "applied":         ("#6366f1", "Candidature"),
+        "reviewing":       ("#f59e0b", "En cours"),
+        "waitlist":        ("#a78bfa", "Liste d'attente"),
+        "accepted_locked": ("#0ea5e9", "Accepté — démarre lundi"),
+        "accepted_trial":  ("#8b5cf6", "Accepté — semaine test"),
+        "validated":       ("#2ecc71", "Validé"),
+        "rejected":        ("#e94560", "Refusé"),
     }
     color, label = m.get(stage, ("#9ca3af", stage))
     return _badge(label, color)
 
 
 def _send_recruit_email(to_email: str, to_name: str, stage: str) -> bool:
-    """Envoie un email de notification au candidat selon le stage."""
+    """Envoie un email de décision au candidat selon le stage."""
     import requests as _req
     api_key = os.getenv("BREVO_API_KEY", "")
     if not api_key or not to_email:
         return False
+
+    first = to_name.split()[0] if to_name else "Bonjour"
+
     subjects = {
-        "validated": "Votre candidature Présence IA a été retenue",
-        "rejected":  "Suites de votre candidature Présence IA",
-        "waitlist":  "Votre candidature Présence IA — liste d'attente",
+        "accepted_locked": "Confirmation – démarrage lundi",
+        "accepted_trial":  "Démarrage lundi – semaine test",
+        "waitlist":        "Suite à votre candidature",
+        "rejected":        "Suite à votre candidature",
+        "validated":       "Votre candidature Présence IA a été retenue",
     }
     bodies = {
-        "validated": (
-            f"Bonjour {to_name},\n\n"
-            "Nous avons étudié votre candidature et nous sommes ravis de vous informer qu'elle a été retenue.\n\n"
-            "Un membre de l'équipe vous contactera très prochainement pour la suite du processus.\n\n"
-            "À très bientôt,\nL'équipe Présence IA"
+        "accepted_locked": (
+            f"Bonjour,\n\n"
+            "Merci pour votre candidature et votre enregistrement.\n\n"
+            "Je vous confirme que nous vous retenons pour démarrer lundi avec nous.\n\n"
+            "Vous allez recevoir un second email avec vos accès à votre espace privé, dans lequel vous trouverez :\n"
+            "- le détail de l'offre\n"
+            "- les éléments clés pour vos rendez-vous\n"
+            "- les réponses aux objections principales\n\n"
+            "Je vous invite à prendre le temps de vous approprier ces éléments avant vos premiers appels.\n\n"
+            "À très vite,\nNathalie"
         ),
-        "rejected": (
-            f"Bonjour {to_name},\n\n"
-            "Nous avons bien étudié votre candidature et nous vous remercions de l'intérêt que vous portez au programme closer Présence IA.\n\n"
-            "Après examen, nous ne sommes pas en mesure de donner une suite favorable à votre candidature à ce stade.\n\n"
-            "Nous vous souhaitons bonne continuation.\n\nL'équipe Présence IA"
+        "accepted_trial": (
+            f"Bonjour,\n\n"
+            "Merci pour votre candidature, votre profil nous a beaucoup intéressés.\n\n"
+            "Nous vous proposons de démarrer lundi avec nous, avec une première semaine de test.\n\n"
+            "Vous allez recevoir un second email avec vos accès à votre espace privé, dans lequel vous trouverez :\n"
+            "- le détail de l'offre\n"
+            "- les éléments clés pour vos rendez-vous\n"
+            "- les réponses aux objections principales\n\n"
+            "L'objectif est que vous puissiez vous approprier ces éléments avant vos premiers appels.\n\n"
+            "En fonction des résultats, nous ajusterons ensuite l'équipe.\n\n"
+            "À très vite,\nNathalie"
         ),
         "waitlist": (
-            f"Bonjour {to_name},\n\n"
-            "Nous avons bien reçu et examiné votre candidature.\n\n"
-            "Votre profil nous intéresse et nous le conservons dans notre liste d'attente. "
-            "Nous vous contacterons dès qu'une nouvelle place se libère.\n\n"
-            "À bientôt,\nL'équipe Présence IA"
+            f"Bonjour,\n\n"
+            "Merci pour votre candidature, elle a retenu toute mon attention.\n\n"
+            "Je ne peux pas vous intégrer dès lundi, car nous limitons volontairement le nombre de closers pour le lancement.\n\n"
+            "En revanche, votre profil m'intéresse vraiment et j'aimerais pouvoir vous intégrer dès que le volume se stabilise dans les prochaines semaines.\n\n"
+            "Je me permets donc de revenir vers vous rapidement si une place se libère.\n\n"
+            "À bientôt,\nNathalie"
+        ),
+        "rejected": (
+            f"Bonjour,\n\n"
+            "Merci pour votre candidature et le temps que vous y avez consacré.\n\n"
+            "Nous avons fait le choix d'avancer avec un nombre très limité de profils pour le lancement, "
+            "ce qui ne nous permet malheureusement pas de donner suite pour le moment.\n\n"
+            "Je vous souhaite le meilleur pour la suite.\n\n"
+            "Nathalie"
+        ),
+        "validated": (
+            f"Bonjour,\n\n"
+            "Votre candidature a été retenue. Vous allez recevoir vos accès très prochainement.\n\n"
+            "À très bientôt,\nNathalie"
         ),
     }
     subject = subjects.get(stage)
     body    = bodies.get(stage)
     if not subject or not body:
         return False
-    sender_name  = os.getenv("SENDER_NAME",  "Présence IA")
+    sender_name  = os.getenv("SENDER_NAME",  "Nathalie — Présence IA")
     sender_email = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
     try:
         resp = _req.post(
@@ -102,6 +134,78 @@ def _send_recruit_email(to_email: str, to_name: str, stage: str) -> bool:
         return resp.status_code == 201
     except Exception:
         return False
+
+
+def _send_access_email(to_email: str, to_name: str, portal_url: str) -> bool:
+    """Envoie l'email d'accès au portail closer."""
+    import requests as _req
+    api_key = os.getenv("BREVO_API_KEY", "")
+    if not api_key or not to_email:
+        return False
+    body = (
+        f"Bonjour,\n\n"
+        f"Voici vos accès à votre espace :\n\n"
+        f"{portal_url}\n\n"
+        f"Je vous invite à consulter en priorité :\n"
+        f"- le détail de l'offre\n"
+        f"- les objections\n"
+        f"- la structure des appels\n\n"
+        f"À très vite\n\nNathalie"
+    )
+    sender_name  = os.getenv("SENDER_NAME",  "Nathalie — Présence IA")
+    sender_email = os.getenv("SENDER_EMAIL", "contact@presence-ia.online")
+    try:
+        resp = _req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            json={
+                "sender":      {"name": sender_name, "email": sender_email},
+                "to":          [{"email": to_email, "name": to_name}],
+                "subject":     "Accès à votre espace closer",
+                "textContent": body,
+            },
+            timeout=8,
+        )
+        return resp.status_code == 201
+    except Exception:
+        return False
+
+
+def _create_closer_and_send_access(mdb, app) -> str | None:
+    """Crée CloserDB si inexistant, envoie email accès. Retourne le token closer."""
+    from marketing_module.models import CloserDB
+    from datetime import datetime
+    import os as _os
+
+    existing = mdb.query(CloserDB).filter_by(
+        project_id=app.project_id, email=app.email
+    ).first()
+    if existing:
+        closer = existing
+    else:
+        _full = f"{app.first_name or ''} {app.last_name or ''}".strip() or (app.email or "Closer")
+        closer = CloserDB(
+            project_id=app.project_id,
+            name=_full,
+            first_name=app.first_name,
+            last_name=app.last_name,
+            email=app.email,
+            phone=app.phone,
+            commission_rate=0.18,
+            is_active=True,
+            contact_id=app.contact_id,
+        )
+        mdb.add(closer)
+        mdb.flush()
+
+    app.access_granted = True
+    mdb.commit()
+
+    base_url = _os.getenv("BASE_URL", "https://presence-ia.com")
+    portal_url = f"{base_url}/closer/{closer.token}"
+    _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Closer"
+    _send_access_email(app.email, _name, portal_url)
+    return closer.token
 
 
 def _delivery_badge(d: dict) -> str:
@@ -741,7 +845,8 @@ async function iaMesh(token, btn) {{
 
 @router.get("/admin/crm/closers", response_class=HTMLResponse)
 def crm_closers(request: Request):
-    token = _check_token(request)
+    token        = _check_token(request)
+    stage_filter = request.query_params.get("stage", "")
 
     closers = []
     applications = []
@@ -750,21 +855,46 @@ def crm_closers(request: Request):
         from marketing_module.models import CloserDB, CloserApplicationDB
         with MktSession() as mdb:
             closers = mdb.query(CloserDB).filter_by(project_id="presence-ia").all()
-            applications = mdb.query(CloserApplicationDB).filter(
+            q = mdb.query(CloserApplicationDB).filter(
                 CloserApplicationDB.project_id == "presence-ia",
-                CloserApplicationDB.stage != "validated",
-            ).order_by(CloserApplicationDB.created_at.desc()).all()
+            )
+            if stage_filter:
+                q = q.filter(CloserApplicationDB.stage == stage_filter)
+            applications = q.order_by(CloserApplicationDB.created_at.desc()).all()
     except Exception:
         pass
 
+    # Counts par stage pour filtres
+    stage_counts: dict = {}
+    for a in applications:
+        stage_counts[a.stage] = stage_counts.get(a.stage, 0) + 1
+    total_apps = len(applications)
+
+    _STAGE_FILTERS = [
+        ("",               "Tous",              "#6b7280"),
+        ("applied",        "Candidatures",      "#6366f1"),
+        ("reviewing",      "En cours",          "#f59e0b"),
+        ("accepted_locked","Accepté lundi",     "#0ea5e9"),
+        ("accepted_trial", "Semaine test",      "#8b5cf6"),
+        ("waitlist",       "Liste d'attente",   "#a78bfa"),
+        ("rejected",       "Refusés",           "#e94560"),
+    ]
+    filter_btns = "".join(
+        f'<a href="/admin/crm/closers?token={token}&stage={s}" '
+        f'style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;'
+        f'text-decoration:none;border:1px solid {c};'
+        f'background:{"" + c + "20" if stage_filter == s else "#f8fafc"};'
+        f'color:{c if stage_filter == s else "#6b7280"}">'
+        f'{l}</a>'
+        for s, l, c in _STAGE_FILTERS
+    )
+
     closer_rows = "".join(
-        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<tr>'
         f'<td style="padding:10px 12px;color:#394455;font-size:12px">{c.name}</td>'
         f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{c.email or "—"}</td>'
         f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{c.commission_rate*100:.0f}%</td>'
-        f'<td style="padding:10px 12px">'
-        f'{"<span style=\'color:#2ecc71\'>Actif</span>" if c.is_active else "<span style=\'color:#e94560\'>Inactif</span>"}'
-        f'</td>'
+        f'<td style="padding:10px 12px">{"<span style=\'color:#2ecc71\'>Actif</span>" if c.is_active else "<span style=\'color:#e94560\'>Inactif</span>"}</td>'
         f'<td style="padding:10px 12px">'
         f'<a href="/closer/{getattr(c,"token",c.id) or c.id}?preview=1" target="_blank" style="color:#527FB3;font-size:10px;margin-right:8px">↗ Portail</a>'
         f'<a href="/closer/{getattr(c,"token",c.id) or c.id}/agenda" target="_blank" style="color:#996d2e;font-size:10px">📅 Agenda</a>'
@@ -773,12 +903,19 @@ def crm_closers(request: Request):
         for c in closers
     ) or '<tr><td colspan="5" style="padding:20px;color:#9ca3af;text-align:center">Aucun closer</td></tr>'
 
+    def _yn(val, yes="✓", no="—", yes_color="#2ecc71", no_color="#9ca3af"):
+        return (f'<span style="color:{yes_color};font-weight:600">{yes}</span>' if val
+                else f'<span style="color:{no_color}">{no}</span>')
+
     app_rows = "".join(
-        f'<tr style="border-bottom:1px solid #f0f4f8">'
+        f'<tr>'
         f'<td style="padding:10px 12px;color:#394455;font-size:12px">'
-        f'{(a.first_name or "") + " " + (a.last_name or "")}'.strip() + f' <span style="color:#9ca3af;font-size:10px">{a.city or ""}</span></td>'
+        f'{(a.first_name or "") + " " + (a.last_name or "")}'.strip()
+        + f' <span style="color:#9ca3af;font-size:10px">{a.city or ""}</span></td>'
         f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">{a.email or "—"}</td>'
         f'<td style="padding:10px 12px">{_app_stage_badge(a.stage)}</td>'
+        f'<td style="padding:10px 12px;text-align:center">{_yn(getattr(a,"response_sent",False))}</td>'
+        f'<td style="padding:10px 12px;text-align:center">{_yn(getattr(a,"access_granted",False))}</td>'
         f'<td style="padding:10px 12px;color:#6b7280;font-size:11px">'
         f'{a.applied_at.strftime("%d/%m/%y") if a.applied_at else "—"}'
         f'</td>'
@@ -787,7 +924,7 @@ def crm_closers(request: Request):
         f'</td>'
         f'</tr>'
         for a in applications
-    ) or '<tr><td colspan="5" style="padding:20px;color:#9ca3af;text-align:center">Aucune candidature</td></tr>'
+    ) or '<tr><td colspan="7" style="padding:20px;color:#9ca3af;text-align:center">Aucune candidature</td></tr>'
 
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Closers — CRM</title>
@@ -799,9 +936,9 @@ th{{padding:10px 12px;text-align:left;color:#6b7280;font-size:10px;font-weight:6
 tr:hover{{background:#f0f4f8}}
 </style></head><body>
 {admin_nav(token, "crm")}
-<div style="max-width:1100px;margin:0 auto;padding:24px">
+<div style="max-width:1200px;margin:0 auto;padding:24px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-  <h1 style="color:#394455;font-size:18px">Closers</h1>
+  <h1 style="color:#394455;font-size:18px">Closers <span style="color:#9ca3af;font-size:13px;font-weight:400">— {total_apps} candidature(s)</span></h1>
   <div style="display:flex;gap:16px;align-items:center">
     <a href="/admin/crm/closer-messages?token={token}" style="color:#527fb3;font-size:12px;text-decoration:none">Messages recrutement →</a>
     <a href="/admin/crm?token={token}" style="color:#527fb3;font-size:12px;text-decoration:none">← CRM</a>
@@ -809,45 +946,33 @@ tr:hover{{background:#f0f4f8}}
 </div>
 
 <!-- Aperçu pages publiques -->
-<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
-  <p style="color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Aperçu pages closer</p>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:20px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
+  <p style="color:#6b7280;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Pages closer</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <a href="/closer/" target="_blank"
-       style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
-              color:#6b7280;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
-      🌐 Page de présentation
-    </a>
-    <a href="/closer/recruit" target="_blank"
-       style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
-              color:#6b7280;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
-      📝 Formulaire candidature
-    </a>
-    <a href="/closer/demo" target="_blank"
-       style="padding:7px 14px;background:#527fb310;border:1px solid #527fb330;border-radius:6px;
-              color:#527fb3;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
-      👤 Portail closer — aperçu
-    </a>
-    <a href="/closer/demo/meeting/demo-1" target="_blank"
-       style="padding:7px 14px;background:#527fb310;border:1px solid #527fb330;border-radius:6px;
-              color:#527fb3;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
-      📋 Fiche RDV — aperçu
-    </a>
-    <a href="/closer/demo/meeting/demo-3" target="_blank"
-       style="padding:7px 14px;background:#2ecc7110;border:1px solid #2ecc7140;border-radius:6px;
-              color:#2ecc71;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px">
-      ✅ Fiche RDV signé — aperçu
-    </a>
+    <a href="/closer/" target="_blank" style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;color:#6b7280;font-size:12px;text-decoration:none">🌐 Présentation</a>
+    <a href="/closer/recruit" target="_blank" style="padding:7px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;color:#6b7280;font-size:12px;text-decoration:none">📝 Candidature</a>
+    <a href="/closer/demo" target="_blank" style="padding:7px 14px;background:#527fb310;border:1px solid #527fb330;border-radius:6px;color:#527fb3;font-size:12px;text-decoration:none">👤 Portail aperçu</a>
   </div>
 </div>
 
-<h2 style="color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Closers actifs</h2>
+<!-- Filtres par stage -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">{filter_btns}</div>
+
+<!-- Closers actifs -->
+<h2 style="color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Closers actifs ({len(closers)})</h2>
 <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:32px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
 <table><thead><tr><th>Nom</th><th>Email</th><th>Commission</th><th>Statut</th><th></th></tr></thead>
 <tbody>{closer_rows}</tbody></table></div>
 
+<!-- Candidatures -->
 <h2 style="color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Candidatures</h2>
 <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(82,127,179,.07)">
-<table><thead><tr><th>Candidat</th><th>Email</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+<table><thead><tr>
+  <th>Candidat</th><th>Email</th><th>Statut</th>
+  <th style="text-align:center">Email envoyé</th>
+  <th style="text-align:center">Accès créé</th>
+  <th>Date</th><th></th>
+</tr></thead>
 <tbody>{app_rows}</tbody></table></div>
 </div></body></html>""")
 
@@ -870,11 +995,13 @@ def crm_application_detail(app_id: str, request: Request):
 
     name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "—"
     _stage_opts = [
-        ("contacted", "Contacté",    "#9ca3af"),
-        ("applied",   "Candidature", "#527fb3"),
-        ("reviewing", "En cours",    "#f59e0b"),
-        ("validated", "✓ Valider",   "#2ecc71"),
-        ("rejected",  "✗ Refuser",   "#e94560"),
+        ("contacted",       "Contacté",          "#9ca3af"),
+        ("applied",         "Candidature",       "#6366f1"),
+        ("reviewing",       "En cours",          "#f59e0b"),
+        ("accepted_locked", "Accepté — lundi",   "#0ea5e9"),
+        ("accepted_trial",  "Semaine test",      "#8b5cf6"),
+        ("waitlist",        "Liste d'attente",   "#a78bfa"),
+        ("rejected",        "Refuser",           "#e94560"),
     ]
     stage_btns = "".join(
         f'<a href="/admin/crm/application/{app.id}/set-stage/{s}?token={token}" '
@@ -884,6 +1011,8 @@ def crm_application_detail(app_id: str, request: Request):
         f'color:{c};border:1px solid {c if app.stage == s else "#e2e8f0"}">{l}</a>'
         for s, l, c in _stage_opts
     )
+    response_sent  = getattr(app, "response_sent",  False)
+    access_granted = getattr(app, "access_granted", False)
 
     video_block = (f'<div style="margin-top:12px"><a href="{app.video_url}" target="_blank" '
                    f'style="color:#527FB3;font-size:13px">▶ Voir la vidéo</a></div>') if app.video_url else ""
@@ -910,8 +1039,30 @@ body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 {f'<p style="color:#6b7280;font-size:12px;margin-top:4px">📞 {app.phone}</p>' if app.phone else ""}
 {f'<p style="margin-top:8px"><a href="{app.linkedin_url}" target="_blank" style="color:#527FB3;font-size:12px">LinkedIn →</a></p>' if app.linkedin_url else ""}
 
-<div style="margin:24px 0 12px;display:flex;gap:8px;flex-wrap:wrap">
-{stage_btns}
+<!-- Statuts -->
+<div style="margin:24px 0 8px">
+  <p style="color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Changer le statut</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">{stage_btns}</div>
+</div>
+
+<!-- Actions -->
+<div style="margin:16px 0 24px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(82,127,179,.07)">
+  <p style="color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Actions</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <span style="font-size:12px;color:#6b7280">
+      Email réponse : {"<span style='color:#2ecc71;font-weight:600'>envoyé</span>" if response_sent else "<span style='color:#9ca3af'>non envoyé</span>"}
+      &nbsp;·&nbsp;
+      Accès portail : {"<span style='color:#2ecc71;font-weight:600'>créé</span>" if access_granted else "<span style='color:#9ca3af'>non créé</span>"}
+    </span>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+    <button onclick="sendAccess()" id="btn-access"
+      style="padding:8px 16px;background:#0ea5e920;border:1px solid #0ea5e9;border-radius:6px;
+             color:#0ea5e9;font-size:12px;font-weight:600;cursor:pointer">
+      Envoyer email accès portail
+    </button>
+  </div>
+  <div id="action-result" style="display:none;margin-top:8px;font-size:12px"></div>
 </div>
 
 {f'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-top:24px;box-shadow:0 1px 4px rgba(82,127,179,.07)"><p style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Message de présentation</p><p style="color:#394455;font-size:13px;line-height:1.6">{app.message}</p></div>' if app.message else ""}
@@ -936,6 +1087,22 @@ async function saveNotes() {{
   }});
   if (r.ok) alert('Notes sauvegardées');
 }}
+async function sendAccess() {{
+  const btn = document.getElementById('btn-access');
+  const res = document.getElementById('action-result');
+  btn.disabled = true;
+  btn.textContent = '⏳ Envoi...';
+  const r = await fetch('/api/admin/closer/application/{app.id}/send-access?token={token}', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}}
+  }});
+  const d = await r.json();
+  res.style.display = 'block';
+  res.style.color = d.ok ? '#2ecc71' : '#e94560';
+  res.textContent = d.ok ? '✓ Email accès envoyé + compte créé' : ('Erreur : ' + (d.error || ''));
+  btn.disabled = false;
+  btn.textContent = 'Envoyer email accès portail';
+}}
 </script>
 </body></html>""")
 
@@ -945,42 +1112,26 @@ def set_application_stage_get(app_id: str, stage: str, request: Request):
     """Validation candidature via lien direct (GET + redirect)."""
     from fastapi.responses import RedirectResponse
     token = _check_token(request)
+    _DECISION_STAGES = ("accepted_locked", "accepted_trial", "waitlist", "rejected", "validated")
     try:
         from marketing_module.database import SessionLocal as MktSession, db_update_application
-        from marketing_module.models import CloserApplicationDB, CloserDB
+        from marketing_module.models import CloserApplicationDB
         from datetime import datetime
         updates = {"stage": stage}
-        if stage == "validated":
+        if stage in ("validated", "accepted_locked", "accepted_trial"):
             updates["validated_at"] = datetime.utcnow()
         elif stage == "reviewing":
             updates["reviewed_at"] = datetime.utcnow()
         with MktSession() as mdb:
             db_update_application(mdb, app_id, updates)
             app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
-            # Email candidat sur décision finale
-            if app and app.email and stage in ("validated", "rejected", "waitlist"):
+            if app and app.email and stage in _DECISION_STAGES:
                 _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
-                _send_recruit_email(app.email, _name, stage)
-            # Créer CloserDB si validation
-            if stage == "validated" and app:
-                existing = mdb.query(CloserDB).filter_by(
-                    project_id=app.project_id, email=app.email
-                ).first()
-                if not existing:
-                    _full = f"{app.first_name or ''} {app.last_name or ''}".strip() or (app.email or "Closer")
-                    closer = CloserDB(
-                        project_id=app.project_id,
-                        name=_full,
-                        first_name=app.first_name,
-                        last_name=app.last_name,
-                        email=app.email,
-                        phone=app.phone,
-                        commission_rate=0.18,
-                        is_active=True,
-                        contact_id=app.contact_id,
-                    )
-                    mdb.add(closer)
-                    mdb.commit()
+                ok = _send_recruit_email(app.email, _name, stage)
+                if ok:
+                    db_update_application(mdb, app_id, {"response_sent": True})
+            if stage in ("accepted_locked", "accepted_trial", "validated") and app:
+                _create_closer_and_send_access(mdb, app)
     except Exception:
         pass
     return RedirectResponse(f"/admin/crm/application/{app_id}?token={token}", status_code=303)
@@ -988,44 +1139,29 @@ def set_application_stage_get(app_id: str, stage: str, request: Request):
 
 @router.post("/admin/crm/application/{app_id}/stage")
 async def set_application_stage(app_id: str, request: Request):
-    """Kept for backward compat — delegates to GET handler logic."""
     _check_token(request)
-    data = await request.json()
+    data  = await request.json()
     stage = data.get("stage", "")
+    _DECISION_STAGES = ("accepted_locked", "accepted_trial", "waitlist", "rejected", "validated")
     try:
         from marketing_module.database import SessionLocal as MktSession, db_update_application
-        from marketing_module.models import CloserApplicationDB, CloserDB
+        from marketing_module.models import CloserApplicationDB
         from datetime import datetime
         updates = {"stage": stage}
-        if stage == "validated":
+        if stage in ("validated", "accepted_locked", "accepted_trial"):
             updates["validated_at"] = datetime.utcnow()
         elif stage == "reviewing":
             updates["reviewed_at"] = datetime.utcnow()
         with MktSession() as mdb:
             db_update_application(mdb, app_id, updates)
             app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
-            if app and app.email and stage in ("validated", "rejected", "waitlist"):
+            if app and app.email and stage in _DECISION_STAGES:
                 _name = f"{app.first_name or ''} {app.last_name or ''}".strip() or "Candidat"
-                _send_recruit_email(app.email, _name, stage)
-            if stage == "validated" and app:
-                existing = mdb.query(CloserDB).filter_by(
-                    project_id=app.project_id, email=app.email
-                ).first()
-                if not existing:
-                    _full = f"{app.first_name or ''} {app.last_name or ''}".strip() or (app.email or "Closer")
-                    closer = CloserDB(
-                        project_id=app.project_id,
-                        name=_full,
-                        first_name=app.first_name,
-                        last_name=app.last_name,
-                        email=app.email,
-                        phone=app.phone,
-                        commission_rate=0.18,
-                        is_active=True,
-                        contact_id=app.contact_id,
-                    )
-                    mdb.add(closer)
-                    mdb.commit()
+                ok = _send_recruit_email(app.email, _name, stage)
+                if ok:
+                    db_update_application(mdb, app_id, {"response_sent": True})
+            if stage in ("accepted_locked", "accepted_trial", "validated") and app:
+                _create_closer_and_send_access(mdb, app)
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
@@ -1040,6 +1176,23 @@ async def save_application_notes(app_id: str, request: Request):
         with MktSession() as mdb:
             db_update_application(mdb, app_id, {"admin_notes": data.get("notes", "")})
         return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
+@router.post("/api/admin/closer/application/{app_id}/send-access")
+async def send_closer_access(app_id: str, request: Request):
+    """Envoie manuellement l'email d'accès portail closer."""
+    _check_token(request)
+    try:
+        from marketing_module.database import SessionLocal as MktSession
+        from marketing_module.models import CloserApplicationDB
+        with MktSession() as mdb:
+            app = mdb.query(CloserApplicationDB).filter_by(id=app_id).first()
+            if not app:
+                return JSONResponse({"ok": False, "error": "introuvable"})
+            token_closer = _create_closer_and_send_access(mdb, app)
+        return JSONResponse({"ok": True, "token": token_closer})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)})
 

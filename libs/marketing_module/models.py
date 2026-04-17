@@ -159,11 +159,14 @@ class JourneyStage(str, Enum):
     closed           = "closed"
 
 class ApplicationStage(str, Enum):
-    contacted = "contacted"
-    applied   = "applied"
-    reviewing = "reviewing"
-    validated = "validated"
-    rejected  = "rejected"
+    contacted        = "contacted"
+    applied          = "applied"
+    reviewing        = "reviewing"
+    waitlist         = "waitlist"
+    accepted_locked  = "accepted_locked"
+    accepted_trial   = "accepted_trial"
+    validated        = "validated"
+    rejected         = "rejected"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -558,14 +561,17 @@ class CloserApplicationDB(Base):
     message      = Column(Text, nullable=True)
     video_url    = Column(String, nullable=True)   # URL Loom/YouTube
     audio_url    = Column(String, nullable=True)   # URL fichier audio uploadé
-    applied_at   = Column(DateTime, nullable=True, default=_now)
-    reviewed_at  = Column(DateTime, nullable=True)
-    validated_at = Column(DateTime, nullable=True)
-    admin_notes  = Column(Text, nullable=True)
-    meta         = Column(JSON, default=dict)
-    created_at   = Column(DateTime, default=_now)
-    updated_at   = Column(DateTime, default=_now, onupdate=_now)
-    contact      = relationship("ContactDB", back_populates="applications")
+    applied_at      = Column(DateTime, nullable=True, default=_now)
+    reviewed_at     = Column(DateTime, nullable=True)
+    validated_at    = Column(DateTime, nullable=True)
+    start_date      = Column(DateTime, nullable=True)
+    admin_notes     = Column(Text, nullable=True)
+    response_sent   = Column(Boolean, default=False)
+    access_granted  = Column(Boolean, default=False)
+    meta            = Column(JSON, default=dict)
+    created_at      = Column(DateTime, default=_now)
+    updated_at      = Column(DateTime, default=_now, onupdate=_now)
+    contact         = relationship("ContactDB", back_populates="applications")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
