@@ -53,6 +53,8 @@ def init_db():
             ("v3_prospects", "acquisition_cost REAL"),
             ("v3_prospects", "campaign_id TEXT"),
             ("v3_prospects", "date_payment DATETIME"),
+            ("v3_prospects", "sms_status TEXT"),
+            ("v3_prospects", "sms_delivered_at DATETIME"),
             ("scoring_config", "outbound_refs_only INTEGER DEFAULT 1"),
         ]:
             try:
