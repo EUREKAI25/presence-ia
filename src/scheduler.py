@@ -1845,6 +1845,7 @@ def _job_followup():
       - profession ou city vide
       - followup_sent_at déjà renseigné (anti-doublon)
     """
+    import os
     import requests as _req
     import random as _random
     from datetime import datetime, timedelta
