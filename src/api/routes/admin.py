@@ -1312,7 +1312,11 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
     # ── Pipeline global ────────────────────────────────────────────────────────
     total_prospects = db.query(V3ProspectDB).count()
     enriched        = db.query(V3ProspectDB).filter(V3ProspectDB.ia_results.isnot(None)).count()
-    total_contacted = db.query(V3ProspectDB).filter(V3ProspectDB.contacted == True).count()  # noqa: E712
+    from sqlalchemy import or_
+    total_contacted = db.query(V3ProspectDB).filter(
+        or_(V3ProspectDB.email_sent_at.isnot(None), V3ProspectDB.sent_method == "sms"),
+        V3ProspectDB.is_test == False,  # noqa: E712
+    ).count()
     eligible_email  = db.query(V3ProspectDB).filter(
         V3ProspectDB.ia_results.isnot(None),
         V3ProspectDB.email.isnot(None),
