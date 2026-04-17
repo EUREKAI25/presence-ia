@@ -1370,6 +1370,29 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
                 + (f'<div style="font-size:12px;color:#9ca3af;margin-top:2px">{sub}</div>' if sub else '')
                 + '</div>')
 
+    # ── Prochain run automatique ───────────────────────────────────────────────
+    import os as _os
+    from datetime import datetime as _dt_now
+    _now_utc    = _dt_now.utcnow()
+    _launch_end = _date(2026, 4, 21)
+    _is_launch  = _now_utc.date() <= _launch_end
+    _run_hours  = [7, 10, 13, 16, 19] if _is_launch else [9]
+    _dry_run    = _os.getenv("OUTBOUND_DRY_RUN", "true").lower() == "true"
+    _mode_label = "LAUNCH (jusqu'au 21/04)" if _is_launch else "NORMAL"
+    _next_h_utc = next((h for h in _run_hours if h > _now_utc.hour), None)
+    if _next_h_utc is not None:
+        _next_label = f"{_next_h_utc}h UTC = {_next_h_utc + 2}h Paris (aujourd'hui)"
+    else:
+        _first = _run_hours[0]
+        _next_label = f"Demain {_first}h UTC = {_first + 2}h Paris"
+    _hours_paris = " · ".join(f"{h + 2}h" for h in _run_hours)
+    _dry_banner  = (
+        '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;'
+        'padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:8px">'
+        '⚠️ <strong>OUTBOUND_DRY_RUN = true</strong> — les runs automatiques n\'envoient rien.'
+        ' Passer à <code>false</code> pour activer l\'envoi auto.</div>'
+    ) if _dry_run else ""
+
     nav = admin_nav(token, "outbound")
     return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Outbound — Présence IA</title>
@@ -1403,6 +1426,24 @@ h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px;border-botto
 <p class="sub">Tous les envois — email + SMS — tracking Brevo actif depuis 17/04</p>
 
 <div id="trigger-result" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px"></div>
+
+{_dry_banner}
+<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div>
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Prochain run auto</span><br>
+      <span style="font-size:18px;font-weight:700;color:#4f46e5">⏰ {_next_label}</span>
+    </div>
+    <div style="border-left:1px solid #e5e7eb;padding-left:16px">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Mode</span><br>
+      <span style="font-weight:600;color:#1e3a5f">{_mode_label}</span>
+    </div>
+    <div style="border-left:1px solid #e5e7eb;padding-left:16px">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280">Horaires Paris</span><br>
+      <span style="color:#374151">{_hours_paris}</span>
+    </div>
+  </div>
+</div>
 
 <!-- Pipeline global -->
 <h2>Pipeline global</h2>
