@@ -1003,16 +1003,35 @@ def crm_application_detail(app_id: str, request: Request):
         ("waitlist",        "Liste d'attente",   "#a78bfa"),
         ("rejected",        "Refuser",           "#e94560"),
     ]
-    stage_btns = "".join(
-        f'<a href="/admin/crm/application/{app.id}/set-stage/{s}?token={token}" '
-        f'style="display:inline-block;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;'
-        f'text-decoration:none;cursor:pointer;'
-        f'background:{c + "20" if app.stage == s else "#f8fafc"};'
-        f'color:{c};border:1px solid {c if app.stage == s else "#e2e8f0"}">{l}</a>'
-        for s, l, c in _stage_opts
-    )
     response_sent  = getattr(app, "response_sent",  False)
     access_granted = getattr(app, "access_granted", False)
+    _DECISION = {"accepted_locked", "accepted_trial", "waitlist", "rejected"}
+
+    def _stage_btn(s, l, c):
+        is_active  = app.stage == s
+        is_decision = s in _DECISION
+        is_locked  = is_decision and response_sent and not is_active
+        url = f"/admin/crm/application/{app.id}/set-stage/{s}?token={token}"
+        if is_locked:
+            # Grisé, non cliquable
+            return (f'<span style="display:inline-block;padding:8px 16px;border-radius:6px;'
+                    f'font-size:12px;font-weight:600;cursor:not-allowed;opacity:.35;'
+                    f'background:#f8fafc;color:#9ca3af;border:1px solid #e2e8f0">{l}</span>')
+        if is_decision and not is_active:
+            # Bouton décision non encore choisi → confirm JS
+            label_escaped = l.replace("'", "\\'")
+            onclick = f"return confirm('Envoyer la réponse « {label_escaped} » à ce candidat ?\\n\\nCette action enverra un email et ne pourra pas être annulée.')"
+            return (f'<a href="{url}" onclick="{onclick}" '
+                    f'style="display:inline-block;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;'
+                    f'text-decoration:none;cursor:pointer;background:#f8fafc;color:{c};border:1px solid #e2e8f0">{l}</a>')
+        # Bouton normal (non-décision ou actif)
+        return (f'<a href="{url}" '
+                f'style="display:inline-block;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;'
+                f'text-decoration:none;cursor:pointer;'
+                f'background:{c + "20" if is_active else "#f8fafc"};'
+                f'color:{c};border:1px solid {c if is_active else "#e2e8f0"}">{l}</a>')
+
+    stage_btns = "".join(_stage_btn(s, l, c) for s, l, c in _stage_opts)
 
     video_block = (f'<div style="margin-top:12px"><a href="{app.video_url}" target="_blank" '
                    f'style="color:#527FB3;font-size:13px">▶ Voir la vidéo</a></div>') if app.video_url else ""
@@ -1041,7 +1060,10 @@ body{{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#394455}}
 
 <!-- Statuts -->
 <div style="margin:24px 0 8px">
-  <p style="color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Changer le statut</p>
+  <p style="color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">
+    Changer le statut
+    {"&nbsp;<span style='color:#f59e0b;font-size:10px'>⚠ Réponse déjà envoyée — statuts de décision verrouillés</span>" if response_sent else ""}
+  </p>
   <div style="display:flex;gap:8px;flex-wrap:wrap">{stage_btns}</div>
 </div>
 
