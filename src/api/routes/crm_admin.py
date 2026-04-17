@@ -95,7 +95,7 @@ def _send_recruit_email(to_email: str, to_name: str, stage: str) -> bool:
             f"Bonjour,\n\n"
             "Merci pour votre candidature, elle a retenu toute mon attention.\n\n"
             "Je ne peux pas vous intégrer dès lundi, car nous limitons volontairement le nombre de closers pour le lancement.\n\n"
-            "En revanche, votre profil m'intéresse vraiment et j'aimerais pouvoir vous intégrer dès que le volume se stabilise dans les prochaines semaines.\n\n"
+            "En revanche, votre profil m'intéresse vraiment et j'aimerais pouvoir vous intégrer dès que le volume se stabilise dans les prochaines semaines si vous êtes toujours disponible à ce moment-là.\n\n"
             "Je me permets donc de revenir vers vous rapidement si une place se libère.\n\n"
             "À bientôt,\nNathalie"
         ),
