@@ -66,11 +66,12 @@ def clear_active_pair(reason: str = "saturation"):
 
 # ── Sélection automatique ─────────────────────────────────────────────────────
 
-def select_next_pair(db) -> dict | None:
+def select_next_pair(db, exclude: set = None) -> dict | None:
     """
     Sélectionne la prochaine paire directement depuis V3ProspectDB :
     - Uniquement les paires avec ≥1 prospect dispo (ia_results + email + not sent)
     - Classées par score_métier × log(stock) décroissant
+    - exclude : set de (profession, city) à ignorer (paires déjà tentées ce run)
     Indépendant de ProspectionTargetDB (qui pilote Google Places, pas l'outbound).
     """
     import math
@@ -141,6 +142,14 @@ def select_next_pair(db) -> dict | None:
         scored.append(((city, profession, n), prof_score, combined))
 
     scored.sort(key=lambda x: x[2], reverse=True)
+
+    # Exclure les paires déjà tentées ce run
+    if exclude:
+        scored = [s for s in scored if (s[0][1], s[0][0]) not in exclude]
+    if not scored:
+        log.info("active_pair: toutes les paires disponibles déjà tentées ce run")
+        return None
+
     (best_city, best_profession, best_n), best_prof_score, _ = scored[0]
 
     log.info(
@@ -157,17 +166,18 @@ def select_next_pair(db) -> dict | None:
 
 # ── Saturation ────────────────────────────────────────────────────────────────
 
-def check_saturation(db) -> dict | None:
+def check_saturation(db, exclude: set = None) -> dict | None:
     """
     Vérifie si la paire active est saturée (0 prospect disponible).
     Si saturée → efface + sélectionne la suivante.
     Si aucune paire active → sélectionne la meilleure.
+    exclude : set de (profession, city) à ignorer (paires déjà tentées ce run).
     Retourne l'état actif (inchangé ou nouveau) ou None.
     """
     state = get_active_pair()
 
     if not state:
-        return select_next_pair(db)
+        return select_next_pair(db, exclude=exclude)
 
     if _available_count(db, state["city"], state["profession"]) == 0:
         log.info(
@@ -175,7 +185,7 @@ def check_saturation(db) -> dict | None:
             state["profession"], state["city"],
         )
         clear_active_pair("saturation")
-        return select_next_pair(db)
+        return select_next_pair(db, exclude=exclude)
 
     return state
 

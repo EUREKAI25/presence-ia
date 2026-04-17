@@ -2100,7 +2100,7 @@ def _job_outbound(force: bool = False):
             stop_reason = "cap_atteint"; break
 
         with SessionLocal() as _db_p:
-            _active = _check_sat(_db_p)
+            _active = _check_sat(_db_p, visited)
         if not _active:
             stop_reason = "aucune_paire_disponible"; break
 
@@ -2158,7 +2158,7 @@ def _job_outbound(force: bool = False):
                 if not _img_url:
                     log.warning("[OUTBOUND] %s — pas d'image → paire suivante", _active["city"])
                     _clear_pair("no_image")
-                    with SessionLocal() as _db_nx: _next_pair(_db_nx)
+                    with SessionLocal() as _db_nx: _next_pair(_db_nx, visited)
                     continue
         except Exception as _ie:
             log.warning("[OUTBOUND] image check échoué : %s — on continue", _ie)
@@ -2205,7 +2205,7 @@ def _job_outbound(force: bool = False):
             log.info("[OUTBOUND] %s/%s — 0 prospects prêts → paire suivante",
                      _active["profession"], _active["city"])
             _clear_pair("saturation")
-            with SessionLocal() as _db_nx: _next_pair(_db_nx)
+            with SessionLocal() as _db_nx: _next_pair(_db_nx, visited)
             continue
 
         log.info("[OUTBOUND] %s/%s — email_dispo=%d sms_dispo=%d",
@@ -2274,7 +2274,7 @@ def _job_outbound(force: bool = False):
                      _active["profession"], _active["city"],
                      pair_e, rem_e, pair_s, rem_s)
             _clear_pair("saturation")
-            with SessionLocal() as _db_nx: _next_pair(_db_nx)
+            with SessionLocal() as _db_nx: _next_pair(_db_nx, visited)
         else:
             stop_reason = "cap_atteint"; break
     else:
