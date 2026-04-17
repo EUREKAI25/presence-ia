@@ -1973,13 +1973,13 @@ def _job_outbound(force: bool = False):
             .all()
         )
         # SMS : a un mobile, pas encore dans le pool email (personnes différentes)
-        email_ids = {p.id for p in has_email}
+        email_tokens = {p.token for p in has_email}
         has_sms = (
             db.query(V3ProspectDB)
             .filter(
                 *_base_filter,
                 V3ProspectDB.phone.isnot(None),
-                ~V3ProspectDB.id.in_(email_ids) if email_ids else True,
+                ~V3ProspectDB.token.in_(email_tokens) if email_tokens else True,
             )
             .limit(max(cap_sms, 1) * 20)
             .all()
