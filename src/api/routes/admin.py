@@ -1436,10 +1436,9 @@ async function triggerOutbound() {{
   btn.textContent = '⏳ En cours...';
   const token = new URLSearchParams(window.location.search).get('token') || '';
   try {{
-    const r = await fetch('/api/admin/trigger-outbound', {{
+    const r = await fetch(`/api/admin/trigger-outbound?token=${{encodeURIComponent(token)}}`, {{
       method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{token}})
+      headers: {{'Content-Type': 'application/json'}}
     }});
     const d = await r.json();
     res.style.display = 'block';
