@@ -1502,8 +1502,8 @@ async function syncBrevo() {{
       res.innerHTML = `✅ Sync Brevo terminée (30j) — `
         + `Email : ${{d.email_fetched}} events, ${{d.email_updated}} mis à jour | `
         + `SMS : ${{d.sms_fetched}} logs, ${{d.sms_updated}} mis à jour | `
-        + `Distribution : ${{JSON.stringify(sd)}} · `
-        + `<a href="" style="color:#166534">↺ Rafraîchir</a>`;
+        + `Distribution : ${{JSON.stringify(sd)}}`;
+      setTimeout(() => window.location.reload(), 800);
     }} else {{
       res.style.background = '#fee2e2'; res.style.color = '#991b1b';
       res.textContent = 'Erreur sync : ' + (d.error || JSON.stringify(d));
