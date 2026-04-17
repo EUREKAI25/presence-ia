@@ -320,6 +320,7 @@ tr:hover td{{background:#fafafa}}
   <div id="bulk-bar" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <span style="font-size:11px;color:#6b7280;font-weight:600">Sélectionner</span>
     <input type="number" id="bulk-qty" min="1" max="9999" placeholder="max" title="Nombre max à sélectionner (vide = tous)"
+           oninput="_reapplyActiveFilters()"
            style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center">
     <button id="fbtn-email" onclick="selectByType('email')" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✉ Email</button>
     <button id="fbtn-mob"   onclick="selectByType('mob')"   class="btn btn-gray" style="padding:5px 10px;font-size:11px">💬 Mobile</button>
@@ -466,6 +467,11 @@ function _applyMode() {{
 }}
 function toggleTestMode() {{ _testMode = !_testMode; selectNone(); _applyMode(); }}
 
+function _reapplyActiveFilters() {{
+  // Re-déclenche la sélection active quand la qty change
+  if (_geoF.size > 0 || _ctctF.size > 0) _applyFilters();
+}}
+
 function selectNeverContacted() {{
   _clearFilters();
   const qty = _getQty(); let n = 0;
@@ -579,7 +585,8 @@ function selectNone() {{
 function _selectedIds() {{ return [...document.querySelectorAll('.row-cb:checked')].map(cb=>cb.dataset.cid); }}
 
 async function bulkSendEmail() {{
-  const ids = _selectedIds();
+  const qty = _getQty();
+  const ids = _selectedIds().slice(0, isFinite(qty) ? qty : undefined);
   if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
   if(!confirm('Envoyer un email à ' + ids.length + ' contact(s) ?')) return;
   const prog = document.getElementById('bulk-progress');
@@ -597,7 +604,8 @@ async function bulkSendEmail() {{
   prog.textContent = 'Terminé — '+ok+' envoyés, '+err+' erreurs';
 }}
 async function bulkSendSMS() {{
-  const ids = _selectedIds();
+  const qty = _getQty();
+  const ids = _selectedIds().slice(0, isFinite(qty) ? qty : undefined);
   if(!ids.length) {{ alert('Aucun contact sélectionné'); return; }}
   if(!confirm('Envoyer un SMS à ' + ids.length + ' contact(s) ?')) return;
   const prog = document.getElementById('bulk-progress');
