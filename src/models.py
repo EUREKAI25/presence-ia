@@ -607,6 +607,28 @@ class RefCityDB(Base):
     header_image_url : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
 
 
+class PipelineJobDB(Base):
+    """Suivi des pipelines lancés après paiement Stripe."""
+    __tablename__ = "pipeline_jobs"
+    id                : Mapped[str]            = mapped_column(sa.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    stripe_event_id   : Mapped[str]            = mapped_column(sa.String, nullable=False, unique=True, index=True)
+    stripe_session_id : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    offer_id          : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    offer_name        : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    pipeline_type     : Mapped[str]            = mapped_column(sa.String, nullable=False)  # methode/implantation/domination
+    email             : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    company_name      : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    city              : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    business_type     : Mapped[str]            = mapped_column(sa.String, nullable=False)
+    website           : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    status            : Mapped[str]            = mapped_column(sa.String, default="pending")  # pending/running/done/error
+    error             : Mapped[Optional[str]]  = mapped_column(sa.Text, nullable=True)
+    deliverable_path  : Mapped[Optional[str]]  = mapped_column(sa.String, nullable=True)
+    score             : Mapped[Optional[float]]= mapped_column(sa.Float, nullable=True)
+    created_at        : Mapped[datetime]       = mapped_column(sa.DateTime, default=datetime.utcnow)
+    completed_at      : Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
+
+
 class V3BookingDB(Base):
     """Réservations d'audits — créées depuis la landing /l/{token}/book."""
     __tablename__ = "v3_bookings"
