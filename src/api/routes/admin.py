@@ -1277,12 +1277,20 @@ def admin_outbound_stats(request: Request, db: Session = Depends(get_db)):
 
     from datetime import date as _date, timedelta as _td
 
-    # ── Source de vérité : email_sent_at (pas email_status) ───────────────────
-    email_rows = db.query(V3ProspectDB).filter(V3ProspectDB.email_sent_at.isnot(None)).all()
+    # ── Source de vérité : email_sent_at >= 17/04 (exclut tests antérieurs) ──
+    from datetime import date as _date2
+    _STATS_START = datetime(2026, 4, 17)
+    email_rows = db.query(V3ProspectDB).filter(
+        V3ProspectDB.email_sent_at.isnot(None),
+        V3ProspectDB.email_sent_at >= _STATS_START,
+        V3ProspectDB.is_test == False,  # noqa: E712
+    ).all()
     sms_rows   = db.query(V3ProspectDB).filter(
         V3ProspectDB.sent_method == "sms",
         V3ProspectDB.sent_at.isnot(None),
-        V3ProspectDB.email_sent_at.is_(None),  # exclure ceux qui ont aussi eu un email
+        V3ProspectDB.sent_at >= _STATS_START,
+        V3ProspectDB.email_sent_at.is_(None),
+        V3ProspectDB.is_test == False,  # noqa: E712
     ).all()
 
     # ── KPIs email ─────────────────────────────────────────────────────────────
