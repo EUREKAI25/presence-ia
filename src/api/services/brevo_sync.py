@@ -114,7 +114,7 @@ def _fetch_sms_reports(api_key: str, date_from: str, date_to: str) -> list:
             f"{API_BASE}/transactionalSMS/statistics/events",
             headers={"api-key": api_key},
             params={"startDate": date_from, "endDate": date_to,
-                    "limit": 500, "offset": offset},
+                    "limit": 100, "offset": offset},
             timeout=30,
         )
         if not r.ok:
@@ -125,9 +125,9 @@ def _fetch_sms_reports(api_key: str, date_from: str, date_to: str) -> list:
         if not batch:
             break
         logs.extend(batch)
-        if len(batch) < 500:
+        if len(batch) < 100:
             break
-        offset += 500
+        offset += 100
     return logs
 
 
