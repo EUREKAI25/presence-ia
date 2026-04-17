@@ -1581,11 +1581,46 @@ async function requestPayment(){{
         current_section = []
         current_label  = None
 
+        # Sections avec rendu différencié (aide à la décision / logique offre)
+        _UPGRADE_LABELS = {
+            "POURQUOI PASSER À L'OFFRE SUPÉRIEURE",
+            "LOGIQUE DE L'OFFRE",
+        }
+
+        def _is_upgrade_label(label: str) -> bool:
+            u = label.upper()
+            return "POURQUOI PASSER" in u or "LOGIQUE DE L'OFFRE" in u
+
         def _flush():
             nonlocal current_label, current_section
             if not current_section and not current_label:
                 return
             if current_label:
+                if _is_upgrade_label(current_label):
+                    # Bloc aide à la décision — visuellement distinct
+                    html_parts.append(
+                        f'<div style="margin-top:20px;border-top:1px solid {meta["border"]};padding-top:14px">'
+                        f'<p style="color:{meta["color"]};font-size:10px;font-weight:700;'
+                        f'text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">'
+                        f'{current_label}</p>'
+                    )
+                    for ln in current_section:
+                        if ln.startswith("→"):
+                            item = ln[1:].strip()
+                            html_parts.append(
+                                f'<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0">'
+                                f'<span style="color:{meta["color"]};font-size:11px;flex-shrink:0">✓</span>'
+                                f'<span style="color:#d1d5db;font-size:13px">{item}</span>'
+                                f'</div>'
+                            )
+                        else:
+                            html_parts.append(
+                                f'<p style="color:#9ca3af;font-size:13px;margin-bottom:4px">{ln}</p>'
+                            )
+                    html_parts.append('</div>')
+                    current_section = []
+                    current_label   = None
+                    return
                 html_parts.append(
                     f'<p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;'
                     f'letter-spacing:.1em;margin:18px 0 8px">{current_label}</p>'
@@ -1609,7 +1644,8 @@ async function requestPayment(){{
 
         # Parse les labels de section (majuscules seules)
         _section_keywords = {"POUR QUI", "CE QU'ON LIVRE", "CE QU'ON FAIT",
-                              "GARANTIE", "EXCLUSIVITÉ TERRITORIALE", "RÉSULTAT"}
+                              "GARANTIE", "EXCLUSIVITÉ TERRITORIALE", "RÉSULTAT",
+                              "PAS INCLUS", "POURQUOI PASSER", "LOGIQUE DE L'OFFRE"}
 
         for ln in body_lines:
             stripped = ln.strip()
