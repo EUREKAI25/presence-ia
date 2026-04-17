@@ -1391,9 +1391,19 @@ h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
 </style></head><body>
 {nav}
 <div class="wrap">
-<h1>Outbound — Performance</h1>
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
+  <h1 style="margin:0">Outbound — Performance</h1>
+  <button id="btn-trigger" onclick="triggerOutbound()"
+    style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;
+           padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;
+           cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(99,102,241,.4)">
+    ▶ Déclencher outbound maintenant
+  </button>
+</div>
 <p class="sub">Emails envoyés depuis job_outbound — tracking Brevo &nbsp;·&nbsp;
   <span style="color:#6366f1">{eligible_total:,} prospects éligibles en DB</span></p>
+
+<div id="trigger-result" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px"></div>
 
 <div class="kpis">{kpis}</div>
 
@@ -1417,7 +1427,38 @@ h2{{font-size:15px;font-weight:600;color:#374151;margin:24px 0 10px}}
   Sender rotation : 25 adresses &nbsp;·&nbsp;
   <a href="/admin/outbound-stats?token={token}" style="color:#6366f1">↺ Rafraîchir</a>
 </p>
-</div></body></html>""")
+</div>
+<script>
+async function triggerOutbound() {{
+  const btn = document.getElementById('btn-trigger');
+  const res = document.getElementById('trigger-result');
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours...';
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  try {{
+    const r = await fetch('/api/admin/trigger-outbound', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{token}})
+    }});
+    const d = await r.json();
+    res.style.display = 'block';
+    res.style.background = d.ok ? '#dcfce7' : '#fee2e2';
+    res.style.color = d.ok ? '#166534' : '#991b1b';
+    res.textContent = d.ok
+      ? '✅ Job outbound lancé — surveiller les logs.'
+      : ('Erreur : ' + (d.detail || JSON.stringify(d)));
+  }} catch(e) {{
+    res.style.display = 'block';
+    res.style.background = '#fee2e2';
+    res.style.color = '#991b1b';
+    res.textContent = 'Erreur réseau : ' + e;
+  }}
+  btn.disabled = false;
+  btn.innerHTML = '▶ Déclencher outbound maintenant';
+}}
+</script>
+</body></html>""")
 
 
 
