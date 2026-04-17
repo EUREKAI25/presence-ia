@@ -1502,9 +1502,10 @@ def _outbound_send_prospect(p, dry_run: bool = False,
             if not phone_e164:
                 return {**base, "ok": False, "error": f"Numéro invalide : {p.phone}"}
             resp = _req.post(
-                "https://api.brevo.com/v3/transactionalSMS/send",
+                "https://api.brevo.com/v3/transactionalSMS/sms",
                 headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                json={"sender": "PresenceIA", "recipient": phone_e164, "content": body},
+                json={"sender": "PresenceIA", "recipient": phone_e164,
+                      "content": body, "type": "transactional"},
                 timeout=15,
             )
         else:
