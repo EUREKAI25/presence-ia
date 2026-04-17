@@ -32,8 +32,8 @@ _EVENT_MAP = {
 
 def _find_prospect_by_email(db, email: str):
     """Retourne le v3_prospect le plus récemment envoyé pour cet email."""
-    from ..database import SessionLocal
-    from ..models import V3ProspectDB
+    from ...database import SessionLocal
+    from ...models import V3ProspectDB
     return (
         db.query(V3ProspectDB)
         .filter(V3ProspectDB.email == email)
@@ -72,7 +72,7 @@ async def brevo_webhook(request: Request):
     log.info("[BREVO_WEBHOOK] %d événement(s) reçu(s)", len(events))
 
     # ── Traitement ─────────────────────────────────────────────────────────────
-    from ..database import SessionLocal
+    from ...database import SessionLocal
 
     processed = 0
     skipped   = 0
@@ -107,7 +107,7 @@ async def brevo_webhook(request: Request):
         # Mise à jour DB
         try:
             with SessionLocal() as db:
-                from ..models import V3ProspectDB
+                from ...models import V3ProspectDB
                 prospect = (
                     db.query(V3ProspectDB)
                     .filter(V3ProspectDB.email == email)
